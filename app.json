@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Vishful Spaces",
+    "slug": "vishful-spaces",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.co.vishful.spaces"
+    },
+    "android": {
+      "package": "in.co.vishful.spaces",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "description": "Vishful Spaces — co-living and property management",
+    "extra": {
+      "eas": {
+        "projectId": "fa3c3961-8d61-42cf-9872-c6d7536b5401"
+      }
+    },
+    "owner": "arunvishful"
+  }
+}
