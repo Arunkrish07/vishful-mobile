@@ -14,7 +14,7 @@ The Google flow must produce the **same Supabase session token** the existing OT
 - Auth is **phone-keyed**: Supabase Auth identity = `{phone}@vishful.local`; role resolved from `user_roles`.
 - Google provides **email + name + Google ID, never a phone**. Both `team_members` and `tenants` carry an optional `email` column, so email-matching is feasible.
 - **Staff** are the high-value, low-edge-case slice (work emails on file, benefit from no-SMS login). Tenants often lack an email and phone-OTP already serves them → tenant Google login is out of scope.
-- Dev loop is **Expo Go**; `expo-auth-session` (web OAuth) runs in **both Expo Go and the EAS build** with one code path, unlike native `@react-native-google-signin` which needs a dev build for every test.
+- **OAuth requires a development build on SDK 52.** Expo removed the `auth.expo.io` proxy, and Expo Go cannot customize the app scheme, so per Expo's docs *"Expo Go cannot be used for local development and testing of OAuth or OpenID Connect-enabled apps."* This holds for **any** Google library — there is no Expo Go path. Since a dev build is required regardless, native `@react-native-google-signin` is chosen for its native account-picker UX and direct use of the registered SHA-1. (An earlier draft picked `expo-auth-session` on the false premise that it ran in Expo Go; that premise was corrected against the Expo docs.)
 
 ## Decisions
 
@@ -22,7 +22,7 @@ The Google flow must produce the **same Supabase session token** the existing OT
 |---|---|
 | Who | Staff only (`team_members`); tenants unchanged |
 | Mapping | Match Google `email` → `team_members.email` (case-insensitive), require `status = 'active'` |
-| Client library | `expo-auth-session` (web-based OAuth) |
+| Client library | `@react-native-google-signin/google-signin` (native) — requires a dev build |
 | Token verification | Server-side in a Convex action (never trust the client) |
 | Session minting | Reuse the exact Supabase admin sign-in path from `verifyOtpAndLogin` under `{phone}@vishful.local` |
 | Return shape | Identical to `verifyOtpAndLogin` (`{ success, token, user, user_type }`) |
@@ -31,8 +31,8 @@ The Google flow must produce the **same Supabase session token** the existing OT
 
 ### 1. Google Cloud Console (manual setup, guided)
 - OAuth consent screen configured.
-- **Web application** OAuth client → produces the **Web Client ID**. Used as (a) the `expo-auth-session` client ID and (b) the `aud` value the backend verifies.
-- **Android** OAuth client registered with package `in.co.vishful.spaces` + the provided **SHA-1** fingerprint (`C4:56:4A:A4:BB:14:E0:65:68:8A:05:8D:6C:9B:36:B2:91:65:76:5E`), for the standalone build's redirect. (Not required for the Expo Go proxy path, but needed for the EAS build.)
+- **Web application** OAuth client → produces the **Web Client ID**. Passed to `GoogleSignin.configure({ webClientId })` and used as the `aud` value the backend verifies against.
+- **Android** OAuth client registered with package `in.co.vishful.spaces` + the SHA-1(s) — **required** for the native Android sign-in flow to succeed.
 
 Fingerprints on record (TWO distinct certificates). For Google Sign-In, register
 **every** SHA-1 the app may be signed with on the Android OAuth client — Play App
@@ -50,13 +50,15 @@ does not block setup since all are registered.
 - SHA-1: `AC:E8:12:1A:46:93:56:39:D3:26:2E:31:9B:C8:9D:CD:36:B6:FE:65`
 - SHA-256: `EF:0E:DC:76:66:DE:22:0A:9D:94:D6:10:EB:58:8D:AC:17:D9:FB:FD:3A:87:9E:66:26:1D:E4:B4:67:57:1A:86`
 
-### 2. `app.json`
-- Add `"scheme": "vishfulspaces"` under `expo` so the standalone EAS build can receive the OAuth redirect (`vishfulspaces://`). Expo Go uses Expo's auth proxy automatically.
+### 2. `app.json` + config plugin
+- Add `"@react-native-google-signin/google-signin"` to `expo.plugins` so the library's native code is compiled into the dev/standalone build.
+- No custom URL scheme is required for the native flow — Android identifies the app by package (`in.co.vishful.spaces`) + SHA-1.
 
 ### 3. `lib/googleAuth.ts` (new)
-- Thin wrapper over `expo-auth-session/providers/google`.
-- Exposes `useGoogleAuth()` → `{ promptAsync, ready }`; on success returns the Google **ID token**.
-- New dependencies: `expo-auth-session`, `expo-web-browser`, `expo-crypto` (versions pinned to Expo SDK 52 via `npx expo install`).
+- Thin wrapper over `@react-native-google-signin/google-signin`.
+- `configureGoogleSignin()` → `GoogleSignin.configure({ webClientId: <WEB_CLIENT_ID>, offlineAccess: false })`. The `webClientId` is the Web OAuth client ID and becomes the idToken `aud`.
+- `signInWithGoogle()` → `GoogleSignin.hasPlayServices()` → `GoogleSignin.signIn()` → returns the **ID token**. User-cancel (`statusCodes.SIGN_IN_CANCELLED`) is surfaced as a benign "cancelled" result, not an error.
+- New dependency: `@react-native-google-signin/google-signin` (native module — installed via `npx expo install`; only runs in a dev/standalone build, never Expo Go).
 
 ### 4. `convex/googleAuth.ts` (new)
 Action `verifyGoogleAndLogin({ idToken })`:
@@ -73,14 +75,14 @@ Action `verifyGoogleAndLogin({ idToken })`:
 
 ### 6. `LoginScreen`
 - "Continue with Google" button below the existing OTP card (dusk styling, consistent with the current design).
-- Flow: tap → `promptAsync()` → on success get `id_token` → `sb.verifyGoogleAndLogin(idToken)` → on `success` call `auth.login(token, user)` → routed by role exactly like OTP. On failure show the returned message.
+- Flow: tap → `signInWithGoogle()` → on success get `idToken` → `sb.verifyGoogleAndLogin(idToken)` → on `success` call `auth.login(token, user)` → routed by role exactly like OTP. On failure show the returned message; user-cancel is silent.
 
 ## Data flow
 
 ```
 Tap "Continue with Google"
-  → expo-auth-session opens Google consent (browser / Custom Tab)
-  → app receives id_token
+  → GoogleSignin.signIn() opens the native Google account picker
+  → app receives idToken
   → Convex verifyGoogleAndLogin(idToken)
        verify aud + email_verified server-side
        match team_members by email (active only)
@@ -108,14 +110,22 @@ Tap "Continue with Google"
 
 ## Testing
 
-- **Prerequisite:** one `active` `team_member` whose `email` equals a real Google account signable-in on the emulator browser.
-- **Happy path (Expo Go):** Continue with Google → lands on the admin drawer with the correct role.
+- **Build prerequisite:** an EAS **development build** (`eas build --profile development`) installed on the device/emulator — Google Sign-In cannot run in Expo Go. Local `expo run:android` is unavailable (managed workflow, Java not on PATH), so EAS is the route.
+- **Data prerequisite:** one `active` `team_member` whose `email` equals a real Google account signable-in on the device.
+- **Happy path (dev build):** Continue with Google → native account picker → lands on the admin drawer with the correct role.
 - **Negative path:** Google account whose email is not a `team_member` → rejected with the "contact administrator" message.
 - **Regression:** tenant phone-OTP login unchanged; existing `9876543210 → 123456` demo path still works.
+
+## Rollout gating (known constraints)
+
+The code (client + backend) can be written and type-checked in this environment, but two steps are gated on external access before the feature is live end-to-end:
+1. **Convex deploy is blocked here** (no account access). `convex/googleAuth.ts` and the `GOOGLE_WEB_CLIENT_ID` env var only take effect once someone with Convex access deploys — bundle it with any other deploy-pending changes.
+2. **A dev build is required** to exercise the native module. Until an EAS development build exists with the Google client IDs registered, the button will not complete a sign-in.
 
 ## Out of scope (YAGNI)
 
 - Tenant Google login
 - Self-signup / public registration
-- Native `@react-native-google-signin`
+- `expo-auth-session` (browser flow) — superseded by the native library
+- Web-platform Google login
 - Account-linking UI (e.g. "link your Google account" in settings)
