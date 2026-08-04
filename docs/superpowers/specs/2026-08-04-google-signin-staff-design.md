@@ -34,10 +34,21 @@ The Google flow must produce the **same Supabase session token** the existing OT
 - **Web application** OAuth client → produces the **Web Client ID**. Used as (a) the `expo-auth-session` client ID and (b) the `aud` value the backend verifies.
 - **Android** OAuth client registered with package `in.co.vishful.spaces` + the provided **SHA-1** fingerprint (`C4:56:4A:A4:BB:14:E0:65:68:8A:05:8D:6C:9B:36:B2:91:65:76:5E`), for the standalone build's redirect. (Not required for the Expo Go proxy path, but needed for the EAS build.)
 
-Fingerprints on record for the app-signing certificate:
+Fingerprints on record (TWO distinct certificates). For Google Sign-In, register
+**every** SHA-1 the app may be signed with on the Android OAuth client — Play App
+Signing key, upload key, and debug key as applicable. Which cert is which
+(upload vs Play App Signing vs debug) is TBD — to be confirmed in the plan, but
+does not block setup since all are registered.
+
+**Certificate A:**
 - MD5: `60:D1:B9:33:0E:53:7A:42:B1:68:3D:75:1A:2B:03:2A`
 - SHA-1: `C4:56:4A:A4:BB:14:E0:65:68:8A:05:8D:6C:9B:36:B2:91:65:76:5E`
 - SHA-256: `0E:96:15:C3:85:B3:03:88:76:28:F6:67:94:42:9A:4B:DE:30:2A:E0:55:05:E8:56:19:87:27:AE:19:4A:82:36`
+
+**Certificate B:**
+- MD5: `93:1C:73:32:6F:F3:4A:94:D6:0C:F7:B4:3A:87:FF:2F`
+- SHA-1: `AC:E8:12:1A:46:93:56:39:D3:26:2E:31:9B:C8:9D:CD:36:B6:FE:65`
+- SHA-256: `EF:0E:DC:76:66:DE:22:0A:9D:94:D6:10:EB:58:8D:AC:17:D9:FB:FD:3A:87:9E:66:26:1D:E4:B4:67:57:1A:86`
 
 ### 2. `app.json`
 - Add `"scheme": "vishfulspaces"` under `expo` so the standalone EAS build can receive the OAuth redirect (`vishfulspaces://`). Expo Go uses Expo's auth proxy automatically.
