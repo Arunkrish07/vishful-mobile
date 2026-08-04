@@ -40,6 +40,16 @@ export async function verifyOtpAndLogin(phone: string, otp: string): Promise<{
   return client.action(api.otpAuth.verifyOtpAndLogin, { phone, otp });
 }
 
+export async function verifyGoogleAndLogin(idToken: string): Promise<{
+  success: boolean;
+  token?: string;
+  user?: { userId: string; userName: string; phone: string; role: string; organizationId: string; organizationName: string; supabaseUserId?: string | null };
+  user_type?: string;
+  message?: string;
+}> {
+  return client.action(api.googleAuth.verifyGoogleAndLogin, { idToken });
+}
+
 export async function getSession(token: string): Promise<{
   valid: boolean;
   userId?: string; userName?: string; phone?: string;
