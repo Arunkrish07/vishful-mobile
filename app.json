@@ -14,11 +14,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "in.co.vishful.spaces"
+      "bundleIdentifier": "dev.a0.apps.vishfulpm538"
     },
     "android": {
       "package": "in.co.vishful.spaces",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -35,6 +35,9 @@
         "projectId": "fa3c3961-8d61-42cf-9872-c6d7536b5401"
       }
     },
-    "owner": "arunvishful"
+    "owner": "arunvishful",
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ]
   }
 }

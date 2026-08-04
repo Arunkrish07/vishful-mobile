@@ -15,6 +15,7 @@
     "@clerk/clerk-react": "5.0.0",
     "@expo/vector-icons": "~14.0.4",
     "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-google-signin/google-signin": "^16.1.4",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/drawer": "^6.6.15",
     "@react-navigation/native": "^6.1.17",
