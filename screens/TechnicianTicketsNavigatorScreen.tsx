@@ -391,13 +391,12 @@ function TicketCardSkeleton() {
 //  2. MY TICKETS
 // ════════════════════════════════════════════════════════════════
 const FILTERS = [
-  { key: 'all',     label: 'All',          statuses: [] as string[] },
-  { key: 'active',  label: 'Active',       statuses: ['assigned', 'in_progress'] },
-  { key: 'waiting', label: 'Waiting',      statuses: ['waiting_for_cost_approval', 'waiting_for_parts'] },
-  { key: 'pending', label: 'Approvals',    statuses: ['pending_tenant_approval', 'pending_admin_approval'] },
-  { key: 'closed',  label: 'Closed',       statuses: ['closed', 'completed'] },
-  { key: 'breached',label: 'SLA Breached', statuses: [] },
-];
+  { key: 'open',                        label: 'Open',           statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'completed', 'reassigned'] },
+  { key: 'waiting_for_cost_approval',   label: 'Cost Approval',  statuses: ['waiting_for_cost_approval'] },
+  { key: 'pending_admin_approval',      label: 'Admin Approval', statuses: ['pending_admin_approval'] },
+  { key: 'pending_tenant_approval',     label: 'Tenant Approval',statuses: ['pending_tenant_approval'] },
+  { key: 'closed',                      label: 'Closed',         statuses: ['closed'] },
+] as const;
 
 function MyTicketsScreen({ navigation, route }: any) {
   const { colors } = useTheme();
@@ -405,7 +404,7 @@ function MyTicketsScreen({ navigation, route }: any) {
   const [tickets, setTickets]     = useState<Ticket[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter]       = useState<string>(route?.params?.filterKey || 'all');
+  const [filter, setFilter]       = useState<string>(route?.params?.filterKey || 'open');
 
   useEffect(() => { if (route?.params?.filterKey) setFilter(route.params.filterKey); }, [route?.params?.filterKey]);
 
@@ -421,29 +420,13 @@ function MyTicketsScreen({ navigation, route }: any) {
   const filtered = useMemo(() => {
     const opt = FILTERS.find(f => f.key === filter);
     if (!opt) return tickets;
-    if (filter === 'breached') {
-      return tickets.filter(t => {
-        if (!t.sla_deadline) return false;
-        if (['closed','completed','pending_admin_approval','pending_tenant_approval'].includes(t.status)) return false;
-        return new Date(t.sla_deadline) < new Date();
-      });
-    }
-    if (opt.statuses.length === 0) return tickets;
-    return tickets.filter(t => opt.statuses.includes(t.status));
+    return tickets.filter(t => (opt.statuses as readonly string[]).includes(t.status));
   }, [tickets, filter]);
 
   const getCount = (key: string) => {
     const opt = FILTERS.find(f => f.key === key);
     if (!opt) return 0;
-    if (key === 'breached') {
-      return tickets.filter(t => {
-        if (!t.sla_deadline) return false;
-        if (['closed','completed','pending_admin_approval','pending_tenant_approval'].includes(t.status)) return false;
-        return new Date(t.sla_deadline) < new Date();
-      }).length;
-    }
-    if (opt.statuses.length === 0) return tickets.length;
-    return tickets.filter(t => opt.statuses.includes(t.status)).length;
+    return tickets.filter(t => (opt.statuses as readonly string[]).includes(t.status)).length;
   };
 
   return (
@@ -457,9 +440,9 @@ function MyTicketsScreen({ navigation, route }: any) {
             <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 1 }}>MY WORK</Text>
             <Text style={{ fontSize: 22, fontWeight: '800', color: colors.text }}>My Tickets</Text>
           </View>
-          {getCount('active') > 0 && (
+          {getCount('open') > 0 && (
             <View style={{ backgroundColor: BRAND_LIGHT, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 }}>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: BRAND }}>{getCount('active')} active</Text>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: BRAND }}>{getCount('open')} open</Text>
             </View>
           )}
         </View>
@@ -475,14 +458,13 @@ function MyTicketsScreen({ navigation, route }: any) {
             {FILTERS.map(opt => {
               const cnt = getCount(opt.key);
               const isActive = filter === opt.key;
-              const isBreach = opt.key === 'breached' && cnt > 0;
               return (
                 <TouchableOpacity key={opt.key} onPress={() => setFilter(opt.key)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: isActive ? (isBreach ? '#DC2626' : BRAND) : colors.surface, borderWidth: 1.5, borderColor: isActive ? (isBreach ? '#DC2626' : BRAND) : colors.border }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? '#fff' : isBreach ? '#DC2626' : colors.textSecondary }}>{opt.label}</Text>
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: isActive ? BRAND : colors.surface, borderWidth: 1.5, borderColor: isActive ? BRAND : colors.border }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? '#fff' : colors.textSecondary }}>{opt.label}</Text>
                   {cnt > 0 && (
-                    <View style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : isBreach ? '#FEE2E2' : BRAND_LIGHT, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: isActive ? '#fff' : isBreach ? '#DC2626' : BRAND }}>{cnt}</Text>
+                    <View style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : BRAND_LIGHT, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: isActive ? '#fff' : BRAND }}>{cnt}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
