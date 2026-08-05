@@ -19,6 +19,10 @@ import {
   checkTenantPendingTickets,
   uploadTicketPhoto,
 } from '../services/ticketService';
+// Web parity: tenant's room-allocated asset is resolved from the same
+// `asset_allocations` data the Assets module uses — there's no tenant-scoped
+// endpoint, so we fetch allocations and filter client-side by bed_id.
+import { listAllocations } from '../lib/supabaseService';
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low', color: '#16A34A', bg: '#DCFCE7' },
@@ -58,6 +62,9 @@ export default function CreateTicketScreen({ navigation }: any) {
 
   const [selectedPhotos, setSelectedPhotos] = useState<{ uri: string; base64?: string; mimeType?: string }[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
+  // Web parity: read-only "Linked to your room's allocated asset" line (tenant only).
+  const [linkedAsset, setLinkedAsset] = useState<{ id: string; name: string } | null>(null);
 
   // ── AI Issue Classifier (mirrors web useIssueClassifier) ──────────────────
   // CONFIDENCE thresholds: ≥85 = auto_select, 60–84 = suggest, <60 = manual
@@ -181,6 +188,31 @@ export default function CreateTicketScreen({ navigation }: any) {
   }, [description, issueTypes, classifierOverridden]);
 
   useEffect(() => { loadInitialData(); }, []);
+
+  // Web parity: resolve the asset allocated to the tenant's bed (read-only,
+  // no dropdown). Only bed-level allocations count as "your room's asset" —
+  // apartment/property-wide allocations are ambiguous (multiple assets) and
+  // are intentionally not surfaced here.
+  useEffect(() => {
+    if (!isTenant || !tenantLocation?.bedId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const allocations = await listAllocations();
+        if (cancelled || !Array.isArray(allocations)) return;
+        const match = allocations.find(
+          (a: any) => a.allocation_type === 'bed' && a.bed_id === tenantLocation.bedId
+        );
+        if (match?.assets) {
+          const name = [match.assets.brand, match.assets.model].filter(Boolean).join(' ') || match.assets.asset_code || null;
+          if (name) setLinkedAsset({ id: match.asset_id, name });
+        }
+      } catch (e: any) {
+        console.warn('[CreateTicketScreen] listAllocations failed:', e?.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isTenant, tenantLocation?.bedId]);
 
   async function loadInitialData() {
     try {
@@ -319,6 +351,7 @@ export default function CreateTicketScreen({ navigation }: any) {
         ticketData.bed_id = tenantLocation.bedId;
         ticketData.tenant_name = tenantLocation.tenantName;
         ticketData.apartment_code = tenantLocation.bedCode;
+        ticketData.asset_id = linkedAsset?.id ?? null;
       } else {
         ticketData.tenant_id = null;
         ticketData.tenant_name = user?.userName || null;
@@ -425,6 +458,11 @@ export default function CreateTicketScreen({ navigation }: any) {
                 <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                   {tenantLocation.unitNumber} • Bed: {tenantLocation.bedCode}
                 </Text>
+                {linkedAsset && (
+                  <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 4 }}>
+                    Linked to your room's allocated asset: {linkedAsset.name}
+                  </Text>
+                )}
               </View>
             )}
 
