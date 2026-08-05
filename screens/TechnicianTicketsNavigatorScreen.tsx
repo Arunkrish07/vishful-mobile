@@ -226,18 +226,18 @@ function TicketsDashboardScreen({ navigation }: any) {
           <Animated.View style={{ gap: 10, opacity: fadeAnim }}>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <StatCard label="Active" value={stats.active.length} color={BRAND} bg={BRAND_LIGHT} icon="hammer-outline"
-                onPress={() => navigation.navigate('MyTickets', { filterKey: 'active' })} />
+                onPress={() => navigation.navigate('MyTickets', { filterKey: 'open' })} />
               <StatCard label="Waiting" value={stats.waiting.length} color="#7C3AED" bg="rgba(124,58,237,0.1)" icon="time-outline"
-                onPress={() => navigation.navigate('MyTickets', { filterKey: 'waiting' })} />
+                onPress={() => navigation.navigate('MyTickets', { filterKey: 'waiting_for_cost_approval' })} />
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <StatCard label="Pending Approval" value={stats.pending.length} color="#0284C7" bg="rgba(2,132,199,0.1)" icon="checkmark-circle-outline"
-                onPress={() => navigation.navigate('MyTickets', { filterKey: 'pending' })} />
+                onPress={() => navigation.navigate('MyTickets', { filterKey: 'pending_admin_approval' })} />
               <StatCard label="SLA Breached" value={stats.breached.length}
                 color={stats.breached.length > 0 ? '#DC2626' : '#7B6B90'}
                 bg={stats.breached.length > 0 ? 'rgba(220,38,38,0.1)' : 'rgba(107,114,128,0.08)'}
                 icon="warning-outline"
-                onPress={() => navigation.navigate('MyTickets', { filterKey: 'breached' })} />
+                onPress={() => navigation.navigate('MyTickets', { filterKey: 'open' })} />
             </View>
           </Animated.View>
 
@@ -404,9 +404,12 @@ function MyTicketsScreen({ navigation, route }: any) {
   const [tickets, setTickets]     = useState<Ticket[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter]       = useState<string>(route?.params?.filterKey || 'open');
+  const isValidFilterKey = (key: unknown): key is string => FILTERS.some(f => f.key === key);
+  const [filter, setFilter]       = useState<string>(isValidFilterKey(route?.params?.filterKey) ? route.params.filterKey : 'open');
 
-  useEffect(() => { if (route?.params?.filterKey) setFilter(route.params.filterKey); }, [route?.params?.filterKey]);
+  useEffect(() => {
+    if (route?.params?.filterKey) setFilter(isValidFilterKey(route.params.filterKey) ? route.params.filterKey : 'open');
+  }, [route?.params?.filterKey]);
 
   const load = useCallback(async () => {
     try {
