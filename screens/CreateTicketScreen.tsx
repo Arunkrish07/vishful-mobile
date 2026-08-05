@@ -32,6 +32,8 @@ export default function CreateTicketScreen({ navigation }: any) {
   const { user, tenantLocation } = useAuth();
   const isTenant = user?.role === 'tenant';
   const costSubmitGuardRef = useRef(false);
+  // Web parity: tenant raise allows a single issue photo; admin keeps up to 5.
+  const maxPhotos = isTenant ? 1 : 5;
 
   const [issueTypes, setIssueTypes] = useState<IssueType[]>([]);
   const [subTypes, setSubTypes] = useState<IssueSubType[]>([]);
@@ -246,11 +248,16 @@ export default function CreateTicketScreen({ navigation }: any) {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission Required', 'Please allow access to your photo library.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: MEDIA_TYPE_IMAGES, allowsMultipleSelection: true, quality: 0.7, base64: true,
+      mediaTypes: MEDIA_TYPE_IMAGES, allowsMultipleSelection: !isTenant, quality: 0.7, base64: true,
     });
     if (!result.canceled) {
       const newPhotos = result.assets.map(a => ({ uri: a.uri, base64: a.base64 ?? undefined, mimeType: a.mimeType ?? 'image/jpeg' }));
-      setSelectedPhotos(prev => [...prev, ...newPhotos].slice(0, 5));
+      if (isTenant) {
+        // Tenant: single photo only — a new pick replaces the existing one (web parity).
+        setSelectedPhotos(newPhotos.slice(0, 1));
+      } else {
+        setSelectedPhotos(prev => [...prev, ...newPhotos].slice(0, maxPhotos));
+      }
     }
   }
 
@@ -260,7 +267,13 @@ export default function CreateTicketScreen({ navigation }: any) {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      setSelectedPhotos(prev => [...prev, { uri: a.uri, base64: a.base64 ?? undefined, mimeType: a.mimeType ?? 'image/jpeg' }].slice(0, 5));
+      const photo = { uri: a.uri, base64: a.base64 ?? undefined, mimeType: a.mimeType ?? 'image/jpeg' };
+      if (isTenant) {
+        // Tenant: single photo only — a new capture replaces the existing one (web parity).
+        setSelectedPhotos([photo]);
+      } else {
+        setSelectedPhotos(prev => [...prev, photo].slice(0, maxPhotos));
+      }
     }
   }
 
@@ -711,8 +724,8 @@ export default function CreateTicketScreen({ navigation }: any) {
               </>
             )}
 
-            {/* ── SHARED: Photo Upload ─────────────────────────────────────── */}
-            <SectionLabel>Photos (Optional, max 5)</SectionLabel>
+            {/* ── SHARED: Photo Upload (tenant: 1 max, admin: 5 max) ────────── */}
+            <SectionLabel>Photos (Optional, max {maxPhotos})</SectionLabel>
             <View style={{ marginBottom: spacing.lg }}>
               {selectedPhotos.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
@@ -731,27 +744,32 @@ export default function CreateTicketScreen({ navigation }: any) {
                   </View>
                 </ScrollView>
               )}
-              {selectedPhotos.length < 5 && (
+              {/* Tenant: buttons stay visible even with a photo selected so tapping either replaces it. */}
+              {(isTenant || selectedPhotos.length < maxPhotos) && (
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity
                     onPress={takePhoto}
                     style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#7B2FBE', backgroundColor: '#F5F3FF' }}
                   >
                     <Ionicons name="camera-outline" size={18} color="#7B2FBE" />
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#7B2FBE' }}>Camera</Text>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#7B2FBE' }}>
+                      {isTenant && selectedPhotos.length > 0 ? 'Retake' : 'Camera'}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={pickPhotos}
                     style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#7B2FBE', backgroundColor: '#F5F3FF' }}
                   >
                     <Ionicons name="image-outline" size={18} color="#7B2FBE" />
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#7B2FBE' }}>Gallery</Text>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#7B2FBE' }}>
+                      {isTenant && selectedPhotos.length > 0 ? 'Replace' : 'Gallery'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
               {selectedPhotos.length > 0 && (
                 <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: 6, textAlign: 'center' }}>
-                  {selectedPhotos.length}/5 photo{selectedPhotos.length > 1 ? 's' : ''} selected
+                  {selectedPhotos.length}/{maxPhotos} photo{selectedPhotos.length > 1 ? 's' : ''} selected
                 </Text>
               )}
             </View>
