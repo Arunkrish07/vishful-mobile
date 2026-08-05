@@ -379,8 +379,8 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* SLA breach banner */}
-        {isSlaBreached && (
+        {/* SLA breach banner — SLA/timer info is hidden from tenants (web parity) */}
+        {isSlaBreached && !isTenant && (
           <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: spacing.xl, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Ionicons name="warning-outline" size={16} color="#DC2626" />
             <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#DC2626' }}>
@@ -716,7 +716,7 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
             <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: statusCfg.color }}>{statusCfg.label}</Text>
           </View>
         } />
-        {(ticket as any).sla_deadline && (
+        {!isTenant && (ticket as any).sla_deadline && (
           <Row label="SLA Deadline" value={new Date((ticket as any).sla_deadline).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} />
         )}
       </View>
