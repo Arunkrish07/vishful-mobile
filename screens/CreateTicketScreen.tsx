@@ -286,12 +286,15 @@ export default function CreateTicketScreen({ navigation }: any) {
         setUploadingPhotos(false);
       }
 
+      // Tenants don't choose priority — auto-derive from the selected issue type (web parity).
+      const effectivePriority = isTenant ? (selectedIssueType.priority || 'medium') : priority;
+
       const ticketData: any = {
         issue_type_id: selectedIssueType.id,
         issue_type: selectedIssueType.name,
         issue_subtype: selectedSubType?.name || null,
         description: description.trim(),
-        priority,
+        priority: effectivePriority,
         created_by: user?.supabaseUserId || user?.userId || null,
         photo_urls: photoUrls.length > 0 ? photoUrls : null,
       };
@@ -527,28 +530,6 @@ export default function CreateTicketScreen({ navigation }: any) {
                         selectedId={selectedSubType?.id}
                       />
                     )}
-                  </View>
-                )}
-
-                {/* Step 4: Priority (compact) */}
-                {selectedIssueType && (
-                  <View style={[glass.card, { marginBottom: spacing.lg }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>4</Text>
-                      </View>
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Priority</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {PRIORITY_OPTIONS.map(p => (
-                        <TouchableOpacity key={p.value} onPress={() => setPriority(p.value)}
-                          style={{ flex: 1, paddingVertical: 8, borderRadius: borderRadius.md, alignItems: 'center',
-                            backgroundColor: priority === p.value ? p.color : colors.surface,
-                            borderWidth: 1, borderColor: priority === p.value ? p.color : colors.border }}>
-                          <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: priority === p.value ? '#fff' : p.color }}>{p.label}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
                   </View>
                 )}
               </>
