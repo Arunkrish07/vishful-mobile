@@ -352,9 +352,11 @@ export default function TicketDetailScreen({ route, navigation }: any) {
     if (a.scope_type === 'issue_type' && a.issue_type_id && a.issue_type_id === (ticket as any).issue_type_id) return true;
     return false;
   });
+  // Tenants must use the approval flow only (Accept & Close / Not Resolved) —
+  // web has no generic status dropdown for tenants, so exclude them here to
+  // avoid bypassing the required-reason rework flow (tenantApproveCompletion).
   const canUpdateStatus = (isAssignedTechnician && nextStatuses.length > 0) ||
-    (isAdmin && nextStatuses.length > 0) ||
-    (isTenant && nextStatuses.length > 0);
+    (isAdmin && nextStatuses.length > 0);
 
   // Show resolution form for completed/closed tickets or when admin triggers it
   const showResolutionSection = ['completed', 'pending_tenant_approval', 'pending_admin_approval', 'closed'].includes(ticket.status);
@@ -2457,11 +2459,11 @@ function ApprovalModal({ visible, onClose, onApprove, submitting }: any) {
             <>
               <TouchableOpacity onPress={() => onApprove(true)} disabled={submitting}
                 style={{ backgroundColor: '#16A34A', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center' }}>
-                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>✓ Approve & Close Ticket</Text>}
+                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>Accept & Close</Text>}
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowReject(true)}
                 style={{ backgroundColor: '#FEE2E2', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center' }}>
-                <Text style={{ color: '#DC2626', fontWeight: '800', fontSize: fontSize.md }}>✗ Request Rework</Text>
+                <Text style={{ color: '#DC2626', fontWeight: '800', fontSize: fontSize.md }}>Not Resolved</Text>
               </TouchableOpacity>
             </>
           ) : (
