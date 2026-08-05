@@ -19,10 +19,9 @@ import {
   checkTenantPendingTickets,
   uploadTicketPhoto,
 } from '../services/ticketService';
-// Web parity: tenant's room-allocated asset is resolved from the same
-// `asset_allocations` data the Assets module uses — there's no tenant-scoped
-// endpoint, so we fetch allocations and filter client-side by bed_id.
-import { listAllocations } from '../lib/supabaseService';
+// Web parity: tenant's room-allocated asset, resolved server-side and scoped
+// to just their bed (avoids shipping the org's whole allocation table).
+import { getAllocationForBed } from '../lib/supabaseService';
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low', color: '#16A34A', bg: '#DCFCE7' },
@@ -190,25 +189,19 @@ export default function CreateTicketScreen({ navigation }: any) {
   useEffect(() => { loadInitialData(); }, []);
 
   // Web parity: resolve the asset allocated to the tenant's bed (read-only,
-  // no dropdown). Only bed-level allocations count as "your room's asset" —
-  // apartment/property-wide allocations are ambiguous (multiple assets) and
-  // are intentionally not surfaced here.
+  // no dropdown). Server-scoped to this bed only — the tenant device never
+  // receives other rooms'/tenants' allocation data.
   useEffect(() => {
     if (!isTenant || !tenantLocation?.bedId) return;
     let cancelled = false;
     (async () => {
       try {
-        const allocations = await listAllocations();
-        if (cancelled || !Array.isArray(allocations)) return;
-        const match = allocations.find(
-          (a: any) => a.allocation_type === 'bed' && a.bed_id === tenantLocation.bedId
-        );
-        if (match?.assets) {
-          const name = [match.assets.brand, match.assets.model].filter(Boolean).join(' ') || match.assets.asset_code || null;
-          if (name) setLinkedAsset({ id: match.asset_id, name });
-        }
+        const match = await getAllocationForBed(tenantLocation.bedId);
+        if (cancelled || !match?.assets) return;
+        const name = [match.assets.brand, match.assets.model].filter(Boolean).join(' ') || match.assets.asset_code || null;
+        if (name) setLinkedAsset({ id: match.asset_id, name });
       } catch (e: any) {
-        console.warn('[CreateTicketScreen] listAllocations failed:', e?.message);
+        console.warn('[CreateTicketScreen] getAllocationForBed failed:', e?.message);
       }
     })();
     return () => { cancelled = true; };

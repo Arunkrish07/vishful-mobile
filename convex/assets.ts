@@ -436,6 +436,39 @@ export const listAllocations = action({
   },
 });
 
+// ─── NEW: GET ALLOCATION FOR BED (scoped — avoids org-wide fetch) ─────────────
+// Tenant-safe: returns only the single allocation tied to this bed (or null),
+// not the whole org's asset_allocations table. Used by the tenant ticket-raise
+// screen to show the read-only "linked to your room's asset" line.
+export const getAllocationForBed = action({
+  args: { bedId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { bedId }) => {
+    const sb = getSupabase();
+    const { data: alloc } = (await sb
+      .from("asset_allocations")
+      .select("id, asset_id, allocation_type, bed_id")
+      .eq("organization_id", ORG_ID)
+      .eq("allocation_type", "bed")
+      .eq("bed_id", bedId)
+      .maybeSingle()) as any;
+    if (!alloc?.asset_id) return null;
+
+    const { data: asset } = (await sb
+      .from("assets")
+      .select("id, asset_code, brand, model")
+      .eq("organization_id", ORG_ID)
+      .eq("id", alloc.asset_id)
+      .maybeSingle()) as any;
+    if (!asset) return null;
+
+    return {
+      asset_id: alloc.asset_id,
+      assets: { brand: asset.brand ?? null, model: asset.model ?? null, asset_code: asset.asset_code ?? null },
+    };
+  },
+});
+
 // ─── NEW: UPDATE VENDOR ───────────────────────────────────────────────────────
 export const updateVendor = action({
   args: { vendorId: v.string(), data: v.any() },

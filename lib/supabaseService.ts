@@ -589,6 +589,11 @@ export async function createApartmentFull(propertyId: string, data: any) {
 export async function listAllocations() {
   return client.action((api as any).assets.listAllocations, {});
 }
+// Bed-scoped allocation lookup — returns only the requesting bed's asset
+// allocation (or null), not the whole org's allocations table.
+export async function getAllocationForBed(bedId: string) {
+  return client.action((api as any).assets.getAllocationForBed, { bedId });
+}
 export async function updateVendor(vendorId: string, data: any) {
   return client.action((api as any).assets.updateVendor, { vendorId, data });
 }
