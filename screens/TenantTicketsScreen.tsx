@@ -46,12 +46,20 @@ const TICKET_URL  = `${CONVEX_BASE}/api/voice-ticket-direct`;
 
 type VoiceStep = 'idle' | 'recording' | 'processing' | 'review' | 'submitting' | 'success' | 'error';
 
+// ── Tenant ticket-list tab filter (web parity: Open / Tenant Approval / Closed) ──
+const TENANT_FILTERS = [
+  { key: 'open',             label: 'Open',            statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'completed', 'reassigned'] },
+  { key: 'tenant_approval',  label: 'Tenant Approval',  statuses: ['pending_tenant_approval'] },
+  { key: 'closed',           label: 'Closed',           statuses: ['closed'] },
+] as const;
+
 export default function TenantTicketsScreen({ navigation }: any) {
   const { colors } = useTheme();
   const { user, tenantLocation } = useAuth();
   const [tickets, setTickets]       = useState<Ticket[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab]   = useState<'open' | 'tenant_approval' | 'closed'>('open');
 
   // ── Approval modal ────────────────────────────────────────────────────────
   const [approvalTicket,    setApprovalTicket]    = useState<Ticket | null>(null);
@@ -343,9 +351,16 @@ export default function TenantTicketsScreen({ navigation }: any) {
     } finally { setApprovalLoading(false); }
   };
 
-  const openTickets      = tickets.filter(t => !['closed', 'completed'].includes(t.status));
-  const closedTickets    = tickets.filter(t => ['closed', 'completed'].includes(t.status));
   const pendingApproval  = tickets.filter(t => t.status === 'pending_tenant_approval');
+
+  const tabCounts: Record<typeof TENANT_FILTERS[number]['key'], number> = {
+    open:             tickets.filter(t => (TENANT_FILTERS[0].statuses as readonly string[]).includes(t.status)).length,
+    tenant_approval:  tickets.filter(t => (TENANT_FILTERS[1].statuses as readonly string[]).includes(t.status)).length,
+    closed:           tickets.filter(t => (TENANT_FILTERS[2].statuses as readonly string[]).includes(t.status)).length,
+  };
+
+  const activeFilter    = TENANT_FILTERS.find(f => f.key === activeTab)!;
+  const filteredTickets = tickets.filter(t => (activeFilter.statuses as readonly string[]).includes(t.status));
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -415,37 +430,47 @@ export default function TenantTicketsScreen({ navigation }: any) {
             contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 16 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BRAND]} />}
           >
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <StatCard label="Total"  value={tickets.length}     color={BRAND}   bg="#EDE9FE" />
-              <StatCard label="Active" value={openTickets.length} color="#D97706" bg="#FEF3C7" />
-              <StatCard label="Closed" value={closedTickets.length} color="#16A34A" bg="#DCFCE7" />
+            {/* Tab bar — Open / Tenant Approval / Closed (web parity) */}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {TENANT_FILTERS.map(f => {
+                const selected = activeTab === f.key;
+                return (
+                  <TouchableOpacity
+                    key={f.key}
+                    onPress={() => setActiveTab(f.key)}
+                    style={{
+                      flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: borderRadius.lg,
+                      backgroundColor: selected ? BRAND : (colors.surfaceSecondary || '#F3F0F9'),
+                      borderWidth: 1, borderColor: selected ? BRAND : colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: selected ? '#fff' : colors.text }}>
+                      {f.label}
+                    </Text>
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: selected ? 'rgba(255,255,255,0.85)' : colors.textTertiary, marginTop: 1 }}>
+                      {tabCounts[f.key]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            {pendingApproval.length > 0 && (
-              <>
-                <SectionHeader title="Needs Your Approval" count={pendingApproval.length} urgent />
-                {pendingApproval.map(t => (
-                  <TenantTicketCard key={t.id} ticket={t} onPress={() => openApprovalModal(t)} showApprovalCta />
-                ))}
-              </>
-            )}
+            {filteredTickets.map(t => (
+              <TenantTicketCard
+                key={t.id}
+                ticket={t}
+                onPress={() => activeTab === 'tenant_approval' ? openApprovalModal(t) : navigation.navigate('TicketDetail', { ticketId: t.id })}
+                showApprovalCta={activeTab === 'tenant_approval'}
+              />
+            ))}
 
-            {openTickets.filter(t => t.status !== 'pending_tenant_approval').length > 0 && (
-              <>
-                <SectionHeader title="Active Tickets" count={openTickets.filter(t => t.status !== 'pending_tenant_approval').length} />
-                {openTickets.filter(t => t.status !== 'pending_tenant_approval').map(t => (
-                  <TenantTicketCard key={t.id} ticket={t} onPress={() => navigation.navigate('TicketDetail', { ticketId: t.id })} />
-                ))}
-              </>
-            )}
-
-            {closedTickets.length > 0 && (
-              <>
-                <SectionHeader title="Completed" count={closedTickets.length} />
-                {closedTickets.map(t => (
-                  <TenantTicketCard key={t.id} ticket={t} onPress={() => navigation.navigate('TicketDetail', { ticketId: t.id })} />
-                ))}
-              </>
+            {tickets.length > 0 && filteredTickets.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 60 }}>
+                <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Ionicons name="checkmark-done-outline" size={36} color={BRAND} />
+                </View>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>No {activeFilter.label.toLowerCase()} tickets</Text>
+              </View>
             )}
 
             {tickets.length === 0 && (
@@ -844,28 +869,6 @@ export default function TenantTicketsScreen({ navigation }: any) {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
-function StatCard({ label, value, color, bg }: any) {
-  return (
-    <View style={{ flex: 1, backgroundColor: bg, borderRadius: borderRadius.lg, paddingVertical: 12, alignItems: 'center' }}>
-      <Text style={{ fontSize: fontSize.xxl, fontWeight: '900', color }}>{value}</Text>
-      <Text style={{ fontSize: fontSize.xs, fontWeight: '600', color, opacity: 0.7 }}>{label}</Text>
-    </View>
-  );
-}
-
-function SectionHeader({ title, count, urgent }: { title: string; count: number; urgent?: boolean }) {
-  const { colors } = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      {urgent && <Ionicons name="alert-circle" size={16} color="#D97706" />}
-      <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: urgent ? '#D97706' : colors.text }}>{title}</Text>
-      <View style={{ backgroundColor: urgent ? '#FEF3C7' : colors.surfaceSecondary, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
-        <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: urgent ? '#D97706' : colors.textSecondary }}>{count}</Text>
-      </View>
-    </View>
-  );
-}
-
 function TenantTicketCard({ ticket, onPress, showApprovalCta }: {
   ticket: Ticket; onPress: () => void; showApprovalCta?: boolean;
 }) {
