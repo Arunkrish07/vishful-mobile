@@ -579,7 +579,14 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
             <View style={styles.placeholderCard}>
               <Ionicons name="create-outline" size={48} color="#9CA3AF" />
               <Text style={styles.placeholderTitle}>Manual Entry</Text>
-              <Text style={styles.placeholderSubtext}>Coming soon — use Voice tab for now</Text>
+              <Text style={styles.placeholderSubtext}>Prefer typing? Fill in the details yourself.</Text>
+              <TouchableOpacity
+                style={styles.manualEntryBtn}
+                onPress={() => navigation.navigate('CreateTicket')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.manualEntryBtnLabel}>Type it instead</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <>
@@ -839,7 +846,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 }, elevation: 2,
   },
   placeholderTitle:   { fontSize: 18, fontWeight: '700', color: '#6B7280', marginTop: 14 },
-  placeholderSubtext: { fontSize: 14, color: '#9CA3AF', marginTop: 4 },
+  placeholderSubtext: { fontSize: 14, color: '#9CA3AF', marginTop: 4, textAlign: 'center' },
+  manualEntryBtn: {
+    marginTop: 20, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 14,
+    backgroundColor: INDIGO,
+    shadowColor: INDIGO, shadowOpacity: 0.3, shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 }, elevation: 5,
+  },
+  manualEntryBtnLabel: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 
   micSection: { alignItems: 'center', paddingVertical: 48 },
   micWrapper:  { width: 180, height: 180, alignItems: 'center', justifyContent: 'center' },
