@@ -48,9 +48,9 @@ type VoiceStep = 'idle' | 'recording' | 'processing' | 'review' | 'submitting' |
 
 // ── Tenant ticket-list tab filter (web parity: Open / Tenant Approval / Closed) ──
 const TENANT_FILTERS = [
-  { key: 'open',             label: 'Open',            statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'completed', 'reassigned'] },
+  { key: 'open',             label: 'Open',            statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'completed', 'reassigned', 'on_hold', 'reopened'] },
   { key: 'tenant_approval',  label: 'Tenant Approval',  statuses: ['pending_tenant_approval'] },
-  { key: 'closed',           label: 'Closed',           statuses: ['closed'] },
+  { key: 'closed',           label: 'Closed',           statuses: ['closed', 'cancelled'] },
 ] as const;
 
 export default function TenantTicketsScreen({ navigation }: any) {

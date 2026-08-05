@@ -392,11 +392,11 @@ function TicketCardSkeleton() {
 //  2. MY TICKETS
 // ════════════════════════════════════════════════════════════════
 const FILTERS = [
-  { key: 'open',                        label: 'Open',           statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'completed', 'reassigned'] },
+  { key: 'open',                        label: 'Open',           statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'completed', 'reassigned', 'on_hold', 'reopened'] },
   { key: 'waiting_for_cost_approval',   label: 'Cost Approval',  statuses: ['waiting_for_cost_approval'] },
   { key: 'pending_admin_approval',      label: 'Admin Approval', statuses: ['pending_admin_approval'] },
   { key: 'pending_tenant_approval',     label: 'Tenant Approval',statuses: ['pending_tenant_approval'] },
-  { key: 'closed',                      label: 'Closed',         statuses: ['closed'] },
+  { key: 'closed',                      label: 'Closed',         statuses: ['closed', 'cancelled'] },
 ] as const;
 
 function MyTicketsScreen({ navigation, route }: any) {
