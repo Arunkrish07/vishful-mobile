@@ -34,6 +34,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
+import { client as convexClient, api as convexApi } from '../lib/convexApi';
 import { GlassBackground, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { DiagnosticFlow, DiagnosticFlowResult } from './DiagnosticFlow';
@@ -652,6 +653,7 @@ function TicketDetailScreen({ navigation, route }: any) {
   const [showPurchaseRecord, setShowPurchaseRecord]   = useState(false);
   const [lightboxUrl, setLightboxUrl]                 = useState<string | null>(null);
   const [showCompletedBanner, setShowCompletedBanner] = useState(false);
+  const [autoApproveThreshold, setAutoApproveThreshold] = useState(1000);
 
   const userId = user?.supabaseUserId || user?.userId || '';
   const isAdmin = ['org_admin','super_admin','property_manager','admin','pm'].includes(user?.role || '');
@@ -680,6 +682,16 @@ function TicketDetailScreen({ navigation, route }: any) {
   }, [ticketId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Org auto-approve threshold for cost estimates (web parity — was hardcoded ₹1,000)
+  useEffect(() => {
+    convexClient.action((convexApi as any).settings.getOrgExitSettings, {})
+      .then((data: any) => {
+        const val = Number(data?.ticket_auto_approve_threshold);
+        if (Number.isFinite(val) && val > 0) setAutoApproveThreshold(val);
+      })
+      .catch(() => { /* keep default 1000 */ });
+  }, []);
 
   // Reset stale modals when ticket status changes
   useEffect(() => {
@@ -1961,6 +1973,7 @@ function TicketDetailScreen({ navigation, route }: any) {
           ticketId={ticketId}
           userId={userId}
           diagnosisResult={diagnosisResult}
+          autoApproveThreshold={autoApproveThreshold}
           onClose={() => setShowCostReview(false)}
           onSubmit={async () => { setShowCostReview(false); await load(); }}
           onNoCost={async () => { setShowCostReview(false); setShowCompletedBanner(true); await load(); }}
@@ -2145,11 +2158,12 @@ function CostEstimateRow({ estimate, isAdmin, ticketId, userId, onUpdated }: {
 // ════════════════════════════════════════════════════════════════
 //  COST ESTIMATE REVIEW MODAL — post-diagnosis, sends to admin
 // ════════════════════════════════════════════════════════════════
-function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, onClose, onSubmit, onNoCost }: {
+function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, autoApproveThreshold, onClose, onSubmit, onNoCost }: {
   visible: boolean;
   ticketId: string;
   userId: string;
   diagnosisResult: DiagnosticFlowResult | null;
+  autoApproveThreshold?: number;
   onClose: () => void;
   onSubmit: () => void;
   onNoCost: () => void;
@@ -2203,6 +2217,7 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, o
     setItems(p => p.map((it, i) => i === idx ? { ...it, [key]: val } : it));
 
   const total = items.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
+  const threshold = autoApproveThreshold && autoApproveThreshold > 0 ? autoApproveThreshold : 1000;
 
   const handleSubmit = async () => {
     if (items.some(i => !i.item_name.trim())) {
@@ -2305,11 +2320,11 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, o
               <Text style={{ fontSize: 20, fontWeight: '800', color: BRAND }}>₹{total.toLocaleString('en-IN')}</Text>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: total > 0 && total <= 1000 ? 'rgba(34,197,94,0.08)' : 'rgba(2,132,199,0.08)', borderRadius: 12, padding: 12 }}>
-              <Ionicons name={total > 0 && total <= 1000 ? 'flash-outline' : 'send-outline'} size={16} color={total > 0 && total <= 1000 ? '#16A34A' : '#0284C7'} />
-              <Text style={{ fontSize: 12, color: total > 0 && total <= 1000 ? '#16A34A' : '#0284C7', flex: 1, fontWeight: '600' }}>
-                {total > 0 && total <= 1000
-                  ? 'Under ₹1,000 — auto-approved instantly and moves to "Waiting for Parts" (unless it\'s a repeat job in the same apartment, which needs admin approval).'
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: total > 0 && total <= threshold ? 'rgba(34,197,94,0.08)' : 'rgba(2,132,199,0.08)', borderRadius: 12, padding: 12 }}>
+              <Ionicons name={total > 0 && total <= threshold ? 'flash-outline' : 'send-outline'} size={16} color={total > 0 && total <= threshold ? '#16A34A' : '#0284C7'} />
+              <Text style={{ fontSize: 12, color: total > 0 && total <= threshold ? '#16A34A' : '#0284C7', flex: 1, fontWeight: '600' }}>
+                {total > 0 && total <= threshold
+                  ? `Under ₹${threshold.toLocaleString('en-IN')} — auto-approved instantly and moves to "Waiting for Parts" (unless it's a repeat job in the same apartment, which needs admin approval).`
                   : 'This will be sent to admin for approval. Ticket moves to "Awaiting Approval".'}
               </Text>
             </View>
