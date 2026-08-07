@@ -924,8 +924,14 @@ export const submitCostEstimates = action({
     });
 
     // ── AUTO-APPROVAL + REPEAT JOB DETECTION (mirrors web saveDiagnostic) ────
-    // Threshold: ₹1000 — read from org settings if available, else default.
-    const AUTO_APPROVE_THRESHOLD = 1000;
+    // Threshold + repeat-window come from org settings (web parity), default 1000 / 30d.
+    const { data: orgSettings } = await sb
+      .from("organizations")
+      .select("ticket_auto_approve_threshold, ticket_repeat_check_days")
+      .eq("id", ORG_ID)
+      .maybeSingle();
+    const AUTO_APPROVE_THRESHOLD = Number((orgSettings as any)?.ticket_auto_approve_threshold) || 1000;
+    const REPEAT_CHECK_DAYS = Number((orgSettings as any)?.ticket_repeat_check_days) || 30;
     const totalEstimatedCost = items.reduce((s: number, i: any) => s + ((i.quantity || 1) * (i.unit_price || 0)), 0);
 
     const { data: ticketCtx } = await sb
@@ -934,11 +940,11 @@ export const submitCostEstimates = action({
       .eq("id", ticketId)
       .maybeSingle();
 
-    // 1. Check for repeat job (same issue in same apartment within last 30 days)
+    // 1. Check for repeat job (same issue in same apartment within the configured window)
     let isRepeatJob = false;
     if (ticketCtx?.apartment_id && ticketCtx?.issue_type_id) {
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 30);
+      cutoff.setDate(cutoff.getDate() - REPEAT_CHECK_DAYS);
       let repeatQ = sb
         .from("maintenance_tickets")
         .select("id, ticket_number, created_at")

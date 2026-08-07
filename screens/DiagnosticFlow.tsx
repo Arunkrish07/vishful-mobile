@@ -292,16 +292,13 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
     } finally { setSubmitting(false); }
   }
 
-  async function handleFinalSubmit() {
+  function handleFinalSubmit() {
     if (!confirmedDiag) return;
     if (validParts.length===0) { Alert.alert('Add Parts','Add at least one part to submit.'); return; }
-    setSubmitting(true);
-    try {
-      await client.action(api.tickets.submitCostEstimates, { ticketId, items:validParts, submittedBy:actorId });
-      onComplete({ answers, result:confirmedDiag, fullDiagnosis:diagnosis||undefined, parts:validParts, submitForApproval:true });
-    } catch (e: any) {
-      Alert.alert('Submit failed', e?.message||'Please try again.');
-    } finally { setSubmitting(false); }
+    // NOTE: do NOT submit cost estimates here. The parent opens the CostEstimateReviewModal
+    // (pre-filled from these parts) which is the single submit point + shows the auto-approve
+    // threshold preview. Submitting here caused duplicate estimate rows / doubled totals.
+    onComplete({ answers, result:confirmedDiag, fullDiagnosis:diagnosis||undefined, parts:validParts, submitForApproval:true });
   }
 
   function handleReset() {
