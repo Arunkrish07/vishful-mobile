@@ -68,6 +68,11 @@ const MANAGED_ROLES = new Set(['property_manager', 'admin', 'manager']);
 // Roles that use their own dedicated navigators and never hit the admin drawer's
 // permission gating (so they must NOT trigger a role_permissions lookup).
 const NON_DRAWER_ROLES = new Set(['tenant', 'technician']);
+// Roles allowed into the admin drawer. Any authenticated role that is NOT here and
+// NOT in NON_DRAWER_ROLES is treated as unauthorized — it must not inherit admin
+// access by default (closes the old "anything that isn't tenant/technician → full
+// admin" escalation, including the backend's 'unknown'/'team_member' fallbacks).
+const ADMIN_ROLES = new Set([...SUPER_ROLES, ...MANAGED_ROLES, 'pm', 'team_member']);
 
 /** Map an AppModule display name to the lowercase slug used by role_permissions.module. */
 const moduleSlug = (module: AppModule): string => module.toLowerCase().replace(/\s+/g, '_');
@@ -124,11 +129,16 @@ function PermissionsProvider({ children }: { children: React.ReactNode }) {
   const canAccess = React.useCallback((module: AppModule): boolean => {
     if (module === 'Dashboard' || module === 'Settings' || module === 'Announcements') return true; // always visible
     if (isSuperuser) return true;                                     // super_admin / org_admin bypass
-    if (Object.keys(permMap).length === 0) return true;               // still loading / no config yet
+    if (Object.keys(permMap).length === 0) {
+      // No permission rows loaded yet. Fail OPEN only for known admin roles whose
+      // config may simply be unset; DENY for any other role so an unrecognized role
+      // can't inherit full admin access while perms are empty.
+      return ADMIN_ROLES.has(role);
+    }
     // Deny-by-default: managed + unknown non-tenant roles are gated by DB perms.
     // Key by the lowercase slug (role_permissions.module is lowercase, e.g. 'properties').
     return !!(permMap[moduleSlug(module)]?.can_read);
-  }, [isSuperuser, permMap]);
+  }, [isSuperuser, permMap, role]);
 
   return (
     <PermissionsContext.Provider value={{ canAccess, isPermissionsLoading: isLoading, isSuperuser }}>
@@ -746,6 +756,7 @@ const PRIMARY_TABS = ['Dashboard', 'Tickets', 'Properties', 'Tenants'];
 function AdminFloatingNav({ navRef }: { navRef: any }) {
   const insets = useSafeAreaInsets();
   const { width: WIN_W, height: WIN_H } = Dimensions.get('window');
+  const { logout } = useAuth();
   const { canAccess: rawCanAccess, isSuperuser } = usePermissions();
   const canAccess = React.useCallback(
     (m?: AppModule, always?: boolean) =>
@@ -778,6 +789,14 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
   const go = (name: string) => {
     setMoreOpen(false);
     try { if (navRef.isReady?.()) navRef.navigate(name as never); } catch {}
+  };
+
+  const handleLogout = () => {
+    setMoreOpen(false);
+    Alert.alert('Confirm Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: () => logout() },
+    ]);
   };
 
   const primaryItems = ADMIN_MENU.filter(i => PRIMARY_TABS.includes(i.name) && canAccess(i.module, i.always));
@@ -851,6 +870,11 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
                 );
               })}
             </ScrollView>
+            {/* Sign out — pinned below the menu grid so it stays reachable */}
+            <TouchableOpacity style={NAV.signOut} activeOpacity={0.85} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color={NAV_DUSK.ember} />
+              <Text style={NAV.signOutLbl}>Sign Out</Text>
+            </TouchableOpacity>
           </Animated.View>
         </View>
       )}
@@ -886,10 +910,30 @@ const NAV = StyleSheet.create({
   cell: { width: '25%', alignItems: 'center', marginBottom: 18, paddingHorizontal: 2 },
   cellIco: { width: 52, height: 52, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   cellLbl: { fontSize: 10.5, fontWeight: '600', color: '#C6B4DE', textAlign: 'center', lineHeight: 13 },
+  signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 6, marginHorizontal: 4, paddingVertical: 14, borderRadius: 16, backgroundColor: 'rgba(240,135,30,0.10)', borderWidth: 1, borderColor: 'rgba(240,135,30,0.35)' },
+  signOutLbl: { fontSize: 14, fontWeight: '800', color: '#FBC98A', letterSpacing: 0.3 },
 });
 
+// Shown when an authenticated account resolves to a role that is neither an admin
+// role nor tenant/technician — instead of silently dropping it into the admin app.
+function UnauthorizedScreen({ onLogout }: { onLogout: () => void }) {
+  return (
+    <LinearGradient colors={glass.screenGradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <Ionicons name="lock-closed-outline" size={48} color="#7B2FBE" />
+      <Text style={{ fontSize: fontSize.xl, fontWeight: '900', color: '#1E1230', marginTop: 16, textAlign: 'center' }}>Access not enabled</Text>
+      <Text style={{ fontSize: fontSize.sm, color: '#5C4B70', marginTop: 10, textAlign: 'center', lineHeight: 20 }}>
+        Your account isn't set up with access to this app yet. Please contact your administrator.
+      </Text>
+      <TouchableOpacity onPress={onLogout} style={{ marginTop: 28, backgroundColor: '#7B2FBE', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12 }}>
+        <Text style={{ color: '#fff', fontWeight: '800' }}>Sign Out</Text>
+      </TouchableOpacity>
+    </LinearGradient>
+  );
+}
+
 function AppNavigator() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, logout } = useAuth();
   const { colors } = useTheme();
   const navRef = useNavigationContainerRef();
 
@@ -919,14 +963,18 @@ function AppNavigator() {
 
   const role = user?.role || '';
 
-  // technician/maintenance → restricted: Tickets only
+  // technician → restricted: Tickets only
   const isEmployee = role === 'technician';
-
   // tenant → restricted: Raise ticket + My requests + Profile only
   const isTenant = role === 'tenant';
+  // Admin drawer is gated to an explicit allow-list (was "anything not
+  // tenant/technician"). An unrecognized/unauthorized role no longer falls
+  // through to the full admin app.
+  const isAdmin = ADMIN_ROLES.has(role);
 
-  // everything else (org_admin, super_admin, property_manager, null→mapped to org_admin) → full access
-  const isAdmin = !isEmployee && !isTenant;
+  if (!isAdmin && !isEmployee && !isTenant) {
+    return <UnauthorizedScreen onLogout={logout} />;
+  }
 
   return (
     <View style={{ flex: 1 }}>
