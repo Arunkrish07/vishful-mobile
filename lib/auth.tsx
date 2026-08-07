@@ -36,7 +36,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   tenantLocation: TenantLocation | null;
-  login: (token: string, userData?: AuthUser) => Promise<void>;
+  login: (token: string, userData?: AuthUser, refreshToken?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => void;
 }
@@ -49,6 +49,7 @@ const AuthContext = createContext<AuthContextType>({
 
 const TOKEN_KEY = '@vishful_auth_token';
 const USER_KEY = '@vishful_auth_user';
+const REFRESH_KEY = '@vishful_auth_refresh';
 
 export function AuthProvider({ children }: { children: any }) {
   const [token, setToken] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: any }) {
   const mounted = useRef(true);
   const justLoggedIn = useRef(false);
   const sessionValidated = useRef(false);
+  const refreshTokenRef = useRef<string | null>(null);
 
   useEffect(() => { return () => { mounted.current = false; }; }, []);
 
@@ -66,8 +68,10 @@ export function AuthProvider({ children }: { children: any }) {
       try {
         const savedToken = await AsyncStorage.getItem(TOKEN_KEY);
         const savedUser = await AsyncStorage.getItem(USER_KEY);
+        const savedRefresh = await AsyncStorage.getItem(REFRESH_KEY);
+        refreshTokenRef.current = savedRefresh;
 
-        console.log("[LOAD AUTH] token exists:", !!savedToken, "user exists:", !!savedUser);
+        console.log("[LOAD AUTH] token exists:", !!savedToken, "user exists:", !!savedUser, "refresh exists:", !!savedRefresh);
 
         if (savedToken && savedUser) {
           setToken(savedToken);
@@ -130,12 +134,45 @@ export function AuthProvider({ children }: { children: any }) {
           setUser(userData);
           AsyncStorage.setItem(USER_KEY, JSON.stringify(userData)).catch(() => {});
         } else {
-          console.log('[AUTH] Session invalid — clearing auth state');
-          sessionValidated.current = false;
-          setToken(null);
-          setUser(null);
-          AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
-          AsyncStorage.removeItem(USER_KEY).catch(() => {});
+          // Access token is invalid — most commonly just expired. Try to renew it
+          // with the stored refresh token before logging the user out.
+          const clearAll = () => {
+            sessionValidated.current = false;
+            refreshTokenRef.current = null;
+            setToken(null);
+            setUser(null);
+            AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
+            AsyncStorage.removeItem(USER_KEY).catch(() => {});
+            AsyncStorage.removeItem(REFRESH_KEY).catch(() => {});
+          };
+          const rt = refreshTokenRef.current;
+          if (!rt) {
+            console.log('[AUTH] Session invalid, no refresh token — clearing auth state');
+            clearAll();
+            return;
+          }
+          console.log('[AUTH] Session invalid — attempting token refresh');
+          sb.refreshSession(rt)
+            .then((r: any) => {
+              if (!mounted.current) return;
+              if (r?.success && r.token) {
+                console.log('[AUTH] Access token refreshed');
+                refreshTokenRef.current = r.refreshToken || rt;
+                AsyncStorage.setItem(REFRESH_KEY, refreshTokenRef.current!).catch(() => {});
+                AsyncStorage.setItem(TOKEN_KEY, r.token).catch(() => {});
+                // Fresh token straight from Supabase — mark validated so the
+                // token-change effect early-returns instead of re-validating (no loop).
+                sessionValidated.current = true;
+                setToken(r.token);
+              } else {
+                console.log('[AUTH] Refresh failed — clearing auth state');
+                clearAll();
+              }
+            })
+            .catch((err: any) => {
+              // Network/transient error — keep cached session rather than logging out.
+              console.warn('[AUTH] Refresh error (keeping cached data):', err?.message);
+            });
         }
       })
       .catch((err) => {
@@ -172,9 +209,13 @@ export function AuthProvider({ children }: { children: any }) {
     }
   }, [isTenant, token, user?.phone]);
 
-  const login = useCallback(async (newToken: string, userData?: AuthUser) => {
+  const login = useCallback(async (newToken: string, userData?: AuthUser, refreshToken?: string) => {
     try {
       await AsyncStorage.setItem(TOKEN_KEY, newToken);
+      if (refreshToken) {
+        refreshTokenRef.current = refreshToken;
+        await AsyncStorage.setItem(REFRESH_KEY, refreshToken);
+      }
       if (userData) {
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
         setUser(userData);
@@ -194,6 +235,7 @@ export function AuthProvider({ children }: { children: any }) {
 
   const logout = useCallback(() => {
     sessionValidated.current = false;
+    refreshTokenRef.current = null;
     // Best-effort: drop this device's push token before clearing the session.
     import('./pushNotifications').then(m => m.unregisterPush()).catch(() => {});
     setToken(null);
@@ -201,6 +243,7 @@ export function AuthProvider({ children }: { children: any }) {
     setTenantLocation(null);
     AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
     AsyncStorage.removeItem(USER_KEY).catch(() => {});
+    AsyncStorage.removeItem(REFRESH_KEY).catch(() => {});
   }, []);
 
   const refreshUser = useCallback(() => {

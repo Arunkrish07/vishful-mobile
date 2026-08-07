@@ -33,11 +33,26 @@ export async function sendOtp(phone: string): Promise<{ success: boolean; messag
 export async function verifyOtpAndLogin(phone: string, otp: string): Promise<{
   success: boolean;
   token?: string;
+  refreshToken?: string;
   user?: { userId: string; userName: string; phone: string; role: string; organizationId: string; organizationName: string; supabaseUserId?: string | null };
   reason?: string;
   message?: string;
 }> {
   return client.action(api.otpAuth.verifyOtpAndLogin, { phone, otp });
+}
+
+// Exchange a stored refresh token for a fresh access token. Returns { success:false }
+// on any failure so the caller can fall back to logging out.
+export async function refreshSession(refreshToken: string): Promise<{ success: boolean; token?: string; refreshToken?: string }> {
+  if (!refreshToken || typeof refreshToken !== 'string' || refreshToken.trim().length === 0) {
+    return { success: false };
+  }
+  try {
+    return await client.action(api.otpAuth.refreshSession, { refreshToken });
+  } catch (e: any) {
+    console.warn('[supabaseService] refreshSession error:', e?.message);
+    return { success: false };
+  }
 }
 
 export async function getSession(token: string): Promise<{

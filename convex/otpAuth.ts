@@ -359,6 +359,9 @@ export const verifyOtpAndLogin = action({
       return {
         success: true,
         token: sessionData?.session?.access_token || "",
+        // Return the refresh token so the client can renew the access token when it
+        // expires (~1h) instead of forcing a re-login. Consumed by refreshSession.
+        refreshToken: sessionData?.session?.refresh_token || "",
         user_type: userType,
         user: {
           userId: authUserId || "",
@@ -532,6 +535,39 @@ export const getSession = action({
     } catch (err: any) {
       console.error("[getSession] Error:", err?.message);
       return { valid: false };
+    }
+  },
+});
+
+// Exchange a Supabase refresh token for a fresh access token (and rotated refresh
+// token). Lets the client renew an expired session silently instead of logging the
+// user out. Returns { success:false } when the refresh token is missing/invalid.
+export const refreshSession = action({
+  args: { refreshToken: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { refreshToken }) => {
+    if (!refreshToken || typeof refreshToken !== "string" || refreshToken.trim().length === 0) {
+      return { success: false };
+    }
+    try {
+      const authClient = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false } }
+      );
+      const { data, error } = await authClient.auth.refreshSession({ refresh_token: refreshToken });
+      if (error || !data?.session?.access_token) {
+        console.warn("[refreshSession] failed:", error?.message);
+        return { success: false };
+      }
+      return {
+        success: true,
+        token: data.session.access_token,
+        refreshToken: data.session.refresh_token || refreshToken,
+      };
+    } catch (err: any) {
+      console.error("[refreshSession] Error:", err?.message);
+      return { success: false };
     }
   },
 });

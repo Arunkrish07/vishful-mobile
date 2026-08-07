@@ -134,7 +134,7 @@ export default function LoginScreen() {
       const cleanPhone = phone.trim().replace(/\D/g, '').slice(-10);
       const result = await sb.verifyOtpAndLogin(cleanPhone, otp.trim());
       if (result.success && result.token) {
-        await login(result.token, result.user as any);
+        await login(result.token, result.user as any, result.refreshToken);
       } else {
         setError(result.message || 'Something went wrong. Please try again.');
       }
