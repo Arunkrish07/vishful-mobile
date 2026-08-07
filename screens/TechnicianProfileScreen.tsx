@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, glass, borderRadius } from '../lib/theme';
@@ -126,47 +126,6 @@ export default function TechnicianProfileScreen() {
                 </View>
               );
             })}
-          </View>
-
-          {/* Settings */}
-          <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.md, marginTop: spacing.md }}>
-            Settings
-          </Text>
-          <View style={glass.card}>
-            {[
-              { icon: 'notifications-outline', label: 'Push Notifications', action: 'toggle' },
-              { icon: 'moon-outline', label: 'Dark Mode', action: 'coming_soon' },
-              { icon: 'language-outline', label: 'Language', value: 'English' },
-              { icon: 'shield-checkmark-outline', label: 'Privacy Policy', action: 'nav' },
-            ].map((item, i, arr) => (
-              <TouchableOpacity
-                key={item.label}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
-                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-                  borderBottomColor: 'rgba(224,213,234,0.2)',
-                }}
-                disabled={item.action === 'toggle'}
-              >
-                <View style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  backgroundColor: 'rgba(123,47,190,0.08)',
-                  alignItems: 'center', justifyContent: 'center', marginRight: spacing.md,
-                }}>
-                  <Ionicons name={item.icon as any} size={18} color="#7B2FBE" />
-                </View>
-                <Text style={{ flex: 1, fontSize: fontSize.md, color: colors.text }}>{item.label}</Text>
-                {item.value && (
-                  <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginRight: 4 }}>{item.value}</Text>
-                )}
-                {item.action === 'coming_soon' && (
-                  <Text style={{ fontSize: 10, color: colors.textTertiary, marginRight: 4 }}>Soon</Text>
-                )}
-                {item.action !== 'toggle' && (
-                  <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-                )}
-              </TouchableOpacity>
-            ))}
           </View>
 
           {/* Logout */}

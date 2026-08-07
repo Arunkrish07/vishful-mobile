@@ -167,8 +167,10 @@ function TicketsDashboardScreen({ navigation }: any) {
 
   const stats = useMemo(() => {
     const active  = tickets.filter(t => ['assigned', 'in_progress'].includes(t.status));
-    const waiting = tickets.filter(t => ['waiting_for_cost_approval', 'waiting_for_parts'].includes(t.status));
-    const pending = tickets.filter(t => ['pending_tenant_approval', 'pending_admin_approval'].includes(t.status));
+    // Counts below must match the tab each stat card opens (see StatCard onPress),
+    // otherwise tapping a card lands on a tab showing a different number.
+    const waiting = tickets.filter(t => ['waiting_for_cost_approval'].includes(t.status));
+    const pending = tickets.filter(t => ['pending_admin_approval'].includes(t.status));
     const closed  = tickets.filter(t => ['closed', 'completed'].includes(t.status));
     const breached = tickets.filter(t => {
       if (!t.sla_deadline) return false;

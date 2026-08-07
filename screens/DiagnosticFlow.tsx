@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../lib/ThemeContext';
 import { useAuth } from '../lib/auth';
 import { client, api } from '../lib/convexApi';
-import { saveTicketResolution } from '../services/ticketService';
+import { saveTicketResolution, submitDiagnosis } from '../services/ticketService';
 import * as sb from '../lib/supabaseService';
 
 const BRAND = '#E8841A';
@@ -270,6 +270,20 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
     if (!confirmedDiag) return;
     setSubmitting(true);
     try {
+      // Persist the diagnosis first (Q&A + AI cause) so no-cost closures keep a
+      // diagnostic record and the ticket transitions assigned→in_progress, exactly
+      // like the cost path does. Failure here must not block the closure.
+      try {
+        await submitDiagnosis({
+          ticketId,
+          issueTypeId,
+          questionsAnswers: answers.reduce((acc, qa) => ({ ...acc, [qa.question]: qa.answer }), {} as Record<string, string>),
+          aiDiagnosis: diagnosis ? JSON.stringify(diagnosis) : undefined,
+          employeeOverride: `${confirmedDiag.cause}. Solution: ${confirmedDiag.recommendation}`,
+          performedBy: actorId,
+        });
+      } catch (e) { console.warn('submitDiagnosis (no-cost) error:', e); }
+
       // Write a minimal resolution row (mirrors the "Mark Complete" flow) instead
       // of only flipping status — no-cost closures previously left no
       // ticket_resolutions record. saveResolution also routes the ticket to the

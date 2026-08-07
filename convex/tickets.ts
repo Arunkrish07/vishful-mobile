@@ -1618,9 +1618,18 @@ export const saveResolution = action({
       return { success: true, newStatus: ticket.status };
     }
 
-    // Determine approval routing (same as web)
+    // Determine approval routing (same as web). Admin-created tickets with NO cost
+    // estimates need no approval step → auto-close.
     const isAdminCreated = !ticket.tenant_id;
-    const pendingStatus  = isAdminCreated ? "pending_admin_approval" : "pending_tenant_approval";
+    let pendingStatus: string = isAdminCreated ? "pending_admin_approval" : "pending_tenant_approval";
+    if (isAdminCreated) {
+      const { data: estRows } = await sb
+        .from("ticket_cost_estimates")
+        .select("id")
+        .eq("ticket_id", args.ticketId)
+        .limit(1);
+      if (!estRows || (estRows as any[]).length === 0) pendingStatus = "closed";
+    }
     await sb.from("maintenance_tickets").update({
       status:      pendingStatus,
       resolved_at: new Date().toISOString(),
