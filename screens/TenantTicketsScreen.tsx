@@ -908,7 +908,7 @@ function TenantTicketCard({ ticket, onPress, showApprovalCta }: {
         <Text style={{ fontSize: 11, color: colors.textTertiary }}>
           {formatDate(ticket.created_at, '')}
         </Text>
-        {ticket.estimated_cost && <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#7B2FBE' }}>₹{ticket.estimated_cost}</Text>}
+        {/* Cost intentionally hidden from tenants (web parity — cost is technician/admin-only) */}
       </View>
     </TouchableOpacity>
   );

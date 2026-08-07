@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
@@ -100,6 +100,8 @@ export default function TenantProfileScreen() {
               email:            t.email ?? null,
               gender:           t.gender ?? null,
               permanentAddress: t.permanentAddress ?? null,
+              photoUrl:         t.photoUrl ?? null,
+              kycCompleted:     t.kycCompleted ?? false,
             });
             setAccommodation({
               stayingStatus:  t.stayingStatus ?? null,
@@ -107,6 +109,8 @@ export default function TenantProfileScreen() {
               bed:            t.bedCode ?? null,
               onboardingDate: t.checkInDate ?? null,
               noticeDate:     t.noticeDate ?? null,
+              monthlyRent:    t.monthlyRent ?? null,
+              exitDate:       t.estimatedExitDate ?? null,
             });
             setError(null);
           } else {
@@ -184,10 +188,15 @@ export default function TenantProfileScreen() {
                     width: 60, height: 60, borderRadius: 16,
                     backgroundColor: colors.primary,
                     alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg,
+                    overflow: 'hidden',
                   }}>
-                    <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff' }}>
-                      {(profile?.name || user?.userName || 'T')[0].toUpperCase()}
-                    </Text>
+                    {profile?.photoUrl ? (
+                      <Image source={{ uri: profile.photoUrl }} style={{ width: 60, height: 60 }} resizeMode="cover" />
+                    ) : (
+                      <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff' }}>
+                        {(profile?.name || user?.userName || 'T')[0].toUpperCase()}
+                      </Text>
+                    )}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>
@@ -228,6 +237,12 @@ export default function TenantProfileScreen() {
                     {accommodation?.noticeDate && formatDate(accommodation?.noticeDate) && (
                       <InfoRow icon="warning-outline"  label="Notice Date" value={formatDate(accommodation?.noticeDate) ?? 'N/A'} />
                     )}
+                    {accommodation?.exitDate && formatDate(accommodation?.exitDate) && (
+                      <InfoRow icon="exit-outline"     label="Estimated Exit Date" value={formatDate(accommodation?.exitDate) ?? 'N/A'} />
+                    )}
+                    {accommodation?.monthlyRent ? (
+                      <InfoRow icon="cash-outline"     label="Monthly Rent" value={`₹${Number(accommodation.monthlyRent).toLocaleString('en-IN')}`} />
+                    ) : null}
                   </View>
                 </>
               )}
@@ -240,6 +255,7 @@ export default function TenantProfileScreen() {
                   { icon: 'mail-outline',  label: 'Email',             value: profile?.email },
                   { icon: 'person-outline',label: 'Gender',            value: profile?.gender },
                   { icon: 'home-outline',  label: 'Permanent Address', value: profile?.permanentAddress },
+                  { icon: profile?.kycCompleted ? 'checkmark-circle-outline' : 'alert-circle-outline', label: 'KYC Status', value: profile?.kycCompleted ? 'Verified' : 'Pending' },
                 ].filter(d => d.value).map((d) => (
                   <InfoRow key={d.label} icon={d.icon} label={d.label} value={d.value as string} />
                 ))}

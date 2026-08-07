@@ -559,6 +559,7 @@ export async function createTicketHelper(data: any): Promise<any> {
     sla_deadline:    slaDeadline,
     assigned_to:     assignedTo,
     status,
+    asset_id:        data.asset_id     || null,
     photo_urls:      data.photo_urls   || null,
     created_by:      data.created_by   || null,
     tenant_name:     tenantName,
