@@ -145,6 +145,7 @@ export default function TenantsScreen() {
   const [photoUri,        setPhotoUri]        = useState<string | null>(null);
   const [photoBase64,     setPhotoBase64]     = useState<string | undefined>();
   const [aadhaarFrontUri, setAadhaarFrontUri] = useState<string | null>(null);
+  const [aadhaarFrontBase64, setAadhaarFrontBase64] = useState<string | undefined>();
   const [aadhaarBackUri,  setAadhaarBackUri]  = useState<string | null>(null);
   const [idCardUri,       setIdCardUri]       = useState<string | null>(null);
   const [uploadingDocs,   setUploadingDocs]   = useState(false);
@@ -238,6 +239,13 @@ export default function TenantsScreen() {
         photoUrl = await uploadDocToStorage(photoUri, photoBase64, 'kyc-photos', 'photo');
         setUploadingDocs(false);
       }
+      // Upload the Aadhaar front doc → id_proof_url (the one KYC document column).
+      let idProofUrl: string | null = null;
+      if (aadhaarFrontUri && aadhaarFrontBase64) {
+        setUploadingDocs(true);
+        idProofUrl = await uploadDocToStorage(aadhaarFrontUri, aadhaarFrontBase64, 'kyc-docs', 'aadhaar');
+        setUploadingDocs(false);
+      }
       // 1. Create the base tenant (live createTenant only persists identity).
       const created: any = await sb.createTenant({
         full_name: fullName,
@@ -267,6 +275,7 @@ export default function TenantsScreen() {
           emergency_contact_phone:  form.emergencyContactPhone || null,
           pan_number:               form.pan_number || null,
           ...(form.aadhar_number ? { id_proof_number: form.aadhar_number, id_proof_type: 'aadhaar' } : {}),
+          ...(idProofUrl ? { id_proof_url: idProofUrl } : {}),
           ...(photoUrl ? { photo_url: photoUrl } : {}),
           kyc_completed:            true,
         });
@@ -274,7 +283,7 @@ export default function TenantsScreen() {
       setShowAdd(false);
       setForm({ ...EMPTY_FORM });
       setPhotoUri(null); setPhotoBase64(undefined);
-      setAadhaarFrontUri(null); setAadhaarBackUri(null); setIdCardUri(null);
+      setAadhaarFrontUri(null); setAadhaarFrontBase64(undefined); setAadhaarBackUri(null); setIdCardUri(null);
       refresh();
     } catch (e: any) { Alert.alert('Error', e.message); }
     setLoading(false);
@@ -291,6 +300,12 @@ export default function TenantsScreen() {
       if (photoUri && photoBase64) {
         setUploadingDocs(true);
         photoUrl = (await uploadDocToStorage(photoUri, photoBase64, 'kyc-photos', 'photo')) || photoUrl;
+        setUploadingDocs(false);
+      }
+      let idProofUrl: string | null = null;
+      if (aadhaarFrontUri && aadhaarFrontBase64) {
+        setUploadingDocs(true);
+        idProofUrl = await uploadDocToStorage(aadhaarFrontUri, aadhaarFrontBase64, 'kyc-docs', 'aadhaar');
         setUploadingDocs(false);
       }
       await sb.updateTenant(editTenant._id, {
@@ -312,10 +327,12 @@ export default function TenantsScreen() {
         emergency_contact_name:   form.emergencyContactName || null,
         emergency_contact_phone:  form.emergencyContactPhone || null,
         pan_number:               form.pan_number || null,
+        ...(idProofUrl ? { id_proof_url: idProofUrl } : {}),
         photo_url:                photoUrl,
       });
       setShowEdit(false); setEditTenant(null); setForm({ ...EMPTY_FORM });
       setPhotoUri(null); setPhotoBase64(undefined);
+      setAadhaarFrontUri(null); setAadhaarFrontBase64(undefined); setAadhaarBackUri(null); setIdCardUri(null);
       refresh();
     } catch (e: any) { Alert.alert('Error', e.message); }
     setLoading(false);
@@ -364,7 +381,7 @@ export default function TenantsScreen() {
       onboardingDate:          t.onboardingDate || '',
     });
     setPhotoUri(t.photoUrl || null); setPhotoBase64(undefined);
-    setAadhaarFrontUri(null); setAadhaarBackUri(null); setIdCardUri(null);
+    setAadhaarFrontUri(null); setAadhaarFrontBase64(undefined); setAadhaarBackUri(null); setIdCardUri(null);
     setShowEdit(true);
   };
 
@@ -800,6 +817,7 @@ export default function TenantsScreen() {
           setPhotoBase64={setPhotoBase64}
           aadhaarFrontUri={aadhaarFrontUri}
           setAadhaarFrontUri={setAadhaarFrontUri}
+          setAadhaarFrontBase64={setAadhaarFrontBase64}
           aadhaarBackUri={aadhaarBackUri}
           setAadhaarBackUri={setAadhaarBackUri}
           idCardUri={idCardUri}
@@ -822,6 +840,7 @@ export default function TenantsScreen() {
           setPhotoBase64={setPhotoBase64}
           aadhaarFrontUri={aadhaarFrontUri}
           setAadhaarFrontUri={setAadhaarFrontUri}
+          setAadhaarFrontBase64={setAadhaarFrontBase64}
           aadhaarBackUri={aadhaarBackUri}
           setAadhaarBackUri={setAadhaarBackUri}
           idCardUri={idCardUri}
@@ -1319,7 +1338,7 @@ function FormSection({ icon, title }: { icon: string; title: string }) {
 function TenantFormModal({
   visible, title, form, setF, loading, onClose, onSubmit, submitLabel,
   photoUri, setPhotoUri, setPhotoBase64,
-  aadhaarFrontUri, setAadhaarFrontUri,
+  aadhaarFrontUri, setAadhaarFrontUri, setAadhaarFrontBase64,
   aadhaarBackUri,  setAadhaarBackUri,
   idCardUri,       setIdCardUri,
   pickImage,
@@ -1332,6 +1351,7 @@ function TenantFormModal({
   photoUri: string | null; setPhotoUri: (v: string | null) => void;
   setPhotoBase64: (v?: string) => void;
   aadhaarFrontUri: string | null; setAadhaarFrontUri: (v: string | null) => void;
+  setAadhaarFrontBase64: (v?: string) => void;
   aadhaarBackUri:  string | null; setAadhaarBackUri:  (v: string | null) => void;
   idCardUri:       string | null; setIdCardUri:       (v: string | null) => void;
   pickImage: (cb: (uri: string, b64?: string) => void, title?: string) => void;
@@ -1388,12 +1408,12 @@ function TenantFormModal({
           {/* ══ SECTION 1: Aadhaar Upload ══ */}
           <FormSection icon="scan-outline" title="Aadhaar Card" />
           <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12, marginTop: -8 }}>
-            Upload front and back to auto-fill your details
+            The front image is saved to the tenant's KYC record. Back is kept on-device only.
           </Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <DocUpload uri={aadhaarFrontUri} required label="Aadhaar Front *"
-                onPick={() => pickImage((uri, b64) => { setAadhaarFrontUri(uri); }, 'Aadhaar Front')} />
+              <DocUpload uri={aadhaarFrontUri} label="Aadhaar Front"
+                onPick={() => pickImage((uri, b64) => { setAadhaarFrontUri(uri); setAadhaarFrontBase64(b64); }, 'Aadhaar Front')} />
             </View>
             <View style={{ flex: 1 }}>
               <DocUpload uri={aadhaarBackUri} label="Aadhaar Back"
@@ -1413,7 +1433,7 @@ function TenantFormModal({
           <Input label="S/W/D of (Relationship)" value={form.relation_name} onChangeText={setF('relation_name')} placeholder="e.g. S/o Ramesh Kumar" />
           <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Date of Birth *</Text><DateField value={form.date_of_birth} onChange={setF('date_of_birth')} /></View>
           <PillSelect label="Gender *" value={form.gender} options={GENDER_OPTS} onSelect={setF('gender')} required />
-          <PillSelect label="Food Preference *" value={form.food_preference} options={FOOD_OPTS} onSelect={setF('food_preference')} required />
+          <PillSelect label="Food Preference" value={form.food_preference} options={FOOD_OPTS} onSelect={setF('food_preference')} />
           <Input label="Profession *" value={form.profession} onChangeText={setF('profession')} placeholder="e.g. Software Engineer, Student" />
 
           {/* Photo */}
@@ -1446,7 +1466,7 @@ function TenantFormModal({
           <FormSection icon="call-outline" title="Emergency Contact" />
           <Input label="Contact Name *" value={form.emergencyContactName} onChangeText={setF('emergencyContactName')} placeholder="Parent / Spouse name" />
           <View style={{ marginBottom: 12 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 6 }}>Relationship *</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 6 }}>Relationship</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {RELATION_OPTS.map(r => {
@@ -1465,11 +1485,14 @@ function TenantFormModal({
 
           {/* ══ SECTION 5: Bank Details ══ */}
           <FormSection icon="card-outline" title="Bank Details" />
-          <Input label="Bank Name *" value={form.bank_name} onChangeText={setF('bank_name')} placeholder="e.g. HDFC Bank" />
-          <Input label="Branch *" value={form.bank_branch} onChangeText={setF('bank_branch')} placeholder="Branch name" />
-          <Input label="Account Number *" value={form.bank_account_number} onChangeText={setF('bank_account_number')} placeholder="Account number" keyboardType="number-pad" />
-          <Input label="Account Holder Name *" value={form.bank_account_holder} onChangeText={setF('bank_account_holder')} placeholder="Name on account" />
-          <Input label="IFSC Code *" value={form.bank_ifsc} onChangeText={v => setF('bank_ifsc')(v.toUpperCase().slice(0,11))} placeholder="e.g. HDFC0001234" autoCapitalize="characters" maxLength={11} />
+          <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: -8, marginBottom: 10 }}>
+            Not yet stored on the tenant record from mobile — capture in the web app for now.
+          </Text>
+          <Input label="Bank Name" value={form.bank_name} onChangeText={setF('bank_name')} placeholder="e.g. HDFC Bank" />
+          <Input label="Branch" value={form.bank_branch} onChangeText={setF('bank_branch')} placeholder="Branch name" />
+          <Input label="Account Number" value={form.bank_account_number} onChangeText={setF('bank_account_number')} placeholder="Account number" keyboardType="number-pad" />
+          <Input label="Account Holder Name" value={form.bank_account_holder} onChangeText={setF('bank_account_holder')} placeholder="Name on account" />
+          <Input label="IFSC Code" value={form.bank_ifsc} onChangeText={v => setF('bank_ifsc')(v.toUpperCase().slice(0,11))} placeholder="e.g. HDFC0001234" autoCapitalize="characters" maxLength={11} />
 
           {/* ══ SECTION 6: Other ID & Tax Details ══ */}
           <FormSection icon="document-text-outline" title="Other ID & Tax Details" />
