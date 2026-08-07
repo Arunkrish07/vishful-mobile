@@ -21,7 +21,9 @@ import { client as convexClient, api as convexApi } from '../lib/convexApi';
 const NAV_REGISTRY = [
   { module: 'dashboard',        label: 'Dashboard',        icon: 'grid-outline',            tabs: [] },
   { module: 'properties',       label: 'Properties',       icon: 'business-outline',        tabs: [] },
+  { module: 'owners',           label: 'Owners',           icon: 'people-circle-outline',   tabs: [] },
   { module: 'tenants',          label: 'Tenants',          icon: 'people-outline',          tabs: [] },
+  { module: 'tenant_lifecycle', label: 'Tenant Lifecycle', icon: 'git-branch-outline',      tabs: [] },
   { module: 'assets',           label: 'Assets',           icon: 'cube-outline',
     tabs: [
       { key: 'inventory',   label: 'Inventory' },
@@ -62,7 +64,11 @@ const NAV_REGISTRY = [
       { key: 'summary',  label: 'Summary'  },
     ],
   },
+  { module: 'analytics',     label: 'Analytics',     icon: 'analytics-outline',      tabs: [] },
+  { module: 'availability',  label: 'Availability',  icon: 'calendar-outline',       tabs: [] },
   { module: 'market_ai',     label: 'Market AI',     icon: 'radio-outline',         tabs: [] },
+  { module: 'announcements', label: 'Announcements', icon: 'megaphone-outline',      tabs: [] },
+  { module: 'team',          label: 'Team',          icon: 'briefcase-outline',      tabs: [] },
   { module: 'whatsapp_logs', label: 'WhatsApp Logs', icon: 'logo-whatsapp',          tabs: [] },
   { module: 'audit_logs',    label: 'Audit Logs',    icon: 'document-text-outline',  tabs: [] },
   { module: 'settings', label: 'Settings', icon: 'settings-outline', tabs: [] },
@@ -769,7 +775,7 @@ export default function SettingsScreen() {
       <SaveBtn loading={loading} label="Save Financial Constants" onPress={async () => {
         setLoading(true);
         try {
-          await call('saveLifecycleConfig', { id: lifecycleId, ...Object.fromEntries(Object.entries(finForm).map(([k, v]) => [k, Number(v)])) });
+          await call('saveLifecycleConfig', { data: { id: lifecycleId, ...Object.fromEntries(Object.entries(finForm).map(([k, v]) => [k, Number(v)])) } });
           Alert.alert('Saved', 'Financial constants updated.');
         } catch (e: any) { Alert.alert('Error', e.message); }
         setLoading(false);
@@ -828,7 +834,7 @@ export default function SettingsScreen() {
         <SaveBtn loading={loading} label="Save Exit Settings" onPress={async () => {
           setLoading(true);
           try {
-            await call('saveOrgExitSettings', exitForm);
+            await call('saveOrgExitSettings', { data: exitForm });
             Alert.alert('Saved', 'Exit process settings updated.');
           } catch (e: any) { Alert.alert('Error', e.message); }
           setLoading(false);
@@ -885,7 +891,7 @@ export default function SettingsScreen() {
         <SaveBtn loading={loading} label="Save Auto-Approval Settings" onPress={async () => {
           setLoading(true);
           try {
-            await call('saveOrgExitSettings', { ticket_auto_approve_threshold: parseFloat(autoForm.ticket_auto_approve_threshold), ticket_repeat_check_days: parseInt(autoForm.ticket_repeat_check_days) });
+            await call('saveOrgExitSettings', { data: { ticket_auto_approve_threshold: parseFloat(autoForm.ticket_auto_approve_threshold), ticket_repeat_check_days: parseInt(autoForm.ticket_repeat_check_days) } });
             Alert.alert('Saved', 'Auto-approval settings updated.');
           } catch (e: any) { Alert.alert('Error', e.message); }
           setLoading(false);
@@ -1092,8 +1098,8 @@ export default function SettingsScreen() {
                   if (!ruleForm.assigned_employee_id) { Alert.alert('Required', 'Select a team member.'); return; }
                   setLoading(true);
                   try {
-                    if (editRule) { await call('updateAssignmentRule', { id: editRule.id, ...ruleForm, priority: parseInt(ruleForm.priority) }); }
-                    else { await call('createAssignmentRule', { ...ruleForm, priority: parseInt(ruleForm.priority) }); }
+                    if (editRule) { await call('updateAssignmentRule', { id: editRule.id, data: { ...ruleForm, priority: parseInt(ruleForm.priority) } }); }
+                    else { await call('createAssignmentRule', { data: { ...ruleForm, priority: parseInt(ruleForm.priority) } }); }
                     setRuleOpen(false); loadTab('rules');
                     Alert.alert('Saved', 'Assignment rule saved.');
                   } catch (e: any) { Alert.alert('Error', e.message); }
@@ -1179,7 +1185,7 @@ export default function SettingsScreen() {
                   if (!maintForm.name.trim()) { Alert.alert('Required', 'Enter item name.'); return; }
                   setLoading(true);
                   try {
-                    await call('createMaintenanceItem', maintForm);
+                    await call('createMaintenanceItem', { data: maintForm });
                     setMaintOpen(false); setMaintForm({ name: '', unit: '', description: '' }); loadTab('maintenance');
                     Alert.alert('Added', 'Maintenance item added.');
                   } catch (e: any) { Alert.alert('Error', e.message); }

@@ -961,6 +961,7 @@ export default function TicketsScreen({ navigation }: any) {
 
   // Extra data for admin tabs
   const [issueTypes,     setIssueTypes]    = useState<IssueType[]>([]);
+  const [issueTypesLoaded, setIssueTypesLoaded] = useState(false);
   const [regularRules,   setRegularRules]  = useState<any[]>([]);
   const [regularLoading, setRegularLoading] = useState(false);
   const [aiAnalysis,     setAiAnalysis]    = useState<string | null>(null);
@@ -993,7 +994,7 @@ export default function TicketsScreen({ navigation }: any) {
     try {
       const types = await fetchIssueTypes();
       setIssueTypes(types);
-    } catch {}
+    } catch {} finally { setIssueTypesLoaded(true); }
   }, [issueTypes.length]);
 
   // Load regular maintenance rules for the Regular tab
@@ -1002,7 +1003,7 @@ export default function TicketsScreen({ navigation }: any) {
     setRegularLoading(true);
     try {
       const { default: client, api } = await import('../lib/convexApi') as any;
-      const rules = await client.action(api.tickets.getRegularMaintenanceRules ?? api.tickets.getIssueTypes, {});
+      const rules = await client.action(api.tickets.getIssueTypes, {});
       setRegularRules(Array.isArray(rules) ? rules : []);
     } catch {
       setRegularRules([]);
@@ -1586,9 +1587,14 @@ export default function TicketsScreen({ navigation }: any) {
               </Text>
             </View>
 
-            {issueTypes.length === 0 ? (
+            {!issueTypesLoaded ? (
               <View style={{ alignItems:'center', paddingVertical:40 }}>
                 <ActivityIndicator color="#7B2FBE" />
+              </View>
+            ) : issueTypes.length === 0 ? (
+              <View style={{ alignItems:'center', paddingVertical:40, gap:8 }}>
+                <Ionicons name="pricetags-outline" size={28} color="#B9A8CE" />
+                <Text style={{ fontSize:13, color:'#7A6A8E', textAlign:'center' }}>No ticket categories configured.{'\n'}Add them in the web app Settings → Ticket Categories.</Text>
               </View>
             ) : issueTypes.map((it: any) => (
               <View key={it.id} style={{ backgroundColor:'rgba(255,255,255,0.65)', borderRadius:18, padding:14, borderWidth:1, borderColor:'rgba(255,255,255,0.3)' }}>

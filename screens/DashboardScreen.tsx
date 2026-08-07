@@ -1107,6 +1107,36 @@ export default function DashboardScreen() {
           </View>
           <StatCard title="No Warranty Info" value={warrantyStats.noInfo} icon="help-circle-outline" color={colors.textTertiary} />
 
+          {/* ── Recent Tickets ── */}
+          {recentTickets.length > 0 && (
+            <>
+              <SectionLabel>Recent Tickets</SectionLabel>
+              {recentTickets.map((t: any) => {
+                const isClosed = ['closed', 'completed'].includes(t.status);
+                const overdue  = !isClosed && t.sla_deadline && new Date(t.sla_deadline) < new Date();
+                const stripe   = isClosed ? colors.success : overdue ? colors.danger : colors.primary;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={styles.ticketCard}
+                    activeOpacity={0.85}
+                    onPress={() => { try { (navigation as any).navigate('Tickets'); } catch {} }}
+                  >
+                    <View style={[styles.ticketStripe, { backgroundColor: stripe }]} />
+                    <View style={{ flex: 1, paddingLeft: 14 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>{t.ticket_number || 'Ticket'}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary, textTransform: 'capitalize' }}>{String(t.status || '').replace(/_/g, ' ')}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginTop: 3 }} numberOfLines={1}>{t.issue_type || 'Maintenance Issue'}</Text>
+                      {t.property_name ? <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{t.property_name}</Text> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
+
           <View style={{ height: 40 }} />
         </Animated.ScrollView>
       </SafeAreaView>
