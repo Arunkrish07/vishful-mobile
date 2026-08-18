@@ -201,8 +201,8 @@ export default function FloatingAIAssistant() {
                   </View>
                   <View style={[S.bubbleInner, S.bubbleInnerBot, { paddingVertical: 12 }]}>
                     <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-                      <ActivityIndicator size="small" color="#7B2FBE" />
-                      <Text style={{ fontSize: 12, color: '#7B2FBE', fontWeight: '600' }}>Thinking…</Text>
+                      <ActivityIndicator size="small" color="#6366F1" />
+                      <Text style={{ fontSize: 12, color: '#6366F1', fontWeight: '600' }}>Thinking…</Text>
                     </View>
                   </View>
                 </View>
@@ -274,7 +274,7 @@ const S = StyleSheet.create({
     bottom: 28,
     right: 20,
     zIndex: 999,
-    shadowColor: '#7B2FBE',
+    shadowColor: '#6366F1',
     shadowOpacity: 0.5,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
@@ -282,12 +282,12 @@ const S = StyleSheet.create({
   },
   fabInner: {
     width: 56, height: 56, borderRadius: 28,
-    backgroundColor: '#7B2FBE',
+    backgroundColor: '#6366F1',
     alignItems: 'center', justifyContent: 'center',
   },
 
   // Panel
-  panel: { flex: 1, backgroundColor: '#F7F3F9' },
+  panel: { flex: 1, backgroundColor: '#F8FAFC' },
   panelHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
@@ -297,9 +297,9 @@ const S = StyleSheet.create({
   panelHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: {
     width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#7B2FBE',
+    backgroundColor: '#6366F1',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#7B2FBE', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
+    shadowColor: '#6366F1', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
   },
   panelTitle:    { fontSize: 16, fontWeight: '800', color: '#1E1230' },
   panelSubtitle: { fontSize: 11, color: '#9B8BAE', marginTop: 1 },
@@ -320,7 +320,7 @@ const S = StyleSheet.create({
   bubbleUser: { justifyContent: 'flex-end' },
   bubbleBot:  { justifyContent: 'flex-start' },
   botAvatar: {
-    width: 22, height: 22, borderRadius: 11, backgroundColor: '#7B2FBE',
+    width: 22, height: 22, borderRadius: 11, backgroundColor: '#6366F1',
     alignItems: 'center', justifyContent: 'center', marginBottom: 2,
     flexShrink: 0,
   },
@@ -328,7 +328,7 @@ const S = StyleSheet.create({
     maxWidth: W * 0.78, borderRadius: 18, padding: 12,
   },
   bubbleInnerUser: {
-    backgroundColor: '#7B2FBE',
+    backgroundColor: '#6366F1',
     borderBottomRightRadius: 4,
   },
   bubbleInnerBot: {
@@ -345,7 +345,7 @@ const S = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7,
     borderWidth: 1, borderColor: 'rgba(123,47,190,0.15)',
   },
-  suggestionText: { fontSize: 12, color: '#7B2FBE', fontWeight: '600' },
+  suggestionText: { fontSize: 12, color: '#6366F1', fontWeight: '600' },
 
   // Input
   inputArea: {
@@ -364,8 +364,8 @@ const S = StyleSheet.create({
   },
   sendBtn: {
     width: 42, height: 42, borderRadius: 14,
-    backgroundColor: '#7B2FBE',
+    backgroundColor: '#6366F1',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#7B2FBE', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
+    shadowColor: '#6366F1', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4,
   },
 });
