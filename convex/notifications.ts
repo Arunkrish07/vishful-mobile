@@ -119,7 +119,7 @@ export const notifyUsers = internalAction({
       .in("user_id", userIds);
     const tokens = [...new Set((rows || []).map((r: any) => r.token).filter(Boolean))];
     if (!tokens.length) return { sent: 0 };
-    await ctx.runAction(internal.notifications.sendNotification, { to: tokens, title, body, data });
+    await ctx.runAction(internal.notifications.sendNotification, { to: tokens as string[], title, body, data });
     return { sent: tokens.length };
   },
 });

@@ -570,7 +570,7 @@ export const getPropertyPerformanceData = action({
         .eq("id", propertyId)
         .eq("organization_id", ORG_ID)
         .single()
-        .then(r => r.data)
+        .then((r: any) => r.data)
         .catch(() => null),
     ]);
 

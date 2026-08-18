@@ -1,8 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-let _client: ReturnType<typeof createClient> | null = null;
+// Typed as `any`: this is a schema-less service-role client, so @supabase/supabase-js
+// infers query results as `never` (no Database generic). Every caller already treats
+// results as `any`; returning `any` here clears ~467 spurious `never` type errors
+// across convex/ that would otherwise block `convex dev/deploy`'s typecheck.
+let _client: any = null;
 
-export function getSupabase() {
+export function getSupabase(): any {
   if (!_client) {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
