@@ -7,8 +7,8 @@
 // (never throws) in Expo Go, on simulators, or when permission is denied.
 
 import { Platform } from 'react-native';
+import { isRunningInExpoGo } from 'expo';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { client, api } from './convexApi';
 
 let _lastRegisteredToken: string | null = null;
@@ -16,8 +16,11 @@ let _lastRegisteredToken: string | null = null;
 /** Best-effort: acquire the device push token and persist it against the user. */
 export async function registerForPush(userId?: string | null, role?: string | null): Promise<void> {
   try {
+    // Expo Go cannot register native push tokens (removed in SDK 53+).
+    if (isRunningInExpoGo()) return;
     // Physical device only — emulators/simulators can't get a real push token.
     if (!Device.isDevice) return;
+    const Notifications = await import('expo-notifications');
 
     const { status: existing } = await Notifications.getPermissionsAsync();
     let status = existing;

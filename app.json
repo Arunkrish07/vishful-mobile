@@ -2,6 +2,7 @@
   "expo": {
     "name": "Vishful Spaces",
     "slug": "vishful-spaces",
+    "scheme": "vishfulspaces",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
