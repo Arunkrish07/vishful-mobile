@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { spacing, fontSize, glass } from '../lib/theme';
-import { Button, Input, EmptyState, LoadingScreen, GlassBackground } from '../components/shared';
+import { Button, Input, EmptyState, LoadingScreen, GlassBackground, IconBtnSolid, SearchField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -128,8 +128,10 @@ export default function AnnouncementsScreen() {
         content: form.content.trim(),
         priority: form.priority,
         imageUrl: form.image_url?.trim() || null,
-        // Sending implies it goes live to tenants — publish it when sending.
-        isPublished: sendWa ? true : false,
+        // Web parity: creating (with or without Send) stores a draft. Sending only
+        // broadcasts on WhatsApp; visibility in the tenant app is controlled by the
+        // explicit Publish toggle (is_published), matching web createAndSend.
+        isPublished: false,
         createdBy: user?.userId || null,
       });
       setShowAdd(false);
@@ -279,21 +281,20 @@ export default function AnnouncementsScreen() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Announcements</Text>
-            <Text style={styles.headerSub}>{published} published · {total - published} drafts</Text>
+            {(total - published) > 0 ? (
+              <Text style={[styles.headerSub, { color: '#94A3B8' }]}>{total - published} draft{(total - published) === 1 ? '' : 's'}</Text>
+            ) : null}
           </View>
           {canManage ? (
-            <TouchableOpacity
-              style={styles.addBtn}
+            <IconBtnSolid
               onPress={() => { setForm({ ...EMPTY_FORM }); setShowAdd(true); }}
-            >
-              <Ionicons name="add" size={22} color="#fff" />
-            </TouchableOpacity>
+            />
           ) : <View style={{ width: 38 }} />}
         </View>
 
         {/* Stat row */}
         <View style={styles.statRow}>
-          <StatChip icon="megaphone-outline" label="Total" value={total} color="#7B2FBE" />
+          <StatChip icon="megaphone-outline" label="Total" value={total} color="#2563EB" />
           <StatChip icon="eye-outline" label="Published" value={published} color="#16a34a" />
           <StatChip icon="alert-circle-outline" label="Urgent" value={urgent} color="#dc2626" />
         </View>
@@ -315,21 +316,7 @@ export default function AnnouncementsScreen() {
 
         {/* Search */}
         <View style={styles.searchRow}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={18} color="#9B8BAE" style={{ marginRight: 8 }} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search announcements…"
-              placeholderTextColor="#9B8BAE"
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={18} color="#9B8BAE" />
-              </TouchableOpacity>
-            )}
-          </View>
+          <SearchField value={search} onChangeText={setSearch} placeholder="Search announcements…" />
         </View>
 
         {/* List */}
@@ -427,7 +414,7 @@ function AnnouncementCard({ ann, canManage, onEdit, onDelete, onTogglePublish, o
                 : `Created ${fmtDate(ann.created_at)}`}
             </Text>
           </View>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#9B8BAE" />
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
         </View>
       </TouchableOpacity>
 
@@ -435,7 +422,7 @@ function AnnouncementCard({ ann, canManage, onEdit, onDelete, onTogglePublish, o
         <View style={{ marginTop: 12 }}>
           {/* Banner image (if any) */}
           {ann.image_url && /^https?:\/\//i.test(String(ann.image_url)) ? (
-            <Image source={{ uri: ann.image_url }} style={{ width: '100%', height: 160, borderRadius: 12, marginBottom: 10, backgroundColor: 'rgba(123,47,190,0.05)' }} resizeMode="cover" />
+            <Image source={{ uri: ann.image_url }} style={{ width: '100%', height: 160, borderRadius: 12, marginBottom: 10, backgroundColor: 'rgba(37,99,235,0.05)' }} resizeMode="cover" />
           ) : null}
 
           {/* Content preview */}
@@ -446,7 +433,7 @@ function AnnouncementCard({ ann, canManage, onEdit, onDelete, onTogglePublish, o
           {/* Actions — admin/super_admin only */}
           {canManage && (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <ActionChip label="Edit" icon="pencil-outline" color="#7B2FBE" onPress={onEdit} />
+              <ActionChip label="Edit" icon="pencil-outline" color="#2563EB" onPress={onEdit} />
               <ActionChip
                 label={ann.is_published ? 'Unpublish' : 'Publish'}
                 icon={ann.is_published ? 'eye-off-outline' : 'eye-outline'}
@@ -480,7 +467,7 @@ function StatChip({ icon, label, value, color }: any) {
     <View style={[styles.statChip, { backgroundColor: color + '10' }]}>
       <Ionicons name={icon} size={16} color={color} />
       <Text style={{ fontSize: 16, fontWeight: '800', color, marginLeft: 4 }}>{value}</Text>
-      <Text style={{ fontSize: 11, color: '#9B8BAE', marginLeft: 4 }}>{label}</Text>
+      <Text style={{ fontSize: 11, color: '#6B7280', marginLeft: 4 }}>{label}</Text>
     </View>
   );
 }
@@ -493,7 +480,7 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{title}</Text>
             <View style={{ width: 24 }} />
@@ -515,7 +502,7 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
                         flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                         gap: 4, paddingVertical: 10, borderRadius: 12,
                         backgroundColor: active ? cfg.color : 'rgba(255,255,255,0.6)',
-                        borderWidth: 1, borderColor: active ? cfg.color : 'rgba(224,213,234,0.5)',
+                        borderWidth: 1, borderColor: active ? cfg.color : 'rgba(229,231,235,0.5)',
                       }}
                     >
                       <Ionicons name={cfg.icon} size={14} color={active ? '#fff' : cfg.color} />
@@ -531,18 +518,18 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
               <Text style={styles.sectionLabel}>Content *</Text>
               <View style={{
                 backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14,
-                borderWidth: 1, borderColor: 'rgba(224,213,234,0.5)', padding: 14,
+                borderWidth: 1, borderColor: 'rgba(229,231,235,0.5)', padding: 14,
               }}>
                 <TextInput
-                  style={{ fontSize: 15, color: '#1E1230', minHeight: 120, textAlignVertical: 'top' }}
+                  style={{ fontSize: 15, color: '#111827', minHeight: 120, textAlignVertical: 'top' }}
                   value={form.content}
                   onChangeText={setF('content')}
                   placeholder="Write your announcement here…"
-                  placeholderTextColor="#9B8BAE"
+                  placeholderTextColor="#6B7280"
                   multiline
                 />
               </View>
-              <Text style={{ fontSize: 11, color: '#9B8BAE', marginTop: 4 }}>
+              <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
                 This message will be shown to tenants when published.
               </Text>
             </View>
@@ -550,16 +537,16 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
             {/* Banner image (optional) */}
             <View style={{ marginBottom: 16 }}>
               <Text style={styles.sectionLabel}>Banner Image (optional)</Text>
-              <Text style={{ fontSize: 11, color: '#9B8BAE', marginBottom: 8 }}>
+              <Text style={{ fontSize: 11, color: '#6B7280', marginBottom: 8 }}>
                 If set, the image appears above the announcement text for tenants.
               </Text>
               {form.image_url ? (
                 <View>
-                  <Image source={{ uri: form.image_url }} style={{ width: '100%', height: 150, borderRadius: 12, backgroundColor: 'rgba(123,47,190,0.05)' }} resizeMode="cover" />
+                  <Image source={{ uri: form.image_url }} style={{ width: '100%', height: 150, borderRadius: 12, backgroundColor: 'rgba(37,99,235,0.05)' }} resizeMode="cover" />
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                    <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#7B2FBE', backgroundColor: 'rgba(123,47,190,0.06)' }}>
-                      <Ionicons name="image-outline" size={16} color="#7B2FBE" />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#7B2FBE' }}>Replace</Text>
+                    <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#2563EB', backgroundColor: '#EFF6FF' }}>
+                      <Ionicons name="image-outline" size={16} color="#2563EB" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Replace</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={onClearImage} disabled={imgUploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#DC2626', backgroundColor: 'rgba(220,38,38,0.06)' }}>
                       <Ionicons name="trash-outline" size={16} color="#DC2626" />
@@ -568,11 +555,11 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
                   </View>
                 </View>
               ) : (
-                <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(123,47,190,0.4)', borderStyle: 'dashed', backgroundColor: 'rgba(123,47,190,0.04)' }}>
+                <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(37,99,235,0.4)', borderStyle: 'dashed', backgroundColor: 'rgba(37,99,235,0.04)' }}>
                   {imgUploading
-                    ? <ActivityIndicator size="small" color="#7B2FBE" />
-                    : <Ionicons name="cloud-upload-outline" size={18} color="#7B2FBE" />}
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#7B2FBE' }}>{imgUploading ? 'Uploading…' : 'Upload Image'}</Text>
+                    ? <ActivityIndicator size="small" color="#2563EB" />
+                    : <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />}
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#2563EB' }}>{imgUploading ? 'Uploading…' : 'Upload Image'}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -586,7 +573,7 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#25D366', backgroundColor: 'rgba(37,211,102,0.08)', opacity: loading ? 0.5 : 1 }}
                 >
                   <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E1230' }}>Save &amp; Send on WhatsApp</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>Save &amp; Send on WhatsApp</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -595,7 +582,7 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
               <Ionicons name="information-circle-outline" size={16} color="#2563eb" />
               <Text style={styles.infoText}>
                 {showSend
-                  ? 'Save keeps it as a draft. Save & Send publishes it and delivers it to active tenants on WhatsApp.'
+                  ? 'Saved as a draft. Save & Send also delivers it to active tenants on WhatsApp. Use Publish to make it visible in the tenant app.'
                   : 'Saved as draft — use Publish to make it visible to tenants.'}
               </Text>
             </View>
@@ -611,14 +598,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.08)',
+    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
   },
   menuBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#1E1230' },
-  headerSub: { fontSize: 12, color: '#9B8BAE', marginTop: 1 },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
+  headerSub: { fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 },
   addBtn: {
     width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
   },
   statRow: {
     flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10,
@@ -631,19 +618,19 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.5)',
-    borderWidth: 1, borderColor: 'rgba(224,213,234,0.5)',
+    borderWidth: 1, borderColor: 'rgba(229,231,235,0.5)',
   },
-  filterChipActive: { backgroundColor: 'rgba(123,47,190,0.1)', borderColor: 'rgba(123,47,190,0.3)' },
-  filterLabel: { fontSize: 13, fontWeight: '600', color: '#9B8BAE' },
-  filterLabelActive: { color: '#7B2FBE' },
+  filterChipActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  filterLabel: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  filterLabelActive: { color: '#fff' },
   searchRow: { paddingHorizontal: 16, paddingBottom: 8 },
   searchBox: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.65)',
-    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(224,213,234,0.5)',
+    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(229,231,235,0.5)',
     paddingHorizontal: 14, height: 44,
   },
-  searchInput: { flex: 1, fontSize: 15, color: '#1E1230' },
+  searchInput: { flex: 1, fontSize: 15, color: '#111827' },
   card: {
     ...glass.card, marginBottom: 10, padding: 14,
     flexDirection: 'column', overflow: 'hidden',
@@ -655,25 +642,25 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
-  annTitle: { fontSize: 14, fontWeight: '700', color: '#1E1230', flex: 1 },
-  annDate:  { fontSize: 11, color: '#9B8BAE', marginTop: 3 },
+  annTitle: { fontSize: 14, fontWeight: '700', color: '#111827', flex: 1 },
+  annDate:  { fontSize: 11, color: '#6B7280', marginTop: 3 },
   badge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7 },
   badgeText: { fontSize: 10, fontWeight: '700' },
   contentBox: {
     backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 10,
-    padding: 12, borderWidth: 0.5, borderColor: 'rgba(224,213,234,0.5)',
+    padding: 12, borderWidth: 0.5, borderColor: 'rgba(229,231,235,0.5)',
   },
-  contentText: { fontSize: 14, color: '#1E1230', lineHeight: 20 },
+  contentText: { fontSize: 14, color: '#111827', lineHeight: 20 },
   sectionLabel: {
-    fontSize: 11, fontWeight: '600', color: '#5C4B70',
+    fontSize: 11, fontWeight: '600', color: '#556274',
     letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8,
   },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.08)',
+    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: '#1E1230' },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
   infoBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
     backgroundColor: 'rgba(37,99,235,0.08)', borderRadius: 10,
