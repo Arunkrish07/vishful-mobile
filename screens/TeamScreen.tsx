@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { spacing, fontSize, glass } from '../lib/theme';
-import { Button, Input, EmptyState, LoadingScreen, GlassBackground, DateField } from '../components/shared';
+import { Button, Input, EmptyState, LoadingScreen, GlassBackground, DateField, IconBtnSolid, SearchField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -177,6 +177,7 @@ export default function TeamScreen() {
         gender: form.gender || null,
         designation: form.designation.trim() || null,
         department: form.department || null,
+        joining_date: form.joining_date || null,
         salary_amount: form.salary_amount ? parseFloat(form.salary_amount) : null,
         id_proof_type: form.id_proof_type || null,
         id_proof_number: form.id_proof_number.trim() || null,
@@ -184,6 +185,7 @@ export default function TeamScreen() {
         aadhar_number: form.aadhar_number.trim() || null,
         address: form.address.trim() || null,
         city: form.city.trim() || null,
+        state: form.state.trim() || null,
         bank_name: form.bank_name.trim() || null,
         bank_account_number: form.bank_account_number.trim() || null,
         bank_ifsc: form.bank_ifsc.trim() || null,
@@ -310,14 +312,11 @@ export default function TeamScreen() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Team</Text>
-            <Text style={styles.headerSub}>{members.length} members</Text>
+            <Text style={styles.headerSub}>Access & roles</Text>
           </View>
-          <TouchableOpacity
-            style={styles.addBtn}
+          <IconBtnSolid
             onPress={() => { setForm({ ...EMPTY_FORM }); setSelectedSpecs([]); setShowAdd(true); }}
-          >
-            <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
+          />
         </View>
 
         {/* Tabs */}
@@ -328,7 +327,7 @@ export default function TeamScreen() {
               onPress={() => setActiveTab(t.key)}
               style={[styles.tab, activeTab === t.key && styles.tabActive]}
             >
-              <Ionicons name={t.icon as any} size={14} color={activeTab === t.key ? '#7B2FBE' : '#9B8BAE'} />
+              <Ionicons name={t.icon as any} size={14} color={activeTab === t.key ? '#2563EB' : '#6B7280'} />
               <Text style={[styles.tabLabel, activeTab === t.key && styles.tabLabelActive]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
@@ -337,21 +336,7 @@ export default function TeamScreen() {
         {/* Search (members only) */}
         {activeTab === 'members' && (
           <View style={styles.searchRow}>
-            <View style={styles.searchBox}>
-              <Ionicons name="search-outline" size={18} color="#9B8BAE" style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by name, phone…"
-                placeholderTextColor="#9B8BAE"
-                value={search}
-                onChangeText={setSearch}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')}>
-                  <Ionicons name="close-circle" size={18} color="#9B8BAE" />
-                </TouchableOpacity>
-              )}
-            </View>
+            <SearchField value={search} onChangeText={setSearch} placeholder="Search by name, phone…" />
           </View>
         )}
 
@@ -419,7 +404,7 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setShowPayment(false)}>
-                <Ionicons name="close" size={24} color="#1E1230" />
+                <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Record Payment</Text>
               <View style={{ width: 24 }} />
@@ -427,20 +412,20 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={[styles.selectedBanner]}>
-                  <Ionicons name="person-circle-outline" size={20} color="#7B2FBE" />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E1230', marginLeft: 8 }}>
+                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
                 </View>
               )}
               <PickerRow label="Payment Type" value={paymentForm.payment_type}
-                options={[{ label: 'Salary', value: 'salary' }, { label: 'Bonus', value: 'bonus' }, { label: 'Advance', value: 'advance' }]}
+                options={[{ label: 'Salary', value: 'salary' }, { label: 'Advance', value: 'advance' }, { label: 'Bonus', value: 'bonus' }, { label: 'Deduction', value: 'deduction' }]}
                 onSelect={setPF('payment_type')} />
               <Input label="Amount (₹) *" value={paymentForm.amount} onChangeText={setPF('amount')} placeholder="0" keyboardType="numeric" icon="cash-outline" />
-              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Payment Date *</Text><DateField value={paymentForm.payment_date} onChange={setPF('payment_date')} /></View>
+              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Payment Date *</Text><DateField value={paymentForm.payment_date} onChange={setPF('payment_date')} /></View>
               <Input label="Month (optional)" value={paymentForm.payment_month} onChangeText={setPF('payment_month')} placeholder="YYYY-MM" icon="calendar-number-outline" />
               <PickerRow label="Payment Mode" value={paymentForm.payment_mode}
-                options={[{ label: 'Bank Transfer', value: 'bank_transfer' }, { label: 'Cash', value: 'cash' }, { label: 'UPI', value: 'upi' }]}
+                options={[{ label: 'Bank Transfer', value: 'bank_transfer' }, { label: 'Cash', value: 'cash' }, { label: 'UPI', value: 'upi' }, { label: 'Cheque', value: 'cheque' }]}
                 onSelect={setPF('payment_mode')} />
               <Input label="Notes" value={paymentForm.notes} onChangeText={setPF('notes')} placeholder="Optional notes…" multiline icon="create-outline" />
               <View style={{ marginTop: 16 }}>
@@ -457,7 +442,7 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setShowAttendance(false)}>
-                <Ionicons name="close" size={24} color="#1E1230" />
+                <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Mark Attendance</Text>
               <View style={{ width: 24 }} />
@@ -465,13 +450,13 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={styles.selectedBanner}>
-                  <Ionicons name="person-circle-outline" size={20} color="#7B2FBE" />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E1230', marginLeft: 8 }}>
+                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
                 </View>
               )}
-              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Date *</Text><DateField value={attForm.date} onChange={setAF('date')} /></View>
+              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Date *</Text><DateField value={attForm.date} onChange={setAF('date')} /></View>
               <PickerRow label="Status" value={attForm.status}
                 options={[
                   { label: 'Present', value: 'present' }, { label: 'Absent', value: 'absent' },
@@ -515,15 +500,15 @@ function MemberCard({ member, onEdit, onDelete, onPayment, onAttendance }: any) 
             </View>
             {member.designation ? <Text style={styles.memberMeta}>{member.designation}{member.department ? ` · ${member.department}` : ''}</Text> : null}
             <Text style={styles.memberMeta}>
-              <Ionicons name="call-outline" size={12} color="#9B8BAE" /> {member.phone || '—'}
+              <Ionicons name="call-outline" size={12} color="#6B7280" /> {member.phone || '—'}
             </Text>
             {member.salary_amount ? (
               <Text style={styles.memberMeta}>
-                <Ionicons name="cash-outline" size={12} color="#9B8BAE" /> ₹{Number(member.salary_amount).toLocaleString('en-IN')}/mo
+                <Ionicons name="cash-outline" size={12} color="#6B7280" /> ₹{Number(member.salary_amount).toLocaleString('en-IN')}/mo
               </Text>
             ) : null}
           </View>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#9B8BAE" />
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
         </View>
       </TouchableOpacity>
 
@@ -532,14 +517,14 @@ function MemberCard({ member, onEdit, onDelete, onPayment, onAttendance }: any) 
           {(member.specialties || member.specializations)?.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {(member.specialties || member.specializations).map((s: string) => (
-                <View key={s} style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, color: '#7B2FBE', fontWeight: '600' }}>{s}</Text>
+                <View key={s} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '600' }}>{s}</Text>
                 </View>
               ))}
             </View>
           )}
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-            <ActionChip label="Edit" icon="pencil-outline" color="#7B2FBE" onPress={onEdit} />
+            <ActionChip label="Edit" icon="pencil-outline" color="#2563EB" onPress={onEdit} />
             <ActionChip label="Payment" icon="cash-outline" color="#16a34a" onPress={onPayment} />
             <ActionChip label="Attendance" icon="calendar-outline" color="#2563eb" onPress={onAttendance} />
             <ActionChip label="Remove" icon="trash-outline" color="#dc2626" onPress={onDelete} />
@@ -569,9 +554,9 @@ function PaymentRow({ payment, members }: any) {
     <View style={[styles.card, { padding: 12 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E1230' }}>{name}</Text>
-          <Text style={{ fontSize: 12, color: '#9B8BAE' }}>{payment.payment_type} · {payment.payment_mode}</Text>
-          <Text style={{ fontSize: 12, color: '#9B8BAE' }}>{formatDate(payment.payment_date)}{payment.payment_month ? ` · ${payment.payment_month}` : ''}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>{name}</Text>
+          <Text style={{ fontSize: 12, color: '#6B7280' }}>{payment.payment_type} · {payment.payment_mode}</Text>
+          <Text style={{ fontSize: 12, color: '#6B7280' }}>{formatDate(payment.payment_date)}{payment.payment_month ? ` · ${payment.payment_month}` : ''}</Text>
         </View>
         <Text style={{ fontSize: 16, fontWeight: '800', color: '#16a34a' }}>₹{Number(payment.amount || 0).toLocaleString('en-IN')}</Text>
       </View>
@@ -586,14 +571,14 @@ const ATT_COLORS: Record<string, string> = {
 function AttendanceRow({ record, members }: any) {
   const member = members.find((m: any) => m.id === record.team_member_id);
   const name = member ? `${member.first_name || ''} ${member.last_name || ''}`.trim() : '—';
-  const color = ATT_COLORS[record.status] || '#9B8BAE';
+  const color = ATT_COLORS[record.status] || '#6B7280';
   return (
     <View style={[styles.card, { padding: 12 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E1230' }}>{name}</Text>
-          <Text style={{ fontSize: 12, color: '#9B8BAE' }}>{formatDate(record.date)}</Text>
-          {record.check_in ? <Text style={{ fontSize: 12, color: '#9B8BAE' }}>{record.check_in} → {record.check_out || '—'}</Text> : null}
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>{name}</Text>
+          <Text style={{ fontSize: 12, color: '#6B7280' }}>{formatDate(record.date)}</Text>
+          {record.check_in ? <Text style={{ fontSize: 12, color: '#6B7280' }}>{record.check_in} → {record.check_out || '—'}</Text> : null}
         </View>
         <View style={{ backgroundColor: color + '18', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color, textTransform: 'capitalize' }}>{(record.status || '').replace('_', ' ')}</Text>
@@ -614,7 +599,7 @@ function MemberFormModal({ visible, title, form, setF, selectedSpecs, setSelecte
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{title}</Text>
             <View style={{ width: 24 }} />
@@ -637,7 +622,7 @@ function MemberFormModal({ visible, title, form, setF, selectedSpecs, setSelecte
             <PickerRow label="Department" value={form.department}
               options={DEPARTMENTS.map(d => ({ label: d, value: d }))}
               onSelect={setF('department')} />
-            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Joining Date</Text><DateField value={form.joining_date} onChange={setF('joining_date')} /></View>
+            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Joining Date</Text><DateField value={form.joining_date} onChange={setF('joining_date')} /></View>
             <Input label="Salary (₹/month)" value={form.salary_amount} onChangeText={setF('salary_amount')} placeholder="0" keyboardType="numeric" icon="cash-outline" />
 
             <SectionLabel title="Specializations" icon="star-outline" />
@@ -650,11 +635,11 @@ function MemberFormModal({ visible, title, form, setF, selectedSpecs, setSelecte
                     onPress={() => toggleSpec(s)}
                     style={{
                       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-                      backgroundColor: active ? '#7B2FBE' : 'rgba(255,255,255,0.6)',
-                      borderWidth: 1, borderColor: active ? '#7B2FBE' : 'rgba(224,213,234,0.5)',
+                      backgroundColor: active ? '#2563EB' : 'rgba(255,255,255,0.6)',
+                      borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(229,231,235,0.5)',
                     }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : '#5C4B70' }}>{s}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : '#556274' }}>{s}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -663,6 +648,8 @@ function MemberFormModal({ visible, title, form, setF, selectedSpecs, setSelecte
             <SectionLabel title="Identity" icon="card-outline" />
             <Input label="PAN Number" value={form.pan_number} onChangeText={setF('pan_number')} placeholder="ABCDE1234F" autoCapitalize="characters" icon="document-text-outline" />
             <Input label="Aadhar Number" value={form.aadhar_number} onChangeText={setF('aadhar_number')} placeholder="12-digit Aadhar" keyboardType="numeric" icon="shield-outline" />
+            <Input label="ID Proof Type" value={form.id_proof_type} onChangeText={setF('id_proof_type')} placeholder="e.g. Aadhaar / Passport / Voter ID" icon="id-card-outline" />
+            <Input label="ID Proof Number" value={form.id_proof_number} onChangeText={setF('id_proof_number')} placeholder="Document number" icon="document-outline" />
 
             <SectionLabel title="Address" icon="location-outline" />
             <Input label="Address" value={form.address} onChangeText={setF('address')} placeholder="Street address" multiline icon="home-outline" />
@@ -692,8 +679,8 @@ function MemberFormModal({ visible, title, form, setF, selectedSpecs, setSelecte
 function SectionLabel({ title, icon }: { title: string; icon: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, marginTop: 18 }}>
-      <Ionicons name={icon as any} size={14} color="#7B2FBE" />
-      <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B2FBE', letterSpacing: 0.8, textTransform: 'uppercase' }}>{title}</Text>
+      <Ionicons name={icon as any} size={14} color="#2563EB" />
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB', letterSpacing: 0.8, textTransform: 'uppercase' }}>{title}</Text>
     </View>
   );
 }
@@ -701,7 +688,7 @@ function SectionLabel({ title, icon }: { title: string; icon: string }) {
 function PickerRow({ label, value, options, onSelect }: any) {
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontSize: 11, fontWeight: '600', color: '#5C4B70', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
+      <Text style={{ fontSize: 11, fontWeight: '600', color: '#556274', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         {options.map((opt: any) => (
           <TouchableOpacity
@@ -709,11 +696,11 @@ function PickerRow({ label, value, options, onSelect }: any) {
             onPress={() => onSelect(opt.value)}
             style={{
               paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-              backgroundColor: value === opt.value ? '#7B2FBE' : 'rgba(255,255,255,0.6)',
-              borderWidth: 1, borderColor: value === opt.value ? '#7B2FBE' : 'rgba(224,213,234,0.5)',
+              backgroundColor: value === opt.value ? '#2563EB' : 'rgba(255,255,255,0.6)',
+              borderWidth: 1, borderColor: value === opt.value ? '#2563EB' : 'rgba(229,231,235,0.5)',
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: '600', color: value === opt.value ? '#fff' : '#5C4B70' }}>{opt.label}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: value === opt.value ? '#fff' : '#556274' }}>{opt.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -725,55 +712,55 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.08)',
+    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
   },
   menuBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#1E1230' },
-  headerSub: { fontSize: 12, color: '#9B8BAE', marginTop: 1 },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
+  headerSub: { fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 },
   addBtn: {
     width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
   },
   tabRow: {
     flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8, gap: 8,
-    borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.08)',
+    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
   },
   tab: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.4)',
   },
-  tabActive: { backgroundColor: 'rgba(123,47,190,0.1)', borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)' },
-  tabLabel: { fontSize: 12, fontWeight: '600', color: '#9B8BAE' },
-  tabLabelActive: { color: '#7B2FBE' },
+  tabActive: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#E5E7EB' },
+  tabLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  tabLabelActive: { color: '#2563EB' },
   searchRow: { paddingHorizontal: 16, paddingVertical: 8 },
   searchBox: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.65)',
-    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(224,213,234,0.5)',
+    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(229,231,235,0.5)',
     paddingHorizontal: 14, height: 44,
   },
-  searchInput: { flex: 1, fontSize: 15, color: '#1E1230' },
+  searchInput: { flex: 1, fontSize: 15, color: '#111827' },
   card: { ...glass.card, marginBottom: 10, padding: 14 },
   avatar: {
     width: 46, height: 46, borderRadius: 14,
-    backgroundColor: 'rgba(123,47,190,0.08)',
+    backgroundColor: '#EFF6FF',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(123,47,190,0.12)',
+    borderWidth: 1.5, borderColor: '#E5E7EB',
   },
-  avatarText: { fontSize: 16, fontWeight: '800', color: '#7B2FBE' },
-  memberName: { fontSize: 15, fontWeight: '700', color: '#1E1230' },
-  memberMeta: { fontSize: 12, color: '#9B8BAE', marginTop: 2 },
+  avatarText: { fontSize: 16, fontWeight: '800', color: '#2563EB' },
+  memberName: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  memberMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   badgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
   selectedBanner: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12,
+    backgroundColor: '#EFF6FF', borderRadius: 12,
     padding: 12, marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.08)',
+    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: '#1E1230' },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
 });
