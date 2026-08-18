@@ -97,7 +97,7 @@ export default function AccountingScreen() {
     if (amt > balance + 0.01) { Alert.alert('Amount too high', `Payment cannot exceed the outstanding balance of Rs ${balance.toLocaleString('en-IN')}.`); return; }
     setLoading(true);
     try {
-      await sb.recordPayment({
+      const res = await sb.recordPayment({
         token: token!,
         invoiceId: showPay._id,
         paymentDate: new Date().toISOString().split('T')[0],
@@ -105,6 +105,7 @@ export default function AccountingScreen() {
         amountPaid: amt,
         referenceNumber: payRef.trim() || null,
       });
+      if (res?.ok === false) { Alert.alert('Duplicate payment', res.reason || 'This payment looks like a duplicate and was not recorded.'); return; }
       setShowPay(null); setPayAmount(''); setPayRef('');
       setRefreshKey((k: number) => k + 1);
     } catch (e: any) { Alert.alert('Error', e.message); }

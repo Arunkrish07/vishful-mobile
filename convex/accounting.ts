@@ -557,6 +557,29 @@ export const createInvoice = action({
     const other = Number(data.other_charges ?? data.otherCharges ?? 0);
     const total = rent + elec + other;
     const today = new Date().toISOString().slice(0, 10);
+    const billingMonth = data.billing_month || data.billingMonth || null;
+
+    // ── (B) Server-side invoice numbering — web parity generateInvoiceNumbers:
+    //     <Prop5>/<FY>/<MM>/<5-digit running>  e.g. VISHL/25-26/03/00001.
+    //     Running count is per-property across all invoices (same client-side
+    //     count as web; fine for single-admin use). Never left to a DB trigger.
+    let invoiceNumber: string | null = null;
+    try {
+      const numMonth = /^\d{4}-\d{2}$/.test(String(billingMonth)) ? String(billingMonth) : today.slice(0, 7);
+      const [yy, mm] = numMonth.split("-").map(Number);
+      const fyStart = mm >= 4 ? yy : yy - 1;
+      const fy = `${String(fyStart).slice(-2)}-${String(fyStart + 1).slice(-2)}`;
+      const mmStr = numMonth.split("-")[1];
+      const props: any[] = await safeList(sb.from("properties").select("name").eq("id", propertyId).limit(1));
+      const abbr = String(props[0]?.name || "UNKNO").replace(/\s+/g, "").slice(0, 5).toUpperCase().padEnd(5, "X");
+      const existingInv: any[] = await safeList(
+        sb.from("invoices").select("id").eq("organization_id", ORG_ID).eq("property_id", propertyId)
+      );
+      const running = existingInv.length + 1;
+      invoiceNumber = `${abbr}/${fy}/${mmStr}/${String(running).padStart(5, "0")}`;
+    } catch (e: any) {
+      console.warn("[accounting] invoice numbering failed, leaving null:", e?.message);
+    }
 
     const payload: any = {
       organization_id: ORG_ID,
@@ -565,7 +588,7 @@ export const createInvoice = action({
       property_id: propertyId,
       apartment_id: apartmentId,
       bed_id: bedId,
-      billing_month: data.billing_month || data.billingMonth || null,
+      billing_month: billingMonth,
       rent_amount: rent,
       electricity_amount: elec,
       other_charges: other,
@@ -573,10 +596,24 @@ export const createInvoice = action({
       due_date: data.due_date || data.dueDate || null,
       invoice_date: today,
       status: "pending",
-      // invoice_number intentionally omitted — assigned server-side (DB trigger/RPC), never client-side.
+      invoice_number: invoiceNumber, // web parity: generated above, not left to a DB trigger
     };
     const { data: row, error } = await sb.from("invoices").insert(payload).select().single();
     if (error) throw new Error(error.message);
+
+    // ── (A) invoice_line_items — one row per non-zero charge (web parity). Best-effort:
+    //     the invoice already exists; the DB trigger/view drives the ledger (web's
+    //     rebuildTenantTransactions is a no-op, so there is nothing else to post here).
+    const charges: Array<[string, number]> = [["rent", rent], ["electricity", elec], ["other_charges", other]];
+    for (const [lineType, amount] of charges) {
+      if (amount > 0) {
+        try {
+          await insertRow("invoice_line_items", { invoice_id: (row as any).id, line_type: lineType, amount, description: lineType });
+        } catch (e: any) {
+          console.warn(`[accounting] invoice_line_items ${lineType} insert failed:`, e?.message);
+        }
+      }
+    }
     return row;
   },
 });
@@ -612,6 +649,32 @@ export const recordPayment = action({
 
     const paymentDate = data.payment_date || data.paymentDate || new Date().toISOString().slice(0, 10);
 
+    // ── (C) Duplicate-receipt guard (web parity checkReceiptDuplicate) ──
+    //   A: reference/UTR uniqueness across the org. B: same tenant + date + amount
+    //   (closes the manual re-entry hole). Fail-open: a broken check never blocks a
+    //   legitimate payment. Returns { ok:false } so the UI can explain the block.
+    try {
+      const refNum = String(data.reference_number ?? data.referenceNumber ?? "").trim();
+      if (refNum) {
+        const dupRef: any[] = await safeList(
+          sb.from("receipts").select("id, receipt_number, reference_number")
+            .eq("organization_id", ORG_ID).eq("reference_number", refNum).eq("is_deleted", false).limit(1)
+        );
+        if (dupRef[0]) {
+          return { ok: false, duplicate: true, reason: `Duplicate payment — reference/UTR "${refNum}" is already used (receipt ${dupRef[0].receipt_number ?? "—"}).` };
+        }
+      }
+      const dupFp: any[] = await safeList(
+        sb.from("receipts").select("id, receipt_number")
+          .eq("organization_id", ORG_ID).eq("tenant_id", tenantId).eq("payment_date", paymentDate).eq("amount_paid", amount).eq("is_deleted", false).limit(1)
+      );
+      if (dupFp[0]) {
+        return { ok: false, duplicate: true, reason: `Duplicate payment — this tenant already has a payment of ${amount} on ${paymentDate} (receipt ${dupFp[0].receipt_number ?? "—"}).` };
+      }
+    } catch (e: any) {
+      console.warn("[accounting] duplicate-receipt check failed, allowing payment:", e?.message);
+    }
+
     // Canonical server-side receipt numbering; fall back to DB default if the RPC is unavailable.
     let receiptNumber: string | null = null;
     try {
@@ -639,7 +702,12 @@ export const recordPayment = action({
     // Insert the receipt only — the ledger trigger does the journal posting + FIFO allocation.
     // Do NOT write a `payments` row and do NOT manually flip invoice status.
     const { data: row, error } = await sb.from("receipts").insert(payload).select().single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      if ((error as any).code === "23505" || /duplicate key|unique constraint/i.test(error.message || "")) {
+        return { ok: false, duplicate: true, reason: "Duplicate payment — this receipt already exists (unique constraint)." };
+      }
+      throw new Error(error.message);
+    }
     return row;
   },
 });
