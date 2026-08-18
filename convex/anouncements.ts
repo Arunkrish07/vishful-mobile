@@ -30,11 +30,11 @@ async function resolveWhatsappControls(sb: any) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SEND ANNOUNCEMENT OVER WHATSAPP
-//  Mirrors web notifyAnnouncementCreated → whatsapp-notify edge function with
-//  event_type "announcement_created". The server resolves active tenants and
-//  sends the BotBee image/text template based on whether image_url is present.
-//  Returns { ok, sent?, skipped?, reason? } so the UI can show the result and
-//  fall back gracefully if WhatsApp is off / unavailable.
+//  Web parity: creates a durable whatsapp_send_jobs row (job_type "announcement")
+//  and kicks off the whatsapp-send-job edge worker, which resolves active tenants,
+//  writes per-recipient deliveries, and tracks progress (visible/retryable in
+//  WhatsApp Logs). Returns { ok, queued?, jobId?, skipped?, reason? } so the UI can
+//  show the result and fall back gracefully if WhatsApp is off / unavailable.
 // ═══════════════════════════════════════════════════════════════════════════
 export const sendAnnouncementWhatsapp = action({
   args: {
@@ -50,29 +50,41 @@ export const sendAnnouncementWhatsapp = action({
     if (!controls.enabled) {
       return { ok: false, skipped: "whatsapp_disabled", reason: "WhatsApp notifications are turned off in Settings." };
     }
+    // Web parity: create a durable whatsapp_send_jobs row (job_type "announcement")
+    // and kick off the whatsapp-send-job edge worker, which resolves active tenants,
+    // creates per-recipient deliveries, and tracks progress (visible in WhatsApp Logs
+    // + retryable). Replaces the old one-shot whatsapp-notify call (no job record, no retry).
+    let job: any;
     try {
-      const { data, error } = await sb.functions.invoke("whatsapp-notify", {
-        body: {
-          event_type: "announcement_created",
-          controls,
-          organization_id: ORG_ID,
+      job = await insertRow("whatsapp_send_jobs", {
+        organization_id: ORG_ID,
+        created_by: null,
+        job_type: "announcement",
+        status: "pending",
+        label: title.slice(0, 120),
+        payload: {
           title,
           content,
           priority: priority ?? "normal",
           image_url: (imageUrl && String(imageUrl).trim()) || null,
+          controls,
         },
       });
-      if (error) {
-        return { ok: false, reason: error.message || "whatsapp-notify failed", whatsapp: false };
-      }
-      const row: any = data || {};
-      if (row?.error) return { ok: false, reason: row.error };
-      if (row?.skipped === "disabled" || row?.skipped === "whatsapp_disabled") {
-        return { ok: false, skipped: "whatsapp_disabled", reason: "WhatsApp is disabled for this workspace." };
-      }
-      return { ok: true, sent: row?.sent ?? 0, skipped: row?.skipped ?? null };
     } catch (e: any) {
-      return { ok: false, reason: e?.message || "edge function unavailable", whatsapp: false };
+      return { ok: false, reason: e?.message || "Could not create the send job." };
+    }
+    const jobId = job?.id;
+    if (!jobId) return { ok: false, reason: "Send job was not created." };
+    try {
+      const { error } = await sb.functions.invoke("whatsapp-send-job", { body: { job_id: jobId } });
+      if (error) {
+        try { await updateRow("whatsapp_send_jobs", jobId, { status: "failed", error_message: error.message || "kickoff failed" }); } catch { /* best-effort */ }
+        return { ok: false, queued: true, jobId, reason: error.message || "Send job created but the worker did not start; retry from WhatsApp Logs." };
+      }
+      return { ok: true, queued: true, jobId };
+    } catch (e: any) {
+      try { await updateRow("whatsapp_send_jobs", jobId, { status: "failed", error_message: e?.message || "kickoff failed" }); } catch { /* best-effort */ }
+      return { ok: false, queued: true, jobId, reason: e?.message || "Send job created but the worker is unavailable; retry from WhatsApp Logs." };
     }
   },
 });

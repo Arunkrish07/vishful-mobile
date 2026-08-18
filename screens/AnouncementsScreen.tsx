@@ -151,7 +151,7 @@ export default function AnnouncementsScreen() {
     try {
       const res = await sb.sendAnnouncementWhatsapp(ann.title, ann.content, ann.priority || 'normal', ann.image_url ?? null);
       if (res?.ok) {
-        Alert.alert('Sent on WhatsApp', res.sent ? `Delivered to ${res.sent} tenant${res.sent === 1 ? '' : 's'}.` : 'Announcement sent to active tenants.');
+        Alert.alert('Queued on WhatsApp', 'Your announcement is being sent to active tenants in the background. Track delivery progress under WhatsApp Logs.');
       } else if (res?.skipped === 'whatsapp_disabled') {
         Alert.alert('WhatsApp is off', res.reason || 'Turn on WhatsApp under Settings to send announcements.');
       } else {
