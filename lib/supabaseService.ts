@@ -411,6 +411,31 @@ export async function deleteTeamMember(id: string) {
   return client.action(api.settings.deleteTeamMember, { id });
 }
 
+// Team payments & attendance (real persistence — replace getAll/insertRow stubs)
+export async function listTeamPayments() {
+  return client.action(api.settings.listTeamPayments, {});
+}
+
+export async function createTeamPayment(data: any) {
+  return client.action(api.settings.createTeamPayment, { data });
+}
+
+export async function updateTeamPayment(id: string, data: any) {
+  return client.action(api.settings.updateTeamPayment, { id, data });
+}
+
+export async function deleteTeamPayment(id: string) {
+  return client.action(api.settings.deleteTeamPayment, { id });
+}
+
+export async function listTeamAttendance() {
+  return client.action(api.settings.listTeamAttendance, {});
+}
+
+export async function createTeamAttendance(data: any) {
+  return client.action(api.settings.createTeamAttendance, { data });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SETTINGS — USERS
 // ═══════════════════════════════════════════════════════════════════════════════

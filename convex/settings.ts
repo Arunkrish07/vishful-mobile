@@ -42,6 +42,68 @@ export const deleteTeamMember = action({
   },
 });
 
+// ─── TEAM PAYMENTS ───────────────────────────────────────────────────
+// Mobile parity: previously the screen hit the generic getAll/insertRow stubs
+// (no-ops), so Save Payment silently discarded data. These persist for real.
+// NOTE: the web app also posts salary payments to Accounting → Expenses
+// (syncTeamSalaryPaymentExpense) — that secondary sync is NOT ported here yet.
+export const listTeamPayments = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    return safeList(
+      sb.from("team_payments").select("*").eq("organization_id", ORG_ID).order("payment_date", { ascending: false })
+    );
+  },
+});
+
+export const createTeamPayment = action({
+  args: { data: v.any() },
+  returns: v.any(),
+  handler: async (_ctx, { data }) => {
+    return insertRow("team_payments", { ...data, organization_id: ORG_ID });
+  },
+});
+
+export const updateTeamPayment = action({
+  args: { id: v.string(), data: v.any() },
+  returns: v.any(),
+  handler: async (_ctx, { id, data }) => {
+    return updateRow("team_payments", id, data);
+  },
+});
+
+export const deleteTeamPayment = action({
+  args: { id: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { id }) => {
+    return deleteRow("team_payments", id);
+  },
+});
+
+// ─── TEAM ATTENDANCE ─────────────────────────────────────────────────
+// NOTE: web also recomputes draft salary bills on attendance change
+// (onTeamAttendanceChanged) — not ported here yet.
+export const listTeamAttendance = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    return safeList(
+      sb.from("team_attendance").select("*").eq("organization_id", ORG_ID).order("date", { ascending: false })
+    );
+  },
+});
+
+export const createTeamAttendance = action({
+  args: { data: v.any() },
+  returns: v.any(),
+  handler: async (_ctx, { data }) => {
+    return insertRow("team_attendance", { ...data, organization_id: ORG_ID });
+  },
+});
+
 // ─── USERS FOR SETTINGS ──────────────────────────────────────────────
 export const listUsersForSettings = action({
   args: {},

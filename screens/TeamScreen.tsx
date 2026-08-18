@@ -89,8 +89,8 @@ export default function TeamScreen() {
     setMembers(null);
     Promise.all([
       sb.getTeamMembers(),
-      sb.getAll('team_payments'),
-      sb.getAll('team_attendance'),
+      sb.listTeamPayments(),
+      sb.listTeamAttendance(),
     ]).then(([m, p, a]: any) => {
       if (!mounted.current) return;
       setMembers(m ?? []);
@@ -225,7 +225,7 @@ export default function TeamScreen() {
     }
     setLoading(true);
     try {
-      await sb.insertRow('team_payments', {
+      await sb.createTeamPayment({
         team_member_id: selected.id,
         payment_type: paymentForm.payment_type,
         amount: parseFloat(paymentForm.amount),
@@ -251,7 +251,7 @@ export default function TeamScreen() {
     }
     setLoading(true);
     try {
-      await sb.insertRow('team_attendance', {
+      await sb.createTeamAttendance({
         team_member_id: selected.id,
         date: attForm.date,
         status: attForm.status,
