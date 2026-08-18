@@ -18,6 +18,9 @@ import { GlassBackground } from '../components/shared';
 
 const fmtInr = (v: number) => `₹${(Number(v) || 0).toLocaleString('en-IN')}`;
 
+// Web parity: competitor segment filter chips.
+const SEGMENTS = ['all', 'budget', 'mid-range', 'premium', 'luxury'];
+
 export default function MarketScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
@@ -28,6 +31,7 @@ export default function MarketScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [seg, setSeg] = useState('all');
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -74,6 +78,11 @@ export default function MarketScreen() {
     } finally { setBusy(null); }
   }, []);
 
+  const deepIntelCount = competitors.filter((c) => c.crawlStatus === 'success').length;
+  const shownCompetitors = seg === 'all'
+    ? competitors
+    : competitors.filter((c) => String(c.marketSegment || '').toLowerCase() === seg);
+
   return (
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -83,12 +92,12 @@ export default function MarketScreen() {
             <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: '#1E1230' }}>Market AI</Text>
-            <Text style={{ fontSize: 12, color: '#9B8BAE' }}>Competitor & locality intelligence</Text>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Market AI</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Competitor pricing & locality trends</Text>
           </View>
           {canManage && (
             <TouchableOpacity disabled={!!busy} onPress={doScan}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#7B2FBE', opacity: busy ? 0.5 : 1 }}>
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#2563EB', opacity: busy ? 0.5 : 1 }}>
               {busy === 'scan' ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sync" size={14} color="#fff" />}
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Scan</Text>
             </TouchableOpacity>
@@ -102,28 +111,28 @@ export default function MarketScreen() {
             { k: 'expansion', label: `Expansion${opportunities.length ? ` (${opportunities.length})` : ''}` },
           ] as const).map(x => (
             <TouchableOpacity key={x.k} onPress={() => setTab(x.k as any)}
-              style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: tab === x.k ? '#7B2FBE' : 'rgba(123,47,190,0.1)' }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: tab === x.k ? '#fff' : '#7B2FBE' }}>{x.label}</Text>
+              style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: tab === x.k ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: tab === x.k ? '#fff' : '#2563EB' }}>{x.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {loading && !refreshing ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#7B2FBE" />
-            <Text style={{ marginTop: 12, color: '#5C4B70' }}>Loading market data…</Text>
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text style={{ marginTop: 12, color: '#556274' }}>Loading market data…</Text>
           </View>
         ) : (
           <ScrollView
             contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#7B2FBE" />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
           >
             {tab === 'competitors' && (
               competitors.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                  <Ionicons name="radio-outline" size={56} color="rgba(123,47,190,0.18)" />
-                  <Text style={{ marginTop: 12, color: '#9B8BAE' }}>No competitors tracked yet</Text>
-                  <Text style={{ marginTop: 4, color: '#9B8BAE', fontSize: 12, textAlign: 'center' }}>Discovery jobs populate this from the web app.</Text>
+                  <Ionicons name="radio-outline" size={56} color="rgba(37,99,235,0.18)" />
+                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No competitors tracked yet</Text>
+                  <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Discovery jobs populate this from the web app.</Text>
                 </View>
               ) : (
                 <>
@@ -134,18 +143,36 @@ export default function MarketScreen() {
                       <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Retry {competitors.filter((c) => c.crawlStatus === 'failed').length} failed analysis(es)</Text>
                     </TouchableOpacity>
                   )}
-                  {competitors.map((c) => (
-                    <View key={c.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
+                  {/* Deep-intel coverage badge (web parity) */}
+                  {deepIntelCount > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(22,163,74,0.1)', marginBottom: 10 }}>
+                      <Ionicons name="sparkles-outline" size={12} color="#16a34a" />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#16a34a' }}>{deepIntelCount} with deep intel</Text>
+                    </View>
+                  )}
+                  {/* Segment filter chips (web parity) */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
+                    {SEGMENTS.map((s) => (
+                      <TouchableOpacity key={s} onPress={() => setSeg(s)}
+                        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: seg === s ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'capitalize', color: seg === s ? '#fff' : '#2563EB' }}>{s === 'all' ? 'All' : s}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  {shownCompetitors.length === 0 ? (
+                    <Text style={{ fontSize: 12, color: '#6B7280', textAlign: 'center', paddingVertical: 20 }}>No competitors in this segment.</Text>
+                  ) : shownCompetitors.map((c) => (
+                    <View key={c.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', flexShrink: 1 }} numberOfLines={1}>{c.name}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', flexShrink: 1 }} numberOfLines={1}>{c.name}</Text>
                         {c.rating != null && (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <Ionicons name="star" size={12} color="#E8841A" />
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#E8841A' }}>{c.rating}{c.reviewCount != null ? ` (${c.reviewCount})` : ''}</Text>
+                            <Ionicons name="star" size={12} color="#2563EB" />
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{c.rating}{c.reviewCount != null ? ` (${c.reviewCount})` : ''}</Text>
                           </View>
                         )}
                       </View>
-                      <Text style={{ fontSize: 12, color: '#9B8BAE', marginTop: 3 }}>
+                      <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>
                         {[c.localityName, c.city].filter(Boolean).join(', ') || '—'}
                         {c.marketSegment ? `  ·  ${c.marketSegment}` : ''}
                       </Text>
@@ -158,18 +185,18 @@ export default function MarketScreen() {
             {tab === 'expansion' && (
               opportunities.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                  <Ionicons name="trending-up-outline" size={56} color="rgba(123,47,190,0.18)" />
-                  <Text style={{ marginTop: 12, color: '#9B8BAE' }}>No expansion opportunities</Text>
-                  <Text style={{ marginTop: 4, color: '#9B8BAE', fontSize: 12, textAlign: 'center' }}>Add tracked localities in the web app to see scores.</Text>
+                  <Ionicons name="trending-up-outline" size={56} color="rgba(37,99,235,0.18)" />
+                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No expansion opportunities</Text>
+                  <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Add tracked localities in the web app to see scores.</Text>
                 </View>
               ) : opportunities.map((op, i) => (
-                <View key={`${op.localityName}-${op.city}-${i}`} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <View key={`${op.localityName}-${op.city}-${i}`} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <View style={{ flexShrink: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230' }} numberOfLines={1}>{op.localityName}{op.city ? `, ${op.city}` : ''}</Text>
-                    <Text style={{ fontSize: 12, color: '#9B8BAE', marginTop: 3 }}>{op.competitorCount} competitors · avg {fmtInr(op.avgMarketPrice)}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }} numberOfLines={1}>{op.localityName}{op.city ? `, ${op.city}` : ''}</Text>
+                    <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>{op.competitorCount} competitors · avg {fmtInr(op.avgMarketPrice)}</Text>
                   </View>
-                  <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: op.opportunityScore >= 70 ? '#7B2FBE' : 'rgba(123,47,190,0.12)' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '900', color: op.opportunityScore >= 70 ? '#fff' : '#7B2FBE' }}>Score {op.opportunityScore}</Text>
+                  <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: op.opportunityScore >= 70 ? '#2563EB' : 'rgba(37,99,235,0.12)' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: op.opportunityScore >= 70 ? '#fff' : '#2563EB' }}>Score {op.opportunityScore}</Text>
                   </View>
                 </View>
               ))
