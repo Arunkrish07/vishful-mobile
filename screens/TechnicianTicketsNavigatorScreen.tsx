@@ -71,9 +71,9 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 // ─── Design tokens ────────────────────────────────────────────
-const BRAND       = '#E8841A';
-const BRAND_DARK  = '#C46A0E';
-const BRAND_LIGHT = 'rgba(232,132,26,0.12)';
+const BRAND       = '#312E81';
+const BRAND_DARK  = '#1E1B4B';
+const BRAND_LIGHT = 'rgba(49,46,129,0.12)';
 
 // ─── Pill ─────────────────────────────────────────────────────
 function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
@@ -191,7 +191,7 @@ function TicketsDashboardScreen({ navigation }: any) {
   const StatCard = ({ label, value, color, bg, icon, onPress }: any) => (
     <TouchableOpacity
       onPress={onPress} activeOpacity={0.8}
-      style={{ flex: 1, backgroundColor: bg, borderRadius: 18, padding: 16, minHeight: 90, justifyContent: 'space-between', borderWidth: 1, borderColor: `${color}30` }}
+      style={{ flex: 1, backgroundColor: bg, borderRadius: 14, padding: 16, minHeight: 90, justifyContent: 'space-between', borderWidth: 1, borderColor: `${color}30` }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Text style={{ fontSize: 28, fontWeight: '800', color }}>{value}</Text>
@@ -230,21 +230,21 @@ function TicketsDashboardScreen({ navigation }: any) {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <StatCard label="Active" value={stats.active.length} color={BRAND} bg={BRAND_LIGHT} icon="hammer-outline"
                 onPress={() => navigation.navigate('MyTickets', { filterKey: 'open' })} />
-              <StatCard label="Waiting" value={stats.waiting.length} color="#7C3AED" bg="rgba(124,58,237,0.1)" icon="time-outline"
+              <StatCard label="Waiting" value={stats.waiting.length} color="#6366F1" bg="rgba(99,102,241,0.1)" icon="time-outline"
                 onPress={() => navigation.navigate('MyTickets', { filterKey: 'waiting_for_cost_approval' })} />
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <StatCard label="Pending Approval" value={stats.pending.length} color="#0284C7" bg="rgba(2,132,199,0.1)" icon="checkmark-circle-outline"
                 onPress={() => navigation.navigate('MyTickets', { filterKey: 'pending_admin_approval' })} />
               <StatCard label="SLA Breached" value={stats.breached.length}
-                color={stats.breached.length > 0 ? '#DC2626' : '#7B6B90'}
+                color={stats.breached.length > 0 ? '#DC2626' : '#556274'}
                 bg={stats.breached.length > 0 ? 'rgba(220,38,38,0.1)' : 'rgba(107,114,128,0.08)'}
                 icon="warning-outline"
                 onPress={() => navigation.navigate('MyTickets', { filterKey: 'open' })} />
             </View>
           </Animated.View>
 
-          <Animated.View style={{ opacity: fadeAnim, backgroundColor: colors.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: colors.border }}>
+          <Animated.View style={{ opacity: fadeAnim, backgroundColor: colors.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.border }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Completion Rate</Text>
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#22C55E' }}>
@@ -354,14 +354,14 @@ function SkeletonBox({ width, height, borderRadius = 8, style }: { width?: numbe
     return () => anim.stop();
   }, []);
   return (
-    <Animated.View style={[{ width, height, borderRadius, backgroundColor: '#E5DFF0' }, { opacity }, style]} />
+    <Animated.View style={[{ width, height, borderRadius, backgroundColor: '#EEF2FF' }, { opacity }, style]} />
   );
 }
 
 function TicketCardSkeleton() {
   const { colors } = useTheme();
   return (
-    <View style={{ backgroundColor: colors.surface, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
+    <View style={{ backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}>
       {/* Status bar at top */}
       <SkeletonBox width="40%" height={4} borderRadius={0} />
       <View style={{ padding: 16, gap: 10 }}>
@@ -394,11 +394,11 @@ function TicketCardSkeleton() {
 //  2. MY TICKETS
 // ════════════════════════════════════════════════════════════════
 const FILTERS = [
-  { key: 'open',                        label: 'Open',           statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'completed', 'reassigned', 'on_hold', 'reopened'] },
+  { key: 'open',                        label: 'Open',           statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'reassigned', 'on_hold', 'reopened'] },
   { key: 'waiting_for_cost_approval',   label: 'Cost Approval',  statuses: ['waiting_for_cost_approval'] },
   { key: 'pending_admin_approval',      label: 'Admin Approval', statuses: ['pending_admin_approval'] },
   { key: 'pending_tenant_approval',     label: 'Tenant Approval',statuses: ['pending_tenant_approval'] },
-  { key: 'closed',                      label: 'Closed',         statuses: ['closed', 'cancelled'] },
+  { key: 'closed',                      label: 'Closed',         statuses: ['closed', 'completed', 'cancelled'] },
 ] as const;
 
 function MyTicketsScreen({ navigation, route }: any) {
@@ -521,7 +521,7 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-      style={{ backgroundColor: colors.surface, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
+      style={{ backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
       <View style={{ height: 4, backgroundColor: statusCfg.color }} />
       <View style={{ padding: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -529,9 +529,9 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 }}>
               <Text style={{ fontSize: 11, fontWeight: '800', color: BRAND, letterSpacing: 0.3 }}>{ticket.ticket_number}</Text>
               {photoUrls.length > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 }}>
-                  <Ionicons name="camera" size={9} color="#7C3AED" />
-                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#7C3AED' }}>{photoUrls.length}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 }}>
+                  <Ionicons name="camera" size={9} color="#6366F1" />
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#6366F1' }}>{photoUrls.length}</Text>
                 </View>
               )}
             </View>
@@ -986,7 +986,7 @@ function TicketDetailScreen({ navigation, route }: any) {
 
     // 1. Reassign — shown unless pending cost estimates exist (web exact gate)
     if (!hasPendingCosts)
-      buttons.push({ label: 'Reassign', icon: 'swap-horizontal-outline', color: '#7B6B90', bg: colors.surface, action: 'reassign' });
+      buttons.push({ label: 'Reassign', icon: 'swap-horizontal-outline', color: '#556274', bg: colors.surface, action: 'reassign' });
 
     // 2. Diagnose — ALWAYS shown for active tickets (web: always push "diagnose")
     buttons.push({
@@ -1004,7 +1004,7 @@ function TicketDetailScreen({ navigation, route }: any) {
     buttons.push({
       label: 'Mark Complete',
       icon: 'checkmark-circle-outline',
-      color: hasDiagnostic && !hasPendingCosts ? '#fff' : '#9B8BAE',
+      color: hasDiagnostic && !hasPendingCosts ? '#fff' : '#6B7280',
       bg: hasDiagnostic && !hasPendingCosts ? '#22C55E' : 'rgba(107,114,128,0.1)',
       action: 'complete',
       disabled: !hasDiagnostic || hasPendingCosts,
@@ -1163,7 +1163,7 @@ function TicketDetailScreen({ navigation, route }: any) {
               </View>
             </SectionCard>
           )}
-          <SectionCard title="Tenant & Location" icon="person-outline" iconColor="#7C3AED" iconBg="rgba(124,58,237,0.1)">
+          <SectionCard title="Tenant & Location" icon="person-outline" iconColor="#6366F1" iconBg="rgba(99,102,241,0.1)">
             <View style={{ gap: 10 }}>
               {ticket.tenant_name && <InfoRow icon="person-circle-outline" label="Tenant" value={ticket.tenant_name} />}
               {ticket.tenant_phone && <InfoRow icon="call-outline" label="Phone" value={ticket.tenant_phone} />}
@@ -1234,7 +1234,7 @@ function TicketDetailScreen({ navigation, route }: any) {
             const totalApproved = approvedEstimates.reduce((s, e) => s + e.total, 0);
             const totalPending  = pendingEstimates.reduce((s, e)  => s + e.total, 0);
             return (
-              <SectionCard title="Cost Estimates" icon="receipt-outline" iconColor="#7C3AED" iconBg="rgba(124,58,237,0.1)">
+              <SectionCard title="Cost Estimates" icon="receipt-outline" iconColor="#6366F1" iconBg="rgba(99,102,241,0.1)">
                 <View style={{ gap: 10 }}>
                   {visibleEstimates.map((est: any) => (
                     <View key={est.id}>
@@ -1378,11 +1378,11 @@ function TicketDetailScreen({ navigation, route }: any) {
 
           {/* ══ TIME METRICS (mirrors web timeMetrics card) ══ */}
           {timeMetrics && (timeMetrics.responseTime || timeMetrics.workDuration || timeMetrics.totalTime) && (
-            <SectionCard title="Time Metrics" icon="timer-outline" iconColor="#7C3AED" iconBg="rgba(124,58,237,0.1)">
+            <SectionCard title="Time Metrics" icon="timer-outline" iconColor="#6366F1" iconBg="rgba(99,102,241,0.1)">
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 {timeMetrics.responseTime && (
-                  <View style={{ flex: 1, backgroundColor: 'rgba(124,58,237,0.06)', borderRadius: 12, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#7C3AED' }}>{timeMetrics.responseTime}</Text>
+                  <View style={{ flex: 1, backgroundColor: 'rgba(99,102,241,0.06)', borderRadius: 12, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#6366F1' }}>{timeMetrics.responseTime}</Text>
                     <Text style={{ fontSize: 10, fontWeight: '600', color: colors.textTertiary, marginTop: 2, textAlign: 'center' }}>RESPONSE TIME</Text>
                   </View>
                 )}
@@ -1404,7 +1404,7 @@ function TicketDetailScreen({ navigation, route }: any) {
 
           {/* ══ ACTIVITY LOG + COMMENTS ══ */}
           {logs.length > 0 && (
-            <SectionCard title="Activity Log" icon="time-outline" iconColor="#7B6B90" iconBg="rgba(107,114,128,0.1)">
+            <SectionCard title="Activity Log" icon="time-outline" iconColor="#556274" iconBg="rgba(107,114,128,0.1)">
               <View style={{ gap: 0 }}>
                 {logs.map((log, idx) => {
                   const isComment = (log.action || '').toLowerCase() === 'comment';
@@ -1413,15 +1413,15 @@ function TicketDetailScreen({ navigation, route }: any) {
                       <View style={{ alignItems: 'center' }}>
                         <View style={{
                           width: 10, height: 10, borderRadius: 5, marginTop: 5,
-                          backgroundColor: isComment ? '#7C3AED' : idx === 0 ? BRAND : colors.border,
+                          backgroundColor: isComment ? '#6366F1' : idx === 0 ? BRAND : colors.border,
                         }} />
                         {idx < logs.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: colors.border, marginTop: 4 }} />}
                       </View>
                       <View style={{ flex: 1, paddingBottom: 14 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                           {isComment && (
-                            <View style={{ backgroundColor: 'rgba(124,58,237,0.1)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
-                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#7C3AED' }}>COMMENT</Text>
+                            <View style={{ backgroundColor: 'rgba(99,102,241,0.1)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
+                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#6366F1' }}>COMMENT</Text>
                             </View>
                           )}
                           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, flex: 1 }}>{log.action}</Text>
@@ -1462,7 +1462,7 @@ function TicketDetailScreen({ navigation, route }: any) {
                     <TouchableOpacity
                       onPress={handlePostComment}
                       disabled={postingComment || !commentText.trim()}
-                      style={{ flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10, borderRadius: 10, backgroundColor: '#7C3AED' }}
+                      style={{ flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10, borderRadius: 10, backgroundColor: '#6366F1' }}
                     >
                       {postingComment
                         ? <ActivityIndicator size="small" color="#fff" />
@@ -1517,7 +1517,7 @@ function TicketDetailScreen({ navigation, route }: any) {
         {/* ─── UNLOCK CLOSED TICKET MODAL (admin only — mirrors web) ─────────── */}
         <Modal visible={showUnlockModal} animationType="fade" transparent>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <View style={{ backgroundColor: colors.background, borderRadius: 20, padding: 24, width: '100%', gap: 16 }}>
+            <View style={{ backgroundColor: colors.background, borderRadius: 14, padding: 24, width: '100%', gap: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="lock-open-outline" size={19} color="#EF4444" />
@@ -1851,7 +1851,7 @@ function TicketDetailScreen({ navigation, route }: any) {
                       </View>
 
                       {/* ══ STEP 3: Payment fields — auto-filled by OCR after screenshot upload ══ */}
-                      <View style={{ backgroundColor: 'rgba(123,47,190,0.04)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.12)', gap: 10 }}>
+                      <View style={{ backgroundColor: 'rgba(49,46,129,0.04)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(49,46,129,0.12)', gap: 10 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="card-outline" size={13} color={BRAND} />
                           <Text style={{ fontSize: 10, fontWeight: '700', color: BRAND, letterSpacing: 0.3 }}>PAYMENT DETAILS</Text>
@@ -1866,7 +1866,7 @@ function TicketDetailScreen({ navigation, route }: any) {
 
                         {/* Payment Date */}
                         <View style={{ gap: 4 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Payment Date *</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Payment Date *</Text>
                           <DateField value={resolutionForm.paymentDate}
                             onChange={(v: string) => setResolutionForm(p => ({ ...p, paymentDate: v }))} />
                         </View>
@@ -2240,8 +2240,8 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, a
         <SafeAreaView style={{ flex: 1 }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(124,58,237,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-              <Ionicons name="receipt-outline" size={19} color="#7C3AED" />
+            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(99,102,241,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+              <Ionicons name="receipt-outline" size={19} color="#6366F1" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>Cost Estimate</Text>
@@ -2341,7 +2341,7 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, a
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleSubmit} disabled={loading || noCostLoading}
-              style={{ backgroundColor: '#7C3AED', borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              style={{ backgroundColor: '#6366F1', borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
               {loading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="send-outline" size={20} color="#fff" />}
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Send to Admin for Approval</Text>
             </TouchableOpacity>
@@ -2503,7 +2503,7 @@ function PurchaseRecordModal({ visible, ticketId, userId, approvedEstimates, ven
               <View style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, overflow: 'hidden' }}>
                 {[{ id: '__general', vendor_name: '+ General / One-time Vendor' }, ...vendors].map(v => (
                   <TouchableOpacity key={v.id} onPress={() => setForm(p => ({ ...p, vendor_id: v.id, vendor_name_manual: '' }))}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: vendors.indexOf(v as any) > -1 ? 0.5 : 0, borderTopColor: colors.border, backgroundColor: form.vendor_id === v.id ? 'rgba(232,132,26,0.1)' : 'transparent' }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: vendors.indexOf(v as any) > -1 ? 0.5 : 0, borderTopColor: colors.border, backgroundColor: form.vendor_id === v.id ? 'rgba(49,46,129,0.1)' : 'transparent' }}>
                     <Ionicons name={form.vendor_id === v.id ? 'checkmark-circle' : 'radio-button-off-outline'} size={18} color={form.vendor_id === v.id ? BRAND : colors.textTertiary} />
                     <Text style={{ fontSize: 13, color: colors.text, flex: 1 }}>{v.vendor_name}</Text>
                   </TouchableOpacity>
@@ -2608,8 +2608,8 @@ function ReassignModal({ visible, ticketId, userId, onClose, onSubmit }: any) {
       <GlassBackground>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(124,58,237,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-              <Ionicons name="swap-horizontal-outline" size={19} color="#7C3AED" />
+            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(99,102,241,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+              <Ionicons name="swap-horizontal-outline" size={19} color="#6366F1" />
             </View>
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 }}>Reassign Ticket</Text>
             <TouchableOpacity onPress={onClose}><Ionicons name="close-circle" size={28} color={colors.textTertiary} /></TouchableOpacity>
@@ -2642,7 +2642,7 @@ function ReassignModal({ visible, ticketId, userId, onClose, onSubmit }: any) {
           )}
           <View style={{ padding: 20 }}>
             <TouchableOpacity onPress={handleSubmit} disabled={loading || !selected}
-              style={{ backgroundColor: selected ? '#7C3AED' : colors.border, borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              style={{ backgroundColor: selected ? '#6366F1' : colors.border, borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
               {loading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="swap-horizontal-outline" size={20} color="#fff" />}
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Confirm Reassignment</Text>
             </TouchableOpacity>
@@ -2657,7 +2657,7 @@ function ReassignModal({ visible, ticketId, userId, onClose, onSubmit }: any) {
 function SectionCard({ title, icon, iconColor, iconBg, children }: any) {
   const { colors } = useTheme();
   return (
-    <View style={{ backgroundColor: colors.surface, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: colors.border }}>
+    <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 18, borderWidth: 1, borderColor: colors.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name={icon} size={17} color={iconColor} />
@@ -2716,20 +2716,20 @@ function TechnicianTabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'rgba(255,255,255,0.88)',
-          borderTopColor: 'rgba(224,213,234,0.3)',
-          borderTopWidth: 0.5,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E5E7EB',
+          borderTopWidth: 1,
           height: Platform.OS === 'ios' ? 88 : 64,
           paddingBottom: Platform.OS === 'ios' ? 24 : 8,
           paddingTop: 8,
-          shadowColor: '#1E1230',
+          shadowColor: '#111827',
           shadowOpacity: 0.06,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: -4 },
           elevation: 0,
         },
-        tabBarActiveTintColor: '#7B2FBE',
-        tabBarInactiveTintColor: '#9B8BAE',
+        tabBarActiveTintColor: '#312E81',
+        tabBarInactiveTintColor: '#556274',
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
         tabBarIcon: ({ color, focused }) => {
           const icons: Record<string, [string, string]> = {
