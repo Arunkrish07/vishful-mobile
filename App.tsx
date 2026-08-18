@@ -42,6 +42,7 @@ import MarketScreen from './screens/MarketScreen';
 import WhatsAppLogsScreen from './screens/WhatsAppLogsScreen';
 import AuditLogsScreen from './screens/AuditLogsScreen';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ConvexProvider, ConvexReactClient } from 'convex/react';
 
 // ── Inline Permissions System ────────────────────────────────────────────────
 // Fetches role_permissions from Supabase and exposes canAccess(module).
@@ -172,6 +173,9 @@ LogBox.ignoreLogs([
   "reading 'includes'",
   'min/vs/assets/ts.worker',
   '/ts.worker',
+  'expo-notifications',
+  'not fully supported in Expo Go',
+  'was removed from Expo Go',
 ]);
 
 // console noise filter — safe in both web and React Native
@@ -219,12 +223,12 @@ const AuthStack = createNativeStackNavigator();
 // ── Placeholder for ticket screens (removed — new system TBD) ───────────
 function TicketPlaceholder() {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F3F9' }}>
-      <Ionicons name="construct-outline" size={48} color="#7B2FBE" />
-      <Text style={{ fontSize: 18, fontWeight: '700', color: '#1E1230', marginTop: 16 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+      <Ionicons name="construct-outline" size={48} color="#2563EB" />
+      <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginTop: 16 }}>
         Tickets
       </Text>
-      <Text style={{ fontSize: 14, color: '#5C4B70', marginTop: 4, textAlign: 'center', paddingHorizontal: 32 }}>
+      <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4, textAlign: 'center', paddingHorizontal: 32 }}>
         New ticket system coming soon
       </Text>
     </View>
@@ -261,7 +265,7 @@ function CustomDrawerContent(props: any) {
 
   return (
     <LinearGradient
-      colors={['#EDE4F8', '#F2EAF6', '#FBF0E8']}
+      colors={['#F8FAFC', '#F4F6FB', '#EFF6FF']}
       start={{ x: 0, y: 0 }}
       end={{ x: 0.5, y: 1 }}
       style={{ flex: 1 }}
@@ -276,8 +280,8 @@ function CustomDrawerContent(props: any) {
         <View style={{
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.lg,
-          borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(123,47,190,0.08)',
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
           marginBottom: spacing.sm,
         }}>
           {/* Logo row */}
@@ -289,24 +293,24 @@ function CustomDrawerContent(props: any) {
               />
               <View>
                 <Text style={{
-                  fontSize: fontSize.lg,
-                  fontWeight: '900',
-                  color: '#1E1230',
-                  letterSpacing: 0.5,
+                  fontSize: fontSize.xl,
+                  fontWeight: '800',
+                  color: '#1D4ED8',
+                  letterSpacing: -0.3,
                 }}>
-                  <Text style={{ color: '#7B2FBE' }}>VISH</Text>
-                  <Text style={{ color: '#E8841A' }}>FUL</Text>
+                  Vishful
                 </Text>
                 <Text style={{
-                  fontSize: 8,
-                  color: '#5C4B70',
-                  letterSpacing: 2,
+                  fontSize: 10,
+                  color: '#6B7280',
+                  letterSpacing: 1.6,
                   fontWeight: '600',
-                }}>STAY | BELONG | SUCCEED</Text>
+                  textTransform: 'uppercase',
+                }}>Stay · Belong · Succeed</Text>
               </View>
             </View>
             <TouchableOpacity onPress={handleDrawerLogout} style={{ padding: 6 }}>
-              <Ionicons name="log-out-outline" size={20} color="#5C4B70" />
+              <Ionicons name="log-out-outline" size={20} color="#556274" />
             </TouchableOpacity>
           </View>
 
@@ -315,14 +319,14 @@ function CustomDrawerContent(props: any) {
             <View style={{
               width: 46,
               height: 46,
-              borderRadius: 14,
-              backgroundColor: 'rgba(123,47,190,0.08)',
+              borderRadius: 23,
+              backgroundColor: '#EFF6FF',
               alignItems: 'center',
               justifyContent: 'center',
-              borderWidth: 1.5,
-              borderColor: 'rgba(123,47,190,0.12)',
+              borderWidth: 1,
+              borderColor: '#BFDBFE',
             }}>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#7B2FBE' }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#1D4ED8' }}>
                 {(user?.userName || 'V')[0].toUpperCase()}
               </Text>
             </View>
@@ -330,13 +334,13 @@ function CustomDrawerContent(props: any) {
               <Text style={{
                 fontSize: fontSize.md,
                 fontWeight: '700',
-                color: '#1E1230',
+                color: '#111827',
               }}>
                 {user?.userName || 'Admin'}
               </Text>
               <Text style={{
                 fontSize: fontSize.xs,
-                color: '#5C4B70',
+                color: '#6B7280',
                 marginTop: 1,
               }}>{'Vishful Spaces LLP'}</Text>
             </View>
@@ -375,8 +379,8 @@ function MainDrawer() {
         end={{ x: 0.5, y: 1 }}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
       >
-        <ActivityIndicator size="small" color="#7B2FBE" />
-        <Text style={{ marginTop: 12, fontSize: 13, color: '#5C4B70' }}>Loading permissions…</Text>
+        <ActivityIndicator size="small" color="#2563EB" />
+        <Text style={{ marginTop: 12, fontSize: 13, color: '#6B7280' }}>Loading permissions…</Text>
       </LinearGradient>
     );
   }
@@ -389,9 +393,9 @@ function MainDrawer() {
         // Floating bottom bar is the primary nav now — no edge-swipe sidebar
         // (also avoids conflicts with horizontal scrolls inside screens).
         swipeEnabled: false,
-        drawerActiveTintColor: '#7B2FBE',
-        drawerInactiveTintColor: '#5C4B70',
-        drawerActiveBackgroundColor: 'rgba(255,255,255,0.65)',
+        drawerActiveTintColor: '#1D4ED8',
+        drawerInactiveTintColor: '#6B7280',
+        drawerActiveBackgroundColor: '#EFF6FF',
         drawerLabelStyle: {
           fontSize: 14,
           fontWeight: '500',
@@ -501,18 +505,20 @@ function TenantTabNavigator() {
           else if (route.name === 'Profile') iconName = 'person-outline';
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#7B2FBE',
-        tabBarInactiveTintColor: '#9B8BAE',
+        tabBarActiveTintColor: '#1D4ED8',
+        tabBarInactiveTintColor: '#556274',
         tabBarStyle: {
-          backgroundColor: 'rgba(255,255,255,0.88)',
-          borderTopWidth: 0.5,
-          borderTopColor: 'rgba(224,213,234,0.3)',
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E7EB',
+          height: 64,
+          paddingBottom: 8,
           paddingTop: 6,
           elevation: 0,
-          shadowColor: '#3D1A6E',
+          shadowColor: '#0F172A',
           shadowOpacity: 0.06,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: -4 },
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -2 },
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: -2 },
       })}
@@ -624,18 +630,18 @@ function FloatingAIAssistant({ raised }: { raised?: boolean }) {
   if (role === 'tenant') return null;
 
   const AS = StyleSheet.create({
-    fab: { position: 'absolute', bottom: 28, right: 20, zIndex: 999, shadowColor: '#7B2FBE', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
-    fabBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' },
-    panel: { width: AI_W, height: Dimensions.get('window').height, backgroundColor: '#F7F3F9' },
+    fab: { position: 'absolute', bottom: 28, right: 20, zIndex: 999, shadowColor: '#2563EB', shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
+    fabBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
+    panel: { width: AI_W, height: Dimensions.get('window').height, backgroundColor: '#F8FAFC' },
     hdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: 'rgba(255,255,255,0.95)', borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' },
-    avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' },
+    avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
     bubble: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10, gap: 6 },
     bInner: { maxWidth: AI_W * 0.78, borderRadius: 18, padding: 12 },
-    bUser: { backgroundColor: '#7B2FBE', borderBottomRightRadius: 4 },
+    bUser: { backgroundColor: '#2563EB', borderBottomRightRadius: 4 },
     bBot: { backgroundColor: 'rgba(255,255,255,0.95)', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' },
     inpArea: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.95)', borderTopWidth: 1, borderTopColor: 'rgba(123,47,190,0.1)' },
-    inp: { flex: 1, minHeight: 42, maxHeight: 120, backgroundColor: '#fff', borderWidth: 1.5, borderColor: 'rgba(123,47,190,0.2)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#1E1230', textAlignVertical: 'top' },
-    send: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' },
+    inp: { flex: 1, minHeight: 42, maxHeight: 120, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#111827', textAlignVertical: 'top' },
+    send: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
   });
 
   return (
@@ -648,7 +654,7 @@ function FloatingAIAssistant({ raised }: { raised?: boolean }) {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={AS.avatar}><Ionicons name="sparkles" size={16} color="#fff" /></View>
                   <View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E1230' }}>AI Assistant</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>AI Assistant</Text>
                     <Text style={{ fontSize: 11, color: '#9B8BAE' }}>Ask about your data</Text>
                   </View>
                 </View>
@@ -660,7 +666,7 @@ function FloatingAIAssistant({ raised }: { raised?: boolean }) {
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity onPress={() => setOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="close" size={20} color="#5C4B70" />
+                    <Ionicons name="close" size={20} color="#6B7280" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -668,21 +674,21 @@ function FloatingAIAssistant({ raised }: { raised?: boolean }) {
               <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 8 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {messages.map((msg, i) => (
                   <View key={i} style={[AS.bubble, msg.role === 'user' ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
-                    {msg.role === 'assistant' && <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center', marginBottom: 2, flexShrink: 0 }}><Ionicons name="sparkles" size={10} color="#fff" /></View>}
+                    {msg.role === 'assistant' && <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginBottom: 2, flexShrink: 0 }}><Ionicons name="sparkles" size={10} color="#fff" /></View>}
                     <View style={[AS.bInner, msg.role === 'user' ? AS.bUser : AS.bBot]}>
                       {msg.role === 'user'
                         ? <Text style={{ fontSize: 14, color: '#fff', lineHeight: 20 }}>{msg.content}</Text>
-                        : <AIMarkdown text={msg.content} style={{ fontSize: 14, color: '#1E1230', lineHeight: 20 }} />}
+                        : <AIMarkdown text={msg.content} style={{ fontSize: 14, color: '#111827', lineHeight: 20 }} />}
                     </View>
                   </View>
                 ))}
                 {busy && (
                   <View style={[AS.bubble, { justifyContent: 'flex-start' }]}>
-                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}><Ionicons name="sparkles" size={10} color="#fff" /></View>
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}><Ionicons name="sparkles" size={10} color="#fff" /></View>
                     <View style={[AS.bInner, AS.bBot, { paddingVertical: 12 }]}>
                       <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-                        <ActivityIndicator size="small" color="#7B2FBE" />
-                        <Text style={{ fontSize: 12, color: '#7B2FBE', fontWeight: '600' }}>Thinking…</Text>
+                        <ActivityIndicator size="small" color="#2563EB" />
+                        <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '600' }}>Thinking…</Text>
                       </View>
                     </View>
                   </View>
@@ -693,7 +699,7 @@ function FloatingAIAssistant({ raised }: { raised?: boolean }) {
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       {AI_SUGGESTIONS.map((s, i) => (
                         <TouchableOpacity key={i} onPress={() => handleSend(s)} style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(123,47,190,0.15)' }}>
-                          <Text style={{ fontSize: 12, color: '#7B2FBE', fontWeight: '600' }}>{s}</Text>
+                          <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '600' }}>{s}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -713,7 +719,7 @@ function FloatingAIAssistant({ raised }: { raised?: boolean }) {
         </View>
       </Modal>
       {!open && (
-        <Animated.View style={[AS.fab, raised && { bottom: 108 }, { transform: [{ scale: pulseAnim }] }]}>
+        <Animated.View style={[AS.fab, raised && { bottom: 78 }, { transform: [{ scale: pulseAnim }] }]}>
           <TouchableOpacity onPress={() => setOpen(true)} style={AS.fabBtn} activeOpacity={0.85}>
             <Ionicons name="sparkles" size={24} color="#fff" />
           </TouchableOpacity>
@@ -723,40 +729,50 @@ function FloatingAIAssistant({ raised }: { raised?: boolean }) {
   );
 }
 
-// ── Floating bottom navigation (replaces the side drawer for admins) ─────────
-const NAV_DUSK = {
-  plumNight: '#1C0E36', ember: '#F0871E', emberGlow: '#FFC073',
-  warmWhite: '#FBF4EC', mauveHaze: '#C6B4DE', mauveDim: '#9A88B6',
+// ── Bottom nav rail — exact match to vishful-mobile-app nav-rail ───────────
+const NAV_UI = {
+  brand: '#1D4ED8',
+  accent: '#2563EB',
+  idle: '#556274',
+  muted: '#6B7280',
+  line: '#E5E7EB',
+  trackBg: 'rgba(255,255,255,0.97)',
+  onBg: '#FFFFFF',
+  onGlow: '#EEF4FF',
 };
 
-type NavItem = { name: string; icon: any; module?: AppModule; always?: boolean };
-// Mirrors MainDrawer exactly (same names/icons/permission modules).
-const ADMIN_MENU: NavItem[] = [
-  { name: 'Dashboard',        icon: 'grid-outline',            always: true },
-  { name: 'Tickets',          icon: 'ticket-outline',          module: 'Tickets' },
-  { name: 'Properties',       icon: 'business-outline',        module: 'Properties' },
-  { name: 'Owners',           icon: 'people-circle-outline',   module: 'Owners' },
-  { name: 'Tenants',          icon: 'people-outline',          module: 'Tenants' },
-  { name: 'Tenant Lifecycle', icon: 'git-branch-outline',      module: 'Tenant Lifecycle' },
-  { name: 'Assets',           icon: 'cube-outline',            module: 'Assets' },
-  { name: 'Accounting',       icon: 'receipt-outline',         module: 'Accounting' },
-  { name: 'Electricity',      icon: 'flash-outline',           module: 'Electricity' },
-  { name: 'Reports',          icon: 'bar-chart-outline',       module: 'Reports' },
-  { name: 'Analytics',        icon: 'analytics-outline',       module: 'Analytics' },
-  { name: 'Availability',     icon: 'calendar-outline',        module: 'Availability' },
-  { name: 'Market AI',        icon: 'radio-outline',           module: 'Market AI' },
-  { name: 'Announcements',    icon: 'megaphone-outline',       always: true },
-  { name: 'Team',             icon: 'briefcase-outline',       module: 'Team' },
-  { name: 'WhatsApp Logs',    icon: 'logo-whatsapp',           module: 'WhatsApp Logs' },
-  { name: 'Audit Logs',       icon: 'document-text-outline',   module: 'Audit Logs' },
-  { name: 'Settings',         icon: 'settings-outline',        always: true },
+/** Order + labels match the web `An` nav rail exactly. */
+type NavItem = {
+  name: string;
+  label: string;
+  icon: any;
+  module?: AppModule;
+  always?: boolean;
+};
+
+const ADMIN_NAV_RAIL: NavItem[] = [
+  { name: 'Dashboard',        label: 'Home',          icon: 'home-outline',            always: true },
+  { name: 'Tenant Lifecycle', label: 'Lifecycle',     icon: 'git-branch-outline',      module: 'Tenant Lifecycle' },
+  { name: 'Tickets',          label: 'Tickets',       icon: 'ticket-outline',          module: 'Tickets' },
+  { name: 'Electricity',      label: 'EB',            icon: 'flash-outline',           module: 'Electricity' },
+  { name: 'Properties',       label: 'Properties',    icon: 'business-outline',        module: 'Properties' },
+  { name: 'Tenants',          label: 'Tenants',       icon: 'people-outline',          module: 'Tenants' },
+  { name: 'Assets',           label: 'Assets',        icon: 'cube-outline',            module: 'Assets' },
+  { name: 'Accounting',       label: 'Accounts',      icon: 'wallet-outline',          module: 'Accounting' },
+  { name: 'Reports',          label: 'Reports',       icon: 'bar-chart-outline',       module: 'Reports' },
+  { name: 'Availability',     label: 'Availability',  icon: 'calendar-outline',        module: 'Availability' },
+  { name: 'Announcements',    label: 'Announcements', icon: 'megaphone-outline',       always: true },
+  { name: 'Owners',           label: 'Owners',        icon: 'people-circle-outline',   module: 'Owners' },
+  { name: 'Analytics',        label: 'Analytics',     icon: 'analytics-outline',       module: 'Analytics' },
+  { name: 'Market AI',        label: 'Market AI',     icon: 'sparkles-outline',        module: 'Market AI' },
+  { name: 'WhatsApp Logs',    label: 'WhatsApp',      icon: 'logo-whatsapp',           module: 'WhatsApp Logs' },
+  { name: 'Audit Logs',       label: 'Audit Logs',    icon: 'document-text-outline',   module: 'Audit Logs' },
+  { name: 'Settings',         label: 'Settings',      icon: 'settings-outline',        always: true },
+  { name: 'Team',             label: 'Team',          icon: 'briefcase-outline',       module: 'Team' },
 ];
-const PRIMARY_TABS = ['Dashboard', 'Tickets', 'Properties', 'Tenants'];
 
 function AdminFloatingNav({ navRef }: { navRef: any }) {
   const insets = useSafeAreaInsets();
-  const { width: WIN_W, height: WIN_H } = Dimensions.get('window');
-  const { logout } = useAuth();
   const { canAccess: rawCanAccess, isSuperuser } = usePermissions();
   const canAccess = React.useCallback(
     (m?: AppModule, always?: boolean) =>
@@ -765,10 +781,9 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
   );
 
   const [active, setActive] = useState('Dashboard');
-  const [moreOpen, setMoreOpen] = useState(false);
-  const sheetAnim = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
+  const itemLayouts = useRef<Record<string, { x: number; w: number }>>({});
 
-  // Track the active top-level route from the navigation container's root state.
   useEffect(() => {
     const update = () => {
       try {
@@ -782,153 +797,140 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
     return () => { try { unsub?.(); } catch {} };
   }, [navRef]);
 
+  // Keep the active tab centered in the horizontal rail (same as web nav-rail).
   useEffect(() => {
-    Animated.timing(sheetAnim, { toValue: moreOpen ? 1 : 0, duration: 240, useNativeDriver: true }).start();
-  }, [moreOpen]);
+    const layout = itemLayouts.current[active];
+    if (!layout || !scrollRef.current) return;
+    const target = Math.max(0, layout.x - 80);
+    scrollRef.current.scrollTo({ x: target, animated: true });
+  }, [active]);
 
   const go = (name: string) => {
-    setMoreOpen(false);
     try { if (navRef.isReady?.()) navRef.navigate(name as never); } catch {}
   };
 
-  const handleLogout = () => {
-    setMoreOpen(false);
-    Alert.alert('Confirm Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: () => logout() },
-    ]);
-  };
-
-  const primaryItems = ADMIN_MENU.filter(i => PRIMARY_TABS.includes(i.name) && canAccess(i.module, i.always));
-  const moreItems    = ADMIN_MENU.filter(i => !PRIMARY_TABS.includes(i.name) && canAccess(i.module, i.always));
-  const activeInMore = moreItems.some(i => i.name === active);
-
-  const renderTab = (item: NavItem | null) => {
-    const isMore   = item === null;
-    const label    = isMore ? 'More' : item!.name;
-    const icon     = isMore ? 'apps' : item!.icon;
-    const isActive = isMore ? (moreOpen || activeInMore) : active === item!.name;
-    return (
-      <TouchableOpacity
-        key={isMore ? '__more' : item!.name}
-        style={NAV.tab}
-        activeOpacity={0.8}
-        onPress={() => (isMore ? setMoreOpen(true) : go(item!.name))}
-      >
-        <Ionicons name={icon} size={22} color={isActive ? NAV_DUSK.ember : NAV_DUSK.mauveHaze} />
-        <Text style={[NAV.tabLbl, { color: isActive ? NAV_DUSK.emberGlow : NAV_DUSK.mauveDim }]} numberOfLines={1}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+  const items = ADMIN_NAV_RAIL.filter(i => canAccess(i.module, i.always));
 
   return (
-    <>
-      <View pointerEvents="box-none" style={[NAV.wrap, { bottom: Math.max(insets.bottom, 10) + 6 }]}>
-        <View style={NAV.bar}>
-          {primaryItems.map(i => renderTab(i))}
-          {renderTab(null)}
-        </View>
-      </View>
-
-      {/* More sheet — plain absolute overlay with explicit dims (Fabric-safe; a
-          flex/percentage Modal collapses to 0×0 on the new architecture). */}
-      {moreOpen && (
-        <View style={{ position: 'absolute', top: 0, left: 0, width: WIN_W, height: WIN_H, zIndex: 1000, elevation: 40 }}>
-          <TouchableWithoutFeedback onPress={() => setMoreOpen(false)}>
-            <Animated.View style={[{ position: 'absolute', top: 0, left: 0, width: WIN_W, height: WIN_H, backgroundColor: 'rgba(10,4,22,0.62)' }, { opacity: sheetAnim }]} />
-          </TouchableWithoutFeedback>
-          <Animated.View
-            style={[
-              NAV.sheet,
-              {
-                width: WIN_W,
-                maxHeight: Math.round(WIN_H * 0.8),
-                paddingBottom: insets.bottom + 16,
-                transform: [{ translateY: sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [WIN_H, 0] }) }],
-              },
-            ]}
-          >
-            <View style={NAV.sheetHandle} />
-            <View style={NAV.sheetHead}>
-              <Text style={NAV.sheetTitle}>All menus</Text>
-              <TouchableOpacity onPress={() => setMoreOpen(false)} style={NAV.sheetClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={18} color={NAV_DUSK.mauveHaze} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView contentContainerStyle={NAV.grid} showsVerticalScrollIndicator={false}>
-              {moreItems.map(i => {
-                const on = active === i.name;
-                return (
-                  <TouchableOpacity key={i.name} style={NAV.cell} activeOpacity={0.8} onPress={() => go(i.name)}>
-                    <View style={[NAV.cellIco, on && { backgroundColor: 'rgba(240,135,30,0.18)', borderColor: NAV_DUSK.ember }]}>
-                      <Ionicons name={i.icon} size={22} color={on ? NAV_DUSK.emberGlow : NAV_DUSK.warmWhite} />
-                    </View>
-                    <Text style={NAV.cellLbl} numberOfLines={2}>{i.name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            {/* Sign out — pinned below the menu grid so it stays reachable */}
-            <TouchableOpacity style={NAV.signOut} activeOpacity={0.85} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={20} color={NAV_DUSK.ember} />
-              <Text style={NAV.signOutLbl}>Sign Out</Text>
+    <View
+      pointerEvents="box-none"
+      style={[NAV.rail, { paddingBottom: Math.max(insets.bottom, 8) }]}
+    >
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={NAV.track}
+        decelerationRate="fast"
+      >
+        {items.map((item) => {
+          const on = active === item.name;
+          return (
+            <TouchableOpacity
+              key={item.name}
+              style={[NAV.item, on && NAV.itemOn]}
+              activeOpacity={0.85}
+              onPress={() => go(item.name)}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                itemLayouts.current[item.name] = { x, w: width };
+              }}
+            >
+              <Ionicons
+                name={item.icon}
+                size={18}
+                color={on ? NAV_UI.brand : NAV_UI.idle}
+                style={on ? { transform: [{ translateY: -1 }, { scale: 1.06 }] } : undefined}
+              />
+              <Text style={[NAV.label, on && NAV.labelOn]} numberOfLines={1}>
+                {item.label}
+              </Text>
+              {on ? <View style={NAV.underline} /> : null}
             </TouchableOpacity>
-          </Animated.View>
-        </View>
-      )}
-    </>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
 const NAV = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 900, elevation: 30 },
-  bar: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(28,14,54,0.97)',
-    borderRadius: 26, paddingHorizontal: 6, paddingVertical: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 16,
-    marginHorizontal: 14,
+  rail: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 900,
+    elevation: 24,
+    backgroundColor: NAV_UI.trackBg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: NAV_UI.line,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: -2 },
   },
-  tab: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 4, minWidth: 60 },
-  tabLbl: { fontSize: 10, fontWeight: '700', marginTop: 3, letterSpacing: 0.2 },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(10,4,22,0.6)' },
-  sheet: {
-    position: 'absolute', left: 0, bottom: 0,
-    backgroundColor: '#241141',
-    borderTopLeftRadius: 26, borderTopRightRadius: 26,
-    paddingTop: 10, paddingHorizontal: 16,
-    borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  track: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    height: 50,
+    gap: 2,
   },
-  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', marginBottom: 10 },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingHorizontal: 4 },
-  sheetTitle: { fontSize: 15, fontWeight: '800', color: '#FBF4EC', letterSpacing: 0.3 },
-  sheetClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 8 },
-  cell: { width: '25%', alignItems: 'center', marginBottom: 18, paddingHorizontal: 2 },
-  cellIco: { width: 52, height: 52, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  cellLbl: { fontSize: 10.5, fontWeight: '600', color: '#C6B4DE', textAlign: 'center', lineHeight: 13 },
-  signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 6, marginHorizontal: 4, paddingVertical: 14, borderRadius: 16, backgroundColor: 'rgba(240,135,30,0.10)', borderWidth: 1, borderColor: 'rgba(240,135,30,0.35)' },
-  signOutLbl: { fontSize: 14, fontWeight: '800', color: '#FBC98A', letterSpacing: 0.3 },
+  item: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 68,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+    position: 'relative',
+  },
+  itemOn: {
+    backgroundColor: NAV_UI.onBg,
+    shadowColor: '#2563EB',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(147,197,253,0.55)',
+  },
+  label: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '600',
+    color: NAV_UI.idle,
+    letterSpacing: 0.1,
+  },
+  labelOn: {
+    color: NAV_UI.brand,
+    fontWeight: '700',
+  },
+  underline: {
+    position: 'absolute',
+    bottom: 3,
+    width: 22,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#1D4ED8',
+  },
 });
 
 // Shown when an authenticated account resolves to a role that is neither an admin
 // role nor tenant/technician — instead of silently dropping it into the admin app.
 function UnauthorizedScreen({ onLogout }: { onLogout: () => void }) {
   return (
-    <LinearGradient colors={glass.screenGradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-      <Ionicons name="lock-closed-outline" size={48} color="#7B2FBE" />
-      <Text style={{ fontSize: fontSize.xl, fontWeight: '900', color: '#1E1230', marginTop: 16, textAlign: 'center' }}>Access not enabled</Text>
-      <Text style={{ fontSize: fontSize.sm, color: '#5C4B70', marginTop: 10, textAlign: 'center', lineHeight: 20 }}>
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <Ionicons name="lock-closed-outline" size={48} color="#2563EB" />
+      <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: '#111827', marginTop: 16, textAlign: 'center' }}>Access not enabled</Text>
+      <Text style={{ fontSize: fontSize.sm, color: '#6B7280', marginTop: 10, textAlign: 'center', lineHeight: 20 }}>
         Your account isn't set up with access to this app yet. Please contact your administrator.
       </Text>
-      <TouchableOpacity onPress={onLogout} style={{ marginTop: 28, backgroundColor: '#7B2FBE', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12 }}>
+      <TouchableOpacity onPress={onLogout} style={{ marginTop: 28, backgroundColor: '#2563EB', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 14 }}>
         <Text style={{ color: '#fff', fontWeight: '800' }}>Sign Out</Text>
       </TouchableOpacity>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -940,21 +942,30 @@ function AppNavigator() {
   if (isLoading) {
     return (
       <LinearGradient
-        colors={glass.screenGradient as any}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={['#0F1224', '#1A1F3A', '#232846']}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
       >
-        <Image
-          source={require('./assets/vishful-logo-DPK24n8p.webp')}
-          style={{ width: 120, height: 120, resizeMode: 'contain' }}
-        />
-        <Text style={{ fontSize: fontSize.xxl, fontWeight: '900', color: '#1E1230', marginTop: 12, letterSpacing: 1 }}>
-          <Text style={{ color: '#7B2FBE' }}>VISH</Text>
-          <Text style={{ color: '#E8841A' }}>FUL</Text>
+        <View style={{
+          width: 132, height: 132, borderRadius: 36,
+          backgroundColor: 'rgba(255,255,255,0.06)',
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Image
+            source={require('./assets/vishful-logo-DPK24n8p.webp')}
+            style={{ width: 100, height: 100, resizeMode: 'contain' }}
+          />
+        </View>
+        <Text style={{ fontSize: 34, fontWeight: '800', color: '#F8FAFC', marginTop: 16, letterSpacing: -0.8 }}>
+          Vishful
         </Text>
-        <Text style={{ fontSize: fontSize.xs, color: '#5C4B70', letterSpacing: 2.5, marginTop: 4 }}>STAY | BELONG | SUCCEED</Text>
-        <ActivityIndicator size="small" color="#E8841A" style={{ marginTop: 32 }} />
+        <Text style={{ fontSize: 12, color: 'rgba(226,232,240,0.58)', letterSpacing: 2.4, marginTop: 8, fontWeight: '600', textTransform: 'uppercase' }}>
+          Stay · Belong · Succeed
+        </Text>
+        <ActivityIndicator size="small" color="#2563EB" style={{ marginTop: 32 }} />
+        <Text style={{ fontSize: 12, color: 'rgba(203,213,225,0.45)', marginTop: 20 }}>Property OS</Text>
       </LinearGradient>
     );
   }
@@ -1023,16 +1034,16 @@ class ErrorBoundary extends React.Component<
       }
       // Real error — show recovery UI
       return (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#1E1230', marginBottom: 8 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#F8FAFC' }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 }}>
             Something went wrong
           </Text>
-          <Text style={{ fontSize: 14, color: '#5C4B70', textAlign: 'center', marginBottom: 20 }}>
-            Please restart the app
+          <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 16 }}>
+            {this.state.error?.message || 'Please restart the app'}
           </Text>
           <TouchableOpacity
             onPress={() => this.setState({ hasError: false, error: null })}
-            style={{ backgroundColor: '#E8841A', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 99 }}
+            style={{ backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 99 }}
           >
             <Text style={{ color: '#fff', fontWeight: '600' }}>Try Again</Text>
           </TouchableOpacity>
@@ -1043,23 +1054,27 @@ class ErrorBoundary extends React.Component<
   }
 }
 
+const convexClient = new ConvexReactClient('https://wonderful-kiwi-122.convex.cloud');
+
 export default function App() {
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <PersistQueryClientProvider
-          client={queryClient}
-          persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE }}
-        >
-          <ThemeProvider>
-            <AuthProvider>
-              <PermissionsProvider>
-                <AppNavigator />
-              </PermissionsProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </PersistQueryClientProvider>
-      </SafeAreaProvider>
+      <ConvexProvider client={convexClient}>
+        <SafeAreaProvider>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE }}
+          >
+            <ThemeProvider>
+              <AuthProvider>
+                <PermissionsProvider>
+                  <AppNavigator />
+                </PermissionsProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </PersistQueryClientProvider>
+        </SafeAreaProvider>
+      </ConvexProvider>
     </ErrorBoundary>
   );
 }
