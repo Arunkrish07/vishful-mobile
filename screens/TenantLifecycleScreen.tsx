@@ -14,6 +14,7 @@ import {
   TextInput, Alert, ActivityIndicator, FlatList, RefreshControl,
   Dimensions, KeyboardAvoidingView, Platform, Image, Animated,
 } from 'react-native';
+import { CONVEX_SITE_URL } from '../lib/config';
 import { Audio } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -302,7 +303,7 @@ const VBRAND = {
 };
 
 // Voice transcription runs server-side via POST /api/transcribe (no client key).
-const TRANSCRIBE_URL = 'https://wonderful-kiwi-122.convex.site/api/transcribe';
+const TRANSCRIBE_URL = `${CONVEX_SITE_URL}/api/transcribe`;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 

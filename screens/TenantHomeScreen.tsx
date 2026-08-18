@@ -25,9 +25,10 @@ import { formatDate } from '../lib/dateUtils';
 import { fetchTickets, tenantApproveCompletion, checkTenantPendingTickets, Ticket } from '../services/ticketService';
 import { getTenantNotices, recordNotice, getTenantLocation } from '../lib/supabaseService';
 import { client, api } from '../lib/convexApi';
+import { CONVEX_SITE_URL } from '../lib/config';
 
 // ─── Convex HTTP endpoints ────────────────────────────────────────────────────
-const CONVEX_BASE   = 'https://wonderful-kiwi-122.convex.site';
+const CONVEX_BASE   = CONVEX_SITE_URL;
 const TRANSCRIBE_URL = `${CONVEX_BASE}/api/transcribe`;
 const TICKET_URL     = `${CONVEX_BASE}/api/voice-ticket-direct`;
 

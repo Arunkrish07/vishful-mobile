@@ -29,6 +29,7 @@ import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
 import { glass, spacing, borderRadius, fontSize } from '../lib/theme';
 import { client, api } from '../lib/convexApi';
+import { CONVEX_SITE_URL } from '../lib/config';
 import {
   fetchTickets,
   fetchCostEstimates,
@@ -41,7 +42,7 @@ import {
 
 const BRAND       = '#312E81';
 const BRAND_LIGHT = 'rgba(49,46,129,0.1)';
-const CONVEX_BASE = 'https://wonderful-kiwi-122.convex.site';
+const CONVEX_BASE = CONVEX_SITE_URL;
 const TICKET_URL  = `${CONVEX_BASE}/api/voice-ticket-direct`;
 
 type VoiceStep = 'idle' | 'recording' | 'processing' | 'review' | 'submitting' | 'success' | 'error';
@@ -156,7 +157,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
       if (uri) {
         try {
           const audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-          const resp = await fetch('https://wonderful-kiwi-122.convex.site/api/transcribe', {
+          const resp = await fetch(`${CONVEX_SITE_URL}/api/transcribe`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ audioBase64, mimeType: 'audio/m4a' }),

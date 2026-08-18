@@ -14,9 +14,10 @@ import * as FileSystem from 'expo-file-system';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { GlassBackground } from '../components/shared';
+import { CONVEX_SITE_URL } from '../lib/config';
 
 // Voice transcription runs server-side via POST /api/transcribe (no client key).
-const TRANSCRIBE_URL = 'https://wonderful-kiwi-122.convex.site/api/transcribe';
+const TRANSCRIBE_URL = `${CONVEX_SITE_URL}/api/transcribe`;
 
 // ── Mock Tenant Fallback ───────────────────────────────────────────────────
 const MOCK_TENANT = {
