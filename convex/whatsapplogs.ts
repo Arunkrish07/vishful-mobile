@@ -2,7 +2,7 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { getSupabase, ORG_ID, safeList } from "./lib/supabaseAdmin";
+import { getSupabase, ORG_ID, safeList, updateRow } from "./lib/supabaseAdmin";
 
 // ─── WHATSAPP DELIVERY LOGS (read-only) ──────────────────────────────────────
 // Mirrors web WhatsAppDeliveryHistoryCard: list recent send jobs, then drill
@@ -49,7 +49,7 @@ export const listJobDeliveries = action({
       sb
         .from("whatsapp_send_deliveries")
         .select(
-          "id, job_id, delivery_kind, tenant_name, label, status, error_message, phone_masked, created_at, sent_at",
+          "id, job_id, tenant_id, delivery_kind, tenant_name, label, status, error_message, phone_masked, created_at, sent_at",
         )
         .eq("organization_id", ORG_ID)
         .eq("job_id", jobId)
@@ -58,6 +58,7 @@ export const listJobDeliveries = action({
     return rows.map((r) => ({
       id: r.id,
       jobId: r.job_id,
+      tenantId: r.tenant_id || null,
       deliveryKind: r.delivery_kind || null,
       tenantName: r.tenant_name || null,
       label: r.label || null,
@@ -90,6 +91,34 @@ export const resendDelivery = action({
       return { ok: true };
     } catch (e: any) {
       return { ok: false, reason: e?.message || "edge function unavailable" };
+    }
+  },
+});
+
+// Fix a delivery that failed due to a wrong/missing number: update the tenant's
+// phone, then re-queue that one delivery. Mirrors web savePhone
+// (updateTenantPhoneNumber + resendWhatsappDelivery). ok=true means the phone was
+// saved; resent=false (with a reason) means the follow-up resend didn't fire.
+export const updateTenantPhoneAndResend = action({
+  args: { tenantId: v.string(), newPhone: v.string(), deliveryId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { tenantId, newPhone, deliveryId }) => {
+    const phone = (newPhone || "").trim();
+    if (!phone) return { ok: false, reason: "Enter a phone number" };
+    const sb = getSupabase();
+    try {
+      await updateRow("tenants", tenantId, { phone });
+    } catch (e: any) {
+      return { ok: false, reason: e?.message || "Could not update phone" };
+    }
+    try {
+      const { error } = await sb.functions.invoke("whatsapp-send-job", {
+        body: { action: "resend_delivery", delivery_id: deliveryId },
+      });
+      if (error) return { ok: true, resent: false, reason: error.message || "Number saved, but resend failed" };
+      return { ok: true, resent: true };
+    } catch (e: any) {
+      return { ok: true, resent: false, reason: e?.message || "Number saved, but resend is unavailable" };
     }
   },
 });

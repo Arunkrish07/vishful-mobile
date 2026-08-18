@@ -7,7 +7,7 @@
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Image,
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Image, Modal, TextInput, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,6 +48,8 @@ export default function WhatsAppLogsScreen() {
   const [busy, setBusy] = useState<string | null>(null); // id of the in-flight write
   const [jobType, setJobType] = useState('all');
   const didAutoExpand = useRef(false); // auto-expand the first failing/running job once per mount
+  const [editPhone, setEditPhone] = useState<{ deliveryId: string; tenantId: string; jobId: string } | null>(null);
+  const [phoneInput, setPhoneInput] = useState('');
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -143,6 +145,24 @@ export default function WhatsAppLogsScreen() {
     } finally { setBusy(null); await afterWrite(jobId); }
   }, [afterWrite]);
 
+  // Fix a failed delivery caused by a wrong number: save a corrected tenant phone, then resend.
+  const doEditPhoneSave = useCallback(async () => {
+    if (!editPhone) return;
+    const phone = phoneInput.trim();
+    if (!phone) { Alert.alert('Enter a number', 'Please enter a valid phone number.'); return; }
+    const { deliveryId, tenantId, jobId } = editPhone;
+    setBusy('phone:' + deliveryId);
+    try {
+      const r = await sb.updateTenantPhoneAndResend(tenantId, phone, deliveryId);
+      if (r?.ok === false) { Alert.alert('Could not update', r.reason || 'Unknown error'); return; }
+      setEditPhone(null); setPhoneInput('');
+      Alert.alert(r?.resent ? 'Number updated' : 'Number saved',
+        r?.resent ? 'Saved the new number and re-queued the message.' : (r?.reason || 'Saved the new number.'));
+    } catch (e: any) {
+      Alert.alert('Could not update', e?.message || 'Unknown error');
+    } finally { setBusy(null); await afterWrite(jobId); }
+  }, [editPhone, phoneInput, afterWrite]);
+
   return (
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -195,6 +215,11 @@ export default function WhatsAppLogsScreen() {
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'capitalize', color: statusColor(d.status) }}>{d.status || '—'}</Text>
+                      {['failed', 'skipped', 'error'].includes(lc(d.status)) && d.tenantId && (
+                        <TouchableOpacity disabled={!!busy} onPress={() => { setEditPhone({ deliveryId: d.id, tenantId: d.tenantId, jobId: job.id }); setPhoneInput(''); }} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
+                          <Ionicons name="create-outline" size={16} color="#D97706" />
+                        </TouchableOpacity>
+                      )}
                       {canResend && (
                         <TouchableOpacity disabled={!!busy} onPress={() => doResendOne(d.id, job.id)} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
                           {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="refresh" size={16} color="#2563EB" />}
@@ -267,6 +292,32 @@ export default function WhatsAppLogsScreen() {
             })}
           </ScrollView>
         )}
+
+        {/* Edit tenant number + resend (failed rows). absoluteFill avoids the Fabric flex:1 Modal collapse. */}
+        <Modal visible={!!editPhone} transparent animationType="fade" onRequestClose={() => { setEditPhone(null); setPhoneInput(''); }}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', paddingHorizontal: 24 }]}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>Update number & resend</Text>
+              <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 14 }}>Save a corrected phone number for this tenant and re-queue the failed message.</Text>
+              <TextInput
+                value={phoneInput}
+                onChangeText={setPhoneInput}
+                placeholder="Phone number"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: '#111827', marginBottom: 16 }}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                <TouchableOpacity onPress={() => { setEditPhone(null); setPhoneInput(''); }} style={{ paddingHorizontal: 14, paddingVertical: 9 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity disabled={!!busy} onPress={doEditPhoneSave} style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, backgroundColor: '#2563EB', opacity: busy ? 0.6 : 1 }}>
+                  {busy && String(busy).startsWith('phone:') ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Save & Resend</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </GlassBackground>
   );

@@ -565,6 +565,9 @@ export async function listWhatsappJobDeliveries(jobId: string) {
 export async function resendWhatsappDelivery(deliveryId: string) {
   return client.action((api as any).whatsapplogs.resendDelivery, { deliveryId });
 }
+export async function updateTenantPhoneAndResend(tenantId: string, newPhone: string, deliveryId: string) {
+  return client.action((api as any).whatsapplogs.updateTenantPhoneAndResend, { tenantId, newPhone, deliveryId });
+}
 export async function resendAllFailedWhatsappDeliveries(jobId: string) {
   return client.action((api as any).whatsapplogs.resendAllFailed, { jobId });
 }
