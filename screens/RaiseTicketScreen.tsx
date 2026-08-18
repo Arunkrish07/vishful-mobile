@@ -545,7 +545,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
         {/* ── Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#1E1230" />
+            <Ionicons name="arrow-back" size={24} color="#111827" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Raise a Complaint</Text>
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.4)',
   },
   backBtn:        { marginRight: 12, padding: 4 },
-  headerTitle:    { fontSize: 20, fontWeight: '800', color: '#1E1230' },
+  headerTitle:    { fontSize: 20, fontWeight: '800', color: '#111827' },
   headerLocation: { fontSize: 12, color: '#6366F1', marginTop: 1, fontWeight: '600' },
 
   tabRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4, gap: 10 },
@@ -841,7 +841,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20, paddingBottom: 40 },
 
   placeholderCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 48, alignItems: 'center',
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 48, alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 }, elevation: 2,
   },
@@ -883,7 +883,7 @@ const styles = StyleSheet.create({
   },
 
   centerSection:    { alignItems: 'center', paddingVertical: 72 },
-  processingTitle:  { fontSize: 18, fontWeight: '700', color: '#1E1230', marginTop: 16 },
+  processingTitle:  { fontSize: 18, fontWeight: '700', color: '#111827', marginTop: 16 },
   processingSubtext:{ fontSize: 14, color: '#6B7280', marginTop: 4 },
 
   card: {
@@ -896,7 +896,7 @@ const styles = StyleSheet.create({
 
   classRow:  { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   classEmoji:{ fontSize: 36, marginTop: 2 },
-  classTitle:{ fontSize: 18, fontWeight: '800', color: '#1E1230' },
+  classTitle:{ fontSize: 18, fontWeight: '800', color: '#111827' },
   classDesc: { fontSize: 14, color: '#6B7280', marginTop: 4, lineHeight: 20 },
   badgeRow:  { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
   badge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },

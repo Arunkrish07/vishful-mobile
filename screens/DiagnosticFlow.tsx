@@ -24,8 +24,8 @@ import { client, api } from '../lib/convexApi';
 import { saveTicketResolution, submitDiagnosis } from '../services/ticketService';
 import * as sb from '../lib/supabaseService';
 
-const BRAND = '#E8841A';
-const BRAND_LIGHT = 'rgba(232,132,26,0.12)';
+const BRAND = '#312E81';
+const BRAND_LIGHT = 'rgba(49,46,129,0.12)';
 
 // ─── Diagnostic questions (UNCHANGED) ────────────────────────────────────────
 interface DiagOption   { value: string; label: string }
@@ -117,8 +117,8 @@ interface CostTier {
 }
 const COST_TIERS: CostTier[] = [
   { id:'basic',    label:'Basic',    tagline:'Essential repair only',       accentColor:'#16A34A', accentBg:'rgba(22,163,74,0.08)',   accentBorder:'rgba(22,163,74,0.25)',   icon:'build-outline',            multiplier:0.7 },
-  { id:'standard', label:'Standard', tagline:'Recommended solution',        accentColor:BRAND,     accentBg:BRAND_LIGHT,              accentBorder:'rgba(232,132,26,0.35)', icon:'star-outline',             badge:'RECOMMENDED', multiplier:1.0 },
-  { id:'premium',  label:'Premium',  tagline:'Full fix + preventive care',  accentColor:'#7C3AED', accentBg:'rgba(124,58,237,0.08)',  accentBorder:'rgba(124,58,237,0.25)', icon:'shield-checkmark-outline', multiplier:1.4 },
+  { id:'standard', label:'Standard', tagline:'Recommended solution',        accentColor:BRAND,     accentBg:BRAND_LIGHT,              accentBorder:'rgba(49,46,129,0.35)', icon:'star-outline',             badge:'RECOMMENDED', multiplier:1.0 },
+  { id:'premium',  label:'Premium',  tagline:'Full fix + preventive care',  accentColor:'#6366F1', accentBg:'rgba(99,102,241,0.08)',  accentBorder:'rgba(99,102,241,0.25)', icon:'shield-checkmark-outline', multiplier:1.4 },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -568,7 +568,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
             const isSel = !noCostSelected && selectedTier?.id===tier.id;
             return (
               <TouchableOpacity key={tier.id} onPress={() => handleSelectTier(tier)} activeOpacity={0.8}
-                style={{ borderRadius:18, borderWidth:isSel?2:1, borderColor:isSel?tier.accentColor:colors.border, backgroundColor:isSel?tier.accentBg:colors.surface, overflow:'hidden' }}>
+                style={{ borderRadius:14, borderWidth:isSel?2:1, borderColor:isSel?tier.accentColor:colors.border, backgroundColor:isSel?tier.accentBg:colors.surface, overflow:'hidden' }}>
                 {/* Card header */}
                 <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:isSel?tier.accentBorder:colors.border }}>
                   <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
@@ -599,7 +599,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
                   {tierParts.slice(0,3).map((p,pi) => (
                     <View key={pi} style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
                       <View style={{ flexDirection:'row', alignItems:'center', gap:6, flex:1 }}>
-                        <View style={{ width:6,height:6,borderRadius:3, backgroundColor:p.cost_type==='labor'?'#7C3AED':tier.accentColor }} />
+                        <View style={{ width:6,height:6,borderRadius:3, backgroundColor:p.cost_type==='labor'?'#6366F1':tier.accentColor }} />
                         <Text style={{ fontSize:12, color:colors.text, flex:1 }} numberOfLines={1}>{p.item_name}</Text>
                       </View>
                       <Text style={{ fontSize:12, fontWeight:'700', color:colors.textSecondary }}>₹{(p.quantity*p.unit_price).toLocaleString('en-IN')}</Text>
@@ -620,7 +620,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
           {/* No Cost card */}
           <TouchableOpacity onPress={() => { setNoCostSelected(true); setSelectedTier(null); setParts([]); }} activeOpacity={0.8}
-            style={{ borderRadius:18, borderWidth:noCostSelected?2:1, borderColor:noCostSelected?'#22C55E':colors.border, backgroundColor:noCostSelected?'rgba(34,197,94,0.07)':colors.surface, overflow:'hidden' }}>
+            style={{ borderRadius:14, borderWidth:noCostSelected?2:1, borderColor:noCostSelected?'#22C55E':colors.border, backgroundColor:noCostSelected?'rgba(34,197,94,0.07)':colors.surface, overflow:'hidden' }}>
             <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:14 }}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
                 <View style={{ width:36,height:36,borderRadius:10, backgroundColor:noCostSelected?'#22C55E':(colors.background||colors.surface), alignItems:'center',justifyContent:'center', borderWidth:1, borderColor:noCostSelected?'transparent':colors.border }}>
@@ -706,7 +706,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
               <View key={i} style={{ backgroundColor:colors.background||colors.surface, borderRadius:12, padding:12, borderWidth:1, borderColor:colors.border, marginBottom:10 }}>
                 <View style={{ flexDirection:'row', justifyContent:'space-between', marginBottom:8 }}>
                   <View style={{ flexDirection:'row', alignItems:'center', gap:6 }}>
-                    <View style={{ width:7,height:7,borderRadius:3.5, backgroundColor:part.cost_type==='labor'?'#7C3AED':BRAND }} />
+                    <View style={{ width:7,height:7,borderRadius:3.5, backgroundColor:part.cost_type==='labor'?'#6366F1':BRAND }} />
                     <Text style={{ fontSize:11, fontWeight:'700', color:colors.textSecondary }}>ITEM {i+1}</Text>
                   </View>
                   <TouchableOpacity onPress={() => removePart(i)}>
@@ -768,9 +768,9 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
             )}
 
             {/* Approver notice */}
-            <View style={{ flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'rgba(124,58,237,0.06)', borderRadius:10, padding:10, marginTop:12, borderWidth:1, borderColor:'rgba(124,58,237,0.2)' }}>
-              <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
-              <Text style={{ fontSize:11, color:'#7C3AED', flex:1 }}>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'rgba(99,102,241,0.06)', borderRadius:10, padding:10, marginTop:12, borderWidth:1, borderColor:'rgba(99,102,241,0.2)' }}>
+              <Ionicons name="person-circle-outline" size={16} color="#6366F1" />
+              <Text style={{ fontSize:11, color:'#6366F1', flex:1 }}>
                 Request will be sent to <Text style={{ fontWeight:'800' }}>{approverName || 'the approver'}</Text> for approval
               </Text>
             </View>
@@ -779,7 +779,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
             <View style={{ gap:10 }}>
               <TouchableOpacity onPress={handleFinalSubmit} disabled={submitting||validParts.length===0}
-                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#7C3AED', borderRadius:14, padding:14, opacity:(submitting||validParts.length===0)?0.55:1 }}>
+                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#6366F1', borderRadius:14, padding:14, opacity:(submitting||validParts.length===0)?0.55:1 }}>
                 {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send-outline" size={18} color="#fff" />}
                 <Text style={{ fontSize:15, fontWeight:'800', color:'#fff' }}>{submitting?'Submitting…':'Submit Cost Estimate'}</Text>
               </TouchableOpacity>

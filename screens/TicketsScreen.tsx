@@ -9,38 +9,38 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 const MEDIA_TYPE_IMAGES = 'images' as any;
-import { GlassBackground } from '../components/shared';
+import { GlassBackground, PageHeader, IconBtnSolid, SearchField, FilterChip } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
 import { glass, spacing, borderRadius, fontSize } from '../lib/theme';
 
-// Vishful brand palette
+// Blue / slate design tokens (web chrome)
 const VBRAND = {
-  purple: '#7B2FBE', purpleDeep: '#3D1A6E', orange: '#E8841A',
-  ink900: '#1E1230', ink700: '#3F2F58', ink600: '#5C4E70', ink500: '#7B6B90', ink400: '#9B8BAE',
-  panel: 'rgba(255,255,255,0.78)', panelBorder: 'rgba(255,255,255,0.55)',
-  surface: '#FAF7FC', divider: 'rgba(224,213,234,0.4)',
+  purple: '#2563EB', purpleDeep: '#1D4ED8', orange: '#4F46E5',
+  ink900: '#111827', ink700: '#374151', ink600: '#6B7280', ink500: '#6B7280', ink400: '#9CA3AF',
+  panel: '#FFFFFF', panelBorder: '#E5E7EB',
+  surface: '#FFFFFF', divider: '#E5E7EB', soft: '#EFF6FF',
 };
 
 // Unified card surface for the redesigned UI
 const vCard = {
-  backgroundColor: 'rgba(255,255,255,0.92)',
-  borderRadius: 18,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 14,
   padding: 16,
-  borderWidth: 0.5,
-  borderColor: 'rgba(123,47,190,0.08)',
-  shadowColor: '#3D1A6E',
-  shadowOpacity: 0.06,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 4 },
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  shadowColor: '#0F172A',
+  shadowOpacity: 0.04,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 2 },
 } as const;
 
 const vInput = {
-  backgroundColor: '#fff',
-  borderRadius: 12,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 14,
   borderWidth: 1,
-  borderColor: 'rgba(123,47,190,0.15)',
+  borderColor: '#E5E7EB',
 } as const;
 import {
   fetchTickets, createTicket, Ticket, STATUS_CONFIG, PRIORITY_CONFIG,
@@ -61,18 +61,18 @@ const MAIN_TABS = [
 
 // Tab groups: each key maps to one or more backend statuses
 const TAB_GROUPS: { key: string; label: string; statuses: string[]; color: string; bg: string }[] = [
-  { key: 'open',            label: 'Open',            statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'reopened', 'on_hold', 'reassigned'], color: '#7B2FBE', bg: '#EDE9FE' },
-  { key: 'cost_approval',   label: 'Cost Approval',   statuses: ['waiting_for_cost_approval'],                            color: '#DC2626', bg: '#FEE2E2' },
-  { key: 'admin_approval',  label: 'Admin Approval',  statuses: ['pending_admin_approval'],                               color: '#BE185D', bg: '#FCE7F3' },
-  { key: 'tenant_approval', label: 'Tenant Approval', statuses: ['pending_tenant_approval'],                              color: '#D97706', bg: '#FEF3C7' },
-  { key: 'closed',          label: 'Closed',          statuses: ['closed', 'completed', 'cancelled'],                     color: '#374151', bg: '#E5E7EB' },
+  { key: 'open',            label: 'Open',            statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'reopened', 'on_hold', 'reassigned'], color: '#2563EB', bg: '#EEF2FF' },
+  { key: 'cost_approval',   label: 'Cost Approval',   statuses: ['waiting_for_cost_approval'],                            color: '#EF4444', bg: '#FEF2F2' },
+  { key: 'admin_approval',  label: 'Admin Approval',  statuses: ['pending_admin_approval'],                               color: '#2563EB', bg: '#EEF2FF' },
+  { key: 'tenant_approval', label: 'Tenant Approval', statuses: ['pending_tenant_approval'],                              color: '#F59E0B', bg: '#FFFBEB' },
+  { key: 'closed',          label: 'Closed',          statuses: ['closed', 'completed', 'cancelled'],                     color: '#22C55E', bg: '#ECFDF5' },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: 'low',      label: 'Low',      color: '#16A34A', bg: '#DCFCE7' },
-  { value: 'medium',   label: 'Medium',   color: '#D97706', bg: '#FEF3C7' },
-  { value: 'high',     label: 'High',     color: '#DC2626', bg: '#FEE2E2' },
-  { value: 'critical', label: 'Critical', color: '#7C2D12', bg: '#FEE2E2' },
+  { value: 'low',      label: 'Low',      color: '#22C55E', bg: '#ECFDF5' },
+  { value: 'medium',   label: 'Medium',   color: '#F59E0B', bg: '#FFFBEB' },
+  { value: 'high',     label: 'High',     color: '#EF4444', bg: '#FEF2F2' },
+  { value: 'critical', label: 'Critical', color: '#EF4444', bg: '#FEF2F2' },
 ];
 
 // ─── Admin Raise Ticket Modal ─────────────────────────────────────────────────
@@ -393,8 +393,8 @@ function AdminRaiseTicketModal({
                 onPress={onClose}
                 style={{
                   width: 40, height: 40, borderRadius: 12,
-                  backgroundColor: 'rgba(255,255,255,0.7)',
-                  borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.6)',
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 0.5, borderColor: '#E5E7EB',
                   alignItems: 'center', justifyContent: 'center', marginRight: 12,
                   shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
                 }}
@@ -406,11 +406,11 @@ function AdminRaiseTicketModal({
                 <Text style={{ fontSize: 20, fontWeight: '900', color: VBRAND.ink900, letterSpacing: -0.4, marginTop: 2 }}>Raise Ticket</Text>
               </View>
               {/* Step dots — animated dashes */}
-              <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999 }}>
+              <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999 }}>
                 {[!!selectedProperty, !!description.trim(), !!selectedIssueType].map((done, i) => (
                   <View key={i} style={{
                     width: done ? 18 : 6, height: 6, borderRadius: 3,
-                    backgroundColor: done ? VBRAND.purple : 'rgba(123,47,190,0.18)',
+                    backgroundColor: done ? VBRAND.purple : '#EEF2FF',
                   }} />
                 ))}
               </View>
@@ -418,7 +418,7 @@ function AdminRaiseTicketModal({
 
             {loading ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
                   <ActivityIndicator size="large" color={VBRAND.purple} />
                 </View>
                 <Text style={{ fontSize: 13, color: VBRAND.ink500, fontWeight: '600' }}>Loading…</Text>
@@ -452,7 +452,7 @@ function AdminRaiseTicketModal({
                       </Text>
                       {loadingApartments ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }}>
-                          <ActivityIndicator size="small" color="#7B2FBE" />
+                          <ActivityIndicator size="small" color="#2563EB" />
                           <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>Loading apartments...</Text>
                         </View>
                       ) : apartments.length > 0 ? (
@@ -478,7 +478,7 @@ function AdminRaiseTicketModal({
                       </Text>
                       {loadingBeds ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }}>
-                          <ActivityIndicator size="small" color="#7B2FBE" />
+                          <ActivityIndicator size="small" color="#2563EB" />
                           <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>Loading beds...</Text>
                         </View>
                       ) : beds.length > 0 ? (
@@ -523,8 +523,8 @@ function AdminRaiseTicketModal({
                     {/* AI scanning indicator */}
                     {description.trim().length >= 4 && classifying && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                        <ActivityIndicator size="small" color="#7B2FBE" />
-                        <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE' }}>Identifying issue type…</Text>
+                        <ActivityIndicator size="small" color="#2563EB" />
+                        <Text style={{ fontSize: fontSize.xs, color: '#2563EB' }}>Identifying issue type…</Text>
                       </View>
                     )}
                   </View>
@@ -536,7 +536,7 @@ function AdminRaiseTicketModal({
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                       <View style={{
                         width: 26, height: 26, borderRadius: 8,
-                        backgroundColor: selectedIssueType ? '#7B2FBE' : colors.border,
+                        backgroundColor: selectedIssueType ? '#2563EB' : colors.border,
                         alignItems: 'center', justifyContent: 'center',
                       }}>
                         {selectedIssueType
@@ -546,20 +546,20 @@ function AdminRaiseTicketModal({
                       </View>
                       <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Issue Type *</Text>
                       {selectedIssueType && (
-                        <View style={{ backgroundColor: 'rgba(123,47,190,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, color: '#7B2FBE', fontWeight: '700' }}>AUTO-DETECTED</Text>
+                        <View style={{ backgroundColor: '#EEF2FF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>AUTO-DETECTED</Text>
                         </View>
                       )}
                     </View>
 
                     {selectedIssueType ? (
                       /* Auto-selected result — tap X to change manually */
-                      <View style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                        <Ionicons name="sparkles" size={18} color="#7B2FBE" />
+                      <View style={{ backgroundColor: '#EEF2FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                        <Ionicons name="sparkles" size={18} color="#2563EB" />
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#7B2FBE' }}>{selectedIssueType.name}</Text>
+                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#2563EB' }}>{selectedIssueType.name}</Text>
                           {selectedIssueType.sla_hours != null && (
-                            <Text style={{ fontSize: 11, color: '#9B8BAE', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h · Default priority: {selectedIssueType.priority}</Text>
+                            <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h · Default priority: {selectedIssueType.priority}</Text>
                           )}
                         </View>
                         <TouchableOpacity
@@ -573,7 +573,7 @@ function AdminRaiseTicketModal({
                           }}
                           style={{ padding: 6 }}
                         >
-                          <Ionicons name="close-circle" size={20} color="#9B8BAE" />
+                          <Ionicons name="close-circle" size={20} color="#9CA3AF" />
                         </TouchableOpacity>
                       </View>
                     ) : (
@@ -600,19 +600,19 @@ function AdminRaiseTicketModal({
                         </Text>
                         {loadingSubTypes ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }}>
-                            <ActivityIndicator size="small" color="#7B2FBE" />
+                            <ActivityIndicator size="small" color="#2563EB" />
                             <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>Loading details…</Text>
                           </View>
                         ) : subTypes.length > 0 ? (
                           selectedSubType ? (
-                            <View style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                              <Ionicons name="sparkles" size={16} color="#7B2FBE" />
+                            <View style={{ backgroundColor: '#EEF2FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                              <Ionicons name="sparkles" size={16} color="#2563EB" />
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#7B2FBE', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
-                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#7B2FBE' }}>{selectedSubType.name}</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
+                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>{selectedSubType.name}</Text>
                               </View>
                               <TouchableOpacity onPress={() => setSelectedSubType(null)} style={{ padding: 4 }}>
-                                <Ionicons name="close-circle" size={18} color="#9B8BAE" />
+                                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
                               </TouchableOpacity>
                             </View>
                           ) : (
@@ -647,8 +647,8 @@ function AdminRaiseTicketModal({
                           activeOpacity={0.85}
                           style={{
                             flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                            backgroundColor: priority === p.value ? p.color : 'rgba(255,255,255,0.6)',
-                            borderWidth: 1, borderColor: priority === p.value ? p.color : 'rgba(123,47,190,0.12)',
+                            backgroundColor: priority === p.value ? p.color : '#FFFFFF',
+                            borderWidth: 1, borderColor: priority === p.value ? p.color : '#EEF2FF',
                             shadowColor: priority === p.value ? p.color : 'transparent',
                             shadowOpacity: priority === p.value ? 0.25 : 0,
                             shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
@@ -703,8 +703,8 @@ function AdminRaiseTicketModal({
                         style={{
                           flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                           gap: 8, paddingVertical: 12, borderRadius: 12,
-                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(123,47,190,0.4)',
-                          backgroundColor: 'rgba(123,47,190,0.04)',
+                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#E5E7EB',
+                          backgroundColor: '#EEF2FF',
                         }}
                       >
                         <Ionicons name="camera-outline" size={16} color={VBRAND.purple} />
@@ -716,8 +716,8 @@ function AdminRaiseTicketModal({
                         style={{
                           flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                           gap: 8, paddingVertical: 12, borderRadius: 12,
-                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(123,47,190,0.4)',
-                          backgroundColor: 'rgba(123,47,190,0.04)',
+                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#E5E7EB',
+                          backgroundColor: '#EEF2FF',
                         }}
                       >
                         <Ionicons name="image-outline" size={16} color={VBRAND.purple} />
@@ -731,9 +731,9 @@ function AdminRaiseTicketModal({
                 {/* Auto-assign info */}
                 {selectedProperty && selectedIssueType && (
                   <View style={{
-                    backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 14,
+                    backgroundColor: '#EEF2FF', borderRadius: 14,
                     padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10,
-                    borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.18)',
+                    borderWidth: 0.5, borderColor: '#E5E7EB',
                   }}>
                     <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
                       <Ionicons name="flash" size={16} color={VBRAND.purple} />
@@ -758,7 +758,7 @@ function AdminRaiseTicketModal({
                   }}
                 >
                   <LinearGradient
-                    colors={canSubmit ? [VBRAND.purple, VBRAND.orange] : ['#9CA3AF', '#6B7280']}
+                    colors={canSubmit ? [VBRAND.purpleDeep, VBRAND.purple] : ['#9CA3AF', '#6B7280']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={{ paddingVertical: 17, alignItems: 'center', justifyContent: 'center' }}
                   >
@@ -823,8 +823,8 @@ function RaiseTicketDropdown({
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: 14, paddingVertical: 14,
           borderRadius: 12, borderWidth: 1,
-          borderColor: value ? 'rgba(123,47,190,0.4)' : 'rgba(123,47,190,0.15)',
-          backgroundColor: value ? 'rgba(123,47,190,0.06)' : '#fff',
+          borderColor: value ? '#2563EB' : '#EEF2FF',
+          backgroundColor: value ? '#EEF2FF' : '#fff',
           marginBottom: 12, gap: 10,
           opacity: disabled ? 0.45 : 1,
         }}
@@ -832,7 +832,7 @@ function RaiseTicketDropdown({
         {icon && (
           <View style={{
             width: 28, height: 28, borderRadius: 8,
-            backgroundColor: value ? 'rgba(123,47,190,0.12)' : 'rgba(123,47,190,0.06)',
+            backgroundColor: value ? '#EEF2FF' : '#EEF2FF',
             alignItems: 'center', justifyContent: 'center',
           }}>
             <Ionicons name={icon as any} size={15} color={value ? VBRAND.purple : VBRAND.ink400} />
@@ -853,7 +853,7 @@ function RaiseTicketDropdown({
           <TouchableOpacity activeOpacity={1}>
             <View style={{
               backgroundColor: '#fff',
-              borderRadius: 22, maxHeight: 440,
+              borderRadius: 14, maxHeight: 440,
               overflow: 'hidden',
               shadowColor: VBRAND.purpleDeep,
               shadowOpacity: 0.3, shadowRadius: 28, shadowOffset: { width: 0, height: 12 }, elevation: 14,
@@ -861,12 +861,12 @@ function RaiseTicketDropdown({
               <View style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                 paddingHorizontal: 18, paddingVertical: 16,
-                borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.1)',
+                borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
               }}>
                 <Text style={{ fontSize: 15, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 }}>{placeholder}</Text>
                 <TouchableOpacity
                   onPress={() => setOpen(false)}
-                  style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(123,47,190,0.06)', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <Ionicons name="close" size={18} color={VBRAND.ink600} />
                 </TouchableOpacity>
@@ -883,8 +883,8 @@ function RaiseTicketDropdown({
                       style={{
                         flexDirection: 'row', alignItems: 'center',
                         paddingHorizontal: 18, paddingVertical: 15,
-                        borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.06)',
-                        backgroundColor: isSelected ? 'rgba(123,47,190,0.08)' : 'transparent',
+                        borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
+                        backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
                       }}
                     >
                       <Text style={{ flex: 1, fontSize: 14, fontWeight: isSelected ? '700' : '500', color: isSelected ? VBRAND.purpleDeep : VBRAND.ink900, letterSpacing: -0.1 }}>
@@ -915,7 +915,7 @@ function StepHeader({ step, title, done, doneLabel }: { step: number; title: str
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
       <View style={{
         width: 28, height: 28, borderRadius: 9,
-        backgroundColor: done ? VBRAND.purple : 'rgba(123,47,190,0.1)',
+        backgroundColor: done ? VBRAND.purple : '#EEF2FF',
         alignItems: 'center', justifyContent: 'center',
         shadowColor: done ? VBRAND.purple : 'transparent',
         shadowOpacity: done ? 0.3 : 0,
@@ -1064,147 +1064,85 @@ export default function TicketsScreen({ navigation }: any) {
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
-        {/* ── Header (Vishful brand) ─────────────────────────────────── */}
-        <View style={{
-          flexDirection: 'row', alignItems: 'center',
-          paddingHorizontal: 18, paddingTop: 8, paddingBottom: 14,
-        }}>
-          {/* Back arrow only when there's history — no drawer hamburger at root
-              (nav is the floating bottom bar now). */}
-          {navigation.canGoBack() && (
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={{
-                width: 40, height: 40, borderRadius: 12,
-                backgroundColor: 'rgba(255,255,255,0.7)',
-                borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.6)',
-                alignItems: 'center', justifyContent: 'center', marginRight: 12,
-                shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-              }}
-            >
-              <Ionicons name="arrow-back" size={20} color={VBRAND.ink900} />
-            </TouchableOpacity>
-          )}
-
-          <View style={{ width: 38, height: 28, overflow: 'hidden', alignItems: 'center', marginRight: 10 }}>
-            <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 10, color: VBRAND.ink400, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>
-              Maintenance{actionNeeded > 0 ? ` · ${actionNeeded} need action` : ''}
-            </Text>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: VBRAND.ink900, letterSpacing: -0.4, marginTop: 2 }}>
-              {screenTitle}
-            </Text>
-          </View>
-
-          {/* Raise Ticket — gradient */}
-          <TouchableOpacity
-            onPress={() => { if (!tenantBlocked) setShowRaiseModal(true); }}
-            activeOpacity={0.85}
-            style={{
-              borderRadius: 999, overflow: 'hidden',
-              opacity: tenantBlocked ? 0.55 : 1,
-              shadowColor: VBRAND.purple, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
-            }}
-          >
-            <LinearGradient
-              colors={tenantBlocked ? ['#9CA3AF', '#6B7280'] : [VBRAND.purple, VBRAND.orange]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9 }}
-            >
-            <Ionicons name="add" size={18} color="#fff" strokeWidth={2.6 as any} />
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.2 }}>Raise</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* ── Export CSV (mirrors web app download button) ───────────── */}
-          <TouchableOpacity
-            onPress={async () => {
-              try {
-                if (filtered.length === 0) {
-                  Alert.alert('No Data', 'No tickets to export.');
-                  return;
-                }
-                // Build CSV rows matching web app column order
-                const header = ['Ticket #', 'Tenant', 'Property', 'Issue', 'Priority', 'Status', 'Created', 'SLA'].join(',');
-                const rows = filtered.map((t: any) => {
-                  const now = new Date();
-                  let slaStatus = '—';
-                  if (t.sla_deadline) {
-                    const deadline = new Date(t.sla_deadline);
-                    if (['completed', 'closed'].includes(t.status)) slaStatus = 'Done';
-                    else if (now > deadline) slaStatus = 'Breached';
-                    else slaStatus = 'On Track';
+        {/* ── Header (page-header) ─────────────────────────────────── */}
+        <PageHeader
+          title={screenTitle === 'Tickets' ? 'Maintenance Tickets' : screenTitle}
+          subtitle="Track and manage maintenance requests"
+          onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+          right={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <IconBtnSolid
+                icon="add"
+                disabled={tenantBlocked}
+                onPress={() => { if (!tenantBlocked) setShowRaiseModal(true); }}
+              />
+              {/* ── Export CSV (mirrors web app download button) ───────────── */}
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    if (filtered.length === 0) {
+                      Alert.alert('No Data', 'No tickets to export.');
+                      return;
+                    }
+                    // Build CSV rows matching web app column order
+                    const header = ['Ticket #', 'Tenant', 'Property', 'Issue', 'Priority', 'Status', 'Created', 'SLA'].join(',');
+                    const rows = filtered.map((t: any) => {
+                      const now = new Date();
+                      let slaStatus = '—';
+                      if (t.sla_deadline) {
+                        const deadline = new Date(t.sla_deadline);
+                        if (['completed', 'closed'].includes(t.status)) slaStatus = 'Done';
+                        else if (now > deadline) slaStatus = 'Breached';
+                        else slaStatus = 'On Track';
+                      }
+                      const esc = (v: string) => `"${String(v || '').replace(/"/g, '""')}"`;
+                      return [
+                        esc(t.ticket_number || '—'),
+                        esc(t.tenant_name || t.tenants?.full_name || '—'),
+                        esc(`${t.properties?.property_name || '—'}${t.apartments?.apartment_code ? ' · ' + t.apartments.apartment_code : ''}`),
+                        esc(t.issue_types?.name || t.issue_type || '—'),
+                        esc(t.priority || '—'),
+                        esc(t.status || '—'),
+                        esc(t.created_at ? formatDate(t.created_at, '—') : '—'),
+                        esc(slaStatus),
+                      ].join(',');
+                    });
+                    const csvContent = [header, ...rows].join('\n');
+                    const filename = `tickets-${new Date().toISOString().split('T')[0]}.csv`;
+                    const FileSystem = await import('expo-file-system') as any;
+                    const fileUri = FileSystem.cacheDirectory + filename;
+                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
+                    const Sharing = await import('expo-sharing') as any;
+                    const canShare = await Sharing.isAvailableAsync();
+                    if (canShare) {
+                      await Sharing.shareAsync(fileUri, {
+                        mimeType: 'text/csv',
+                        dialogTitle: 'Export Tickets',
+                        UTI: 'public.comma-separated-values-text',
+                      });
+                    } else {
+                      Alert.alert('Sharing not available', 'Cannot share files on this device.');
+                    }
+                  } catch (e: any) {
+                    Alert.alert('Export failed', e?.message || 'Could not export tickets.');
                   }
-                  const esc = (v: string) => `"${String(v || '').replace(/"/g, '""')}"`;
-                  return [
-                    esc(t.ticket_number || '—'),
-                    esc(t.tenant_name || t.tenants?.full_name || '—'),
-                    esc(`${t.properties?.property_name || '—'}${t.apartments?.apartment_code ? ' · ' + t.apartments.apartment_code : ''}`),
-                    esc(t.issue_types?.name || t.issue_type || '—'),
-                    esc(t.priority || '—'),
-                    esc(t.status || '—'),
-                    esc(t.created_at ? formatDate(t.created_at, '—') : '—'),
-                    esc(slaStatus),
-                  ].join(',');
-                });
-                const csvContent = [header, ...rows].join('\n');
-                const filename = `tickets-${new Date().toISOString().split('T')[0]}.csv`;
-                const FileSystem = await import('expo-file-system') as any;
-                const fileUri = FileSystem.cacheDirectory + filename;
-                await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
-                const Sharing = await import('expo-sharing') as any;
-                const canShare = await Sharing.isAvailableAsync();
-                if (canShare) {
-                  await Sharing.shareAsync(fileUri, {
-                    mimeType: 'text/csv',
-                    dialogTitle: 'Export Tickets',
-                    UTI: 'public.comma-separated-values-text',
-                  });
-                } else {
-                  Alert.alert('Sharing not available', 'Cannot share files on this device.');
-                }
-              } catch (e: any) {
-                Alert.alert('Export failed', e?.message || 'Could not export tickets.');
-              }
-            }}
-            style={{
-              width: 40, height: 40, borderRadius: 12, marginLeft: 8,
-              backgroundColor: 'rgba(255,255,255,0.7)',
-              borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.6)',
-              alignItems: 'center', justifyContent: 'center',
-              shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-            }}
-          >
-            <Ionicons name="download-outline" size={18} color={VBRAND.ink900} />
-          </TouchableOpacity>
-        </View>
+                }}
+                style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1, borderColor: '#E5E7EB',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="download-outline" size={18} color={VBRAND.ink900} />
+              </TouchableOpacity>
+            </View>
+          }
+        />
 
         {/* ── Search ─────────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 10 }}>
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 10,
-            backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 14,
-            paddingHorizontal: 14,
-            borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.12)',
-            shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-          }}>
-            <Ionicons name="search-outline" size={18} color={VBRAND.ink400} />
-            <TextInput
-              style={{ flex: 1, fontSize: 14, color: VBRAND.ink900, paddingVertical: 12, fontWeight: '500' }}
-              placeholder="Search tickets, tenants, issues…"
-              placeholderTextColor={VBRAND.ink400}
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search ? (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={18} color={VBRAND.ink400} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+        <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10 }}>
+          <SearchField value={search} onChangeText={setSearch} placeholder="Search" />
         </View>
 
         {/* ── Tab bar area: fixed at top, never scrolls away ─────────────── */}
@@ -1214,7 +1152,7 @@ export default function TicketsScreen({ navigation }: any) {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 4, gap: 8, flexDirection: 'row' }}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4, gap: 8, flexDirection: 'row' }}
               style={{ marginTop: 2 }}
             >
               {MAIN_TABS.map(tab => {
@@ -1228,17 +1166,13 @@ export default function TicketsScreen({ navigation }: any) {
                       flexDirection: 'row', alignItems: 'center', gap: 6,
                       paddingHorizontal: 14, paddingVertical: 9,
                       borderRadius: 999,
-                      backgroundColor: active ? VBRAND.purpleDeep : 'rgba(255,255,255,0.7)',
+                      backgroundColor: active ? '#2563EB' : '#FFFFFF',
                       borderWidth: 1,
-                      borderColor: active ? VBRAND.purpleDeep : 'rgba(123,47,190,0.14)',
-                      shadowColor: active ? VBRAND.purpleDeep : VBRAND.ink900,
-                      shadowOpacity: active ? 0.28 : 0.04,
-                      shadowRadius: active ? 10 : 4,
-                      shadowOffset: { width: 0, height: active ? 4 : 1 },
+                      borderColor: active ? '#2563EB' : '#E5E7EB',
                     }}
                   >
-                    <Ionicons name={tab.icon as any} size={13} color={active ? '#fff' : VBRAND.purpleDeep} />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : VBRAND.purpleDeep, letterSpacing: 0.1 }}>
+                    <Ionicons name={tab.icon as any} size={13} color={active ? '#fff' : VBRAND.ink600} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : VBRAND.ink600, letterSpacing: 0.1 }}>
                       {tab.label}
                     </Text>
                   </TouchableOpacity>
@@ -1252,52 +1186,18 @@ export default function TicketsScreen({ navigation }: any) {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 8, gap: 8, flexDirection: 'row', alignItems: 'center' }}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8, flexDirection: 'row', alignItems: 'center' }}
               style={{ marginTop: 2 }}
             >
-              {visibleTabs.map(g => {
-                const active = filterStatus === g.key;
-                const cnt = counts[g.key] || 0;
-                return (
-                  <TouchableOpacity
-                    key={g.key}
-                    onPress={() => setFilterStatus(g.key)}
-                    activeOpacity={0.7}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', gap: 6,
-                      paddingHorizontal: 13, paddingVertical: 8,
-                      borderRadius: 999,
-                      backgroundColor: active ? g.color : 'rgba(255,255,255,0.7)',
-                      borderWidth: 1,
-                      borderColor: active ? g.color : 'rgba(123,47,190,0.12)',
-                      shadowColor: active ? g.color : VBRAND.purpleDeep,
-                      shadowOpacity: active ? 0.25 : 0.04,
-                      shadowRadius: active ? 8 : 4,
-                      shadowOffset: { width: 0, height: active ? 3 : 1 },
-                    }}
-                  >
-                    <Text style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      color: active ? '#fff' : VBRAND.ink700,
-                      letterSpacing: 0.1,
-                    }}>
-                      {g.label}
-                    </Text>
-                    {cnt > 0 && (
-                      <View style={{
-                        backgroundColor: active ? 'rgba(255,255,255,0.28)' : g.color,
-                        borderRadius: 999, minWidth: 18, height: 18,
-                        alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
-                      }}>
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>
-                          {cnt}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+              {visibleTabs.map(g => (
+                <FilterChip
+                  key={g.key}
+                  label={g.label}
+                  active={filterStatus === g.key}
+                  count={counts[g.key] || undefined}
+                  onPress={() => setFilterStatus(g.key)}
+                />
+              ))}
             </ScrollView>
           )}
         </View>
@@ -1387,7 +1287,7 @@ export default function TicketsScreen({ navigation }: any) {
         {(!isAdmin || mainTab === 'list') && (
           loading ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
                 <ActivityIndicator size="large" color={VBRAND.purple} />
               </View>
               <Text style={{ fontSize: 13, color: VBRAND.ink500, fontWeight: '600' }}>Loading tickets…</Text>
@@ -1402,8 +1302,8 @@ export default function TicketsScreen({ navigation }: any) {
                 <View style={{ alignItems: 'center', paddingVertical: 70, gap: 6 }}>
                   <View style={{
                     width: 80, height: 80, borderRadius: 24,
-                    backgroundColor: 'rgba(255,255,255,0.7)',
-                    borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)',
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1, borderColor: '#E5E7EB',
                     alignItems: 'center', justifyContent: 'center', marginBottom: 12,
                     shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
                   }}>
@@ -1447,11 +1347,11 @@ export default function TicketsScreen({ navigation }: any) {
           const priCount: Record<string,number> = {};
           open.forEach(t => { const k = t.priority||'medium'; priCount[k]=(priCount[k]||0)+1; });
 
-          const STAT_COLORS: Record<string,string> = { open:'#7B2FBE', closed:'#16A34A', breached:'#DC2626', cost:'#D97706', admin:'#BE185D' };
+          const STAT_COLORS: Record<string,string> = { open:'#2563EB', closed:'#22C55E', breached:'#EF4444', cost:'#F59E0B', admin:'#2563EB' };
 
           return (
             <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 14 }}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7B2FBE']} />}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />}
             >
               {/* KPI cards row 1 */}
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -1461,13 +1361,13 @@ export default function TicketsScreen({ navigation }: any) {
                   { label: 'SLA Breach',  value: slaBreached.length, color: STAT_COLORS.breached },
                 ].map(s => (
                   <View key={s.label} style={{
-                    flex: 1, backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 18,
+                    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14,
                     padding: 14, alignItems: 'center',
-                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+                    borderWidth: 1, borderColor: '#E5E7EB',
                     shadowColor: s.color, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2,
                   }}>
                     <Text style={{ fontSize: 26, fontWeight: '900', color: s.color }}>{s.value}</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#5C4B70', marginTop: 2 }}>{s.label}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#6B7280', marginTop: 2 }}>{s.label}</Text>
                   </View>
                 ))}
               </View>
@@ -1480,20 +1380,20 @@ export default function TicketsScreen({ navigation }: any) {
                   { label: 'Resolve Rate',  value: `${resolveRate}%`, color: STAT_COLORS.closed },
                 ].map(s => (
                   <View key={s.label} style={{
-                    flex: 1, backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 18,
+                    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14,
                     padding: 14, alignItems: 'center',
-                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+                    borderWidth: 1, borderColor: '#E5E7EB',
                     shadowColor: s.color, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2,
                   }}>
                     <Text style={{ fontSize: 22, fontWeight: '900', color: s.color }}>{s.value}</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#5C4B70', marginTop: 2 }}>{s.label}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#6B7280', marginTop: 2 }}>{s.label}</Text>
                   </View>
                 ))}
               </View>
 
               {/* Priority breakdown */}
-              <View style={{ backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E1230', marginBottom: 12 }}>Open by Priority</Text>
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Open by Priority</Text>
                 {[{v:'critical',l:'Critical',c:'#7C2D12'},{v:'high',l:'High',c:'#DC2626'},{v:'medium',l:'Medium',c:'#D97706'},{v:'low',l:'Low',c:'#16A34A'}].map(p => {
                   const cnt = priCount[p.v]||0;
                   const pct = open.length > 0 ? (cnt/open.length)*100 : 0;
@@ -1512,18 +1412,18 @@ export default function TicketsScreen({ navigation }: any) {
               </View>
 
               {/* Top issues */}
-              <View style={{ backgroundColor:'rgba(255,255,255,0.65)', borderRadius:18, padding:16, borderWidth:1, borderColor:'rgba(255,255,255,0.3)' }}>
-                <Text style={{ fontSize:13, fontWeight:'800', color:'#1E1230', marginBottom:12 }}>Top Issue Types</Text>
+              <View style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB' }}>
+                <Text style={{ fontSize:13, fontWeight:'800', color:'#111827', marginBottom:12 }}>Top Issue Types</Text>
                 {topIssues.length === 0
-                  ? <Text style={{ fontSize:12, color:'#9B8BAE' }}>No data yet</Text>
+                  ? <Text style={{ fontSize:12, color:'#9CA3AF' }}>No data yet</Text>
                   : topIssues.map(([name, cnt], i) => (
                     <View key={name} style={{ flexDirection:'row', alignItems:'center', gap:10, marginBottom:8 }}>
                       <View style={{ width:22, height:22, borderRadius:11, backgroundColor:'#EDE9F5', alignItems:'center', justifyContent:'center' }}>
-                        <Text style={{ fontSize:10, fontWeight:'800', color:'#7B2FBE' }}>{i+1}</Text>
+                        <Text style={{ fontSize:10, fontWeight:'800', color:'#2563EB' }}>{i+1}</Text>
                       </View>
-                      <Text style={{ flex:1, fontSize:12, fontWeight:'600', color:'#1E1230' }} numberOfLines={1}>{name}</Text>
+                      <Text style={{ flex:1, fontSize:12, fontWeight:'600', color:'#111827' }} numberOfLines={1}>{name}</Text>
                       <View style={{ backgroundColor:'#EDE9F5', borderRadius:99, paddingHorizontal:8, paddingVertical:3 }}>
-                        <Text style={{ fontSize:11, fontWeight:'800', color:'#7B2FBE' }}>{cnt}</Text>
+                        <Text style={{ fontSize:11, fontWeight:'800', color:'#2563EB' }}>{cnt}</Text>
                       </View>
                     </View>
                   ))
@@ -1536,35 +1436,35 @@ export default function TicketsScreen({ navigation }: any) {
         {/* ── REGULAR MAINTENANCE TAB ───────────────────────────────────── */}
         {isAdmin && mainTab === 'regular' && (
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 12 }}
-            refreshControl={<RefreshControl refreshing={regularLoading} onRefresh={loadRegularRules} colors={['#7B2FBE']} />}
+            refreshControl={<RefreshControl refreshing={regularLoading} onRefresh={loadRegularRules} colors={['#2563EB']} />}
           >
             {/* Info banner */}
             <View style={{ backgroundColor:'#EDE9F5', borderRadius:14, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8 }}>
-              <Ionicons name="information-circle-outline" size={16} color="#7B2FBE" style={{ marginTop:1 }} />
-              <Text style={{ flex:1, fontSize:12, color:'#5C4B70', lineHeight:18 }}>
+              <Ionicons name="information-circle-outline" size={16} color="#2563EB" style={{ marginTop:1 }} />
+              <Text style={{ flex:1, fontSize:12, color:'#6B7280', lineHeight:18 }}>
                 Regular maintenance rules schedule recurring tickets automatically. Configure them in the web app Settings → Maintenance Rules.
               </Text>
             </View>
 
             {regularLoading ? (
               <View style={{ alignItems:'center', paddingVertical:40 }}>
-                <ActivityIndicator color="#7B2FBE" />
+                <ActivityIndicator color="#2563EB" />
               </View>
             ) : regularRules.length === 0 ? (
               <View style={{ alignItems:'center', paddingVertical:60 }}>
                 <Ionicons name="refresh-circle-outline" size={48} color="#C4B5A0" />
-                <Text style={{ fontSize:16, fontWeight:'700', color:'#1E1230', marginTop:14 }}>No Rules Configured</Text>
-                <Text style={{ fontSize:13, color:'#9B8BAE', marginTop:4, textAlign:'center' }}>
+                <Text style={{ fontSize:16, fontWeight:'700', color:'#111827', marginTop:14 }}>No Rules Configured</Text>
+                <Text style={{ fontSize:13, color:'#9CA3AF', marginTop:4, textAlign:'center' }}>
                   Add regular maintenance rules in the web app to auto-schedule recurring tickets.
                 </Text>
               </View>
             ) : regularRules.map((r: any) => (
-              <View key={r.id} style={{ backgroundColor:'rgba(255,255,255,0.65)', borderRadius:18, padding:16, borderWidth:1, borderColor:'rgba(255,255,255,0.3)' }}>
+              <View key={r.id} style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB' }}>
                 <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start' }}>
                   <View style={{ flex:1 }}>
-                    <Text style={{ fontSize:14, fontWeight:'800', color:'#1E1230' }}>{r.name || r.title || '—'}</Text>
-                    {r.frequency && <Text style={{ fontSize:12, color:'#9B8BAE', marginTop:2 }}>{r.frequency}</Text>}
-                    {r.issue_type && <Text style={{ fontSize:12, color:'#7B2FBE', marginTop:2 }}>{r.issue_type}</Text>}
+                    <Text style={{ fontSize:14, fontWeight:'800', color:'#111827' }}>{r.name || r.title || '—'}</Text>
+                    {r.frequency && <Text style={{ fontSize:12, color:'#9CA3AF', marginTop:2 }}>{r.frequency}</Text>}
+                    {r.issue_type && <Text style={{ fontSize:12, color:'#2563EB', marginTop:2 }}>{r.issue_type}</Text>}
                   </View>
                   <View style={{ backgroundColor: r.is_active !== false ? '#DCFCE7' : '#F3F4F6', borderRadius:99, paddingHorizontal:10, paddingVertical:4 }}>
                     <Text style={{ fontSize:11, fontWeight:'700', color: r.is_active !== false ? '#16A34A' : '#6B7280' }}>
@@ -1581,15 +1481,15 @@ export default function TicketsScreen({ navigation }: any) {
         {isAdmin && mainTab === 'categories' && (
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 12 }}>
             <View style={{ backgroundColor:'#EDE9F5', borderRadius:14, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8, marginBottom:4 }}>
-              <Ionicons name="pricetags-outline" size={16} color="#7B2FBE" style={{ marginTop:1 }} />
-              <Text style={{ flex:1, fontSize:12, color:'#5C4B70', lineHeight:18 }}>
+              <Ionicons name="pricetags-outline" size={16} color="#2563EB" style={{ marginTop:1 }} />
+              <Text style={{ flex:1, fontSize:12, color:'#6B7280', lineHeight:18 }}>
                 Ticket categories (issue types) and their sub-types. Manage them in the web app Settings → Ticket Categories.
               </Text>
             </View>
 
             {!issueTypesLoaded ? (
               <View style={{ alignItems:'center', paddingVertical:40 }}>
-                <ActivityIndicator color="#7B2FBE" />
+                <ActivityIndicator color="#2563EB" />
               </View>
             ) : issueTypes.length === 0 ? (
               <View style={{ alignItems:'center', paddingVertical:40, gap:8 }}>
@@ -1597,12 +1497,12 @@ export default function TicketsScreen({ navigation }: any) {
                 <Text style={{ fontSize:13, color:'#7A6A8E', textAlign:'center' }}>No ticket categories configured.{'\n'}Add them in the web app Settings → Ticket Categories.</Text>
               </View>
             ) : issueTypes.map((it: any) => (
-              <View key={it.id} style={{ backgroundColor:'rgba(255,255,255,0.65)', borderRadius:18, padding:14, borderWidth:1, borderColor:'rgba(255,255,255,0.3)' }}>
+              <View key={it.id} style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:14, borderWidth:1, borderColor:'#E5E7EB' }}>
                 <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center' }}>
                   <View style={{ flex:1 }}>
-                    <Text style={{ fontSize:14, fontWeight:'800', color:'#1E1230' }}>{it.name}</Text>
+                    <Text style={{ fontSize:14, fontWeight:'800', color:'#111827' }}>{it.name}</Text>
                     {it.description && (
-                      <Text style={{ fontSize:12, color:'#9B8BAE', marginTop:2 }} numberOfLines={2}>{it.description}</Text>
+                      <Text style={{ fontSize:12, color:'#9CA3AF', marginTop:2 }} numberOfLines={2}>{it.description}</Text>
                     )}
                   </View>
                   <View style={{ alignItems:'flex-end', gap:4 }}>
@@ -1615,7 +1515,7 @@ export default function TicketsScreen({ navigation }: any) {
                       </Text>
                     </View>
                     {it.sla_hours != null && (
-                      <Text style={{ fontSize:10, color:'#7B2FBE', fontWeight:'600' }}>SLA: {it.sla_hours}h</Text>
+                      <Text style={{ fontSize:10, color:'#2563EB', fontWeight:'600' }}>SLA: {it.sla_hours}h</Text>
                     )}
                   </View>
                 </View>
@@ -1628,10 +1528,10 @@ export default function TicketsScreen({ navigation }: any) {
         {isAdmin && mainTab === 'ai' && (
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 14 }}>
             {/* Header card */}
-            <View style={{ backgroundColor:'rgba(123,47,190,0.08)', borderRadius:18, padding:16, borderWidth:1, borderColor:'rgba(123,47,190,0.2)', alignItems:'center', gap:8 }}>
-              <Ionicons name="sparkles" size={32} color="#7B2FBE" />
-              <Text style={{ fontSize:16, fontWeight:'800', color:'#1E1230', textAlign:'center' }}>AI Ticket Insights</Text>
-              <Text style={{ fontSize:12, color:'#5C4B70', textAlign:'center', lineHeight:18 }}>
+            <View style={{ backgroundColor:'#EEF2FF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB', alignItems:'center', gap:8 }}>
+              <Ionicons name="sparkles" size={32} color="#2563EB" />
+              <Text style={{ fontSize:16, fontWeight:'800', color:'#111827', textAlign:'center' }}>AI Ticket Insights</Text>
+              <Text style={{ fontSize:12, color:'#6B7280', textAlign:'center', lineHeight:18 }}>
                 Analyse patterns across {tickets.length} tickets to find top issues, predict maintenance needs, and surface actionable insights.
               </Text>
               <TouchableOpacity
@@ -1669,7 +1569,7 @@ export default function TicketsScreen({ navigation }: any) {
                 }}
                 style={{
                   flexDirection:'row', alignItems:'center', gap:8,
-                  backgroundColor:'#7B2FBE', borderRadius:99, paddingHorizontal:20, paddingVertical:10,
+                  backgroundColor:'#2563EB', borderRadius:99, paddingHorizontal:20, paddingVertical:10,
                   opacity: aiLoading ? 0.6 : 1,
                 }}
               >
@@ -1685,23 +1585,23 @@ export default function TicketsScreen({ navigation }: any) {
 
             {/* Analysis result */}
             {aiAnalysis && (
-              <View style={{ backgroundColor:'rgba(255,255,255,0.75)', borderRadius:18, padding:16, borderWidth:1, borderColor:'rgba(123,47,190,0.15)' }}>
+              <View style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB' }}>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:6, marginBottom:12 }}>
-                  <Ionicons name="bulb-outline" size={16} color="#7B2FBE" />
-                  <Text style={{ fontSize:13, fontWeight:'800', color:'#1E1230' }}>Insights</Text>
+                  <Ionicons name="bulb-outline" size={16} color="#2563EB" />
+                  <Text style={{ fontSize:13, fontWeight:'800', color:'#111827' }}>Insights</Text>
                 </View>
                 {aiAnalysis.split('\n').filter(l=>l.trim()).map((line, i) => (
                   <View key={i} style={{ flexDirection:'row', alignItems:'flex-start', gap:8, marginBottom:10 }}>
-                    <View style={{ width:6, height:6, borderRadius:3, backgroundColor:'#7B2FBE', marginTop:6 }} />
-                    <Text style={{ flex:1, fontSize:13, color:'#1E1230', lineHeight:20 }}>{line.replace(/^[\d•\-\*\.]+\s*/,'')}</Text>
+                    <View style={{ width:6, height:6, borderRadius:3, backgroundColor:'#2563EB', marginTop:6 }} />
+                    <Text style={{ flex:1, fontSize:13, color:'#111827', lineHeight:20 }}>{line.replace(/^[\d•\-\*\.]+\s*/,'')}</Text>
                   </View>
                 ))}
               </View>
             )}
 
             {/* Quick stats for context */}
-            <View style={{ backgroundColor:'rgba(255,255,255,0.65)', borderRadius:18, padding:14, borderWidth:1, borderColor:'rgba(255,255,255,0.3)' }}>
-              <Text style={{ fontSize:12, fontWeight:'800', color:'#9B8BAE', letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Data Summary</Text>
+            <View style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:14, borderWidth:1, borderColor:'#E5E7EB' }}>
+              <Text style={{ fontSize:12, fontWeight:'800', color:'#9CA3AF', letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Data Summary</Text>
               {[
                 { label:'Total tickets analysed', value: tickets.length },
                 { label:'Open tickets',            value: tickets.filter(t=>!['completed','closed'].includes(t.status)).length },
@@ -1709,8 +1609,8 @@ export default function TicketsScreen({ navigation }: any) {
                 { label:'Unique issue types',      value: new Set(tickets.map(t=>t.issue_type)).size },
               ].map(s => (
                 <View key={s.label} style={{ flexDirection:'row', justifyContent:'space-between', paddingVertical:6, borderBottomWidth:1, borderBottomColor:'rgba(0,0,0,0.06)' }}>
-                  <Text style={{ fontSize:12, color:'#5C4B70' }}>{s.label}</Text>
-                  <Text style={{ fontSize:12, fontWeight:'800', color:'#7B2FBE' }}>{s.value}</Text>
+                  <Text style={{ fontSize:12, color:'#6B7280' }}>{s.label}</Text>
+                  <Text style={{ fontSize:12, fontWeight:'800', color:'#2563EB' }}>{s.value}</Text>
                 </View>
               ))}
             </View>
@@ -1729,12 +1629,12 @@ export default function TicketsScreen({ navigation }: any) {
 
         {/* ── Admin Approval Modal ──────────────────────────────────────── */}
         <Modal visible={showApprovalModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowApprovalModal(false)}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
             <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
               <TouchableOpacity onPress={() => setShowApprovalModal(false)} style={{ marginRight: 12 }}>
-                <Ionicons name="close" size={24} color="#1E1230" />
+                <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230', flex: 1 }}>Review Completion</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827', flex: 1 }}>Review Completion</Text>
             </View>
             <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 16 }}>
               {approvalTicket && (
@@ -1742,10 +1642,10 @@ export default function TicketsScreen({ navigation }: any) {
                   {/* Ticket summary */}
                   <View style={{ backgroundColor: '#FCE7F3', borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#BE185D' }}>
                     <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#BE185D', marginBottom: 6 }}>TICKET SUMMARY</Text>
-                    <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#1E1230' }}>{approvalTicket.ticket_number}</Text>
+                    <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#111827' }}>{approvalTicket.ticket_number}</Text>
                     <Text style={{ fontSize: fontSize.sm, color: '#4B5563', marginTop: 4 }}>{approvalTicket.issue_type} {approvalTicket.issue_subtype ? `· ${approvalTicket.issue_subtype}` : ''}</Text>
                     {approvalTicket.description && (
-                      <Text style={{ fontSize: fontSize.sm, color: '#7B6B90', marginTop: 4 }}>{approvalTicket.description}</Text>
+                      <Text style={{ fontSize: fontSize.sm, color: '#9CA3AF', marginTop: 4 }}>{approvalTicket.description}</Text>
                     )}
                     {approvalTicket.tenant_name && (
                       <Text style={{ fontSize: fontSize.xs, color: '#9D174D', marginTop: 6, fontWeight: '600' }}>
@@ -1763,7 +1663,7 @@ export default function TicketsScreen({ navigation }: any) {
                     <TextInput
                       style={{
                         backgroundColor: '#fff', borderRadius: borderRadius.md,
-                        padding: spacing.md, fontSize: fontSize.md, color: '#1E1230',
+                        padding: spacing.md, fontSize: fontSize.md, color: '#111827',
                         borderWidth: 1, borderColor: '#DC2626', minHeight: 80, textAlignVertical: 'top',
                       }}
                       placeholder="Reason for rejection..."
@@ -1859,23 +1759,23 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
       activeOpacity={0.85}
       style={[
         {
-          backgroundColor: 'rgba(255,255,255,0.92)',
-          borderRadius: 18,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 14,
           padding: 14,
           marginBottom: 0,
-          borderWidth: 0.5,
-          borderColor: 'rgba(123,47,190,0.08)',
-          shadowColor: VBRAND.purpleDeep,
-          shadowOpacity: 0.06,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 3 },
+          borderWidth: 1,
+          borderColor: '#E5E7EB',
+          shadowColor: '#0F172A',
+          shadowOpacity: 0.04,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 2 },
         },
         needsAction && {
           borderWidth: 1.5,
           borderColor: statusCfg.color,
           shadowColor: statusCfg.color,
-          shadowOpacity: 0.18,
-          shadowRadius: 14,
+          shadowOpacity: 0.12,
+          shadowRadius: 10,
         },
       ]}
     >
@@ -1943,7 +1843,7 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
       </View>
 
       {/* Bottom row */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.08)' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 0.5, borderTopColor: '#E5E7EB' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ paddingHorizontal: 9, paddingVertical: 3.5, borderRadius: 999, backgroundColor: priorityCfg.bg }}>
             <Text style={{ fontSize: 10, fontWeight: '800', color: priorityCfg.color, letterSpacing: 0.3 }}>

@@ -1,7 +1,8 @@
 /**
  * TenantLifecycleScreen.tsx
  * Full lifecycle: Booking → Onboarding → Stay → Notice → Exit
- * Tabs: Dashboard | Bed Map | Booking | Onboarding | Switching | Notices | Exit | Payments | Refunds
+ * Tabs: Visual Map | Booking | Onboarding | Switching | Notices | Exit | Refunds | Not in Property
+ * Bed Status KPI is always visible (web parity — not a separate Dashboard tab).
  *
  * ► Data layer : Convex actions → Supabase (existing tables/columns only)
  * ► No direct DB access in this file
@@ -90,8 +91,8 @@ const TERMS_OF_STAY: TermItem[] = [
   },
 ];
 
-const PURPLE = '#7B2FBE';
-const ORANGE = '#E8841A';
+const PURPLE = '#6366F1';
+const ORANGE = '#6366F1';
 
 const regFmtAmt = (v: number | string | undefined): string => {
   if (v === null || v === undefined || v === '') return '';
@@ -154,7 +155,7 @@ function buildRegistrationHtml(d: RegistrationPdfData, ticks: Record<string, boo
     .fvalue { font-size: 11px; font-weight: 600; margin-top: 2px; min-height: 13px; }
     .fvalue.b { font-weight: 800; }
     .arow { display: flex; justify-content: space-between; align-items: center; border: 1px solid #c8c8cc; border-radius: 5px; padding: 7px 10px; margin-top: 6px; }
-    .arow.b { background: rgba(123,47,190,0.06); border-color: ${PURPLE}; }
+    .arow.b { background: rgba(99,102,241,0.06); border-color: ${PURPLE}; }
     .alabel { font-size: 10px; font-weight: 600; }
     .arow.b .alabel { font-weight: 800; }
     .aval { font-size: 12px; font-weight: 800; }
@@ -291,12 +292,13 @@ async function shareRegistrationPdf(uri: string): Promise<void> {
 
 const { width: SW } = Dimensions.get('window');
 
-// ─── Vishful brand palette ─────────────────────────────────────────────────
+// ─── Vishful brand palette (web screen-life tokens) ─────────────────────────
 const VBRAND = {
-  purple: '#7B2FBE', purpleDeep: '#3D1A6E', purpleSoft: 'rgba(123,47,190,0.08)', orange: '#E8841A',
-  ink900: '#1E1230', ink700: '#3F2F58', ink600: '#5C4E70', ink500: '#7B6B90', ink400: '#9B8BAE',
-  surface: 'rgba(255,255,255,0.92)', surfaceSoft: 'rgba(255,255,255,0.7)',
-  cardBorder: 'rgba(123,47,190,0.08)', shadow: '#3D1A6E',
+  purple: '#2563EB', purpleDeep: '#1D4ED8', purpleSoft: '#EFF6FF', orange: '#6366F1',
+  ink900: '#0F172A', ink700: '#334155', ink600: '#556274', ink500: '#64748B', ink400: '#94A3B8',
+  surface: '#FFFFFF', surfaceSoft: '#F8FAFC',
+  cardBorder: '#E5E7EB', line: '#E2E8F0', softLine: '#EEF2F7', shadow: '#0F172A',
+  occ: '#16A34A', book: '#1856FF', note: '#D97706', vac: '#E11D48', nb: '#64748B',
 };
 
 // Voice transcription runs server-side via POST /api/transcribe (no client key).
@@ -332,30 +334,37 @@ const STATUS_CFG: Record<string, { color: string; bg: string; label: string; ico
   'On-Notice':     { color: '#8B6914', bg: '#FFF8E1', label: 'On Notice',   icon: 'warning'             },
   Booked:          { color: '#1565C0', bg: '#E3F2FD', label: 'Booked',      icon: 'calendar'            },
   Exited:          { color: '#C62828', bg: '#FFEBEE', label: 'Exited',      icon: 'exit'                },
-  New:             { color: '#7B2FBE', bg: '#F3E5F5', label: 'New',         icon: 'person-add'          },
+  New:             { color: '#6366F1', bg: '#F3E5F5', label: 'New',         icon: 'person-add'          },
   pending:         { color: '#E65100', bg: '#FFF3E0', label: 'Pending',     icon: 'time'                },
   paid:            { color: '#2E7D32', bg: '#E8F5E9', label: 'Paid',        icon: 'checkmark-circle'    },
-  none:            { color: '#9B8BAE', bg: '#F0EAE0', label: 'No Refund',   icon: 'remove-circle'       },
+  none:            { color: '#6B7280', bg: '#F0EAE0', label: 'No Refund',   icon: 'remove-circle'       },
   completed:       { color: '#2E7D32', bg: '#E8F5E9', label: 'Completed',   icon: 'checkmark-done'      },
 };
 
 const getStatus = (s: string) =>
-  STATUS_CFG[s] ?? { color: '#5C4B70', bg: '#F0EAE0', label: s, icon: 'ellipse-outline' };
+  STATUS_CFG[s] ?? { color: '#556274', bg: '#F0EAE0', label: s, icon: 'ellipse-outline' };
 
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
+/** Web Lifecycle modules (`ol`) — exact order/labels. Bed Status is not a tab. */
 const TABS = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'stats-chart-outline'     },
-  { key: 'map',       label: 'Bed Map',   icon: 'bed-outline'             },
-  { key: 'booking',   label: 'Booking',   icon: 'calendar-outline'        },
-  { key: 'onboard',   label: 'Onboard',   icon: 'log-in-outline'          },
-  { key: 'switch',    label: 'Switch',    icon: 'swap-horizontal-outline' },
-  { key: 'notices',   label: 'Notices',   icon: 'notifications-outline'   },
-  { key: 'exit',      label: 'Exit',      icon: 'log-out-outline'         },
-  { key: 'payments',  label: 'Payments',  icon: 'cash-outline'            },
-  { key: 'refunds',   label: 'Refunds',   icon: 'wallet-outline'          },
-  { key: 'absent',    label: 'Not in Prop', icon: 'home-outline'          },
+  { key: 'map',      label: 'Visual Map',     icon: 'map-outline'             },
+  { key: 'booking',  label: 'Booking',        icon: 'calendar-outline'        },
+  { key: 'onboard',  label: 'Onboarding',     icon: 'person-add-outline'      },
+  { key: 'switch',   label: 'Switching',      icon: 'swap-horizontal-outline' },
+  { key: 'notices',  label: 'Notices',        icon: 'notifications-outline'   },
+  { key: 'exit',     label: 'Exit',           icon: 'log-out-outline'         },
+  { key: 'refunds',  label: 'Refunds',        icon: 'wallet-outline'          },
+  { key: 'absent',   label: 'Not in Property', icon: 'home-outline'           },
 ];
+
+const BED_FOCUS_TILES = [
+  { key: 'occupied', label: 'Occupied', color: '#16A34A' },
+  { key: 'booked',   label: 'Booked',   color: '#1856FF' },
+  { key: 'notice',   label: 'Notice',   color: '#D97706' },
+  { key: 'vacant',   label: 'Vacant',   color: '#E11D48' },
+  { key: 'notbooked', label: 'Not Booked', color: '#64748B' },
+] as const;
 
 const PAY_MODES = [
   { label: 'Cash',          value: 'cash'          },
@@ -370,25 +379,77 @@ const PAY_MODES = [
 function Card({ children, style }: { children: React.ReactNode; style?: any }) {
   return (
     <View style={[{
-      backgroundColor: VBRAND.surface, borderRadius: 18,
-      borderWidth: 0.5, borderColor: VBRAND.cardBorder,
-      padding: 16, marginBottom: 12,
-      shadowColor: VBRAND.shadow, shadowOpacity: 0.06, shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 }, elevation: 2,
+      backgroundColor: VBRAND.surface, borderRadius: 14,
+      borderWidth: 1, borderColor: VBRAND.cardBorder,
+      padding: 12, marginBottom: 10,
+      shadowColor: VBRAND.shadow, shadowOpacity: 0.04, shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 }, elevation: 1,
     }, style]}>{children}</View>
   );
 }
 
-function SectionTitle({ title, accent }: { title: string; accent?: string }) {
+function SectionTitle({ title }: { title: string; accent?: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 4, paddingHorizontal: 2 }}>
-      <View style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: accent || VBRAND.purple }} />
-      <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.ink500,
-        letterSpacing: 1.2, textTransform: 'uppercase' }}>
-        {title}
-      </Text>
+    <View style={{ marginBottom: 10, marginTop: 4 }}>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: VBRAND.ink900 }}>{title}</Text>
     </View>
   );
+}
+
+function LifeAvatar({ name, vacant }: { name?: string; vacant?: boolean }) {
+  const initial = vacant ? 'V' : (name || '?').trim().charAt(0).toUpperCase();
+  return (
+    <View style={{
+      width: 30, height: 30, borderRadius: 15,
+      backgroundColor: vacant ? '#FEE2E2' : VBRAND.purpleSoft,
+      alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Text style={{ fontSize: 12, fontWeight: '800', color: vacant ? '#B91C1C' : VBRAND.purpleDeep }}>{initial}</Text>
+    </View>
+  );
+}
+
+function LifeTenantCard({
+  name, sub, amount, amountOk, pill, vacant, onPress, right,
+}: {
+  name: string; sub?: string; amount?: string; amountOk?: boolean;
+  pill?: string; vacant?: boolean; onPress?: () => void; right?: React.ReactNode;
+}) {
+  const body = (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 9,
+      backgroundColor: '#fff', borderWidth: 1, borderColor: VBRAND.softLine,
+      borderRadius: 12, paddingVertical: 9, paddingHorizontal: 10, marginBottom: 6,
+      shadowColor: '#0F172A', shadowOpacity: 0.03, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    }}>
+      <LifeAvatar name={name} vacant={vacant} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }} numberOfLines={1}>{name}</Text>
+          {!!pill && (
+            <View style={{
+              backgroundColor: pill === 'On Notice' || pill === 'New' ? (pill === 'On Notice' ? '#FEF3C7' : VBRAND.purpleSoft) : VBRAND.purpleSoft,
+              paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
+            }}>
+              <Text style={{
+                fontSize: 10, fontWeight: '700',
+                color: pill === 'On Notice' ? '#B45309' : VBRAND.purpleDeep,
+              }}>{pill}</Text>
+            </View>
+          )}
+        </View>
+        {!!sub && <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }} numberOfLines={1}>{sub}</Text>}
+      </View>
+      {amount != null && (
+        <Text style={{ fontSize: 14, fontWeight: '700', color: amountOk ? '#15803D' : VBRAND.ink900 }}>{amount}</Text>
+      )}
+      {right}
+    </View>
+  );
+  if (onPress) {
+    return <TouchableOpacity activeOpacity={0.85} onPress={onPress}>{body}</TouchableOpacity>;
+  }
+  return body;
 }
 
 function Row({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
@@ -401,7 +462,7 @@ function Row({ label, value, valueColor }: { label: string; value: string; value
 }
 
 function Divider() {
-  return <View style={{ height: 0.5, backgroundColor: 'rgba(123,47,190,0.1)', marginVertical: 10 }} />;
+  return <View style={{ height: 0.5, backgroundColor: '#EEF2FF', marginVertical: 10 }} />;
 }
 
 function EmptyCard({ message }: { message: string }) {
@@ -512,18 +573,18 @@ function BottomSheet({ visible, onClose, title, children }: {
         }}>
           {/* Drag handle */}
           <View style={{ alignItems: 'center', paddingTop: 10 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(123,47,190,0.2)' }} />
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(99,102,241,0.2)' }} />
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 22, paddingTop: 14, paddingBottom: 16,
-            borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.08)' }}>
+            borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }}>
             <Text style={{ fontSize: 18, fontWeight: '900', color: VBRAND.ink900, letterSpacing: -0.3 }}>{title}</Text>
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
               style={{
                 width: 34, height: 34, borderRadius: 12,
-                backgroundColor: 'rgba(123,47,190,0.08)',
+                backgroundColor: '#EEF2FF',
                 alignItems: 'center', justifyContent: 'center',
               }}>
               <Ionicons name="close" size={18} color={VBRAND.purple} />
@@ -562,7 +623,7 @@ function TextF({ value, onChange, placeholder, keyboardType, multiline, editable
       multiline={multiline} editable={editable !== false}
       style={{
         backgroundColor: editable === false ? 'rgba(243,238,247,0.7)' : '#fff',
-        borderRadius: 14, borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.15)',
+        borderRadius: 14, borderWidth: 0.5, borderColor: '#E5E7EB',
         paddingHorizontal: 14, paddingVertical: multiline ? 12 : 0,
         height: multiline ? 92 : 48, fontSize: 14, color: VBRAND.ink900, fontWeight: '500',
         shadowColor: VBRAND.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
@@ -592,7 +653,7 @@ function SelectF({ options, value, onChange, placeholder }: {
     <>
       <TouchableOpacity onPress={() => setOpen(true)} activeOpacity={0.85} style={{
         backgroundColor: '#fff', borderRadius: 14, borderWidth: 0.5,
-        borderColor: 'rgba(123,47,190,0.15)', paddingHorizontal: 14, height: 48,
+        borderColor: '#E5E7EB', paddingHorizontal: 14, height: 48,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         shadowColor: VBRAND.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
       }}>
@@ -618,7 +679,7 @@ function SelectF({ options, value, onChange, placeholder }: {
                 return (
                   <TouchableOpacity onPress={() => { onChange(item.value); setOpen(false); }}
                     style={{ paddingHorizontal: 18, paddingVertical: 14,
-                      borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.06)',
+                      borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
                       backgroundColor: isActive ? VBRAND.purpleSoft : '#fff',
                       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: 14, color: VBRAND.ink900,
@@ -639,7 +700,7 @@ function SelectF({ options, value, onChange, placeholder }: {
 function DateF({ value, onChange, label }: { value: string; onChange: (v: string) => void; label?: string }) {
   return (
     <View>
-      {label && <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#5C4B70', marginBottom: 6 }}>{label.toUpperCase()}</Text>}
+      {label && <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#556274', marginBottom: 6 }}>{label.toUpperCase()}</Text>}
       <DateField value={value} onChange={onChange} placeholder="Select date" />
     </View>
   );
@@ -652,7 +713,9 @@ export default function TenantLifecycleScreen() {
   const mounted = useMountedRef();
   const navigation = useNavigation() as any;
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [bedFocus, setBedFocus] = useState<string | null>('occupied');
+  const [bedFocusSearch, setBedFocusSearch] = useState('');
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving]       = useState(false);
@@ -1696,7 +1759,7 @@ export default function TenantLifecycleScreen() {
       <View style={{
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.78)', borderRadius: 14,
-        borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.12)',
+        borderWidth: 0.5, borderColor: '#E5E7EB',
         paddingHorizontal: 14, height: 46, marginBottom: 14, gap: 10,
         shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
       }}>
@@ -1718,87 +1781,311 @@ export default function TenantLifecycleScreen() {
     return (
       <TouchableOpacity onPress={() => onChange(!checked)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}>
         <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2,
-          borderColor: checked ? '#7B2FBE' : '#C4B5A0', backgroundColor: checked ? '#7B2FBE' : 'transparent',
+          borderColor: checked ? '#6366F1' : '#C4B5A0', backgroundColor: checked ? '#6366F1' : 'transparent',
           alignItems: 'center', justifyContent: 'center' }}>
           {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
         </View>
-        <Text style={{ fontSize: fontSize.sm, color: '#1E1230' }}>{label}</Text>
+        <Text style={{ fontSize: fontSize.sm, color: '#111827' }}>{label}</Text>
       </TouchableOpacity>
     );
   }
 
-  // ─── TAB: DASHBOARD ────────────────────────────────────────────────────────
+  // ─── BED STATUS KPI + FOCUS DETAIL (web default home) ─────────────────────
+
+  function selectBedFocus(key: string) {
+    setBedFocus(key);
+    setActiveTab(null);
+    setBedFocusSearch('');
+  }
+
+  function selectModule(key: string) {
+    setActiveTab(key);
+    setBedFocus(null);
+    setBedFocusSearch('');
+  }
+
+  function renderBedStatusCard() {
+    const totalLive = liveBeds.length;
+    const occPct = totalLive > 0
+      ? Math.round(((bedCounts.occupied + bedCounts.notice) / totalLive) * 100)
+      : 0;
+    const counts: Record<string, number> = {
+      occupied: bedCounts.occupied,
+      booked: bedCounts.booked,
+      notice: bedCounts.notice,
+      vacant: bedCounts.vacant,
+      notbooked: 0,
+    };
+
+    return (
+      <View style={{
+        backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: VBRAND.cardBorder,
+        padding: 11, marginBottom: 10,
+        shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }}>Bed Status</Text>
+            <Text style={{ fontSize: 11, color: VBRAND.ink500, marginTop: 1 }}>vs previous month</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => Alert.alert('Intelligence', 'Occupancy intelligence coming soon.')}
+              style={{
+                height: 24, paddingHorizontal: 10, borderRadius: 999,
+                borderWidth: 1, borderColor: VBRAND.cardBorder,
+                alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff',
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: VBRAND.ink700 }}>Intelligence</Text>
+            </TouchableOpacity>
+            <View style={{
+              height: 24, paddingHorizontal: 10, borderRadius: 999,
+              backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep }}>Total {totalLive}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10 }}>
+          <View style={{
+            width: 56, height: 56, borderRadius: 28,
+            borderWidth: 5, borderColor: '#22C55E',
+            alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6',
+          }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: VBRAND.ink900 }}>{totalLive}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 8 }}>
+            <View style={{
+              backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
+              borderColor: VBRAND.softLine, padding: 9,
+            }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                Current occupancy
+              </Text>
+              <Text style={{ fontSize: 19, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
+              <Text style={{ fontSize: 10, color: VBRAND.ink500 }}>(Occupied + Notice) / Total</Text>
+            </View>
+            <View style={{
+              backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
+              borderColor: VBRAND.softLine, padding: 9,
+            }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                Month occupancy
+              </Text>
+              <Text style={{ fontSize: 19, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
+              <Text style={{ fontSize: 10, color: VBRAND.ink500 }}>{bedCounts.occupied + bedCounts.notice}/{totalLive} beds live</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 5 }}>
+          {BED_FOCUS_TILES.map((t) => {
+            const on = bedFocus === t.key && !activeTab;
+            const val = counts[t.key] ?? 0;
+            return (
+              <TouchableOpacity
+                key={t.key}
+                activeOpacity={0.85}
+                onPress={() => selectBedFocus(t.key)}
+                style={{
+                  flex: 1, minWidth: 0,
+                  backgroundColor: on ? '#EFF6FF' : VBRAND.surfaceSoft,
+                  borderWidth: 1,
+                  borderColor: on ? '#BFDBFE' : VBRAND.softLine,
+                  borderRadius: 10, paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center',
+                }}
+              >
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.color, marginBottom: 4 }} />
+                <Text style={{ fontSize: 14, fontWeight: '800', color: VBRAND.ink900 }}>{val}</Text>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: VBRAND.ink600, textAlign: 'center' }} numberOfLines={1}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
+
+  function renderBedFocusDetail() {
+    if (!bedFocus) {
+      return (
+        <View style={{
+          backgroundColor: VBRAND.surfaceSoft, borderRadius: 14, borderWidth: 1, borderColor: VBRAND.line,
+          padding: 24, alignItems: 'center', marginTop: 4,
+        }}>
+          <Text style={{ fontSize: 13, color: VBRAND.ink500, textAlign: 'center', fontWeight: '600' }}>
+            Pick a Bed Status tile or a Lifecycle module to see details.
+          </Text>
+        </View>
+      );
+    }
+
+    const q = bedFocusSearch.trim().toLowerCase();
+    const titleMap: Record<string, string> = {
+      occupied: 'Occupied',
+      booked: 'Booked',
+      notice: 'Notice',
+      vacant: 'Vacant',
+      notbooked: 'Not Booked',
+    };
+    const title = titleMap[bedFocus] || bedFocus;
+
+    let rows: React.ReactNode[] = [];
+    if (bedFocus === 'occupied') {
+      const list = stayingAllotments.filter((a: any) => {
+        if (!q) return true;
+        const name = (a.tenants?.full_name || '').toLowerCase();
+        const bed = (bedById[a.bed_id]?.bed_code || '').toLowerCase();
+        return name.includes(q) || bed.includes(q);
+      });
+      rows = list.map((a: any) => {
+        const bed = bedById[a.bed_id];
+        const apt = bed ? aptById[bed.apartment_id] : null;
+        const code = `${apt?.apartment_code || '?'}-${bed?.bed_code || '?'}`;
+        return (
+          <LifeTenantCard
+            key={a.id}
+            name={a.tenants?.full_name || 'Tenant'}
+            sub={`${code} · Onboarded ${fmtDate(a.onboarding_date || a.start_date)} · Rent ₹${fmtAmt(a.monthly_rent || getBedRate(a.bed_id))}`}
+            amount={`₹${fmtAmt(a.advance_amount || a.deposit_amount)}`}
+            amountOk
+            right={<Ionicons name="chevron-forward" size={16} color={VBRAND.ink400} />}
+          />
+        );
+      });
+      if (!rows.length) rows = [<EmptyCard key="e" message={q ? `No Occupied records match "${bedFocusSearch}"` : 'No occupied beds'} />];
+    } else if (bedFocus === 'notice') {
+      const list = onNotice.filter((a: any) => {
+        if (!q) return true;
+        return (a.tenants?.full_name || '').toLowerCase().includes(q);
+      });
+      rows = list.map((a: any) => {
+        const bed = bedById[a.bed_id];
+        const apt = bed ? aptById[bed.apartment_id] : null;
+        const code = `${apt?.apartment_code || '?'}-${bed?.bed_code || '?'}`;
+        return (
+          <LifeTenantCard
+            key={a.id}
+            name={a.tenants?.full_name || 'Tenant'}
+            pill="On Notice"
+            sub={`${code} · ${fmtDate(a.notice_date)} → ${fmtDate(a.exit_date || a.expected_exit_date)}`}
+            amount={`₹${fmtAmt(a.monthly_rent || getBedRate(a.bed_id))}`}
+          />
+        );
+      });
+      if (!rows.length) rows = [<EmptyCard key="e" message={q ? `No Notice records match "${bedFocusSearch}"` : 'No notice records'} />];
+    } else if (bedFocus === 'booked') {
+      const list = bookedAllotments.filter((a: any) => {
+        if (!q) return true;
+        return (a.tenants?.full_name || '').toLowerCase().includes(q);
+      });
+      rows = list.map((a: any) => {
+        const bed = bedById[a.bed_id];
+        const apt = bed ? aptById[bed.apartment_id] : null;
+        const code = `${apt?.apartment_code || '?'}-${bed?.bed_code || '?'}`;
+        const isNew = (a.tenants?.staying_status || '').toLowerCase() === 'new';
+        return (
+          <LifeTenantCard
+            key={a.id}
+            name={a.tenants?.full_name || 'Tenant'}
+            pill={isNew ? 'New' : undefined}
+            sub={`${code} · Booked ${fmtDate(a.booking_date || a.created_at)} · Move-in ${fmtDate(a.expected_move_in || a.start_date)}`}
+            amount={`₹${fmtAmt(a.booking_amount || a.advance_amount || config.booking_fee)}`}
+          />
+        );
+      });
+      if (!rows.length) rows = [<EmptyCard key="e" message={q ? `No Booked records match "${bedFocusSearch}"` : 'No booked beds'} />];
+    } else if (bedFocus === 'vacant') {
+      const list = vacantBeds.filter((b: any) => {
+        if (!q) return true;
+        return `${b._aptCode}-${b.bed_code}`.toLowerCase().includes(q) || (b.bed_type || '').toLowerCase().includes(q);
+      });
+      rows = list.map((b: any) => (
+        <LifeTenantCard
+          key={b.id}
+          name={`${b._aptCode}-${b.bed_code}`}
+          vacant
+          sub={`${b.bed_type || '—'} · ${b.toilet_type || '—'}`}
+          amount={`₹${fmtAmt(getBedRate(b.id))}`}
+          onPress={() => selectModule('map')}
+        />
+      ));
+      if (!rows.length) rows = [<EmptyCard key="e" message={q ? `No Vacant records match "${bedFocusSearch}"` : 'No vacant beds'} />];
+    } else {
+      rows = [<EmptyCard key="e" message="No Not Booked records" />];
+    }
+
+    const countLabel =
+      bedFocus === 'occupied' ? stayingAllotments.length
+        : bedFocus === 'notice' ? onNotice.length
+          : bedFocus === 'booked' ? bookedAllotments.length
+            : bedFocus === 'vacant' ? vacantBeds.length
+              : 0;
+
+    return (
+      <View style={{
+        backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: VBRAND.cardBorder,
+        padding: 12, marginTop: 2,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: VBRAND.ink900 }}>
+            {title} - Detail ({countLabel})
+          </Text>
+          <TouchableOpacity
+            onPress={() => { setBedFocus(null); setBedFocusSearch(''); }}
+            style={{
+              width: 28, height: 28, borderRadius: 14, backgroundColor: VBRAND.surfaceSoft,
+              alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: VBRAND.line,
+            }}
+          >
+            <Ionicons name="close" size={14} color={VBRAND.ink500} />
+          </TouchableOpacity>
+        </View>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          backgroundColor: VBRAND.surfaceSoft, borderRadius: 12, borderWidth: 1, borderColor: VBRAND.line,
+          paddingHorizontal: 12, height: 42, marginBottom: 10,
+        }}>
+          <Ionicons name="search-outline" size={16} color={VBRAND.ink400} />
+          <TextInput
+            value={bedFocusSearch}
+            onChangeText={setBedFocusSearch}
+            placeholder="Search tenants..."
+            placeholderTextColor={VBRAND.ink400}
+            style={{ flex: 1, fontSize: 13, color: VBRAND.ink900, fontWeight: '500' }}
+          />
+          {!!bedFocusSearch && (
+            <TouchableOpacity onPress={() => setBedFocusSearch('')}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: VBRAND.purpleDeep }}>Clear search</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {rows}
+      </View>
+    );
+  }
+
+  // ─── TAB: DASHBOARD (legacy fallback — unused; Bed Status replaces it) ─────
 
   function renderDashboard() {
-    const totalLive = liveBeds.length;
-    const occPct = totalLive > 0 ? Math.round(((bedCounts.occupied + bedCounts.notice) / totalLive) * 100) : 0;
-    const STATS = [
-      { label: 'Total Live Beds', value: totalLive,               color: '#7B2FBE', bg: '#F3E5F5', icon: 'bed-outline'           },
-      { label: 'Occupied',        value: bedCounts.occupied,      color: '#2E7D32', bg: '#E8F5E9', icon: 'people-outline'        },
-      { label: 'Vacant',          value: bedCounts.vacant,        color: '#C62828', bg: '#FFEBEE', icon: 'radio-button-off'      },
-      { label: 'On Notice',       value: bedCounts.notice,        color: '#8B6914', bg: '#FFF8E1', icon: 'warning-outline'       },
-      { label: 'Booked',          value: bedCounts.booked,        color: '#1565C0', bg: '#E3F2FD', icon: 'calendar-outline'      },
-      { label: 'Staying',         value: stayingAllotments.length,color: '#2E7D32', bg: '#E8F5E9', icon: 'home-outline'          },
-      { label: 'Pending Onboard', value: bookedAllotments.length, color: '#E65100', bg: '#FFF3E0', icon: 'time-outline'          },
-      { label: 'Pay Due',         value: pendingPayments.length,  color: '#C62828', bg: '#FFEBEE', icon: 'card-outline'          },
-      { label: 'Refunds Pending', value: pendingRefunds.length,   color: '#C62828', bg: '#FFEBEE', icon: 'refresh-outline'       },
-    ];
-    return (
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Hero */}
-        <View style={{ backgroundColor: '#7B2FBE', borderRadius: 20, padding: 20, marginBottom: 14, shadowColor: '#7B2FBE', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.7)', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Occupancy Rate</Text>
-          <Text style={{ fontSize: 42, fontWeight: '900', color: '#fff', letterSpacing: -1 }}>{occPct}%</Text>
-          <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 14 }}>{bedCounts.occupied} of {totalLive} live beds occupied</Text>
-          <View style={{ height: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4 }}>
-            <View style={{ height: 8, width: `${occPct}%` as any, backgroundColor: '#fff', borderRadius: 4, opacity: 0.9 }} />
-          </View>
-          <View style={{ flexDirection: 'row', marginTop: 16, gap: 8 }}>
-            {[{ label: 'Vacant', value: bedCounts.vacant, color: '#FF8A80' }, { label: 'Notice', value: bedCounts.notice, color: '#FFE082' }, { label: 'Booked', value: bedCounts.booked, color: '#80D8FF' }].map(s => (
-              <View key={s.label} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: 8, alignItems: 'center' }}>
-                <Text style={{ fontSize: 18, fontWeight: '900', color: '#fff' }}>{s.value}</Text>
-                <Text style={{ fontSize: 9, color: s.color, fontWeight: '700', textTransform: 'uppercase' }}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Stat grid */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {STATS.map(s => (
-            <View key={s.label} style={{ width: (SW - 48 - 8) / 3, backgroundColor: s.bg, borderRadius: 14, padding: 12, alignItems: 'center' }}>
-              <Ionicons name={s.icon as any} size={20} color={s.color} />
-              <Text style={{ fontSize: 22, fontWeight: '900', color: s.color, marginTop: 4 }}>{s.value}</Text>
-              <Text style={{ fontSize: 9, color: s.color, fontWeight: '600', textAlign: 'center' }}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Alerts */}
-        {overdueRefunds.length > 0 && (
-          <Card style={{ borderColor: '#C62828', borderWidth: 1.5, backgroundColor: '#FFEBEE', marginTop: 14 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="alert-circle" size={20} color="#C62828" />
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#C62828' }}>
-                {overdueRefunds.length} refund(s) overdue ({'>'} {config.refund_deadline_days || 5} days)
-              </Text>
-            </View>
-          </Card>
-        )}
-      </ScrollView>
-    );
+    return renderBedFocusDetail();
   }
 
   // ─── TAB: BED MAP ──────────────────────────────────────────────────────────
 
   function renderBedMap() {
     const STATUS_FILTERS = [
-      { key: null,            label: 'All',      color: '#7B2FBE' },
-      { key: 'occupied',      label: 'Occupied', color: '#2E7D32' },
-      { key: 'vacant',        label: 'Vacant',   color: '#C62828' },
-      { key: 'notice',        label: 'Notice',   color: '#8B6914' },
-      { key: 'booked',        label: 'Booked',   color: '#1565C0' },
-      { key: 'notice-booked', label: 'N+Book',   color: '#6A1B9A' },
+      { key: null,            label: 'All',           color: '#2563EB' },
+      { key: 'occupied',      label: 'Occupied',      color: '#16A34A' },
+      { key: 'vacant',        label: 'Vacant',        color: '#E11D48' },
+      { key: 'notice',        label: 'Notice',        color: '#D97706' },
+      { key: 'booked',        label: 'Booked',        color: '#1856FF' },
+      { key: 'notice-booked', label: 'Notice-Booked', color: '#7C3AED' },
     ];
 
     const BED_STATUS_COLORS: Record<string, { bg: string; border: string; textColor: string; dot: string }> = {
@@ -1844,9 +2131,9 @@ export default function TenantLifecycleScreen() {
         {/* ── Occupancy summary bar ─────────────────────────────────────────── */}
         <Card style={{ marginBottom: 10, padding: 12 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#1E1230' }}>Occupancy</Text>
+            <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#111827' }}>Occupancy</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#7B2FBE' }}>{occupancyPct}%  ({countByStatus['occupied'] || 0}/{totalBeds})</Text>
+              <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#6366F1' }}>{occupancyPct}%  ({countByStatus['occupied'] || 0}/{totalBeds})</Text>
               {/* ── CSV export for bed map ─────────────────────────────────── */}
               <TouchableOpacity
                 onPress={async () => {
@@ -1894,17 +2181,17 @@ export default function TenantLifecycleScreen() {
                 }}
                 style={{
                   width: 30, height: 30, borderRadius: 99,
-                  backgroundColor: 'rgba(123,47,190,0.10)',
+                  backgroundColor: 'rgba(99,102,241,0.10)',
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                <Ionicons name="download-outline" size={16} color="#7B2FBE" />
+                <Ionicons name="download-outline" size={16} color="#6366F1" />
               </TouchableOpacity>
             </View>
           </View>
           {/* Progress bar */}
           <View style={{ height: 6, backgroundColor: '#EDE9F5', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
-            <View style={{ height: 6, width: `${occupancyPct}%` as any, backgroundColor: '#7B2FBE', borderRadius: 99 }} />
+            <View style={{ height: 6, width: `${occupancyPct}%` as any, backgroundColor: '#6366F1', borderRadius: 99 }} />
           </View>
           {/* Stat pills */}
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
@@ -1923,12 +2210,12 @@ export default function TenantLifecycleScreen() {
         </Card>
 
         {/* ── Search ───────────────────────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(224,213,234,0.9)', paddingHorizontal: 12, height: 42, marginBottom: 10 }}>
-          <Ionicons name="search-outline" size={16} color="#9B8BAE" />
-          <TextInput value={mapSearch} onChangeText={setMapSearch} placeholder="Search tenant or bed…" placeholderTextColor="#9B8BAE" style={{ flex: 1, marginLeft: 8, fontSize: fontSize.sm, color: '#1E1230' }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(229,231,235,0.9)', paddingHorizontal: 12, height: 42, marginBottom: 10 }}>
+          <Ionicons name="search-outline" size={16} color="#6B7280" />
+          <TextInput value={mapSearch} onChangeText={setMapSearch} placeholder="Search tenant or bed…" placeholderTextColor="#6B7280" style={{ flex: 1, marginLeft: 8, fontSize: fontSize.sm, color: '#111827' }} />
           {mapSearch.length > 0 && (
             <TouchableOpacity onPress={() => setMapSearch('')}>
-              <Ionicons name="close-circle" size={16} color="#9B8BAE" />
+              <Ionicons name="close-circle" size={16} color="#6B7280" />
             </TouchableOpacity>
           )}
         </View>
@@ -1960,18 +2247,18 @@ export default function TenantLifecycleScreen() {
             ].map(l => (
               <View key={l.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: l.dot }} />
-                <Text style={{ fontSize: 10, color: '#5C4B70', fontWeight: '600' }}>{l.label}</Text>
+                <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>{l.label}</Text>
               </View>
             ))}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 10, color: '#9B8BAE' }}>  S=Single D=Double T=Triple  A=Attached C=Common</Text>
+              <Text style={{ fontSize: 10, color: '#6B7280' }}>  S=Single D=Double T=Triple  A=Attached C=Common</Text>
             </View>
           </View>
         </ScrollView>
 
         {/* ── Sort toggle: Apartment / Gender ──────────────────────────────── */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#9B8BAE' }}>SORT</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: '#6B7280' }}>SORT</Text>
           <View style={{ flexDirection: 'row', backgroundColor: 'rgba(237,233,245,0.7)', borderRadius: 99, padding: 3 }}>
             {([
               { key: 'apartment', label: 'Apartment', icon: 'business-outline' },
@@ -1981,9 +2268,9 @@ export default function TenantLifecycleScreen() {
               return (
                 <TouchableOpacity key={opt.key} onPress={() => setMapSortBy(opt.key)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99,
-                    backgroundColor: active ? '#7B2FBE' : 'transparent' }}>
-                  <Ionicons name={opt.icon as any} size={12} color={active ? '#fff' : '#7B2FBE'} />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : '#7B2FBE' }}>{opt.label}</Text>
+                    backgroundColor: active ? '#6366F1' : 'transparent' }}>
+                  <Ionicons name={opt.icon as any} size={12} color={active ? '#fff' : '#6366F1'} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : '#6366F1' }}>{opt.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1996,7 +2283,7 @@ export default function TenantLifecycleScreen() {
             {[
               { label: '♂ Male',   accent: '#1565C0', bg: '#BBDEFB' },
               { label: '♀ Female', accent: '#C2185B', bg: '#FCE4EC' },
-              { label: '⚥ Mixed',  accent: '#7B2FBE', bg: '#EDE9F5' },
+              { label: '⚥ Mixed',  accent: '#6366F1', bg: '#EDE9F5' },
             ].map(g => (
               <View key={g.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: g.bg, borderWidth: 1.5, borderColor: `${g.accent}55` }} />
@@ -2012,14 +2299,14 @@ export default function TenantLifecycleScreen() {
 
             {/* Property header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(123,47,190,0.12)' }} />
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(99,102,241,0.12)' }} />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EDE9F5', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4 }}>
-                <Ionicons name="business-outline" size={11} color="#7B2FBE" />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#7B2FBE', letterSpacing: 0.5 }}>
+                <Ionicons name="business-outline" size={11} color="#6366F1" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#6366F1', letterSpacing: 0.5 }}>
                   {propGroup.property?.property_name || 'Property'}
                 </Text>
               </View>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(123,47,190,0.12)' }} />
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(99,102,241,0.12)' }} />
             </View>
 
             {/* Apartments */}
@@ -2037,7 +2324,7 @@ export default function TenantLifecycleScreen() {
                 const gender = (aptGroup.apartment?.gender_allowed || '').toLowerCase();
                 const isMale = gender === 'male';
                 const isFemale = gender === 'female';
-                const aptAccent = isMale ? '#1565C0' : isFemale ? '#C2185B' : '#7B2FBE';
+                const aptAccent = isMale ? '#1565C0' : isFemale ? '#C2185B' : '#6366F1';
                 const aptBg = isMale ? '#F0F7FF' : isFemale ? '#FFF0F5' : '#F8F5FF';
                 const aptHeaderBg = isMale ? '#BBDEFB' : isFemale ? '#FCE4EC' : '#EDE9F5';
 
@@ -2056,14 +2343,14 @@ export default function TenantLifecycleScreen() {
                           <Text style={{ fontSize: 12, fontWeight: '900', color: aptAccent }}>{aptGroup.apartment?.apartment_code || '?'}</Text>
                         </View>
                         <View>
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#1E1230' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#111827' }}>
                             {aptGroup.apartment?.apartment_code || 'Unknown Apt'}
                           </Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <Text style={{ fontSize: 9, color: aptAccent, fontWeight: '700' }}>
                               {isMale ? '♂ Male' : isFemale ? '♀ Female' : '⚥ Mixed'}
                             </Text>
-                            <Text style={{ fontSize: 9, color: '#9B8BAE' }}>· {aptBedCount} beds</Text>
+                            <Text style={{ fontSize: 9, color: '#6B7280' }}>· {aptBedCount} beds</Text>
                           </View>
                         </View>
                       </View>
@@ -2119,7 +2406,7 @@ export default function TenantLifecycleScreen() {
                               </View>
                               {/* Rate */}
                               {rate > 0 && (
-                                <Text style={{ fontSize: 8, color: '#7B2FBE', fontWeight: '700' }}>₹{fmtAmt(rate)}</Text>
+                                <Text style={{ fontSize: 8, color: '#6366F1', fontWeight: '700' }}>₹{fmtAmt(rate)}</Text>
                               )}
                               {/* Tenant name */}
                               {firstName
@@ -2138,11 +2425,11 @@ export default function TenantLifecycleScreen() {
         {Object.keys(grouped).length === 0 && (
           <Card style={{ alignItems: 'center', paddingVertical: 36 }}>
             <Ionicons name="bed-outline" size={40} color="#C4B5A0" />
-            <Text style={{ color: '#9B8BAE', fontSize: fontSize.sm, marginTop: 10, fontWeight: '600' }}>No beds match your filters</Text>
+            <Text style={{ color: '#6B7280', fontSize: fontSize.sm, marginTop: 10, fontWeight: '600' }}>No beds match your filters</Text>
             {(mapFilter || mapSearch) && (
               <TouchableOpacity onPress={() => { setMapFilter(null); setMapSearch(''); }}
                 style={{ marginTop: 10, backgroundColor: '#EDE9F5', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 }}>
-                <Text style={{ fontSize: 12, color: '#7B2FBE', fontWeight: '700' }}>Clear filters</Text>
+                <Text style={{ fontSize: 12, color: '#6366F1', fontWeight: '700' }}>Clear filters</Text>
               </TouchableOpacity>
             )}
           </Card>
@@ -2208,21 +2495,21 @@ export default function TenantLifecycleScreen() {
                           <View style={{ flexDirection: 'row', gap: 10 }}>
                             {/* Bed type card */}
                             <View style={{ flex: 1, backgroundColor: '#F8F5FF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#EDE9F5', alignItems: 'center', gap: 4 }}>
-                              <Ionicons name="bed-outline" size={22} color="#7B2FBE" />
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E1230' }}>{bedTypeLabel}</Text>
-                              <Text style={{ fontSize: 10, color: '#9B8BAE', fontWeight: '600' }}>Bed Type</Text>
+                              <Ionicons name="bed-outline" size={22} color="#6366F1" />
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{bedTypeLabel}</Text>
+                              <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '600' }}>Bed Type</Text>
                             </View>
                             {/* Toilet type card */}
                             <View style={{ flex: 1, backgroundColor: isAttached ? '#E8F5E9' : '#FFF3E0', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: isAttached ? '#C8E6C9' : '#FFE0B2', alignItems: 'center', gap: 4 }}>
                               <Ionicons name={isAttached ? 'water-outline' : 'people-outline'} size={22} color={isAttached ? '#2E7D32' : '#E65100'} />
                               <Text style={{ fontSize: 13, fontWeight: '800', color: isAttached ? '#2E7D32' : '#E65100' }}>{toiletLabel}</Text>
-                              <Text style={{ fontSize: 10, color: '#9B8BAE', fontWeight: '600' }}>Toilet</Text>
+                              <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '600' }}>Toilet</Text>
                             </View>
                             {/* Rate card */}
                             <View style={{ flex: 1, backgroundColor: '#EDE9F5', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#D8CCF0', alignItems: 'center', gap: 4 }}>
-                              <Ionicons name="pricetag-outline" size={22} color="#7B2FBE" />
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#7B2FBE' }}>₹{fmtAmt(rate)}</Text>
-                              <Text style={{ fontSize: 10, color: '#9B8BAE', fontWeight: '600' }}>/ month</Text>
+                              <Ionicons name="pricetag-outline" size={22} color="#6366F1" />
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#6366F1' }}>₹{fmtAmt(rate)}</Text>
+                              <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '600' }}>/ month</Text>
                             </View>
                           </View>
                         </View>
@@ -2240,18 +2527,18 @@ export default function TenantLifecycleScreen() {
                                     borderTopWidth: i > 0 ? 1 : 0, borderTopColor: '#EDE9F5',
                                     backgroundColor: isCurrent ? '#F0EBF8' : 'transparent' }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                      {isCurrent && <View style={{ width: 6, height: 6, borderRadius: 99, backgroundColor: '#7B2FBE' }} />}
+                                      {isCurrent && <View style={{ width: 6, height: 6, borderRadius: 99, backgroundColor: '#6366F1' }} />}
                                       <View>
-                                        <Text style={{ fontSize: 12, fontWeight: '700', color: isCurrent ? '#7B2FBE' : '#1E1230' }}>
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: isCurrent ? '#6366F1' : '#111827' }}>
                                           ₹{fmtAmt(r.monthly_rate)}/mo
                                         </Text>
-                                        <Text style={{ fontSize: 10, color: '#9B8BAE' }}>
+                                        <Text style={{ fontSize: 10, color: '#6B7280' }}>
                                           {fmtDate(r.from_date)}{r.to_date ? ` → ${fmtDate(r.to_date)}` : ' → present'}
                                         </Text>
                                       </View>
                                     </View>
                                     {isCurrent && (
-                                      <View style={{ backgroundColor: '#7B2FBE', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                      <View style={{ backgroundColor: '#6366F1', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
                                         <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>CURRENT</Text>
                                       </View>
                                     )}
@@ -2269,11 +2556,11 @@ export default function TenantLifecycleScreen() {
                             <View style={{ backgroundColor: '#F8F5FF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#EDE9F5' }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <View style={{ width: 42, height: 42, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Ionicons name="person-outline" size={20} color="#7B2FBE" />
+                                  <Ionicons name="person-outline" size={20} color="#6366F1" />
                                 </View>
                                 <View>
-                                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E1230' }}>{bedDetail.allotment.tenants?.full_name || '—'}</Text>
-                                  <Text style={{ fontSize: 12, color: '#9B8BAE' }}>{bedDetail.allotment.tenants?.phone || '—'}</Text>
+                                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{bedDetail.allotment.tenants?.full_name || '—'}</Text>
+                                  <Text style={{ fontSize: 12, color: '#6B7280' }}>{bedDetail.allotment.tenants?.phone || '—'}</Text>
                                 </View>
                               </View>
                               <Divider />
@@ -2325,7 +2612,7 @@ export default function TenantLifecycleScreen() {
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <SectionTitle title={`Booked (${bookedAllotments.length})`} />
+          <SectionTitle title={`New Tenants (KYC ✓)`} />
           <ActionBtn title="New Booking" icon="add-circle-outline" small onPress={() => setBookingOpen(true)} />
         </View>
         <SearchBar tab="booking" placeholder="Search tenant, bed…" />
@@ -2334,9 +2621,9 @@ export default function TenantLifecycleScreen() {
             <Card key={a.id}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#1E1230' }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 2 }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE', fontWeight: '600' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>{a.tenants?.full_name}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 2 }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6366F1', fontWeight: '600' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
                 </View>
                 <TouchableOpacity onPress={() => { setCancelId(a.id); setCancelOpen(true); }}
                   style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}>
@@ -2374,7 +2661,7 @@ export default function TenantLifecycleScreen() {
           {/* ── Bank Details (mirrors web app) ─────────────────────────────── */}
           <Field label="Bank Details">
             {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
+              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
               : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={bForm.bankAccountId} onChange={v => setBForm({ ...bForm, bankAccountId: v })} placeholder="Select organisation bank account" />
             }
           </Field>
@@ -2383,12 +2670,12 @@ export default function TenantLifecycleScreen() {
           <View style={{ marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="receipt-outline" size={14} color="#7B2FBE" />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#7B2FBE', letterSpacing: 1, textTransform: 'uppercase' }}>
+                <Ionicons name="receipt-outline" size={14} color="#6366F1" />
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6366F1', letterSpacing: 1, textTransform: 'uppercase' }}>
                   Payment Proof
                 </Text>
                 <View style={{ backgroundColor: '#EDE9F5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 9, color: '#9B8BAE', fontWeight: '600' }}>Optional</Text>
+                  <Text style={{ fontSize: 9, color: '#6B7280', fontWeight: '600' }}>Optional</Text>
                 </View>
               </View>
               {bookingProof && (
@@ -2404,7 +2691,7 @@ export default function TenantLifecycleScreen() {
                 height: bookingProof ? 160 : 80,
                 borderRadius: 14, borderWidth: 1.5,
                 borderStyle: bookingProof ? 'solid' : 'dashed',
-                borderColor: bookingProof ? '#7B2FBE' : '#C4B5A0',
+                borderColor: bookingProof ? '#6366F1' : '#C4B5A0',
                 backgroundColor: bookingProof ? '#F3E5F5' : '#FAF8FF',
                 alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden',
@@ -2413,7 +2700,7 @@ export default function TenantLifecycleScreen() {
               {bookingProof ? (
                 <>
                   <Image source={{ uri: bookingProof.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(123,47,190,0.75)', paddingVertical: 5, alignItems: 'center' }}>
+                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(99,102,241,0.75)', paddingVertical: 5, alignItems: 'center' }}>
                     <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
                   </View>
                 </>
@@ -2422,18 +2709,18 @@ export default function TenantLifecycleScreen() {
                   <View style={{ flexDirection: 'row', gap: 16 }}>
                     <View style={{ alignItems: 'center', gap: 4 }}>
                       <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="image-outline" size={18} color="#7B2FBE" />
+                        <Ionicons name="image-outline" size={18} color="#6366F1" />
                       </View>
-                      <Text style={{ fontSize: 10, color: '#5C4B70', fontWeight: '600' }}>Gallery</Text>
+                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Gallery</Text>
                     </View>
                     <View style={{ alignItems: 'center', gap: 4 }}>
                       <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="camera-outline" size={18} color="#7B2FBE" />
+                        <Ionicons name="camera-outline" size={18} color="#6366F1" />
                       </View>
-                      <Text style={{ fontSize: 10, color: '#5C4B70', fontWeight: '600' }}>Camera</Text>
+                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Camera</Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 10, color: '#9B8BAE' }}>Upload receipt / screenshot</Text>
+                  <Text style={{ fontSize: 10, color: '#6B7280' }}>Upload receipt / screenshot</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -2444,9 +2731,9 @@ export default function TenantLifecycleScreen() {
 
         {/* Cancel confirm */}
         <BottomSheet visible={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancel Booking">
-          <Text style={{ fontSize: fontSize.sm, color: '#5C4B70', marginBottom: 20, lineHeight: 22 }}>
+          <Text style={{ fontSize: fontSize.sm, color: '#556274', marginBottom: 20, lineHeight: 22 }}>
             Cancel the booking for{' '}
-            <Text style={{ fontWeight: '700', color: '#1E1230' }}>
+            <Text style={{ fontWeight: '700', color: '#111827' }}>
               {allotments.find((a: any) => a.id === cancelId)?.tenants?.full_name}
             </Text>? This will free the bed.
           </Text>
@@ -2468,16 +2755,16 @@ export default function TenantLifecycleScreen() {
 
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        <SectionTitle title={`Pending Onboarding (${bookedAllotments.length})`} />
+        <SectionTitle title={`Booked — Ready for Onboarding (${bookedAllotments.length})`} />
         <SearchBar tab="onboard" placeholder="Search tenant…" />
         {filtered.length === 0 ? <EmptyCard message="No pending onboardings" /> :
           filtered.map((a: any) => (
             <Card key={a.id}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#1E1230' }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · Planned: {fmtDate(a.onboarding_date)}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>{a.tenants?.full_name}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · Planned: {fmtDate(a.onboarding_date)}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6366F1' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                   {/* Cancel booking — reuses existing cancelOpen/doCancelBooking flow */}
@@ -2503,7 +2790,7 @@ export default function TenantLifecycleScreen() {
             <Card key={a.id} style={{ borderColor: '#FF7043', borderWidth: 1 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#1E1230' }}>{a.tenants?.full_name}</Text>
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>{a.tenants?.full_name}</Text>
                   <Row label="Balance Due" value={`₹${fmtAmt(a.balance_due)}`} valueColor="#C62828" />
                 </View>
                 <ActionBtn title="Pay" small variant="outline" onPress={() => {
@@ -2522,13 +2809,13 @@ export default function TenantLifecycleScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · {fmtDate(a.onboarding_date)}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE' }}>Rent: ₹{fmtAmt(a.monthly_rental)}/mo · Deposit: ₹{fmtAmt(a.deposit_paid)}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · {fmtDate(a.onboarding_date)}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6366F1' }}>Rent: ₹{fmtAmt(a.monthly_rental)}/mo · Deposit: ₹{fmtAmt(a.deposit_paid)}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <TouchableOpacity onPress={() => { setEditOccForm({ allotmentId: a.id, onboardingDate: a.onboarding_date || '', discount: String(a.discount || 0), premium: String(a.premium || 0), depositPaid: String(a.deposit_paid || 0) }); setEditOccOpen(true); }}
                     style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                    <Ionicons name="pencil-outline" size={16} color="#7B2FBE" />
+                    <Ionicons name="pencil-outline" size={16} color="#6366F1" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => doUndoOnboarding(a.id)}
                     style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}>
@@ -2584,7 +2871,7 @@ export default function TenantLifecycleScreen() {
           {/* ── Bank Details (mirrors web app) ─────────────────────────────── */}
           <Field label="Bank Details">
             {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
+              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
               : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={oForm.bankAccountId} onChange={v => setOForm({ ...oForm, bankAccountId: v })} placeholder="Select organisation bank account" />
             }
           </Field>
@@ -2593,12 +2880,12 @@ export default function TenantLifecycleScreen() {
           <View style={{ marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="receipt-outline" size={14} color="#7B2FBE" />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#7B2FBE', letterSpacing: 1, textTransform: 'uppercase' }}>
+                <Ionicons name="receipt-outline" size={14} color="#6366F1" />
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6366F1', letterSpacing: 1, textTransform: 'uppercase' }}>
                   Payment Proof
                 </Text>
                 <View style={{ backgroundColor: '#EDE9F5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 9, color: '#9B8BAE', fontWeight: '600' }}>Optional</Text>
+                  <Text style={{ fontSize: 9, color: '#6B7280', fontWeight: '600' }}>Optional</Text>
                 </View>
               </View>
               {onboardProof && (
@@ -2614,7 +2901,7 @@ export default function TenantLifecycleScreen() {
                 height: onboardProof ? 160 : 80,
                 borderRadius: 14, borderWidth: 1.5,
                 borderStyle: onboardProof ? 'solid' : 'dashed',
-                borderColor: onboardProof ? '#7B2FBE' : '#C4B5A0',
+                borderColor: onboardProof ? '#6366F1' : '#C4B5A0',
                 backgroundColor: onboardProof ? '#F3E5F5' : '#FAF8FF',
                 alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden',
@@ -2623,7 +2910,7 @@ export default function TenantLifecycleScreen() {
               {onboardProof ? (
                 <>
                   <Image source={{ uri: onboardProof.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(123,47,190,0.75)', paddingVertical: 5, alignItems: 'center' }}>
+                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(99,102,241,0.75)', paddingVertical: 5, alignItems: 'center' }}>
                     <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
                   </View>
                 </>
@@ -2632,18 +2919,18 @@ export default function TenantLifecycleScreen() {
                   <View style={{ flexDirection: 'row', gap: 16 }}>
                     <View style={{ alignItems: 'center', gap: 4 }}>
                       <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="image-outline" size={18} color="#7B2FBE" />
+                        <Ionicons name="image-outline" size={18} color="#6366F1" />
                       </View>
-                      <Text style={{ fontSize: 10, color: '#5C4B70', fontWeight: '600' }}>Gallery</Text>
+                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Gallery</Text>
                     </View>
                     <View style={{ alignItems: 'center', gap: 4 }}>
                       <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="camera-outline" size={18} color="#7B2FBE" />
+                        <Ionicons name="camera-outline" size={18} color="#6366F1" />
                       </View>
-                      <Text style={{ fontSize: 10, color: '#5C4B70', fontWeight: '600' }}>Camera</Text>
+                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Camera</Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 10, color: '#9B8BAE' }}>Upload receipt / screenshot</Text>
+                  <Text style={{ fontSize: 10, color: '#6B7280' }}>Upload receipt / screenshot</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -2656,8 +2943,8 @@ export default function TenantLifecycleScreen() {
                 <Row label="CC Charges" value={`₹${fmtAmt(parseFloat(oForm.ccCharges) || 0)}`} valueColor="#E65100" />
                 <Divider />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#1E1230' }}>Total Amount (incl. CC)</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#7B2FBE' }}>
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#111827' }}>Total Amount (incl. CC)</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#6366F1' }}>
                     ₹{fmtAmt((parseFloat(oForm.paidAmount) || 0) + (parseFloat(oForm.ccCharges) || 0))}
                   </Text>
                 </View>
@@ -2668,8 +2955,8 @@ export default function TenantLifecycleScreen() {
           {/* ── KYC Document Upload ─────────────────────────────────────────── */}
           <View style={{ marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <Ionicons name="card-outline" size={14} color="#7B2FBE" />
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#7B2FBE', letterSpacing: 1, textTransform: 'uppercase' }}>
+              <Ionicons name="card-outline" size={14} color="#6366F1" />
+              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6366F1', letterSpacing: 1, textTransform: 'uppercase' }}>
                 KYC Documents
               </Text>
               <View style={{ backgroundColor: '#FFEBEE', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
@@ -2689,7 +2976,7 @@ export default function TenantLifecycleScreen() {
                       style={{
                         height: 110, borderRadius: 14, borderWidth: 1.5,
                         borderStyle: photo ? 'solid' : 'dashed',
-                        borderColor: photo ? '#7B2FBE' : '#C4B5A0',
+                        borderColor: photo ? '#6366F1' : '#C4B5A0',
                         backgroundColor: photo ? '#F3E5F5' : '#FAF8FF',
                         alignItems: 'center', justifyContent: 'center',
                         overflow: 'hidden',
@@ -2703,7 +2990,7 @@ export default function TenantLifecycleScreen() {
                           />
                           {/* overlay edit hint */}
                           <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
-                            backgroundColor: 'rgba(123,47,190,0.7)', paddingVertical: 4, alignItems: 'center' }}>
+                            backgroundColor: 'rgba(99,102,241,0.7)', paddingVertical: 4, alignItems: 'center' }}>
                             <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
                           </View>
                         </>
@@ -2711,10 +2998,10 @@ export default function TenantLifecycleScreen() {
                         <>
                           <View style={{ width: 40, height: 40, borderRadius: 99, backgroundColor: '#EDE9F5',
                             alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-                            <Ionicons name="camera-outline" size={20} color="#7B2FBE" />
+                            <Ionicons name="camera-outline" size={20} color="#6366F1" />
                           </View>
-                          <Text style={{ fontSize: 12, color: '#5C4B70', fontWeight: '700' }}>{label}</Text>
-                          <Text style={{ fontSize: 10, color: '#9B8BAE', marginTop: 2 }}>Tap to upload</Text>
+                          <Text style={{ fontSize: 12, color: '#556274', fontWeight: '700' }}>{label}</Text>
+                          <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Tap to upload</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -2724,8 +3011,8 @@ export default function TenantLifecycleScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5, justifyContent: 'center' }}>
                         {kycUploading ? (
                           <>
-                            <ActivityIndicator size={10} color="#7B2FBE" />
-                            <Text style={{ fontSize: 10, color: '#7B2FBE' }}>Uploading…</Text>
+                            <ActivityIndicator size={10} color="#6366F1" />
+                            <Text style={{ fontSize: 10, color: '#6366F1' }}>Uploading…</Text>
                           </>
                         ) : (
                           <>
@@ -2750,7 +3037,7 @@ export default function TenantLifecycleScreen() {
               })}
             </View>
 
-            <Text style={{ fontSize: 10, color: '#9B8BAE', marginTop: 8, textAlign: 'center' }}>
+            <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 8, textAlign: 'center' }}>
               Upload Aadhaar / PAN / Passport front & back photos
             </Text>
           </View>
@@ -2769,15 +3056,15 @@ export default function TenantLifecycleScreen() {
             style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
               marginTop: 10, paddingVertical: 13, borderRadius: borderRadius.lg,
-              borderWidth: 1.5, borderColor: '#7B2FBE',
-              backgroundColor: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 'rgba(123,47,190,0.05)' : 'rgba(123,47,190,0.08)',
+              borderWidth: 1.5, borderColor: '#6366F1',
+              backgroundColor: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.08)',
               opacity: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 0.5 : 1,
             }}
           >
             {regGenerating
-              ? <ActivityIndicator size="small" color="#7B2FBE" />
-              : <Ionicons name="document-text-outline" size={18} color="#7B2FBE" />}
-            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#7B2FBE' }}>
+              ? <ActivityIndicator size="small" color="#6366F1" />
+              : <Ionicons name="document-text-outline" size={18} color="#6366F1" />}
+            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#6366F1' }}>
               Generate Registration PDF
             </Text>
           </TouchableOpacity>
@@ -2788,27 +3075,27 @@ export default function TenantLifecycleScreen() {
           <View style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.5)', justifyContent: 'flex-end' }}>
             <View style={{ backgroundColor: '#FAF7FC', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' }}>
               {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="document-text" size={18} color="#7B2FBE" />
+                  <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="document-text" size={18} color="#6366F1" />
                   </View>
                   <View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E1230' }}>Registration Form</Text>
-                    <Text style={{ fontSize: 11, color: '#9B8BAE' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>Registration Form</Text>
+                    <Text style={{ fontSize: 11, color: '#6B7280' }}>
                       {regData ? [regData.firstName, regData.lastName].filter(Boolean).join(' ') : ''}
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setRegPreviewOpen(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="close" size={18} color="#5C4B70" />
+                <TouchableOpacity onPress={() => setRegPreviewOpen(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="close" size={18} color="#556274" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 30 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                   <Ionicons name="checkmark-circle-outline" size={18} color="#16a34a" />
-                  <Text style={{ fontSize: 13, color: '#5C4B70', flex: 1 }}>
+                  <Text style={{ fontSize: 13, color: '#556274', flex: 1 }}>
                     Tick every Term of Stay below before sending or downloading the form.
                   </Text>
                 </View>
@@ -2821,17 +3108,17 @@ export default function TenantLifecycleScreen() {
                       key={t.id}
                       activeOpacity={0.8}
                       onPress={() => setRegTicks((p) => ({ ...p, [t.id]: !p[t.id] }))}
-                      style={{ flexDirection: 'row', gap: 10, backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: on ? 'rgba(22,163,74,0.4)' : 'rgba(123,47,190,0.1)' }}
+                      style={{ flexDirection: 'row', gap: 10, backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: on ? 'rgba(22,163,74,0.4)' : 'rgba(99,102,241,0.1)' }}
                     >
                       <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: on ? '#16a34a' : '#C4B5D8', backgroundColor: on ? '#16a34a' : 'transparent', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
                         {on && <Ionicons name="checkmark" size={14} color="#fff" />}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12.5, color: '#1E1230', lineHeight: 18 }}>
-                          <Text style={{ fontWeight: '800', color: '#7B2FBE' }}>{i + 1}. </Text>{t.text}
+                        <Text style={{ fontSize: 12.5, color: '#111827', lineHeight: 18 }}>
+                          <Text style={{ fontWeight: '800', color: '#6366F1' }}>{i + 1}. </Text>{t.text}
                         </Text>
                         {t.subItems?.map((s, j) => (
-                          <Text key={j} style={{ fontSize: 11.5, color: '#5C4B70', lineHeight: 16, marginTop: 3, marginLeft: 6 }}>{s}</Text>
+                          <Text key={j} style={{ fontSize: 11.5, color: '#556274', lineHeight: 16, marginTop: 3, marginLeft: 6 }}>{s}</Text>
                         ))}
                         {t.footnote && <Text style={{ fontSize: 11.5, fontStyle: 'italic', color: '#C62828', marginTop: 3 }}>{t.footnote}</Text>}
                       </View>
@@ -2845,11 +3132,11 @@ export default function TenantLifecycleScreen() {
               </ScrollView>
 
               {/* Actions */}
-              <View style={{ padding: 18, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(123,47,190,0.1)', gap: 10 }}>
+              <View style={{ padding: 18, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB', gap: 10 }}>
                 <TouchableOpacity
                   onPress={handleShareRegistration}
                   disabled={!allTicked}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: borderRadius.lg, backgroundColor: allTicked ? '#7B2FBE' : '#C4B5D8' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: borderRadius.lg, backgroundColor: allTicked ? '#6366F1' : '#C4B5D8' }}
                 >
                   <Ionicons name="download-outline" size={18} color="#fff" />
                   <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>Download / Share PDF</Text>
@@ -2863,7 +3150,7 @@ export default function TenantLifecycleScreen() {
                   {regSendingWa
                     ? <ActivityIndicator size="small" color="#25D366" />
                     : <Ionicons name="logo-whatsapp" size={18} color="#25D366" />}
-                  <Text style={{ color: '#1E1230', fontSize: fontSize.md, fontWeight: '800' }}>Send Registration via WhatsApp</Text>
+                  <Text style={{ color: '#111827', fontSize: fontSize.md, fontWeight: '800' }}>Send Registration via WhatsApp</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2887,7 +3174,7 @@ export default function TenantLifecycleScreen() {
           {/* ── Bank Details ─────────────────────────────────────────────────── */}
           <Field label="Bank Details">
             {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 4 }}>No bank accounts found.</Text>
+              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found.</Text>
               : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={addPayForm.bankAccountId} onChange={v => setAddPayForm({ ...addPayForm, bankAccountId: v })} placeholder="Select organisation bank account" />
             }
           </Field>
@@ -2898,8 +3185,8 @@ export default function TenantLifecycleScreen() {
               <Row label="CC Charges" value={`₹${fmtAmt(parseFloat(addPayForm.ccCharges) || 0)}`} valueColor="#E65100" />
               <Divider />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#1E1230' }}>Total Amount (incl. CC)</Text>
-                <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#7B2FBE' }}>
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#111827' }}>Total Amount (incl. CC)</Text>
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#6366F1' }}>
                   ₹{fmtAmt((parseFloat(addPayForm.amount) || 0) + (parseFloat(addPayForm.ccCharges) || 0))}
                 </Text>
               </View>
@@ -2943,10 +3230,10 @@ export default function TenantLifecycleScreen() {
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <SectionTitle title={`Room Switching (${roomSwitches.length})`} />
+          <SectionTitle title={`Room Switching`} />
           <ActionBtn title="New Switch" icon="swap-horizontal-outline" small onPress={() => setSwitchOpen(true)} />
         </View>
-        <SearchBar tab="switch" placeholder="Search tenant…" />
+        <SearchBar tab="switch" placeholder="Search by tenant name..." />
         {filtered.length === 0 ? <EmptyCard message="No room switches" /> :
           filtered.map((s: any) => (
             <Card key={s._id}>
@@ -2957,9 +3244,9 @@ export default function TenantLifecycleScreen() {
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                <Text style={{ fontSize: fontSize.xs, color: '#5C4E70' }}>{bedLoc(s.oldBedId)}</Text>
-                <Ionicons name="arrow-forward" size={12} color="#9B8BAE" />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#1E1230' }}>{bedLoc(s.newBedId)}</Text>
+                <Text style={{ fontSize: fontSize.xs, color: '#556274' }}>{bedLoc(s.oldBedId)}</Text>
+                <Ionicons name="arrow-forward" size={12} color="#6B7280" />
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#111827' }}>{bedLoc(s.newBedId)}</Text>
               </View>
               <View style={{ marginTop: 8 }}>
                 <Row label="Type" value={s.switchType === 'immediate' ? 'Immediate' : (s.switchType || '—')} />
@@ -3043,8 +3330,8 @@ export default function TenantLifecycleScreen() {
                 <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
                   {TABS3.map(t => (
                     <TouchableOpacity key={t.k} onPress={() => setStmtTab(t.k)}
-                      style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, backgroundColor: stmtTab === t.k ? '#7B2FBE' : 'rgba(123,47,190,0.08)' }}>
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: stmtTab === t.k ? '#fff' : '#3D1A6E', textAlign: 'center' }}>{t.label}</Text>
+                      style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, backgroundColor: stmtTab === t.k ? '#6366F1' : 'rgba(99,102,241,0.08)' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: stmtTab === t.k ? '#fff' : '#312E81', textAlign: 'center' }}>{t.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -3061,14 +3348,14 @@ export default function TenantLifecycleScreen() {
                                 <View style={{ backgroundColor: e.category === 'Invoice' ? 'rgba(198,40,40,0.1)' : 'rgba(46,125,50,0.1)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
                                   <Text style={{ fontSize: 9, fontWeight: '800', color: e.category === 'Invoice' ? '#C62828' : '#2E7D32' }}>{e.category}</Text>
                                 </View>
-                                <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>{e.date || '—'}</Text>
+                                <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{e.date || '—'}</Text>
                               </View>
-                              <Text style={{ fontSize: fontSize.xs, color: '#5C4E70', marginTop: 3 }} numberOfLines={1}>{e.desc}</Text>
+                              <Text style={{ fontSize: fontSize.xs, color: '#556274', marginTop: 3 }} numberOfLines={1}>{e.desc}</Text>
                             </View>
                             <View style={{ alignItems: 'flex-end' }}>
                               {e.debit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#C62828' }}>₹{fmtAmt(e.debit)}</Text> : null}
                               {e.credit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2E7D32' }}>−₹{fmtAmt(e.credit)}</Text> : null}
-                              <Text style={{ fontSize: 10, color: '#9B8BAE', marginTop: 2 }}>Bal ₹{fmtAmt(e.balance)}</Text>
+                              <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Bal ₹{fmtAmt(e.balance)}</Text>
                             </View>
                           </View>
                         </Card>
@@ -3089,16 +3376,16 @@ export default function TenantLifecycleScreen() {
                         ) : (
                           <TouchableOpacity onPress={() => setDepEdit({ editing: true, value: String(deposit) })}
                             style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, marginBottom: 6 }}>
-                            <Ionicons name="pencil-outline" size={14} color="#7B2FBE" />
-                            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#7B2FBE' }}>Edit Deposit</Text>
+                            <Ionicons name="pencil-outline" size={14} color="#6366F1" />
+                            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#6366F1' }}>Edit Deposit</Text>
                           </TouchableOpacity>
                         )}
-                        {settles.length === 0 ? <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginVertical: 4 }}>No settlement entries.</Text> :
+                        {settles.length === 0 ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginVertical: 4 }}>No settlement entries.</Text> :
                           settles.map((r: any) => (
                             <Row key={r._id} label={`Settled · ${fmtDate(r.paymentDate)}`} value={`−₹${fmtAmt(r.amountPaid)}`} valueColor="#C62828" />
                           ))}
                         <Row label="Net Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} valueColor="#2E7D32" />
-                        <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 8 }}>
+                        <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 8 }}>
                           Editing updates the deposit held on the allotment. Full per-entry ledger edit needs the pending backend deploy.
                         </Text>
                       </Card>
@@ -3133,7 +3420,7 @@ export default function TenantLifecycleScreen() {
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <SectionTitle title={`On Notice (${onNotice.length})`} />
+          <SectionTitle title="Tenant Notices" />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {/* Voice Notice Button */}
             <TouchableOpacity
@@ -3146,7 +3433,7 @@ export default function TenantLifecycleScreen() {
             <ActionBtn title="Record Notice" icon="notifications-outline" small onPress={() => setNoticeOpen(true)} />
           </View>
         </View>
-        <SearchBar tab="notices" placeholder="Search tenant…" />
+        <SearchBar tab="notices" placeholder="Search by tenant name..." />
         {filtered.length === 0 ? <EmptyCard message="No tenants on notice" /> :
           filtered.map((a: any) => {
             const noticeRecord = notices.find((n: any) => n.allotment_id === a.id);
@@ -3155,7 +3442,7 @@ export default function TenantLifecycleScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
                     <Row label="Notice Date" value={fmtDate(a.notice_date)} valueColor="#E65100" />
                     <Row label="Est. Exit" value={fmtDate(a.estimated_exit_date)} valueColor="#C62828" />
                   </View>
@@ -3164,7 +3451,7 @@ export default function TenantLifecycleScreen() {
                       setEditNoticeForm({ noticeId: noticeRecord?.id || '', allotmentId: a.id, bedId: a.bed_id, tenantId: a.tenant_id, noticeDate: a.notice_date || '', exitDate: a.estimated_exit_date || '', notes: noticeRecord?.notes || '' });
                       setEditNoticeOpen(true);
                     }} style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#7B2FBE" />
+                      <Ionicons name="pencil-outline" size={16} color="#6366F1" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => doDeleteNotice(noticeRecord || { id: '', allotment_id: a.id, bed_id: a.bed_id, tenant_id: a.tenant_id })}
                       style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}>
@@ -3192,7 +3479,7 @@ export default function TenantLifecycleScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1A1A2E' }}>🎙️ Voice Notice</Text>
                 <TouchableOpacity onPress={() => { clearNoticeTimers(); noticeRecordingRef.current?.stopAndUnloadAsync().catch(() => {}); noticeRecordingRef.current = null; setVoiceNoticeOpen(false); setNoticeRecState('idle'); }}>
-                  <Ionicons name="close-circle" size={28} color="#9B8BAE" />
+                  <Ionicons name="close-circle" size={28} color="#6B7280" />
                 </TouchableOpacity>
               </View>
 
@@ -3208,7 +3495,7 @@ export default function TenantLifecycleScreen() {
                   >
                     <Ionicons name="mic" size={36} color="#fff" />
                   </TouchableOpacity>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>Tap to start recording</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Tap to start recording</Text>
                 </View>
               )}
 
@@ -3226,7 +3513,7 @@ export default function TenantLifecycleScreen() {
                       <Ionicons name="stop" size={30} color="#fff" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>Tap to stop • Auto-stops after 2s silence</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Tap to stop • Auto-stops after 2s silence</Text>
                 </View>
               )}
 
@@ -3250,7 +3537,7 @@ export default function TenantLifecycleScreen() {
                       style={{ fontSize: fontSize.sm, color: '#1A1A2E', lineHeight: 22, minHeight: 60 }}
                     />
                   </View>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', textAlign: 'center' }}>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280', textAlign: 'center' }}>
                     Edit if needed, then tap Continue to fill in the notice form.
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -3348,13 +3635,13 @@ export default function TenantLifecycleScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* On notice — ready for exit */}
         {onNotice.length > 0 && <>
-          <SectionTitle title="On Notice — Ready for Exit" />
+          <SectionTitle title={`Tenants on Notice (${onNotice.length})`} />
           {onNotice.map((a: any) => (
             <Card key={a.id} style={{ borderColor: '#E65100', borderWidth: 1 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
                   <Row label="Est. Exit" value={fmtDate(a.estimated_exit_date)} valueColor="#E65100" />
                   <Row label="Advance" value={`₹${fmtAmt(a.deposit_paid)}`} />
                 </View>
@@ -3392,7 +3679,7 @@ export default function TenantLifecycleScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>Exit: {fmtDate(e.exitDate || e.exit_date)}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Exit: {fmtDate(e.exitDate || e.exit_date)}</Text>
                   <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
                   <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
                   <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#2E7D32" />
@@ -3402,7 +3689,7 @@ export default function TenantLifecycleScreen() {
                   setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
                   setEditExitOpen(true);
                 }} style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                  <Ionicons name="pencil-outline" size={16} color="#7B2FBE" />
+                  <Ionicons name="pencil-outline" size={16} color="#6366F1" />
                 </TouchableOpacity>
               </View>
             </Card>
@@ -3420,7 +3707,7 @@ export default function TenantLifecycleScreen() {
           <Field label="Exit Date *"><DateF value={eForm.exitDate} onChange={v => setEForm({ ...eForm, exitDate: v })} /></Field>
 
           {/* Inspection */}
-          <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#5C4B70', marginBottom: 6, letterSpacing: 0.5 }}>ROOM INSPECTION *</Text>
+          <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#556274', marginBottom: 6, letterSpacing: 0.5 }}>ROOM INSPECTION *</Text>
           <Card style={{ marginBottom: 14 }}>
             <CheckRow label="All furniture OK" checked={eForm.inspectFurniture} onChange={v => setEForm({ ...eForm, inspectFurniture: v })} />
             <CheckRow label="Bed not damaged" checked={eForm.inspectBed} onChange={v => setEForm({ ...eForm, inspectBed: v })} />
@@ -3428,8 +3715,8 @@ export default function TenantLifecycleScreen() {
             <CheckRow label="Bathroom OK" checked={eForm.inspectBathroom} onChange={v => setEForm({ ...eForm, inspectBathroom: v })} />
             <Divider />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name={inspectDone ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={inspectDone ? '#2E7D32' : '#9B8BAE'} />
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: inspectDone ? '#2E7D32' : '#9B8BAE' }}>
+              <Ionicons name={inspectDone ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={inspectDone ? '#2E7D32' : '#6B7280'} />
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: inspectDone ? '#2E7D32' : '#6B7280' }}>
                 {inspectDone ? 'Inspection Complete' : 'Complete all checks above'}
               </Text>
             </View>
@@ -3444,7 +3731,7 @@ export default function TenantLifecycleScreen() {
             <Card style={{ marginBottom: 14, borderColor: '#FFE0B2', borderWidth: 1, backgroundColor: '#FFFBF5' }}>
               <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#8B6914', marginBottom: 8 }}>ESTIMATED EB (EXIT MONTH)</Text>
               {exitEbLoading ? (
-                <Text style={{ fontSize: fontSize.sm, color: '#9B8BAE' }}>Recomputing from exit date…</Text>
+                <Text style={{ fontSize: fontSize.sm, color: '#6B7280' }}>Recomputing from exit date…</Text>
               ) : exitEb ? (
                 <>
                   <Row label={`Recomputed (${exitEb.daysInExitMonth} day${exitEb.daysInExitMonth === 1 ? '' : 's'})`} value={`₹${fmtAmt(exitEb.recomputed)}`} valueColor="#8B6914" />
@@ -3457,7 +3744,7 @@ export default function TenantLifecycleScreen() {
                     </Text>
                   )}
                   {!exitEb.canRecompute && (
-                    <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 6 }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 6 }}>
                       Previous-month meter reading missing — keeping the invoiced value.
                     </Text>
                   )}
@@ -3468,7 +3755,7 @@ export default function TenantLifecycleScreen() {
 
           {preview && (
             <Card style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#5C4B70', marginBottom: 8 }}>SETTLEMENT PREVIEW</Text>
+              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#556274', marginBottom: 8 }}>SETTLEMENT PREVIEW</Text>
               <Row label={`Stay (${preview.stayDays}d${preview.under1yr ? ' <1yr' : ''})`} value="" />
               <Row label="Pending Rent" value={`₹${fmtAmt(preview.pendRent)}`} />
               <Row label="Damage Charges" value={`₹${fmtAmt(preview.damage)}`} />
@@ -3515,13 +3802,13 @@ export default function TenantLifecycleScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{p.tenantName}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>{p.paymentDate} · {p.paymentMode?.toUpperCase()}</Text>
-                  {p.referenceNumber ? <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>Ref: {p.referenceNumber}</Text> : null}
+                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{p.paymentDate} · {p.paymentMode?.toUpperCase()}</Text>
+                  {p.referenceNumber ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Ref: {p.referenceNumber}</Text> : null}
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <Text style={{ fontWeight: '800', fontSize: fontSize.md, color: '#7B2FBE' }}>₹{fmtAmt(p.amountPaid)}</Text>
+                  <Text style={{ fontWeight: '800', fontSize: fontSize.md, color: '#6366F1' }}>₹{fmtAmt(p.amountPaid)}</Text>
                   <View style={{ backgroundColor: '#F3E5F5', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                    <Text style={{ fontSize: 9, color: '#7B2FBE', fontWeight: '700', textTransform: 'uppercase' }}>{p.receiptType}</Text>
+                    <Text style={{ fontSize: 9, color: '#6366F1', fontWeight: '700', textTransform: 'uppercase' }}>{p.receiptType}</Text>
                   </View>
                 </View>
               </View>
@@ -3548,8 +3835,8 @@ export default function TenantLifecycleScreen() {
             </View>
           </Card>
         )}
-        <SectionTitle title={`Pending Refunds (${pendingRefunds.length})`} />
-        <SearchBar tab="refunds" placeholder="Search tenant…" />
+        <SectionTitle title="Refund Tracking" />
+        <SearchBar tab="refunds" placeholder="Search by tenant name..." />
         {filtered.length === 0 ? <EmptyCard message="No pending refunds 🎉" /> :
           filtered.map((e: any) => {
             const daysSince = daysBetween(e.exitDate || e.exit_date || '');
@@ -3562,7 +3849,7 @@ export default function TenantLifecycleScreen() {
                       <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
                       {isOverdue && <Ionicons name="warning" size={14} color="#C62828" />}
                     </View>
-                    <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>Exit: {fmtDate(e.exitDate || e.exit_date)} · {daysSince}d ago</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Exit: {fmtDate(e.exitDate || e.exit_date)} · {daysSince}d ago</Text>
                     <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
                     <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
                     <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#2E7D32" />
@@ -3572,7 +3859,7 @@ export default function TenantLifecycleScreen() {
                       setEditRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, advanceHeld: e.advanceHeld || e.advance_held || 0, pendingRent: String(e.pendingRent || e.pending_rent || 0), ebCharges: String(e.ebCharges || e.eb_charges || 0), exitCharges: String(e.exitCharges || e.exit_charges || 0), damageCharges: String(e.damageCharges || e.damage_charges || 0), keyLossFee: String(e.keyLossFee || e.key_loss_fee || 0) });
                       setEditRefundOpen(true);
                     }} style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#7B2FBE" />
+                      <Ionicons name="pencil-outline" size={16} color="#6366F1" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => {
                       setCompleteRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, tenantId: e.tenantId || e.tenant_id, tenantName: e.tenantName || e.tenants?.full_name || '', refundDue: e.refundDue || e.refund_due || 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
@@ -3624,7 +3911,7 @@ export default function TenantLifecycleScreen() {
           {/* ── Bank Account (mirrors web app) ───────────────────────────────── */}
           <Field label="Bank Account *">
             {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
+              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
               : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={completeRefundForm.bankAccountId} onChange={v => setCompleteRefundForm({ ...completeRefundForm, bankAccountId: v })} placeholder="Select bank account" />
             }
           </Field>
@@ -3697,7 +3984,7 @@ export default function TenantLifecycleScreen() {
 
         {/* Header row */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <SectionTitle title={`Not in Property (${absenceRecords.length})`} />
+          <SectionTitle title="Not in Property" />
           <ActionBtn title="Add Absence" icon="add-circle-outline" small onPress={() => {
             setAbsenceEditId(null);
             setAbsenceForm(blankAbsence);
@@ -3706,10 +3993,10 @@ export default function TenantLifecycleScreen() {
         </View>
 
         {/* Info banner */}
-        <View style={{ backgroundColor: '#EDE9F5', borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-          <Ionicons name="information-circle-outline" size={16} color="#7B2FBE" style={{ marginTop: 1 }} />
-          <Text style={{ flex: 1, fontSize: fontSize.xs, color: '#5C4B70', lineHeight: 18 }}>
-            Record tenant absences exceeding 30 days to exclude them from electricity billing.
+        <View style={{ backgroundColor: VBRAND.purpleSoft, borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+          <Ionicons name="information-circle-outline" size={16} color={VBRAND.purpleDeep} style={{ marginTop: 1 }} />
+          <Text style={{ flex: 1, fontSize: fontSize.xs, color: VBRAND.ink600, lineHeight: 18 }}>
+            Absences over 30 days excluded from electricity billing.
           </Text>
         </View>
 
@@ -3738,13 +4025,13 @@ export default function TenantLifecycleScreen() {
               <Card key={r.id}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#1E1230' }}>
+                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>
                       {r.tenants?.full_name || '—'}
                     </Text>
-                    <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginBottom: 4 }}>{aptBed}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginBottom: 4 }}>{aptBed}</Text>
                     <Row label="From"     value={fmtDate(r.from_date)} />
                     <Row label="To"       value={fmtDate(r.to_date)} />
-                    <Row label="Duration" value={`${duration} day${duration !== 1 ? 's' : ''}`} valueColor="#7B2FBE" />
+                    <Row label="Duration" value={`${duration} day${duration !== 1 ? 's' : ''}`} valueColor="#6366F1" />
                     {r.reason ? (
                       <Row label="Reason" value={r.reason} />
                     ) : null}
@@ -3764,7 +4051,7 @@ export default function TenantLifecycleScreen() {
                       }}
                       style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}
                     >
-                      <Ionicons name="pencil-outline" size={16} color="#7B2FBE" />
+                      <Ionicons name="pencil-outline" size={16} color="#6366F1" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => doDeleteAbsence(r.id)}
@@ -3856,7 +4143,6 @@ export default function TenantLifecycleScreen() {
   // ─── TAB RENDERER ─────────────────────────────────────────────────────────
 
   const tabContent: Record<string, () => JSX.Element> = {
-    dashboard: renderDashboard,
     map:       renderBedMap,
     booking:   renderBooking,
     onboard:   renderOnboarding,
@@ -3871,30 +4157,32 @@ export default function TenantLifecycleScreen() {
   if (loading) return <LoadingScreen />;
 
   return (
-    <View style={{ flex: 1 , backgroundColor: '#F4EFFA'}}>
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={{ paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10 }}>
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* Header — web life-head */}
+        <View style={{
+          paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8EDF5',
+          backgroundColor: 'rgba(255,255,255,0.96)',
+        }}>
           {anySheetOpen ? (
-            /* ── Back button row when a sheet is open ── */
             <TouchableOpacity
               onPress={closeActiveSheet}
               activeOpacity={0.85}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12, alignSelf: 'flex-start', paddingVertical: 4 }}>
               <View style={{
-                width: 40, height: 40, borderRadius: 12,
-                backgroundColor: 'rgba(255,255,255,0.7)',
-                borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.6)',
+                width: 36, height: 36, borderRadius: 12,
+                backgroundColor: '#fff',
+                borderWidth: 1, borderColor: VBRAND.line,
                 alignItems: 'center', justifyContent: 'center',
-                shadowColor: VBRAND.shadow, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
               }}>
-                <Ionicons name="arrow-back" size={20} color={VBRAND.ink900} />
+                <Ionicons name="arrow-back" size={18} color={VBRAND.ink900} />
               </View>
               <View>
                 <Text style={{ fontSize: 10, color: VBRAND.ink400, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>
                   {TABS.find(t => t.key === activeTab)?.label || 'Lifecycle'}
                 </Text>
-                <Text style={{ fontSize: 18, fontWeight: '900', color: VBRAND.ink900, letterSpacing: -0.3, marginTop: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.3, marginTop: 1 }}>
                   {bookingOpen ? 'New Booking'
                     : cancelOpen ? 'Cancel Booking'
                     : onboardOpen ? 'Onboard Tenant'
@@ -3914,59 +4202,123 @@ export default function TenantLifecycleScreen() {
               </View>
             </TouchableOpacity>
           ) : (
-            /* ── Normal header with menu button on left ── */
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 38, height: 28, overflow: 'hidden', alignItems: 'center' }}>
-                <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 10, color: VBRAND.ink400, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>
-                  Operations
-                </Text>
-                <Text style={{ fontSize: 22, fontWeight: '900', color: VBRAND.ink900, letterSpacing: -0.4, marginTop: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.3 }}>
                   Tenant Lifecycle
                 </Text>
+                <Text style={{ fontSize: 12, color: VBRAND.ink600, fontWeight: '600', marginTop: 2 }}>
+                  Booking → Onboarding → Stay → Exit
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (!activeTab) setBedFocusSearch(prev => prev);
+                    Alert.alert('Search', 'Use the search field in the detail panel or module below.');
+                  }}
+                  style={{
+                    width: 36, height: 36, borderRadius: 12,
+                    backgroundColor: '#fff', borderWidth: 1, borderColor: VBRAND.line,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="search-outline" size={18} color={VBRAND.purpleDeep} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => Alert.alert('Filter', 'Use Bed Status tiles or module tabs to filter.')}
+                  style={{
+                    width: 36, height: 36, borderRadius: 12,
+                    backgroundColor: '#fff', borderWidth: 1, borderColor: VBRAND.line,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="options-outline" size={18} color={VBRAND.purpleDeep} />
+                </TouchableOpacity>
               </View>
             </View>
           )}
         </View>
 
-        {/* Tab bar — hidden when a sheet is open */}
-        <View style={{ maxHeight: anySheetOpen ? 0 : 56, overflow: 'hidden' }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 12, gap: 6 }}>
-            {TABS.map(tab => {
-              const active = activeTab === tab.key;
-              return (
-                <TouchableOpacity key={tab.key} onPress={() => setActiveTab(tab.key)} activeOpacity={0.85}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 6,
-                    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
-                    backgroundColor: active ? VBRAND.purple : 'rgba(255,255,255,0.7)',
-                    borderWidth: 0.5,
-                    borderColor: active ? VBRAND.purple : 'rgba(123,47,190,0.12)',
-                    shadowColor: VBRAND.purple,
-                    shadowOpacity: active ? 0.3 : 0.04,
-                    shadowRadius: active ? 10 : 4,
-                    shadowOffset: { width: 0, height: active ? 4 : 1 },
-                    elevation: active ? 4 : 0,
-                  }}>
-                  <Ionicons name={tab.icon as any} size={13} color={active ? '#fff' : VBRAND.purple} />
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: active ? '#fff' : VBRAND.purpleDeep, letterSpacing: 0.2 }}>{tab.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+        {/* Module icon tabs — web life-tabs-icons */}
+        {!anySheetOpen && (
+          <View>
+            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+              {renderBedStatusCard()}
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 4 }}
+              contentContainerStyle={{
+                gap: 8, paddingVertical: 4, paddingHorizontal: 16,
+              }}
+            >
+              {TABS.map(tab => {
+                const active = activeTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    onPress={() => selectModule(tab.key)}
+                    activeOpacity={0.85}
+                    style={{
+                      minWidth: 72, minHeight: 54, paddingHorizontal: 10, paddingVertical: 8,
+                      borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 4,
+                      backgroundColor: active ? '#EFF6FF' : VBRAND.surfaceSoft,
+                      borderWidth: 1,
+                      borderColor: active ? '#BFDBFE' : VBRAND.softLine,
+                    }}
+                  >
+                    <Ionicons
+                      name={tab.icon as any}
+                      size={20}
+                      color={active ? VBRAND.purpleDeep : VBRAND.ink600}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 10, fontWeight: active ? '800' : '600',
+                        color: active ? VBRAND.purpleDeep : VBRAND.ink600,
+                        textAlign: 'center',
+                      }}
+                      numberOfLines={2}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                onPress={() => Alert.alert('Excel Upload', 'Excel upload opened')}
+                activeOpacity={0.85}
+                style={{
+                  minWidth: 72, minHeight: 54, paddingHorizontal: 10, paddingVertical: 8,
+                  borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 4,
+                  backgroundColor: VBRAND.surfaceSoft, borderWidth: 1, borderColor: VBRAND.softLine,
+                }}
+              >
+                <Ionicons name="document-attach-outline" size={20} color={VBRAND.ink600} />
+                <Text style={{ fontSize: 10, fontWeight: '600', color: VBRAND.ink600, textAlign: 'center' }}>
+                  Excel Upload
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )}
 
-        {/* Tab content */}
+        {/* Module content OR bed-focus detail */}
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 4, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={VBRAND.purple} />}
           keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
         >
-          {(tabContent[activeTab] || renderDashboard)()}
+          {activeTab
+            ? (tabContent[activeTab] || renderBedFocusDetail)()
+            : renderBedFocusDetail()}
         </ScrollView>
       </SafeAreaView>
     </View>

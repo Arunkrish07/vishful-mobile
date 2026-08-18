@@ -171,7 +171,7 @@ const CONFIDENCE_COLORS = {
   high:     { bg: '#dcfce7', text: '#16a34a', border: '#86efac' },
   medium:   { bg: '#fef9c3', text: '#ca8a04', border: '#fde047' },
   low:      { bg: '#ffedd5', text: '#ea580c', border: '#fed7aa' },
-  fallback: { bg: '#f3e8ff', text: '#7c3aed', border: '#d8b4fe' },
+  fallback: { bg: '#f3e8ff', text: '#6366F1', border: '#d8b4fe' },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -641,8 +641,8 @@ export default function TenantHomeScreen({ navigation }: any) {
       <View style={{ alignItems: 'center', paddingVertical: 28, gap: 20 }}>
 
         {!recAvailable && voiceStep === 'idle' && (
-          <View style={{ backgroundColor: '#EDE9FE', borderRadius: 12, padding: 12, width: '100%', borderWidth: 1, borderColor: '#C4B5FD', flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-            <Ionicons name="information-circle-outline" size={18} color="#7C3AED" style={{ marginTop: 1 }} />
+          <View style={{ backgroundColor: '#EEF2FF', borderRadius: 12, padding: 12, width: '100%', borderWidth: 1, borderColor: '#C7D2FE', flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+            <Ionicons name="information-circle-outline" size={18} color="#6366F1" style={{ marginTop: 1 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#5B21B6', marginBottom: 2 }}>Voice not available on this browser</Text>
               <Text style={{ fontSize: 12, color: '#6D28D9', lineHeight: 18 }}>Tap the button below to type your complaint instead.</Text>
@@ -650,7 +650,7 @@ export default function TenantHomeScreen({ navigation }: any) {
           </View>
         )}
 
-        <Text style={{ fontSize: 14, color: '#5C4B70', textAlign: 'center', lineHeight: 22, paddingHorizontal: 16 }}>
+        <Text style={{ fontSize: 14, color: '#556274', textAlign: 'center', lineHeight: 22, paddingHorizontal: 16 }}>
           {voiceStep === 'idle'
             ? (recAvailable ? 'Tap the mic and describe your issue clearly.' : 'Tap below to type your issue.')
             : voiceStep === 'recording' ? 'Listening… tap Stop when done.'
@@ -664,9 +664,9 @@ export default function TenantHomeScreen({ navigation }: any) {
             disabled={voiceStep === 'processing'}
             style={{
               width: 80, height: 80, borderRadius: 40,
-              backgroundColor: voiceStep === 'recording' ? '#DC2626' : '#7B2FBE',
+              backgroundColor: voiceStep === 'recording' ? '#DC2626' : '#312E81',
               alignItems: 'center', justifyContent: 'center',
-              shadowColor: voiceStep === 'recording' ? '#DC2626' : '#7B2FBE',
+              shadowColor: voiceStep === 'recording' ? '#DC2626' : '#312E81',
               shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8,
               opacity: voiceStep === 'processing' ? 0.6 : 1,
             }}
@@ -689,7 +689,7 @@ export default function TenantHomeScreen({ navigation }: any) {
 
         {voiceStep === 'idle' && (
           <View style={{ width: '100%', gap: 6 }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#9B8BAE', letterSpacing: 0.8, marginBottom: 2 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#6B7280', letterSpacing: 0.8, marginBottom: 2 }}>
               {recAvailable ? 'EXAMPLE PHRASES — tap to use' : 'COMMON ISSUES — tap to use'}
             </Text>
             {[
@@ -702,9 +702,9 @@ export default function TenantHomeScreen({ navigation }: any) {
               <TouchableOpacity
                 key={phrase}
                 onPress={() => moveToReview(phrase)}
-                style={{ backgroundColor: 'rgba(123,47,190,0.05)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(123,47,190,0.12)' }}
+                style={{ backgroundColor: 'rgba(49,46,129,0.05)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(49,46,129,0.12)' }}
               >
-                <Text style={{ fontSize: 12, color: '#7B2FBE' }}>"{phrase}"</Text>
+                <Text style={{ fontSize: 12, color: '#312E81' }}>"{phrase}"</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -723,7 +723,7 @@ export default function TenantHomeScreen({ navigation }: any) {
             <Ionicons name="sparkles" size={16} color={confColors.text} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 11, fontWeight: '800', color: confColors.text, letterSpacing: 0.5 }}>AUTO-DETECTED CATEGORY</Text>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1E1230', marginTop: 1 }}>{selectedType.name}</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827', marginTop: 1 }}>{selectedType.name}</Text>
               {classification?.matchedKeyword && <Text style={{ fontSize: 11, color: confColors.text }}>Keyword: "{classification.matchedKeyword}"</Text>}
             </View>
             <View style={{ backgroundColor: confColors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -733,11 +733,11 @@ export default function TenantHomeScreen({ navigation }: any) {
         )}
 
         <View style={{ gap: 6 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70' }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274' }}>
             {editedTranscript ? 'YOUR DESCRIPTION' : 'DESCRIBE YOUR ISSUE'}
           </Text>
           {!canRecord() && !editedTranscript && (
-            <Text style={{ fontSize: 12, color: '#9B8BAE', marginTop: -2, marginBottom: 4 }}>
+            <Text style={{ fontSize: 12, color: '#6B7280', marginTop: -2, marginBottom: 4 }}>
               Type in plain language — AI will detect the issue and assign a technician
             </Text>
           )}
@@ -747,34 +747,34 @@ export default function TenantHomeScreen({ navigation }: any) {
             placeholder="e.g. AC is not working in my room, water is leaking…"
             placeholderTextColor="#B8A8CC"
             autoFocus={!editedTranscript}
-            style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, fontSize: 14, color: '#1E1230', borderWidth: 1.5, borderColor: editedTranscript ? '#E0D5EA' : '#C4B5FD', minHeight: 90, textAlignVertical: 'top', lineHeight: 22 }}
+            style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, fontSize: 14, color: '#111827', borderWidth: 1.5, borderColor: editedTranscript ? '#E5E7EB' : '#C7D2FE', minHeight: 90, textAlignVertical: 'top', lineHeight: 22 }}
           />
         </View>
 
         <View style={{ gap: 6 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70' }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274' }}>
             ISSUE CATEGORY{classification?.confidence === 'fallback' ? ' — please confirm' : ''}
           </Text>
           {loadingIssueTypes
-            ? <ActivityIndicator color="#7B2FBE" />
+            ? <ActivityIndicator color="#312E81" />
             : issueTypes.map(it => (
               <TouchableOpacity
                 key={it.id} onPress={() => setSelectedTypeId(it.id)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: selectedTypeId === it.id ? 'rgba(123,47,190,0.08)' : '#fff', borderRadius: 10, padding: 11, borderWidth: 1.5, borderColor: selectedTypeId === it.id ? '#7B2FBE' : '#E0D5EA' }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: selectedTypeId === it.id ? 'rgba(49,46,129,0.08)' : '#fff', borderRadius: 10, padding: 11, borderWidth: 1.5, borderColor: selectedTypeId === it.id ? '#312E81' : '#E5E7EB' }}
               >
-                <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: selectedTypeId === it.id ? '#7B2FBE' : '#C4B5D0', backgroundColor: selectedTypeId === it.id ? '#7B2FBE' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: selectedTypeId === it.id ? '#312E81' : '#94A3B8', backgroundColor: selectedTypeId === it.id ? '#312E81' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                   {selectedTypeId === it.id && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />}
                 </View>
-                <Text style={{ fontSize: 14, flex: 1, fontWeight: selectedTypeId === it.id ? '700' : '400', color: selectedTypeId === it.id ? '#1E1230' : '#5C4B70' }}>{it.name}</Text>
-                {it.priority && <Text style={{ fontSize: 11, color: '#9B8BAE' }}>{it.priority}</Text>}
+                <Text style={{ fontSize: 14, flex: 1, fontWeight: selectedTypeId === it.id ? '700' : '400', color: selectedTypeId === it.id ? '#111827' : '#556274' }}>{it.name}</Text>
+                {it.priority && <Text style={{ fontSize: 11, color: '#6B7280' }}>{it.priority}</Text>}
               </TouchableOpacity>
             ))
           }
         </View>
 
         <TouchableOpacity onPress={resetVoice} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 4 }}>
-          <Ionicons name="refresh" size={13} color="#7B2FBE" />
-          <Text style={{ fontSize: 13, color: '#7B2FBE', fontWeight: '600' }}>Record Again</Text>
+          <Ionicons name="refresh" size={13} color="#312E81" />
+          <Text style={{ fontSize: 13, color: '#312E81', fontWeight: '600' }}>Record Again</Text>
         </TouchableOpacity>
       </View>
     );
@@ -785,16 +785,16 @@ export default function TenantHomeScreen({ navigation }: any) {
       <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#86efac' }}>
         <Ionicons name="checkmark-circle" size={44} color="#16a34a" />
       </View>
-      <Text style={{ fontSize: 20, fontWeight: '800', color: '#1E1230' }}>Ticket Raised!</Text>
+      <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827' }}>Ticket Raised!</Text>
       {createdTicketNumber ? (
-        <View style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)' }}>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: '#7B2FBE', letterSpacing: 1 }}>{createdTicketNumber}</Text>
+        <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(49,46,129,0.2)' }}>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: '#312E81', letterSpacing: 1 }}>{createdTicketNumber}</Text>
         </View>
       ) : null}
-      <Text style={{ fontSize: 13, color: '#5C4B70', textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 }}>
+      <Text style={{ fontSize: 13, color: '#556274', textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 }}>
         Your {classification?.issueTypeName || 'maintenance'} request has been logged. Our team will respond shortly.
       </Text>
-      <TouchableOpacity onPress={closeVoiceModal} style={{ backgroundColor: '#7B2FBE', borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14, marginTop: 4 }}>
+      <TouchableOpacity onPress={closeVoiceModal} style={{ backgroundColor: '#312E81', borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14, marginTop: 4 }}>
         <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Done</Text>
       </TouchableOpacity>
     </View>
@@ -805,14 +805,14 @@ export default function TenantHomeScreen({ navigation }: any) {
       <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FECACA' }}>
         <Ionicons name="alert-circle" size={38} color="#DC2626" />
       </View>
-      <Text style={{ fontSize: 17, fontWeight: '800', color: '#1E1230' }}>Something Went Wrong</Text>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: '#111827' }}>Something Went Wrong</Text>
       <Text style={{ fontSize: 13, color: '#DC2626', textAlign: 'center', lineHeight: 20, paddingHorizontal: 12 }}>{voiceError || 'An unexpected error occurred.'}</Text>
       <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-        <TouchableOpacity onPress={() => { setVoiceError(''); setVoiceStep('idle'); }} style={{ backgroundColor: '#7B2FBE', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
+        <TouchableOpacity onPress={() => { setVoiceError(''); setVoiceStep('idle'); }} style={{ backgroundColor: '#312E81', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
           <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Try Again</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={closeVoiceModal} style={{ backgroundColor: '#F3F0F7', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: '#E0D5EA' }}>
-          <Text style={{ color: '#5C4B70', fontWeight: '700', fontSize: 14 }}>Cancel</Text>
+        <TouchableOpacity onPress={closeVoiceModal} style={{ backgroundColor: '#F3F0F7', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+          <Text style={{ color: '#556274', fontWeight: '700', fontSize: 14 }}>Cancel</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -838,17 +838,17 @@ export default function TenantHomeScreen({ navigation }: any) {
         {/* ── Header with RAISE COMPLAINT button ── */}
         <View style={[glass.header, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', fontWeight: '600', letterSpacing: 0.5 }}>WELCOME</Text>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230', letterSpacing: -0.3 }}>{user?.userName || 'Tenant'}</Text>
+            <Text style={{ fontSize: fontSize.xs, color: '#6B7280', fontWeight: '600', letterSpacing: 0.5 }}>WELCOME</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827', letterSpacing: -0.3 }}>{user?.userName || 'Tenant'}</Text>
           </View>
           {/* ── VOICE BUTTON — this is what opens the voice modal ── */}
           <TouchableOpacity
             onPress={() => { resetVoice(); setVoiceModalOpen(true); }}
             style={{
               flexDirection: 'row', alignItems: 'center', gap: 6,
-              backgroundColor: '#7B2FBE', paddingHorizontal: 14,
+              backgroundColor: '#312E81', paddingHorizontal: 14,
               paddingVertical: 9, borderRadius: 999,
-              shadowColor: '#7B2FBE', shadowOpacity: 0.35,
+              shadowColor: '#312E81', shadowOpacity: 0.35,
               shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 5,
             }}
           >
@@ -860,7 +860,7 @@ export default function TenantHomeScreen({ navigation }: any) {
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={{ padding: spacing.xl, paddingBottom: 20, gap: 16 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7B2FBE']} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#312E81']} />}
         >
 
           {/* Account Not Linked banner */}
@@ -881,9 +881,9 @@ export default function TenantHomeScreen({ navigation }: any) {
           {/* Raise Complaint card (always visible) */}
           <TouchableOpacity
             onPress={() => { resetVoice(); setVoiceModalOpen(true); }}
-            style={{ backgroundColor: '#EDE9FE', borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1.5, borderColor: '#C4B5FD', flexDirection: 'row', alignItems: 'center', gap: 14 }}
+            style={{ backgroundColor: '#EEF2FF', borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1.5, borderColor: '#C7D2FE', flexDirection: 'row', alignItems: 'center', gap: 14 }}
           >
-            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="mic" size={24} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
@@ -892,7 +892,7 @@ export default function TenantHomeScreen({ navigation }: any) {
                 {canRecord() ? 'Tap to record your voice complaint' : 'Tap to describe your issue'}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#7B2FBE" />
+            <Ionicons name="chevron-forward" size={18} color="#312E81" />
           </TouchableOpacity>
 
           {/* Pending Approval Alerts */}
@@ -921,19 +921,19 @@ export default function TenantHomeScreen({ navigation }: any) {
           {/* Tenant Profile Card */}
           <View onLayout={captureSectionOffset('staying')}>
           {detailsLoading && !tenantDetails ? (
-            <View style={{ backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 20, padding: spacing.lg, alignItems: 'center', gap: 8, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.45)' }}>
-              <ActivityIndicator size="small" color="#7B2FBE" />
-              <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE' }}>Loading your details…</Text>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: spacing.lg, alignItems: 'center', gap: 8, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.45)' }}>
+              <ActivityIndicator size="small" color="#312E81" />
+              <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Loading your details…</Text>
             </View>
           ) : tenantDetails?.tenant ? (
-            <View style={{ backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 20, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.5)', overflow: 'hidden' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, gap: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.12)', backgroundColor: 'rgba(123,47,190,0.05)' }}>
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 14, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.5)', overflow: 'hidden' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, gap: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(49,46,129,0.12)', backgroundColor: 'rgba(49,46,129,0.05)' }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff' }}>{(tenantDetails.tenant.full_name || user?.userName || 'T')[0].toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#1E1230' }}>{tenantDetails.tenant.full_name || user?.userName}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#7B6B90', marginTop: 2 }}>{tenantDetails.tenant.phone}</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#111827' }}>{tenantDetails.tenant.full_name || user?.userName}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#556274', marginTop: 2 }}>{tenantDetails.tenant.phone}</Text>
                   {tenantDetails.tenant.staying_status && (
                     <View style={{ alignSelf: 'flex-start', marginTop: 5, backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
                       <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>
@@ -950,10 +950,10 @@ export default function TenantHomeScreen({ navigation }: any) {
           {/* Accommodation Card */}
           <View onLayout={captureSectionOffset('onboarding')}>
           {(tenantDetails?.allotment || tenantLocation) && (
-            <View style={{ backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 20, padding: spacing.lg, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.45)' }}>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: spacing.lg, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.45)' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm }}>
-                <Ionicons name="home-outline" size={14} color="#7B2FBE" />
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#9B8BAE', letterSpacing: 1 }}>ACCOMMODATION</Text>
+                <Ionicons name="home-outline" size={14} color="#312E81" />
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#6B7280', letterSpacing: 1 }}>ACCOMMODATION</Text>
               </View>
               {[
                 { label: 'Property',     value: tenantDetails?.allotment?.properties?.property_name ?? tenantLocation?.propertyName },
@@ -963,8 +963,8 @@ export default function TenantHomeScreen({ navigation }: any) {
                 { label: 'Check-in',     value: (tenantDetails?.allotment?.onboarding_date || tenantLocation?.checkInDate) ? formatDate(tenantDetails?.allotment?.onboarding_date || tenantLocation?.checkInDate, '') : null },
               ].filter(r => r.value).map(row => (
                 <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ fontSize: fontSize.sm, color: '#7B6B90' }}>{row.label}</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230', flex: 1, textAlign: 'right', marginLeft: 16 }} numberOfLines={1}>{row.value}</Text>
+                  <Text style={{ fontSize: fontSize.sm, color: '#556274' }}>{row.label}</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827', flex: 1, textAlign: 'right', marginLeft: 16 }} numberOfLines={1}>{row.value}</Text>
                 </View>
               ))}
             </View>
@@ -1011,14 +1011,14 @@ export default function TenantHomeScreen({ navigation }: any) {
             VOICE MODAL
         ══════════════════════════════════════════════════════════════ */}
         <Modal visible={voiceModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeVoiceModal}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E0D5EA', backgroundColor: '#fff' }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#fff' }}>
               <TouchableOpacity onPress={closeVoiceModal} style={{ marginRight: 12, padding: 4 }}>
-                <Ionicons name="close" size={24} color="#1E1230" />
+                <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="mic" size={18} color="#7B2FBE" />
-                <Text style={{ fontSize: 17, fontWeight: '800', color: '#1E1230' }}>{voiceModalTitle}</Text>
+                <Ionicons name="mic" size={18} color="#312E81" />
+                <Text style={{ fontSize: 17, fontWeight: '800', color: '#111827' }}>{voiceModalTitle}</Text>
               </View>
             </View>
 
@@ -1027,8 +1027,8 @@ export default function TenantHomeScreen({ navigation }: any) {
               {voiceStep === 'review'     && renderVoiceReview()}
               {voiceStep === 'submitting' && (
                 <View style={{ alignItems: 'center', paddingVertical: 48, gap: 16 }}>
-                  <ActivityIndicator size="large" color="#7B2FBE" />
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#1E1230' }}>Creating your ticket…</Text>
+                  <ActivityIndicator size="large" color="#312E81" />
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Creating your ticket…</Text>
                 </View>
               )}
               {voiceStep === 'success' && renderVoiceSuccess()}
@@ -1036,10 +1036,10 @@ export default function TenantHomeScreen({ navigation }: any) {
             </ScrollView>
 
             {voiceStep === 'review' && (
-              <View style={{ padding: 20, paddingBottom: Platform.OS === 'ios' ? 8 : 20, borderTopWidth: 1, borderTopColor: '#E0D5EA', backgroundColor: '#fff' }}>
+              <View style={{ padding: 20, paddingBottom: Platform.OS === 'ios' ? 8 : 20, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#fff' }}>
                 <TouchableOpacity
                   onPress={handleVoiceSubmit} disabled={!canSubmit}
-                  style={{ backgroundColor: canSubmit ? '#7B2FBE' : '#C4B5D0', borderRadius: 14, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                  style={{ backgroundColor: canSubmit ? '#312E81' : '#94A3B8', borderRadius: 14, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                 >
                   <Ionicons name="paper-plane-outline" size={18} color="#fff" />
                   <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Raise Ticket</Text>
@@ -1053,26 +1053,26 @@ export default function TenantHomeScreen({ navigation }: any) {
             APPROVAL MODAL
         ══════════════════════════════════════════════════════════════ */}
         <Modal visible={!!approvalTicket} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setApprovalTicket(null)}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
               <TouchableOpacity onPress={() => setApprovalTicket(null)} style={{ marginRight: 12 }}>
-                <Ionicons name="close" size={24} color="#1E1230" />
+                <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Review Completed Work</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Review Completed Work</Text>
             </View>
             <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 16 }}>
               {approvalTicket && (
                 <>
                   <View style={{ backgroundColor: '#FFEDD5', borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#EA580C' }}>
                     <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#EA580C', marginBottom: 6 }}>WORK COMPLETED</Text>
-                    <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#1E1230' }}>{approvalTicket.ticket_number}</Text>
+                    <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#111827' }}>{approvalTicket.ticket_number}</Text>
                     <Text style={{ fontSize: fontSize.sm, color: '#4B5563', marginTop: 4 }}>{approvalTicket.issue_type_name || approvalTicket.issue_type}{approvalTicket.issue_subtype ? ` · ${approvalTicket.issue_subtype}` : ''}</Text>
-                    {approvalTicket.description && <Text style={{ fontSize: fontSize.sm, color: '#7B6B90', marginTop: 4 }}>{approvalTicket.description}</Text>}
+                    {approvalTicket.description && <Text style={{ fontSize: fontSize.sm, color: '#556274', marginTop: 4 }}>{approvalTicket.description}</Text>}
                   </View>
                   <Text style={{ fontSize: fontSize.sm, color: '#4B5563', textAlign: 'center', lineHeight: 20 }}>Approve to close the ticket, or reject if the issue is not resolved.</Text>
                   {showRejectInput && (
                     <TextInput
-                      style={{ backgroundColor: '#fff', borderRadius: borderRadius.md, padding: spacing.md, fontSize: fontSize.md, color: '#1E1230', borderWidth: 1, borderColor: '#DC2626', minHeight: 80, textAlignVertical: 'top' }}
+                      style={{ backgroundColor: '#fff', borderRadius: borderRadius.md, padding: spacing.md, fontSize: fontSize.md, color: '#111827', borderWidth: 1, borderColor: '#DC2626', minHeight: 80, textAlignVertical: 'top' }}
                       placeholder="Describe why the issue is not resolved..." placeholderTextColor="#9CA3AF"
                       value={rejectReason} onChangeText={setRejectReason} multiline
                     />
@@ -1104,19 +1104,19 @@ export default function TenantHomeScreen({ navigation }: any) {
           <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFDF5' }} edges={['top', 'bottom']}>
             <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#F0E4B0' }}>
               <TouchableOpacity onPress={() => { if (!noticeSaving) { setNoticeModalOpen(false); setNoticeExitDate(''); setNoticeNotes(''); } }} style={{ marginRight: 12 }}>
-                <Ionicons name="close" size={24} color="#1E1230" />
+                <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
               <Ionicons name="notifications-outline" size={20} color="#8B6914" style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230', flex: 1 }}>Record Move-Out Notice</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827', flex: 1 }}>Record Move-Out Notice</Text>
             </View>
             <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 20 }}>
               <View style={{ gap: 8 }}>
-                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>Expected Move-Out Date <Text style={{ color: '#DC2626' }}>*</Text></Text>
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>Expected Move-Out Date <Text style={{ color: '#DC2626' }}>*</Text></Text>
                 <DateField value={noticeExitDate} onChange={setNoticeExitDate} placeholder="Select move-out date" />
               </View>
               <View style={{ gap: 8 }}>
-                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>Additional Notes <Text style={{ color: '#9B8BAE', fontWeight: '400' }}>(optional)</Text></Text>
-                <TextInput value={noticeNotes} onChangeText={setNoticeNotes} placeholder="Any specific reason or request…" placeholderTextColor="#9B8BAE" multiline numberOfLines={4} style={{ backgroundColor: '#fff', borderRadius: borderRadius.md, padding: spacing.md, fontSize: fontSize.md, color: '#1E1230', borderWidth: 1.5, borderColor: '#E0D5EA', minHeight: 100, textAlignVertical: 'top' }} />
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>Additional Notes <Text style={{ color: '#6B7280', fontWeight: '400' }}>(optional)</Text></Text>
+                <TextInput value={noticeNotes} onChangeText={setNoticeNotes} placeholder="Any specific reason or request…" placeholderTextColor="#6B7280" multiline numberOfLines={4} style={{ backgroundColor: '#fff', borderRadius: borderRadius.md, padding: spacing.md, fontSize: fontSize.md, color: '#111827', borderWidth: 1.5, borderColor: '#E5E7EB', minHeight: 100, textAlignVertical: 'top' }} />
               </View>
               <TouchableOpacity onPress={handleSubmitNotice} disabled={noticeSaving || !noticeExitDate.trim()} style={{ backgroundColor: noticeSaving || !noticeExitDate.trim() ? '#D4C4A0' : '#8B6914', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
                 {noticeSaving ? <ActivityIndicator color="#fff" /> : <><Ionicons name="checkmark-circle-outline" size={20} color="#fff" /><Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>Submit Notice</Text></>}

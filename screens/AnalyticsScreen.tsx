@@ -56,23 +56,23 @@ function linearRegression(values: number[]): { slope: number; intercept: number 
 // ── shared UI ──
 function SummaryCard({ value, label, color, icon }: { value: string | number; label: string; color?: string; icon?: any }) {
   return (
-    <View style={{ flex: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
-      {!!icon && <Ionicons name={icon} size={16} color={color || '#7B2FBE'} style={{ marginBottom: 4 }} />}
-      <Text style={{ fontSize: 17, fontWeight: '900', color: color || '#1E1230' }}>{value}</Text>
-      <Text style={{ fontSize: 10, color: '#9B8BAE', marginTop: 2 }}>{label}</Text>
+    <View style={{ flex: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+      {!!icon && <Ionicons name={icon} size={16} color={color || '#2563EB'} style={{ marginBottom: 4 }} />}
+      <Text style={{ fontSize: 17, fontWeight: '900', color: color || '#111827' }}>{value}</Text>
+      <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>{label}</Text>
     </View>
   );
 }
 
 // dual-series monthly bar chart (e.g. collected vs paid, revenue vs expense)
 function DualBars({ data, aKey, bKey, aLabel, bLabel, aColor, bColor }: any) {
-  if (!data?.length) return <Text style={{ color: '#9B8BAE', textAlign: 'center', marginVertical: 16 }}>No data</Text>;
+  if (!data?.length) return <Text style={{ color: '#6B7280', textAlign: 'center', marginVertical: 16 }}>No data</Text>;
   const max = Math.max(1, ...data.map((d: any) => Math.max(Math.abs(d[aKey] || 0), Math.abs(d[bKey] || 0))));
   return (
     <View>
       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: aColor }} /><Text style={{ fontSize: 11, color: '#5C4B70' }}>{aLabel}</Text></View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: bColor }} /><Text style={{ fontSize: 11, color: '#5C4B70' }}>{bLabel}</Text></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: aColor }} /><Text style={{ fontSize: 11, color: '#556274' }}>{aLabel}</Text></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: bColor }} /><Text style={{ fontSize: 11, color: '#556274' }}>{bLabel}</Text></View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 140, gap: 10, paddingHorizontal: 4 }}>
@@ -82,7 +82,7 @@ function DualBars({ data, aKey, bKey, aLabel, bLabel, aColor, bColor }: any) {
                 <View style={{ width: 12, height: Math.max(3, (Math.abs(d[aKey] || 0) / max) * 108), backgroundColor: aColor, borderRadius: 3 }} />
                 <View style={{ width: 12, height: Math.max(3, (Math.abs(d[bKey] || 0) / max) * 108), backgroundColor: bColor, borderRadius: 3 }} />
               </View>
-              <Text style={{ fontSize: 8, color: '#9B8BAE', marginTop: 4 }}>{d.label}</Text>
+              <Text style={{ fontSize: 8, color: '#6B7280', marginTop: 4 }}>{d.label}</Text>
             </View>
           ))}
         </View>
@@ -93,16 +93,16 @@ function DualBars({ data, aKey, bKey, aLabel, bLabel, aColor, bColor }: any) {
 
 // single-series line/bar for trend (occupancy %, units), with predicted segment dimmed
 function TrendBars({ data, valueKey, suffix }: { data: any[]; valueKey: string; suffix?: string }) {
-  if (!data?.length) return <Text style={{ color: '#9B8BAE', textAlign: 'center', marginVertical: 12 }}>No data</Text>;
+  if (!data?.length) return <Text style={{ color: '#6B7280', textAlign: 'center', marginVertical: 12 }}>No data</Text>;
   const max = Math.max(1, ...data.map((d: any) => d[valueKey] || 0));
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 120, gap: 8, paddingHorizontal: 4 }}>
         {data.map((d: any, i: number) => (
           <View key={i} style={{ alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-            <Text style={{ fontSize: 8, fontWeight: '700', color: d.predicted ? '#E8841A' : '#7B2FBE', marginBottom: 2 }}>{d[valueKey]}{suffix || ''}</Text>
-            <View style={{ width: 16, height: Math.max(4, (d[valueKey] / max) * 90), backgroundColor: d.predicted ? '#E8841A' : '#7B2FBE', borderRadius: 3, opacity: d.predicted ? 0.55 : 0.85 }} />
-            <Text style={{ fontSize: 8, color: '#9B8BAE', marginTop: 3 }}>{d.label}</Text>
+            <Text style={{ fontSize: 8, fontWeight: '700', color: d.predicted ? '#2563EB' : '#2563EB', marginBottom: 2 }}>{d[valueKey]}{suffix || ''}</Text>
+            <View style={{ width: 16, height: Math.max(4, (d[valueKey] / max) * 90), backgroundColor: d.predicted ? '#2563EB' : '#2563EB', borderRadius: 3, opacity: d.predicted ? 0.55 : 0.85 }} />
+            <Text style={{ fontSize: 8, color: '#6B7280', marginTop: 3 }}>{d.label}</Text>
           </View>
         ))}
       </View>
@@ -336,13 +336,13 @@ export default function AnalyticsScreen() {
     return (
       <GlassBackground>
         <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#7B2FBE" /><Text style={{ marginTop: 12, color: '#5C4B70' }}>Loading analytics…</Text>
+          <ActivityIndicator size="large" color="#2563EB" /><Text style={{ marginTop: 12, color: '#556274' }}>Loading analytics…</Text>
         </SafeAreaView>
       </GlassBackground>
     );
   }
 
-  const trendColor = (t: string) => t === 'improving' ? '#16a34a' : t === 'declining' ? '#DC2626' : '#E8841A';
+  const trendColor = (t: string) => t === 'improving' ? '#16a34a' : t === 'declining' ? '#DC2626' : '#2563EB';
   const trendIcon = (t: string) => t === 'improving' ? 'trending-up' : t === 'declining' ? 'trending-down' : 'remove';
 
   return (
@@ -354,64 +354,64 @@ export default function AnalyticsScreen() {
               <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
             </View>
             <View>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: '#1E1230' }}>Analytics</Text>
-              <Text style={{ fontSize: 11, color: '#9B8BAE' }}>Bed, EB, forecasts & cash flow</Text>
+              <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Analytics</Text>
+              <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Revenue & occupancy trends</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={() => setPropOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', maxWidth: 150 }}>
-            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: '#7B2FBE', flexShrink: 1 }}>{propertyFilter === 'all' ? 'All Properties' : propName(propertyFilter)}</Text>
-            <Ionicons name="chevron-down" size={13} color="#7B2FBE" />
+          <TouchableOpacity onPress={() => setPropOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', maxWidth: 150 }}>
+            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: '#2563EB', flexShrink: 1 }}>{propertyFilter === 'all' ? 'All Properties' : propName(propertyFilter)}</Text>
+            <Ionicons name="chevron-down" size={13} color="#2563EB" />
           </TouchableOpacity>
         </View>
 
         {/* Tab bar */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 46 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}>
           {TABS.map((t) => (
-            <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: tab === t.key ? '#7B2FBE' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: tab === t.key ? '#7B2FBE' : 'rgba(123,47,190,0.15)' }}>
-              <Ionicons name={t.icon as any} size={14} color={tab === t.key ? '#fff' : '#7B2FBE'} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: tab === t.key ? '#fff' : '#7B2FBE' }}>{t.label}</Text>
+            <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: tab === t.key ? '#2563EB' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: tab === t.key ? '#2563EB' : 'rgba(37,99,235,0.15)' }}>
+              <Ionicons name={t.icon as any} size={14} color={tab === t.key ? '#fff' : '#2563EB'} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: tab === t.key ? '#fff' : '#2563EB' }}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#7B2FBE" />}>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}>
 
           {/* ── BED PERFORMANCE ── */}
           {tab === 'bed_performance' && (<>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <SummaryCard value={fmtAmt(bedSummary.totalRevenue)} label="Total Revenue" color="#16a34a" icon="cash-outline" />
-              <SummaryCard value={`${bedSummary.avgOccupancy}%`} label="Avg Occupancy" color="#7B2FBE" icon="bed-outline" />
-              <SummaryCard value={bedSummary.vacantBeds} label="Vacant Beds" color="#E8841A" icon="alert-circle-outline" />
+              <SummaryCard value={`${bedSummary.avgOccupancy}%`} label="Avg Occupancy" color="#2563EB" icon="bed-outline" />
+              <SummaryCard value={bedSummary.vacantBeds} label="Vacant Beds" color="#2563EB" icon="alert-circle-outline" />
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', paddingHorizontal: 10, marginBottom: 10 }}>
-              <Ionicons name="search-outline" size={16} color="#9B8BAE" />
-              <TextInput value={search} onChangeText={setSearch} placeholder="Search bed, apartment, property…" placeholderTextColor="#9B8BAE" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#1E1230' }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 10, marginBottom: 10 }}>
+              <Ionicons name="search-outline" size={16} color="#6B7280" />
+              <TextInput value={search} onChangeText={setSearch} placeholder="Search bed, apartment, property…" placeholderTextColor="#6B7280" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#111827' }} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {([['revenue', 'Revenue'], ['occupancy', 'Occupancy'], ['avg_monthly', 'Avg Monthly']] as const).map(([k, lbl]) => (
-                  <TouchableOpacity key={k} onPress={() => setSortBy(k as any)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: sortBy === k ? '#7B2FBE' : 'rgba(123,47,190,0.1)' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: sortBy === k ? '#fff' : '#7B2FBE' }}>{lbl}</Text>
+                {([['revenue', 'Revenue'], ['occupancy', 'Occupancy']] as const).map(([k, lbl]) => (
+                  <TouchableOpacity key={k} onPress={() => setSortBy(k as any)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: sortBy === k ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: sortBy === k ? '#fff' : '#2563EB' }}>{lbl}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
-            {bedData.length === 0 ? <Text style={{ color: '#9B8BAE', textAlign: 'center', marginTop: 24 }}>No beds found</Text>
+            {bedData.length === 0 ? <Text style={{ color: '#6B7280', textAlign: 'center', marginTop: 24 }}>No beds found</Text>
               : bedData.map((b: any) => (
-                <View key={b.id} style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
+                <View key={b.id} style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230' }}>{b.aptCode} · {b.bedCode}</Text>
-                      <Text style={{ fontSize: 11, color: '#9B8BAE' }}>{b.propName}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{b.aptCode} · {b.bedCode}</Text>
+                      <Text style={{ fontSize: 11, color: '#6B7280' }}>{b.propName}</Text>
                     </View>
                     <View style={{ backgroundColor: b.currentStatus === 'Vacant' ? '#FEE2E2' : '#DCFCE7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
                       <Text style={{ fontSize: 10, fontWeight: '800', color: b.currentStatus === 'Vacant' ? '#DC2626' : '#16a34a' }}>{b.currentStatus}</Text>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 14, marginTop: 8 }}>
-                    <View><Text style={{ fontSize: 9, color: '#9B8BAE' }}>Revenue</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>{fmtAmt(b.totalRevenue)}</Text></View>
-                    <View><Text style={{ fontSize: 9, color: '#9B8BAE' }}>Occupancy</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#7B2FBE' }}>{b.occupancyPct}%</Text></View>
-                    <View><Text style={{ fontSize: 9, color: '#9B8BAE' }}>Avg/mo</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#1E1230' }}>{fmtAmt(b.avgMonthly)}</Text></View>
+                    <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Revenue</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>{fmtAmt(b.totalRevenue)}</Text></View>
+                    <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Occupancy</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>{b.occupancyPct}%</Text></View>
+                    <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Avg/mo</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>{fmtAmt(b.avgMonthly)}</Text></View>
                   </View>
                 </View>
               ))}
@@ -421,18 +421,18 @@ export default function AnalyticsScreen() {
           {tab === 'eb_analytics' && (<>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <SummaryCard value={fmtAmt(ebSummary.totalCollected)} label="EB Collected" color="#16a34a" icon="flash-outline" />
-              <SummaryCard value={fmtAmt(ebSummary.totalPaid)} label="EB Paid" color="#E8841A" icon="card-outline" />
+              <SummaryCard value={fmtAmt(ebSummary.totalPaid)} label="EB Paid" color="#2563EB" icon="card-outline" />
               <SummaryCard value={fmtAmt(ebSummary.totalVariance)} label="Variance" color={ebSummary.totalVariance >= 0 ? '#16a34a' : '#DC2626'} icon="swap-vertical-outline" />
             </View>
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', marginBottom: 10 }}>EB Collected vs Paid (12 mo)</Text>
-              <DualBars data={ebMonthly} aKey="ebCollected" bKey="ebPaid" aLabel="Collected" bLabel="Paid" aColor="#16a34a" bColor="#E8841A" />
+            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 10 }}>EB Collected vs Paid (12 mo)</Text>
+              <DualBars data={ebMonthly} aKey="ebCollected" bKey="ebPaid" aLabel="Collected" bLabel="Paid" aColor="#16a34a" bColor="#2563EB" />
             </View>
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', marginBottom: 8 }}>Monthly Variance</Text>
+            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 8 }}>Monthly Variance</Text>
               {ebMonthly.filter((m) => m.ebCollected || m.ebPaid).map((m) => (
-                <View key={m.month} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: 'rgba(123,47,190,0.06)' }}>
-                  <Text style={{ fontSize: 12, color: '#5C4B70' }}>{m.label}</Text>
+                <View key={m.month} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)' }}>
+                  <Text style={{ fontSize: 12, color: '#556274' }}>{m.label}</Text>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: m.variance >= 0 ? '#16a34a' : '#DC2626' }}>{m.variance >= 0 ? '+' : ''}{fmtAmt(m.variance)}</Text>
                 </View>
               ))}
@@ -441,35 +441,35 @@ export default function AnalyticsScreen() {
 
           {/* ── PREDICTIVE ── */}
           {tab === 'predictive' && (<>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: '#5C4B70', marginBottom: 8 }}>Occupancy Forecast (3 mo)</Text>
-            {occForecast.length === 0 ? <Text style={{ color: '#9B8BAE', textAlign: 'center', marginVertical: 16 }}>No occupancy data</Text>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: '#556274', marginBottom: 8 }}>Occupancy Forecast (3 mo)</Text>
+            {occForecast.length === 0 ? <Text style={{ color: '#6B7280', textAlign: 'center', marginVertical: 16 }}>No occupancy data</Text>
               : occForecast.map((f: any, i: number) => (
-                <View key={i} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
+                <View key={i} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', flex: 1 }}>{f.propName}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', flex: 1 }}>{f.propName}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: trendColor(f.trend) + '18', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
                       <Ionicons name={trendIcon(f.trend) as any} size={12} color={trendColor(f.trend)} />
                       <Text style={{ fontSize: 10, fontWeight: '800', color: trendColor(f.trend), textTransform: 'capitalize' }}>{f.trend}</Text>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 16, marginBottom: 10 }}>
-                    <View><Text style={{ fontSize: 9, color: '#9B8BAE' }}>Current</Text><Text style={{ fontSize: 14, fontWeight: '800', color: '#7B2FBE' }}>{f.currentOcc}%</Text></View>
-                    <View><Text style={{ fontSize: 9, color: '#9B8BAE' }}>Next Month</Text><Text style={{ fontSize: 14, fontWeight: '800', color: '#E8841A' }}>{f.nextMonthOcc}%</Text></View>
-                    <View><Text style={{ fontSize: 9, color: '#9B8BAE' }}>Beds</Text><Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230' }}>{f.totalBeds}</Text></View>
+                    <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Current</Text><Text style={{ fontSize: 14, fontWeight: '800', color: '#2563EB' }}>{f.currentOcc}%</Text></View>
+                    <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Next Month</Text><Text style={{ fontSize: 14, fontWeight: '800', color: '#2563EB' }}>{f.nextMonthOcc}%</Text></View>
+                    <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Beds</Text><Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{f.totalBeds}</Text></View>
                   </View>
                   <TrendBars data={f.chartData} valueKey="value" suffix="%" />
                 </View>
               ))}
             {ebForecast.length > 0 && (<>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#5C4B70', marginTop: 4, marginBottom: 8 }}>EB Units Forecast (3 mo)</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#556274', marginTop: 4, marginBottom: 8 }}>EB Units Forecast (3 mo)</Text>
               {ebForecast.map((f: any, i: number) => (
-                <View key={i} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', marginBottom: 10 }}>{f.propName}</Text>
+                <View key={i} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 10 }}>{f.propName}</Text>
                   <TrendBars data={f.chartData} valueKey="value" suffix="u" />
                 </View>
               ))}
             </>)}
-            <Text style={{ fontSize: 10, color: '#9B8BAE', textAlign: 'center', marginTop: 4 }}>Orange bars are linear-regression forecasts</Text>
+            <Text style={{ fontSize: 10, color: '#6B7280', textAlign: 'center', marginTop: 4 }}>Orange bars are linear-regression forecasts</Text>
           </>)}
 
           {/* ── CASH FLOW ── */}
@@ -477,22 +477,22 @@ export default function AnalyticsScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <SummaryCard value={fmtAmt(cashSummary.totalRevenue)} label="Revenue (12mo)" color="#16a34a" icon="trending-up-outline" />
               <SummaryCard value={fmtAmt(cashSummary.totalExpenses)} label="Expenses" color="#DC2626" icon="trending-down-outline" />
-              <SummaryCard value={fmtAmt(cashSummary.totalOwnerPayouts)} label="Owner Payouts" color="#E8841A" icon="people-outline" />
+              <SummaryCard value={fmtAmt(cashSummary.totalOwnerPayouts)} label="Owner Payouts" color="#2563EB" icon="people-outline" />
               <SummaryCard value={fmtAmt(cashSummary.netCashFlow)} label="Net Cash Flow" color={cashSummary.netCashFlow >= 0 ? '#16a34a' : '#DC2626'} icon="wallet-outline" />
-              <SummaryCard value={fmtAmt(depositsHeld)} label="Deposits Held" color="#7B2FBE" icon="lock-closed-outline" />
+              <SummaryCard value={fmtAmt(depositsHeld)} label="Deposits Held" color="#2563EB" icon="lock-closed-outline" />
             </View>
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', marginBottom: 10 }}>Revenue vs Expenses (12 mo)</Text>
+            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 10 }}>Revenue vs Expenses (12 mo)</Text>
               <DualBars data={cashMonthly} aKey="revenue" bKey="expenses" aLabel="Revenue" bLabel="Expenses" aColor="#16a34a" bColor="#DC2626" />
             </View>
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', marginBottom: 8 }}>Net Cash Flow by Month</Text>
+            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 8 }}>Net Cash Flow by Month</Text>
               {cashMonthly.filter((m) => m.revenue || m.expenses || m.ownerPayouts).map((m) => (
-                <View key={m.month} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7, borderTopWidth: 1, borderTopColor: 'rgba(123,47,190,0.06)' }}>
-                  <Text style={{ fontSize: 12, color: '#5C4B70' }}>{m.label}</Text>
+                <View key={m.month} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)' }}>
+                  <Text style={{ fontSize: 12, color: '#556274' }}>{m.label}</Text>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: m.netCashFlow >= 0 ? '#16a34a' : '#DC2626' }}>{m.netCashFlow >= 0 ? '+' : ''}{fmtAmt(m.netCashFlow)}</Text>
-                    <Text style={{ fontSize: 9, color: '#9B8BAE' }}>cum: {fmtAmt(m.cumulative)}</Text>
+                    <Text style={{ fontSize: 9, color: '#6B7280' }}>cum: {fmtAmt(m.cumulative)}</Text>
                   </View>
                 </View>
               ))}
@@ -504,18 +504,18 @@ export default function AnalyticsScreen() {
         <Modal visible={propOpen} transparent animationType="fade" onRequestClose={() => setPropOpen(false)}>
           <TouchableOpacity activeOpacity={1} onPress={() => setPropOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 28 }}>
             <View style={{ backgroundColor: '#fff', borderRadius: 18, maxHeight: '70%' }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E1230', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' }}>Filter by Property</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>Filter by Property</Text>
               <ScrollView>
-                <TouchableOpacity onPress={() => { setPropertyFilter('all'); setPropOpen(false); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.05)' }}>
-                  <Text style={{ fontSize: 14, fontWeight: propertyFilter === 'all' ? '800' : '500', color: propertyFilter === 'all' ? '#7B2FBE' : '#1E1230' }}>All Properties</Text>
-                  {propertyFilter === 'all' && <Ionicons name="checkmark" size={18} color="#7B2FBE" />}
+                <TouchableOpacity onPress={() => { setPropertyFilter('all'); setPropOpen(false); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                  <Text style={{ fontSize: 14, fontWeight: propertyFilter === 'all' ? '800' : '500', color: propertyFilter === 'all' ? '#2563EB' : '#111827' }}>All Properties</Text>
+                  {propertyFilter === 'all' && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                 </TouchableOpacity>
                 {properties.map((p: any) => {
                   const pid = p.id || p._id;
                   return (
-                    <TouchableOpacity key={pid} onPress={() => { setPropertyFilter(pid); setPropOpen(false); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.05)' }}>
-                      <Text style={{ fontSize: 14, fontWeight: propertyFilter === pid ? '800' : '500', color: propertyFilter === pid ? '#7B2FBE' : '#1E1230' }}>{p.property_name || p.name}</Text>
-                      {propertyFilter === pid && <Ionicons name="checkmark" size={18} color="#7B2FBE" />}
+                    <TouchableOpacity key={pid} onPress={() => { setPropertyFilter(pid); setPropOpen(false); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                      <Text style={{ fontSize: 14, fontWeight: propertyFilter === pid ? '800' : '500', color: propertyFilter === pid ? '#2563EB' : '#111827' }}>{p.property_name || p.name}</Text>
+                      {propertyFilter === pid && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                     </TouchableOpacity>
                   );
                 })}

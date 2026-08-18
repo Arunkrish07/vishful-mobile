@@ -7,7 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { GlassBackground, DateField } from '../components/shared';
+import { GlassBackground, GlassHeader, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
@@ -324,7 +324,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
     return (
       <GlassBackground>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#7B2FBE" />
+          <ActivityIndicator size="large" color="#6366F1" />
         </View>
       </GlassBackground>
     );
@@ -365,21 +365,27 @@ export default function TicketDetailScreen({ route, navigation }: any) {
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
-        <View style={[glass.header, {
+        <GlassHeader style={{ paddingHorizontal: 0, paddingVertical: 0 }}>
+        <View style={{
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-        }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 12 }}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
+        }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{
+            width: 40, height: 40, borderRadius: 12, marginRight: 12,
+            backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: '600' }}>TICKET</Text>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.text }}>{(ticket as any).ticket_number}</Text>
+            <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>{(ticket as any).ticket_number}</Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500', marginTop: 2 }}>Ticket details</Text>
           </View>
           <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: statusCfg.bg }}>
             <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: statusCfg.color }}>{statusCfg.label}</Text>
           </View>
         </View>
+        </GlassHeader>
 
         {/* SLA breach banner — SLA/timer info is hidden from tenants (web parity) */}
         {isSlaBreached && !isTenant && (
@@ -399,9 +405,9 @@ export default function TicketDetailScreen({ route, navigation }: any) {
               key={tab}
               onPress={() => setActiveTab(tab)}
               style={{
-                flex: 1, paddingVertical: 8, borderRadius: borderRadius.md, alignItems: 'center',
-                backgroundColor: activeTab === tab ? '#7B2FBE' : colors.surface,
-                borderWidth: 1, borderColor: activeTab === tab ? '#7B2FBE' : colors.border,
+                flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center',
+                backgroundColor: activeTab === tab ? '#2563EB' : '#FFFFFF',
+                borderWidth: 1, borderColor: activeTab === tab ? '#2563EB' : '#E5E7EB',
               }}
             >
               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === tab ? '#fff' : colors.textSecondary }}>
@@ -423,9 +429,9 @@ export default function TicketDetailScreen({ route, navigation }: any) {
               <Ionicons name="hourglass" size={20} color="#D97706" />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#B45309' }}>Awaiting Your Review</Text>
-                <Text style={{ fontSize: fontSize.xs, color: '#5C4B70' }}>Review the work, then approve to close or send back for rework.</Text>
+                <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Review the work, then approve to close or send back for rework.</Text>
               </View>
-              <View style={{ backgroundColor: '#7B2FBE', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <View style={{ backgroundColor: '#2563EB', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>Review</Text>
               </View>
             </TouchableOpacity>
@@ -486,7 +492,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           {canUpdateStatus && nextStatuses.length > 0 && (
             <TouchableOpacity
               onPress={() => setShowStatusModal(true)}
-              style={{ backgroundColor: '#7B2FBE', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
+              style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
             >
               <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>Update Status</Text>
             </TouchableOpacity>
@@ -497,7 +503,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           {isAdmin && ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'waiting_for_cost_approval', 'on_hold', 'reopened', 'reassigned'].includes(ticket.status) && (
             <TouchableOpacity
               onPress={() => setShowReassignModal(true)}
-              style={{ backgroundColor: '#E8841A', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
+              style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
             >
               <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>
                 {ticket.status === 'open' ? 'Assign Technician' : 'Reassign Technician'}
@@ -724,7 +730,7 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
       </View>
 
       <View style={glass.card}>
-        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 8 }}>LOCATION</Text>
+        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 8 }}>LOCATION</Text>
         {(ticket as any).tenant_name && <Row label="Tenant" value={(ticket as any).tenant_name} />}
         {(ticket as any).tenant_phone && <Row label="Phone" value={(ticket as any).tenant_phone} />}
         {(ticket as any).property_name && <Row label="Property" value={(ticket as any).property_name} />}
@@ -734,7 +740,7 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
 
       {(ticket as any).linked_asset && (
         <View style={glass.card}>
-          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 8 }}>LINKED ASSET</Text>
+          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 8 }}>LINKED ASSET</Text>
           <Row label="Asset" value={(ticket as any).linked_asset.label || (ticket as any).linked_asset.asset_code || '—'} />
           {(ticket as any).linked_asset.asset_code && <Row label="Code" value={(ticket as any).linked_asset.asset_code} />}
           {(ticket as any).linked_asset.condition && <Row label="Condition" value={(ticket as any).linked_asset.condition} />}
@@ -743,7 +749,7 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
 
       {(ticket as any).assigned_to_name && (
         <View style={glass.card}>
-          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 8 }}>ASSIGNEE</Text>
+          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 8 }}>ASSIGNEE</Text>
           <Row label="Name" value={(ticket as any).assigned_to_name} />
           {(ticket as any).assigned_to_phone && <Row label="Phone" value={(ticket as any).assigned_to_phone} />}
         </View>
@@ -751,8 +757,8 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
 
       {(ticket as any).description && (
         <View style={glass.card}>
-          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 8 }}>DESCRIPTION</Text>
-          <Text style={{ fontSize: fontSize.md, color: '#1E1230', lineHeight: 22 }}>{(ticket as any).description}</Text>
+          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 8 }}>DESCRIPTION</Text>
+          <Text style={{ fontSize: fontSize.md, color: '#111827', lineHeight: 22 }}>{(ticket as any).description}</Text>
         </View>
       )}
 
@@ -766,13 +772,13 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
             <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1D4ED8', marginBottom: 6 }}>DIAGNOSIS</Text>
             {isObj ? (
               <>
-                {r.cause && <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#1E1230', marginBottom: 4 }}>{r.cause}</Text>}
+                {r.cause && <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#111827', marginBottom: 4 }}>{r.cause}</Text>}
                 {r.severity && <Text style={{ fontSize: fontSize.xs, color: '#1D4ED8', marginBottom: 4, textTransform: 'uppercase' }}>Severity: {r.severity}</Text>}
                 {r.recommendation && <Text style={{ fontSize: fontSize.sm, color: '#374151', lineHeight: 20, marginBottom: 4 }}>{r.recommendation}</Text>}
                 {r.estimatedCost && <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#1D4ED8' }}>Est. Cost: {r.estimatedCost}</Text>}
               </>
             ) : (
-              <Text style={{ fontSize: fontSize.md, color: '#1E1230', lineHeight: 22 }}>{String(r)}</Text>
+              <Text style={{ fontSize: fontSize.md, color: '#111827', lineHeight: 22 }}>{String(r)}</Text>
             )}
           </View>
         );
@@ -796,26 +802,26 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
               <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: cfg.color }}>{cfg.label}</Text>
             </View>
             {isDone && resolution?.closure_summary ? (
-              <View style={{ marginTop: 4, padding: 10, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 10 }}>
-                <Text style={{ fontSize: fontSize.xs, color: '#5C4B70', fontWeight: '700', marginBottom: 2 }}>What was done:</Text>
-                <Text style={{ fontSize: fontSize.sm, color: '#1E1230', lineHeight: 20 }}>{resolution.closure_summary}</Text>
+              <View style={{ marginTop: 4, padding: 10, backgroundColor: '#FFFFFF', borderRadius: 10 }}>
+                <Text style={{ fontSize: fontSize.xs, color: '#6B7280', fontWeight: '700', marginBottom: 2 }}>What was done:</Text>
+                <Text style={{ fontSize: fontSize.sm, color: '#111827', lineHeight: 20 }}>{resolution.closure_summary}</Text>
               </View>
             ) : isAwaiting ? (
               <>
-                <Text style={{ fontSize: fontSize.xs, color: '#5C4B70' }}>
+                <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>
                   The technician has finished the work. Please review and approve, or request rework.
                 </Text>
                 {st === 'pending_tenant_approval' && onOpenApproval && (
                   <TouchableOpacity
                     onPress={onOpenApproval}
-                    style={{ marginTop: 12, backgroundColor: '#7B2FBE', borderRadius: borderRadius.lg, paddingVertical: 12, alignItems: 'center' }}
+                    style={{ marginTop: 12, backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 12, alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#fff' }}>Review & Approve</Text>
                   </TouchableOpacity>
                 )}
               </>
             ) : (
-              <Text style={{ fontSize: fontSize.xs, color: '#5C4B70' }}>
+              <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>
                 Our team is working on your request. You'll be notified when it's resolved.
               </Text>
             )}
@@ -878,7 +884,7 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
                 <View style={{ marginTop: 10 }}>
                   <Text style={{ fontSize: fontSize.xs, color: '#374151', marginBottom: 6 }}>Items used:</Text>
                   {(resolution.actual_items_used as ResolutionItem[]).map((item, i) => (
-                    <Text key={i} style={{ fontSize: fontSize.xs, color: '#1E1230', marginBottom: 2 }}>
+                    <Text key={i} style={{ fontSize: fontSize.xs, color: '#111827', marginBottom: 2 }}>
                       • {item.name} × {item.qty} @ ₹{Math.round(Number(item.unit_cost) || 0)} = ₹{Math.round(Number(item.total) || 0)}
                     </Text>
                   ))}
@@ -889,7 +895,7 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
               {resolution.closure_summary ? (
                 <View style={{ marginTop: 10 }}>
                   <Text style={{ fontSize: fontSize.xs, color: '#374151', marginBottom: 4 }}>Summary:</Text>
-                  <Text style={{ fontSize: fontSize.sm, color: '#1E1230', lineHeight: 20 }}>{resolution.closure_summary}</Text>
+                  <Text style={{ fontSize: fontSize.sm, color: '#111827', lineHeight: 20 }}>{resolution.closure_summary}</Text>
                 </View>
               ) : null}
 
@@ -937,7 +943,7 @@ function ResGridCell({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ width: '50%', paddingRight: 8, marginBottom: 8 }}>
       <Text style={{ fontSize: 10, color: '#6B7280' }}>{label}</Text>
-      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>{value}</Text>
+      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>{value}</Text>
     </View>
   );
 }
@@ -1111,7 +1117,7 @@ function CostsTab({ ticket, estimates, purchases, isAssignedTechnician, isAdmin,
     <>
       {estimates.length > 0 && (
         <View style={glass.card}>
-          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 12 }}>COST ESTIMATES</Text>
+          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 12 }}>COST ESTIMATES</Text>
           {estimates.map((e: CostEstimate) => (
             <View key={e.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderLight, gap: 10 }}>
               <View style={{ flex: 1 }}>
@@ -1141,7 +1147,7 @@ function CostsTab({ ticket, estimates, purchases, isAssignedTechnician, isAdmin,
           ))}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
             <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.textSecondary }}>Total Estimated</Text>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#7B2FBE' }}>₹{totalEstimated.toFixed(2)}</Text>
+            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#2563EB' }}>₹{totalEstimated.toFixed(2)}</Text>
           </View>
           {allEstimatesApproved && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, backgroundColor: '#DCFCE7', borderRadius: borderRadius.md, padding: spacing.sm }}>
@@ -1154,7 +1160,7 @@ function CostsTab({ ticket, estimates, purchases, isAssignedTechnician, isAdmin,
 
       {purchases.length > 0 && (
         <View style={glass.card}>
-          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 12 }}>PURCHASES</Text>
+          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 12 }}>PURCHASES</Text>
           {purchases.map((p: any) => (
             <View key={p.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.borderLight }}>
               <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>
@@ -1192,7 +1198,7 @@ function CostsTab({ ticket, estimates, purchases, isAssignedTechnician, isAdmin,
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 24 }}
         >
-          <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 20 }}>
             <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.text, marginBottom: 4 }}>Approve Estimate</Text>
             <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 12 }}>
               {approveFor?.item_name ? `"${approveFor.item_name}"` : 'this estimate'} — adjust quantity or unit price if needed, then approve.
@@ -1242,7 +1248,7 @@ function CostsTab({ ticket, estimates, purchases, isAssignedTechnician, isAdmin,
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 24 }}
         >
-          <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 20 }}>
             <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.text, marginBottom: 4 }}>Decline Estimate</Text>
             <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 12 }}>
               Why are you declining {declineFor?.item_name ? `"${declineFor.item_name}"` : 'this estimate'}?
@@ -1297,14 +1303,14 @@ function TimelineTab({ logs }: { logs: TicketLog[] }) {
   const { colors } = useTheme();
   return (
     <View style={glass.card}>
-      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 12 }}>ACTIVITY TIMELINE</Text>
+      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 12 }}>ACTIVITY TIMELINE</Text>
       {logs.length === 0 ? (
         <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary, textAlign: 'center', padding: 20 }}>No activity yet</Text>
       ) : (
         logs.map((log, idx) => (
           <View key={log.id} style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
             <View style={{ alignItems: 'center' }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#7B2FBE', marginTop: 4 }} />
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#2563EB', marginTop: 4 }} />
               {idx < logs.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: colors.borderLight, marginTop: 4 }} />}
             </View>
             <View style={{ flex: 1 }}>
@@ -1314,8 +1320,8 @@ function TimelineTab({ logs }: { logs: TicketLog[] }) {
                 return (
                   <View style={{ marginTop: 2 }}>
                     {fmt.summary && (
-                      <View style={{ backgroundColor: 'rgba(123,47,190,0.05)', borderRadius: 8, padding: 8, marginBottom: fmt.body ? 6 : 0 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#5C4B70', marginBottom: 2 }}>Diagnosis summary</Text>
+                      <View style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8, marginBottom: fmt.body ? 6 : 0 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#6B7280', marginBottom: 2 }}>Diagnosis summary</Text>
                         {!!fmt.summary.cause && <Text style={{ fontSize: 11, color: colors.textSecondary }}>Cause: <Text style={{ color: colors.text }}>{fmt.summary.cause}</Text></Text>}
                         {!!fmt.summary.severity && <Text style={{ fontSize: 11, color: colors.textSecondary }}>Severity: <Text style={{ color: colors.text }}>{fmt.summary.severity}</Text></Text>}
                         {!!fmt.summary.estimatedCost && <Text style={{ fontSize: 11, color: colors.textSecondary }}>Est. cost: <Text style={{ color: colors.text }}>{fmt.summary.estimatedCost}</Text></Text>}
@@ -1353,12 +1359,12 @@ function UnlockModal({ visible, onClose, reason, setReason, onUnlock, loading }:
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Unlock Resolution Editing</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Unlock Resolution Editing</Text>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 16 }}>
             <View style={{ backgroundColor: '#FEF3C7', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', gap: 8 }}>
@@ -1368,9 +1374,9 @@ function UnlockModal({ visible, onClose, reason, setReason, onUnlock, loading }:
               </Text>
             </View>
             <TextInput
-              style={[glass.input, { padding: spacing.md, minHeight: 90, textAlignVertical: 'top', color: '#1E1230', fontSize: fontSize.md }]}
+              style={[glass.input, { padding: spacing.md, minHeight: 90, textAlignVertical: 'top', color: '#111827', fontSize: fontSize.md }]}
               placeholder="Explain why resolution needs editing… (optional)"
-              placeholderTextColor="#9B8BAE"
+              placeholderTextColor="#9CA3AF"
               value={reason}
               onChangeText={setReason}
               multiline
@@ -1577,13 +1583,13 @@ function ResolutionFormModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230', flex: 1 }}>Resolution Details</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827', flex: 1 }}>Resolution Details</Text>
             {isReadOnly && (
               <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Read Only</Text>
@@ -1602,8 +1608,8 @@ function ResolutionFormModal({
                     onPress={() => !isReadOnly && setForm((p: TicketResolutionForm) => ({ ...p, resolution_type: opt.value as any }))}
                     style={{
                       paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
-                      backgroundColor: form.resolution_type === opt.value ? '#7B2FBE' : '#fff',
-                      borderWidth: 1.5, borderColor: form.resolution_type === opt.value ? '#7B2FBE' : '#D1D5DB',
+                      backgroundColor: form.resolution_type === opt.value ? '#2563EB' : '#fff',
+                      borderWidth: 1.5, borderColor: form.resolution_type === opt.value ? '#2563EB' : '#D1D5DB',
                     }}
                   >
                     <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: form.resolution_type === opt.value ? '#fff' : '#374151' }}>
@@ -1646,10 +1652,10 @@ function ResolutionFormModal({
                       onPress={() => !isReadOnly && setShowVendorPicker(true)}
                       style={[glass.input, { flexDirection: 'row', alignItems: 'center', padding: spacing.md, justifyContent: 'space-between' }]}
                     >
-                      <Text style={{ color: form.vendor_id ? '#1E1230' : '#9B8BAE', fontSize: fontSize.md }}>
+                      <Text style={{ color: form.vendor_id ? '#111827' : '#9CA3AF', fontSize: fontSize.md }}>
                         {form.vendor_id ? (vendors.find((v: any) => v.id === form.vendor_id)?.vendor_name || 'Select vendor') : 'Select vendor'}
                       </Text>
-                      <Ionicons name="chevron-down" size={16} color="#9B8BAE" />
+                      <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
                     </TouchableOpacity>
                     {form.vendor_id && (() => {
                       const sel = vendors.find((v: any) => v.id === form.vendor_id);
@@ -1665,9 +1671,9 @@ function ResolutionFormModal({
                   </View>
                 ) : null}
                 <TextInput
-                  style={[glass.input, { padding: spacing.md, color: '#1E1230', fontSize: fontSize.md, marginTop: 6 }]}
+                  style={[glass.input, { padding: spacing.md, color: '#111827', fontSize: fontSize.md, marginTop: 6 }]}
                   placeholder="Or enter vendor name manually"
-                  placeholderTextColor="#9B8BAE"
+                  placeholderTextColor="#9CA3AF"
                   value={form.vendor_name_manual}
                   onChangeText={(v) => !isReadOnly && setForm((p: TicketResolutionForm) => ({ ...p, vendor_name_manual: v }))}
                   editable={!isReadOnly}
@@ -1681,18 +1687,18 @@ function ResolutionFormModal({
                 <Text style={formLabel}>Items Used</Text>
                 {!isReadOnly && (
                   <TouchableOpacity onPress={addItem} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="add-circle-outline" size={18} color="#7B2FBE" />
-                    <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE', fontWeight: '700' }}>Add Item</Text>
+                    <Ionicons name="add-circle-outline" size={18} color="#6366F1" />
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', fontWeight: '700' }}>Add Item</Text>
                   </TouchableOpacity>
                 )}
               </View>
               {form.items.length === 0 && (
-                <Text style={{ fontSize: fontSize.xs, color: '#9B8BAE', marginTop: 6 }}>No items added yet</Text>
+                <Text style={{ fontSize: fontSize.xs, color: '#9CA3AF', marginTop: 6 }}>No items added yet</Text>
               )}
               {(form.items as ResolutionItem[]).map((item, idx) => (
                 <View key={idx} style={{ backgroundColor: '#fff', borderRadius: borderRadius.md, padding: spacing.md, marginTop: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#5C4B70' }}>Item {idx + 1}</Text>
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6B7280' }}>Item {idx + 1}</Text>
                     {!isReadOnly && (
                       <TouchableOpacity onPress={() => removeItem(idx)}>
                         <Ionicons name="trash-outline" size={16} color="#DC2626" />
@@ -1700,9 +1706,9 @@ function ResolutionFormModal({
                     )}
                   </View>
                   <TextInput
-                    style={[glass.input, { padding: spacing.sm, color: '#1E1230', fontSize: fontSize.sm, marginBottom: 6 }]}
+                    style={[glass.input, { padding: spacing.sm, color: '#111827', fontSize: fontSize.sm, marginBottom: 6 }]}
                     placeholder="Item name"
-                    placeholderTextColor="#9B8BAE"
+                    placeholderTextColor="#9CA3AF"
                     value={item.name}
                     onChangeText={(v) => updateItem(idx, 'name', v)}
                     editable={!isReadOnly}
@@ -1711,7 +1717,7 @@ function ResolutionFormModal({
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>Qty</Text>
                       <TextInput
-                        style={[glass.input, { padding: spacing.sm, color: '#1E1230', fontSize: fontSize.sm, textAlign: 'center' }]}
+                        style={[glass.input, { padding: spacing.sm, color: '#111827', fontSize: fontSize.sm, textAlign: 'center' }]}
                         keyboardType="numeric"
                         value={String(item.qty)}
                         onChangeText={(v) => updateItem(idx, 'qty', parseInt(v) || 0)}
@@ -1721,7 +1727,7 @@ function ResolutionFormModal({
                     <View style={{ flex: 2 }}>
                       <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>Unit Cost (₹)</Text>
                       <TextInput
-                        style={[glass.input, { padding: spacing.sm, color: '#1E1230', fontSize: fontSize.sm }]}
+                        style={[glass.input, { padding: spacing.sm, color: '#111827', fontSize: fontSize.sm }]}
                         keyboardType="numeric"
                         value={String(item.unit_cost)}
                         onChangeText={(v) => updateItem(idx, 'unit_cost', parseFloat(v) || 0)}
@@ -1731,7 +1737,7 @@ function ResolutionFormModal({
                     <View style={{ flex: 2 }}>
                       <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>Total (₹)</Text>
                       <View style={[glass.input, { padding: spacing.sm, justifyContent: 'center' }]}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#7B2FBE' }}>₹{Math.round(item.total)}</Text>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>₹{Math.round(item.total)}</Text>
                       </View>
                     </View>
                   </View>
@@ -1740,7 +1746,7 @@ function ResolutionFormModal({
               {form.items.length > 0 && (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                   <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Parts subtotal</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#7B2FBE' }}>₹{Math.round(totalParts)}</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>₹{Math.round(totalParts)}</Text>
                 </View>
               )}
             </View>
@@ -1749,10 +1755,10 @@ function ResolutionFormModal({
             <View>
               <Text style={formLabel}>Labour Cost (₹)</Text>
               <TextInput
-                style={[glass.input, { padding: spacing.md, color: '#1E1230', fontSize: fontSize.md, marginTop: 6 }]}
+                style={[glass.input, { padding: spacing.md, color: '#111827', fontSize: fontSize.md, marginTop: 6 }]}
                 keyboardType="numeric"
                 placeholder="0"
-                placeholderTextColor="#9B8BAE"
+                placeholderTextColor="#9CA3AF"
                 value={String(form.total_labour_cost || '')}
                 onChangeText={(v) => !isReadOnly && setForm((p: TicketResolutionForm) => ({ ...p, total_labour_cost: parseFloat(v) || 0 }))}
                 editable={!isReadOnly}
@@ -1760,9 +1766,9 @@ function ResolutionFormModal({
             </View>
 
             {/* Total cost display */}
-            <View style={{ backgroundColor: '#EDE9FE', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70' }}>Total Cost</Text>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#7B2FBE' }}>₹{Math.round(totalCost).toLocaleString('en-IN')}</Text>
+            <View style={{ backgroundColor: '#EFF6FF', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280' }}>Total Cost</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#2563EB' }}>₹{Math.round(totalCost).toLocaleString('en-IN')}</Text>
             </View>
 
             {/* ── PAYMENT DETAILS — shown only when total > 0 ── */}
@@ -1838,7 +1844,7 @@ function ResolutionFormModal({
                         <View style={{ backgroundColor: '#fff', borderRadius: borderRadius.sm, borderWidth: 1, borderColor: '#BBF7D0', padding: spacing.sm, marginTop: 6, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                           <Text style={{ fontSize: 10, fontWeight: '700', color: '#374151' }}>From receipt (OCR): </Text>
                           {paymentOcrMeta.bankName && <Text style={{ fontSize: 10, color: '#374151' }}>{paymentOcrMeta.bankName}</Text>}
-                          {paymentOcrMeta.bankName && paymentOcrMeta.amount != null && <Text style={{ fontSize: 10, color: '#9B8BAE' }}> · </Text>}
+                          {paymentOcrMeta.bankName && paymentOcrMeta.amount != null && <Text style={{ fontSize: 10, color: '#9CA3AF' }}> · </Text>}
                           {paymentOcrMeta.amount != null && (
                             <Text style={{ fontSize: 10, fontWeight: '700', color: '#16A34A' }}>
                               ₹{Math.round(paymentOcrMeta.amount).toLocaleString('en-IN')}
@@ -1892,7 +1898,7 @@ function ResolutionFormModal({
                     onPress={() => !isReadOnly && setShowBankPicker(true)}
                     style={[glass.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, marginTop: 6 }]}
                   >
-                    <Text style={{ fontSize: fontSize.md, color: form.bank_account_id ? '#1E1230' : '#9B8BAE' }}>
+                    <Text style={{ fontSize: fontSize.md, color: form.bank_account_id ? '#111827' : '#9CA3AF' }}>
                       {form.bank_account_id
                         ? (() => {
                           const b = (bankAccounts as BankAccount[]).find((x) => x.id === form.bank_account_id);
@@ -1901,7 +1907,7 @@ function ResolutionFormModal({
                         : 'Select bank account'
                       }
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color="#9B8BAE" />
+                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
                   </TouchableOpacity>
                 </View>
 
@@ -1909,9 +1915,9 @@ function ResolutionFormModal({
                 <View>
                   <Text style={[formLabel, { color: '#15803D' }]}>Payment Reference No. *</Text>
                   <TextInput
-                    style={[glass.input, { padding: spacing.md, color: '#1E1230', fontSize: fontSize.md, marginTop: 6 }]}
+                    style={[glass.input, { padding: spacing.md, color: '#111827', fontSize: fontSize.md, marginTop: 6 }]}
                     placeholder="Txn / UTR / Ref no."
-                    placeholderTextColor="#9B8BAE"
+                    placeholderTextColor="#9CA3AF"
                     value={form.payment_reference_no}
                     onChangeText={(v) => !isReadOnly && setForm((p: TicketResolutionForm) => ({ ...p, payment_reference_no: v }))}
                     editable={!isReadOnly}
@@ -1924,9 +1930,9 @@ function ResolutionFormModal({
             <View>
               <Text style={formLabel}>Closure Comments (visible to tenant)</Text>
               <TextInput
-                style={[glass.input, { padding: spacing.md, minHeight: 90, textAlignVertical: 'top', color: '#1E1230', fontSize: fontSize.md, marginTop: 6 }]}
+                style={[glass.input, { padding: spacing.md, minHeight: 90, textAlignVertical: 'top', color: '#111827', fontSize: fontSize.md, marginTop: 6 }]}
                 placeholder="What was done to resolve this issue…"
-                placeholderTextColor="#9B8BAE"
+                placeholderTextColor="#9CA3AF"
                 value={form.closure_summary}
                 onChangeText={(v) => !isReadOnly && setForm((p: TicketResolutionForm) => ({ ...p, closure_summary: v }))}
                 multiline
@@ -1939,7 +1945,7 @@ function ResolutionFormModal({
               <TouchableOpacity
                 onPress={onSave}
                 disabled={saving}
-                style={{ backgroundColor: '#7B2FBE', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', opacity: saving ? 0.6 : 1, marginTop: 8 }}
+                style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', opacity: saving ? 0.6 : 1, marginTop: 8 }}
               >
                 {saving
                   ? <ActivityIndicator color="#fff" />
@@ -1953,12 +1959,12 @@ function ResolutionFormModal({
 
       {/* Vendor Picker Modal */}
       <Modal visible={showVendorPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowVendorPicker(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={() => setShowVendorPicker(false)} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Select Vendor</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Select Vendor</Text>
           </View>
           <ScrollView>
             {vendors.map((v: any) => (
@@ -1968,14 +1974,14 @@ function ResolutionFormModal({
                 style={{ padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#1E1230' }}>{v.vendor_name}</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#111827' }}>{v.vendor_name}</Text>
                   {(v.contact_person || v.phone) ? (
                     <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 2 }}>
                       {[v.contact_person, v.phone].filter(Boolean).join(' · ')}
                     </Text>
                   ) : null}
                 </View>
-                {form.vendor_id === v.id && <Ionicons name="checkmark" size={20} color="#7B2FBE" />}
+                {form.vendor_id === v.id && <Ionicons name="checkmark" size={20} color="#6366F1" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -1984,12 +1990,12 @@ function ResolutionFormModal({
 
       {/* Bank Account Picker Modal */}
       <Modal visible={showBankPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowBankPicker(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={() => setShowBankPicker(false)} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Select Bank Account</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Select Bank Account</Text>
           </View>
           <ScrollView>
             {(bankAccounts as BankAccount[]).map((b) => (
@@ -1999,12 +2005,12 @@ function ResolutionFormModal({
                 style={{ padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <View>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: '#1E1230' }}>{b.bank_name}</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: '#111827' }}>{b.bank_name}</Text>
                   <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>
                     ••••{String(b.account_number || '').slice(-4)}{b.is_primary ? ' (Primary)' : ''}
                   </Text>
                 </View>
-                {form.bank_account_id === b.id && <Ionicons name="checkmark" size={20} color="#7B2FBE" />}
+                {form.bank_account_id === b.id && <Ionicons name="checkmark" size={20} color="#6366F1" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -2102,7 +2108,7 @@ function ReassignModal({ visible, onClose, teamMembers, onReassign, submitting }
               disabled={submitting}
               style={[glass.card, { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 0 }]}
             >
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>
                   {(m.first_name || 'T')[0].toUpperCase()}
                 </Text>
@@ -2132,12 +2138,12 @@ function DiagnosisModal({ visible, onClose, ticketId, issueTypeId, userId, onSub
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Run Diagnosis</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Run Diagnosis</Text>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 14 }}>
             <QField label="What is the symptom?" value={q1} onChange={setQ1} />
@@ -2186,12 +2192,12 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Submit Cost Estimate</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Submit Cost Estimate</Text>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 14 }}>
             <Text style={{ fontSize: fontSize.sm, color: '#6B7280', marginBottom: 4 }}>
@@ -2218,7 +2224,7 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
                 {items.map((item, idx) => (
                   <View key={idx} style={{ backgroundColor: '#fff', borderRadius: borderRadius.md, padding: spacing.md, borderWidth: 1, borderColor: '#E5E7EB' }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#5C4B70' }}>Item {idx + 1}</Text>
+                      <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6B7280' }}>Item {idx + 1}</Text>
                       {items.length > 1 && (
                         <TouchableOpacity onPress={() => setItems(prev => prev.filter((_, i) => i !== idx))}>
                           <Ionicons name="trash-outline" size={16} color="#DC2626" />
@@ -2227,9 +2233,9 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
                     </View>
 
                     <TextInput
-                      style={[glass.input, { padding: spacing.sm, color: '#1E1230', fontSize: fontSize.sm, marginBottom: 8 }]}
+                      style={[glass.input, { padding: spacing.sm, color: '#111827', fontSize: fontSize.sm, marginBottom: 8 }]}
                       placeholder="Item name (e.g. Capacitor)"
-                      placeholderTextColor="#9B8BAE"
+                      placeholderTextColor="#9CA3AF"
                       value={item.item_name}
                       onChangeText={(v) => { const n = [...items]; n[idx] = { ...n[idx], item_name: v }; setItems(n); }}
                     />
@@ -2242,8 +2248,8 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
                           onPress={() => { const n = [...items]; n[idx] = { ...n[idx], cost_type: ct.value }; setItems(n); }}
                           style={{
                             flex: 1, paddingVertical: 7, borderRadius: borderRadius.md, alignItems: 'center',
-                            backgroundColor: item.cost_type === ct.value ? '#7B2FBE' : '#F3F4F6',
-                            borderWidth: 1, borderColor: item.cost_type === ct.value ? '#7B2FBE' : '#D1D5DB',
+                            backgroundColor: item.cost_type === ct.value ? '#2563EB' : '#F3F4F6',
+                            borderWidth: 1, borderColor: item.cost_type === ct.value ? '#2563EB' : '#D1D5DB',
                           }}
                         >
                           <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: item.cost_type === ct.value ? '#fff' : '#374151' }}>
@@ -2257,7 +2263,7 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>Quantity</Text>
                         <TextInput
-                          style={[glass.input, { padding: spacing.sm, color: '#1E1230', fontSize: fontSize.sm, textAlign: 'center' }]}
+                          style={[glass.input, { padding: spacing.sm, color: '#111827', fontSize: fontSize.sm, textAlign: 'center' }]}
                           keyboardType="numeric"
                           value={String(item.quantity)}
                           onChangeText={(v) => { const n = [...items]; n[idx] = { ...n[idx], quantity: parseInt(v) || 1 }; setItems(n); }}
@@ -2266,29 +2272,29 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
                       <View style={{ flex: 2 }}>
                         <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>Unit Price (₹)</Text>
                         <TextInput
-                          style={[glass.input, { padding: spacing.sm, color: '#1E1230', fontSize: fontSize.sm }]}
+                          style={[glass.input, { padding: spacing.sm, color: '#111827', fontSize: fontSize.sm }]}
                           keyboardType="numeric"
                           value={String(item.unit_price)}
                           onChangeText={(v) => { const n = [...items]; n[idx] = { ...n[idx], unit_price: parseFloat(v) || 0 }; setItems(n); }}
                         />
                       </View>
                     </View>
-                    <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE', marginTop: 6, fontWeight: '700', textAlign: 'right' }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', marginTop: 6, fontWeight: '700', textAlign: 'right' }}>
                       Subtotal: ₹{((item.quantity || 1) * (item.unit_price || 0)).toLocaleString('en-IN')}
                     </Text>
                   </View>
                 ))}
 
                 <TouchableOpacity onPress={addItem} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.md }}>
-                  <Ionicons name="add-circle-outline" size={20} color="#7B2FBE" />
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#7B2FBE' }}>Add Another Item</Text>
+                  <Ionicons name="add-circle-outline" size={20} color="#6366F1" />
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>Add Another Item</Text>
                 </TouchableOpacity>
 
                 {/* Running total — mirrors web */}
                 {items.some(i => i.item_name || i.unit_price > 0) && (
-                  <View style={{ backgroundColor: '#EDE9FE', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70' }}>Total</Text>
-                    <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#7B2FBE' }}>
+                  <View style={{ backgroundColor: '#EFF6FF', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280' }}>Total</Text>
+                    <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#2563EB' }}>
                       ₹{totalEstimate.toLocaleString('en-IN')}
                     </Text>
                   </View>
@@ -2300,7 +2306,7 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
               onPress={handleSubmit}
               disabled={submitting || !canSubmit}
               style={{
-                backgroundColor: noCost ? '#16A34A' : '#7B2FBE',
+                backgroundColor: noCost ? '#16A34A' : '#2563EB',
                 borderRadius: borderRadius.lg, paddingVertical: 14,
                 alignItems: 'center', opacity: (submitting || !canSubmit) ? 0.6 : 1,
               }}
@@ -2331,12 +2337,12 @@ function PurchaseModal({ visible, onClose, onSubmit, submitting, vendors = [] }:
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Record Purchase</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Record Purchase</Text>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 14 }}>
             <QField label="Item Purchased" value={itemName} onChange={setItemName} />
@@ -2345,17 +2351,17 @@ function PurchaseModal({ visible, onClose, onSubmit, submitting, vendors = [] }:
 
             {/* Vendor — dropdown if vendors exist, else free text */}
             <View>
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#5C4B70', marginBottom: 6 }}>Vendor Name</Text>
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 6 }}>Vendor Name</Text>
               {vendors.length > 0 ? (
                 <View>
                   <TouchableOpacity
                     onPress={() => setShowVendorDropdown(true)}
                     style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 10, padding: spacing.md, backgroundColor: '#fff' }}
                   >
-                    <Text style={{ fontSize: fontSize.md, color: selectedVendorId ? '#1E1230' : '#9B8BAE' }}>
+                    <Text style={{ fontSize: fontSize.md, color: selectedVendorId ? '#111827' : '#9CA3AF' }}>
                       {selectedVendorObj ? selectedVendorObj.vendor_name : 'Select vendor'}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color="#9B8BAE" />
+                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
                   </TouchableOpacity>
                   {selectedVendorObj && (selectedVendorObj.contact_person || selectedVendorObj.phone) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, paddingHorizontal: 4 }}>
@@ -2365,20 +2371,20 @@ function PurchaseModal({ visible, onClose, onSubmit, submitting, vendors = [] }:
                       </Text>
                     </View>
                   ) : null}
-                  <Text style={{ fontSize: 11, color: '#9B8BAE', marginTop: 6 }}>Or enter manually:</Text>
+                  <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 6 }}>Or enter manually:</Text>
                   <TextInput
-                    style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: spacing.sm, fontSize: fontSize.sm, color: '#1E1230', marginTop: 4, backgroundColor: '#fff' }}
+                    style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: spacing.sm, fontSize: fontSize.sm, color: '#111827', marginTop: 4, backgroundColor: '#fff' }}
                     placeholder="Vendor name (manual)"
-                    placeholderTextColor="#9B8BAE"
+                    placeholderTextColor="#9CA3AF"
                     value={vendor}
                     onChangeText={(v) => { setVendor(v); if (v) setSelectedVendorId(null); }}
                   />
                 </View>
               ) : (
                 <TextInput
-                  style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: spacing.md, fontSize: fontSize.md, color: '#1E1230', backgroundColor: '#fff' }}
+                  style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: spacing.md, fontSize: fontSize.md, color: '#111827', backgroundColor: '#fff' }}
                   placeholder="Vendor name"
-                  placeholderTextColor="#9B8BAE"
+                  placeholderTextColor="#9CA3AF"
                   value={vendor}
                   onChangeText={setVendor}
                 />
@@ -2401,12 +2407,12 @@ function PurchaseModal({ visible, onClose, onSubmit, submitting, vendors = [] }:
 
       {/* Vendor selector modal */}
       <Modal visible={showVendorDropdown} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowVendorDropdown(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
             <TouchableOpacity onPress={() => setShowVendorDropdown(false)} style={{ marginRight: 12 }}>
-              <Ionicons name="close" size={24} color="#1E1230" />
+              <Ionicons name="close" size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Select Vendor</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Select Vendor</Text>
           </View>
           <ScrollView>
             {vendors.map((v: any) => (
@@ -2416,14 +2422,14 @@ function PurchaseModal({ visible, onClose, onSubmit, submitting, vendors = [] }:
                 style={{ padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#1E1230' }}>{v.vendor_name}</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#111827' }}>{v.vendor_name}</Text>
                   {(v.contact_person || v.phone) ? (
                     <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 2 }}>
                       {[v.contact_person, v.phone].filter(Boolean).join(' · ')}
                     </Text>
                   ) : null}
                 </View>
-                {selectedVendorId === v.id && <Ionicons name="checkmark" size={20} color="#7B2FBE" />}
+                {selectedVendorId === v.id && <Ionicons name="checkmark" size={20} color="#6366F1" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -2438,20 +2444,20 @@ function ApprovalModal({ visible, onClose, onApprove, submitting }: any) {
   const [showReject, setShowReject] = useState(false);
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F3F9' }} edges={['top', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
           <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }}>
-            <Ionicons name="close" size={24} color="#1E1230" />
+            <Ionicons name="close" size={24} color="#111827" />
           </TouchableOpacity>
-          <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1E1230' }}>Review Completion</Text>
+          <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Review Completion</Text>
         </View>
         <View style={{ flex: 1, padding: spacing.xl, gap: 16 }}>
-          <View style={{ backgroundColor: '#EDE9FE', borderRadius: borderRadius.xl, padding: spacing.xl, alignItems: 'center' }}>
-            <Ionicons name="checkmark-circle-outline" size={48} color="#7B2FBE" />
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: '#1E1230', marginTop: 12, textAlign: 'center' }}>
+          <View style={{ backgroundColor: '#EFF6FF', borderRadius: borderRadius.xl, padding: spacing.xl, alignItems: 'center' }}>
+            <Ionicons name="checkmark-circle-outline" size={48} color="#6366F1" />
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: '#111827', marginTop: 12, textAlign: 'center' }}>
               Maintenance work has been completed
             </Text>
-            <Text style={{ fontSize: fontSize.sm, color: '#5C4B70', marginTop: 8, textAlign: 'center' }}>
+            <Text style={{ fontSize: fontSize.sm, color: '#6B7280', marginTop: 8, textAlign: 'center' }}>
               Please verify the work and approve or request rework.
             </Text>
           </View>
@@ -2469,9 +2475,9 @@ function ApprovalModal({ visible, onClose, onApprove, submitting }: any) {
           ) : (
             <>
               <TextInput
-                style={[glass.input, { padding: spacing.md, color: '#1E1230', minHeight: 100, textAlignVertical: 'top' }]}
+                style={[glass.input, { padding: spacing.md, color: '#111827', minHeight: 100, textAlignVertical: 'top' }]}
                 placeholder="Describe what needs to be redone..."
-                placeholderTextColor="#9B8BAE"
+                placeholderTextColor="#9CA3AF"
                 value={rejectionNote}
                 onChangeText={setRejectionNote}
                 multiline
@@ -2481,7 +2487,7 @@ function ApprovalModal({ visible, onClose, onApprove, submitting }: any) {
                 {submitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>Send Back for Rework</Text>}
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowReject(false)}>
-                <Text style={{ color: '#5C4B70', textAlign: 'center', fontSize: fontSize.sm }}>Cancel</Text>
+                <Text style={{ color: '#6B7280', textAlign: 'center', fontSize: fontSize.sm }}>Cancel</Text>
               </TouchableOpacity>
             </>
           )}

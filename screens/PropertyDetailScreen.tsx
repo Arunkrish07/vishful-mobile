@@ -9,19 +9,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, borderRadius, fontSize, glass } from '../lib/theme';
-import { Button, Input, Badge, EmptyState, LoadingScreen, PickerSelect, StatCard, GlassBackground, DateField } from '../components/shared';
+import { Button, Input, Badge, EmptyState, LoadingScreen, PickerSelect, StatCard, GlassBackground, GlassHeader, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { useQuery } from '@tanstack/react-query';
 
-// ─── Vishful brand palette (UI-only redesign tokens) ──────────────────────
+// ─── Indigo / slate design tokens ─────────────────────────────────────────
 const VBRAND = {
-  purple: '#7B2FBE', purpleDeep: '#3D1A6E', orange: '#E8841A',
-  ink900: '#1E1230', ink700: '#3F2F58', ink600: '#5C4E70', ink500: '#7B6B90', ink400: '#9B8BAE',
-  surface: 'rgba(255,255,255,0.92)',
-  cardBorder: 'rgba(123,47,190,0.08)',
-  shadow: '#3D1A6E',
+  purple: '#2563EB', purpleDeep: '#1D4ED8', orange: '#4F46E5',
+  ink900: '#111827', ink700: '#374151', ink600: '#6B7280', ink500: '#6B7280', ink400: '#9CA3AF',
+  surface: '#FFFFFF',
+  cardBorder: '#E5E7EB',
+  soft: '#EFF6FF',
+  shadow: '#0F172A',
 };
 
 const STATUS_OPTS = [
@@ -223,7 +224,7 @@ function DiscrepanciesTab({ discrepancies, colors, fontSize, spacing, styles, be
                 {/* ── 1. Beds with multiple active tenants ── */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <Ionicons name="warning-outline" size={16} color="#C62828" />
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>
                     Beds with Multiple Active Tenants ({bedDisc.length})
                   </Text>
                 </View>
@@ -244,7 +245,7 @@ function DiscrepanciesTab({ discrepancies, colors, fontSize, spacing, styles, be
                     </View>
                     {disc.allots.map((a: any, i: number) => (
                       <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
-                        <Text style={{ fontSize: fontSize.xs, color: '#1E1230', fontWeight: '600', flex: 1 }}>
+                        <Text style={{ fontSize: fontSize.xs, color: '#111827', fontWeight: '600', flex: 1 }}>
                           {a.tenants?.full_name || '—'}
                         </Text>
                         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
@@ -268,7 +269,7 @@ function DiscrepanciesTab({ discrepancies, colors, fontSize, spacing, styles, be
                 {/* ── 2. Tenants with multiple active beds ── */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 8 }}>
                   <Ionicons name="warning-outline" size={16} color="#C62828" />
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>
                     Tenants with Multiple Active Beds ({tenantDisc.length})
                   </Text>
                 </View>
@@ -283,7 +284,7 @@ function DiscrepanciesTab({ discrepancies, colors, fontSize, spacing, styles, be
                   <View key={disc.tenantId} style={[styles.card, { borderColor: '#FFCDD2', borderWidth: 1.5, marginBottom: 8 }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                       <View>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>{disc.tenantName}</Text>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>{disc.tenantName}</Text>
                         {disc.phone ? <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{disc.phone}</Text> : null}
                       </View>
                       <View style={{ backgroundColor: '#FFEBEE', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
@@ -292,7 +293,7 @@ function DiscrepanciesTab({ discrepancies, colors, fontSize, spacing, styles, be
                     </View>
                     {disc.allots.map((a: any, i: number) => (
                       <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
-                        <Text style={{ fontSize: fontSize.xs, fontWeight: '600', color: '#1E1230' }}>
+                        <Text style={{ fontSize: fontSize.xs, fontWeight: '600', color: '#111827' }}>
                           {a.onboarding_date ? fmtDate(a.onboarding_date) : a.bed_id ? a.bed_id.slice(0, 8) : '—'}
                         </Text>
                         <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -314,7 +315,7 @@ function DiscrepanciesTab({ discrepancies, colors, fontSize, spacing, styles, be
               {/* ── 3. Contract expired apartments ── */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 8 }}>
                 <Ionicons name="warning-outline" size={16} color="#E65100" />
-                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>
                   Contract Expired — Renewal Required ({contractDisc.length})
                 </Text>
               </View>
@@ -329,7 +330,7 @@ function DiscrepanciesTab({ discrepancies, colors, fontSize, spacing, styles, be
                 <View key={a.id} style={[styles.card, { borderColor: '#FFE0B2', borderWidth: 1.5, marginBottom: 8 }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View>
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>{a.apartment_code}</Text>
+                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>{a.apartment_code}</Text>
                       {a.floor_number != null && <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Floor {a.floor_number}</Text>}
                     </View>
                     <View>
@@ -973,25 +974,25 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
     <GlassBackground>
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       {/* ── Header ─────────────────────────────────────────────────── */}
+      <GlassHeader style={{ paddingHorizontal: 0, paddingVertical: 0 }}>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={{
             width: 40, height: 40, borderRadius: 12,
-            backgroundColor: 'rgba(255,255,255,0.7)',
-            borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.6)',
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1, borderColor: '#E5E7EB',
             alignItems: 'center', justifyContent: 'center',
             marginRight: 12,
-            shadowColor: VBRAND.shadow, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
           }}
         >
           <Ionicons name="arrow-back" size={20} color={VBRAND.ink900} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 10, color: VBRAND.ink400, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' }}>
-            Property
-          </Text>
           <Text style={styles.title} numberOfLines={1}>{propertyName}</Text>
+          <Text style={{ fontSize: 13, color: VBRAND.ink600, fontWeight: '500', marginTop: 2 }}>
+            Property details
+          </Text>
         </View>
         {/* Analytics button */}
         <TouchableOpacity
@@ -999,10 +1000,9 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
           activeOpacity={0.85}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 5,
-            backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 999,
+            backgroundColor: '#EFF6FF', borderRadius: 999,
             paddingHorizontal: 12, paddingVertical: 8, marginRight: 8,
-            borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.18)',
-            shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+            borderWidth: 1, borderColor: '#C7D2FE',
           }}
         >
           <Ionicons name="bar-chart-outline" size={14} color={VBRAND.purple} />
@@ -1014,16 +1014,16 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
           activeOpacity={0.85}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 5,
-            backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 999,
+            backgroundColor: '#EFF6FF', borderRadius: 999,
             paddingHorizontal: 12, paddingVertical: 8,
-            borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.18)',
-            shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+            borderWidth: 1, borderColor: '#C7D2FE',
           }}
         >
           <Ionicons name="qr-code-outline" size={14} color={VBRAND.purple} />
           <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep, letterSpacing: 0.3 }}>KYC</Text>
         </TouchableOpacity>
       </View>
+      </GlassHeader>
 
       {/* ── Search Bar ─────────────────────────────────────────────── */}
       <View style={{ paddingHorizontal: 18, paddingBottom: 12 }}>
@@ -1039,7 +1039,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
           {search.length > 0 && (
             <TouchableOpacity
               onPress={() => setSearch('')}
-              style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(123,47,190,0.1)', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}
             >
               <Ionicons name="close" size={13} color={VBRAND.purple} />
             </TouchableOpacity>
@@ -1054,13 +1054,13 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
           <View style={{
             flex: 1,
             backgroundColor: VBRAND.surface,
-            borderRadius: 18, padding: 14,
+            borderRadius: 14, padding: 14,
             borderWidth: 0.5, borderColor: VBRAND.cardBorder,
             shadowColor: VBRAND.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
           }}>
             <View style={{
               width: 32, height: 32, borderRadius: 10,
-              backgroundColor: 'rgba(123,47,190,0.12)',
+              backgroundColor: '#EFF6FF',
               alignItems: 'center', justifyContent: 'center', marginBottom: 10,
             }}>
               <Ionicons name="grid-outline" size={16} color={VBRAND.purple} />
@@ -1080,7 +1080,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
           <View style={{
             flex: 1,
             backgroundColor: VBRAND.surface,
-            borderRadius: 18, padding: 14,
+            borderRadius: 14, padding: 14,
             borderWidth: 0.5, borderColor: VBRAND.cardBorder,
             shadowColor: VBRAND.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
           }}>
@@ -1168,8 +1168,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                       style={{
                         paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
                         borderWidth: 0.5,
-                        borderColor: active ? VBRAND.purple : 'rgba(123,47,190,0.15)',
-                        backgroundColor: active ? VBRAND.purple : 'rgba(255,255,255,0.7)',
+                        borderColor: active ? VBRAND.purple : '#EFF6FF',
+                        backgroundColor: active ? VBRAND.purple : '#FFFFFF',
                       }}
                     >
                       <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#fff' : VBRAND.purpleDeep }}>{label}</Text>
@@ -1182,7 +1182,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
             <View style={styles.sectionHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={styles.sectionTitle}>Apartments</Text>
-                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(123,47,190,0.1)' }}>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: '#EFF6FF' }}>
                   <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep }}>{filteredApartments.length}</Text>
                 </View>
               </View>
@@ -1195,8 +1195,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                     flexDirection: 'row', alignItems: 'center', gap: 5,
                     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
                     borderWidth: 0.5,
-                    borderColor: liveOnly ? '#10B981' : 'rgba(123,47,190,0.15)',
-                    backgroundColor: liveOnly ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.7)',
+                    borderColor: liveOnly ? '#10B981' : '#EFF6FF',
+                    backgroundColor: liveOnly ? 'rgba(16,185,129,0.12)' : '#FFFFFF',
                   }}
                 >
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: liveOnly ? '#10B981' : VBRAND.ink400 }} />
@@ -1302,9 +1302,9 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
                     {/* Inline apt menu */}
                     {aptMenuId === a._id ? (
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.1)' }}>
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: '#E5E7EB' }}>
                         <TouchableOpacity
-                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 10 }}
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, backgroundColor: '#EFF6FF', borderRadius: 10 }}
                           onPress={() => {
                             setAptMenuId(null);
                             setEditAptTarget(a);
@@ -1347,7 +1347,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                   {/* Summary metrics strip — sibling of the toggle so the Assets
                       tile is its own reliable tap target (not swallowed by toggle). */}
                   <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
-                    <View style={{ flexDirection: 'row', gap: 0, marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.08)' }}>
+                    <View style={{ flexDirection: 'row', gap: 0, marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: '#E5E7EB' }}>
                       {[
                         { lbl: 'Beds', val: `${liveBedCt}/${aptBedList.length}`, color: VBRAND.purple, onPress: undefined as undefined | (() => void) },
                         { lbl: 'Occupied', val: String(occupiedCt), color: '#E65100', onPress: undefined },
@@ -1358,7 +1358,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                         const Cell: any = m.onPress ? TouchableOpacity : View;
                         return (
                           <Cell key={m.lbl} onPress={m.onPress} activeOpacity={0.7}
-                            style={{ flex: 1, alignItems: 'center', borderRightWidth: i < 3 ? 0.5 : 0, borderRightColor: 'rgba(123,47,190,0.08)' }}>
+                            style={{ flex: 1, alignItems: 'center', borderRightWidth: i < 3 ? 0.5 : 0, borderRightColor: '#E5E7EB' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                               <Text style={{ fontSize: 13, fontWeight: '900', color: m.color }}>{m.val}</Text>
                               {m.onPress ? <Ionicons name="chevron-forward" size={11} color={m.color} /> : null}
@@ -1372,9 +1372,9 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
                   {/* ── Expanded: Bed rows (exact web flow) ─────────────── */}
                   {isExpanded && aptBedList.length > 0 && (
-                    <View style={{ borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.1)' }}>
+                    <View style={{ borderTopWidth: 0.5, borderTopColor: '#E5E7EB' }}>
                       {/* Bed column headers */}
-                      <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 8, backgroundColor: 'rgba(123,47,190,0.04)' }}>
+                      <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#EFF6FF' }}>
                         <Text style={{ fontSize: 9, fontWeight: '800', color: VBRAND.ink400, textTransform: 'uppercase', letterSpacing: 0.6, width: 70 }}>Bed</Text>
                         <Text style={{ fontSize: 9, fontWeight: '800', color: VBRAND.ink400, textTransform: 'uppercase', letterSpacing: 0.6, flex: 1 }}>Type</Text>
                         <Text style={{ fontSize: 9, fontWeight: '800', color: VBRAND.ink400, textTransform: 'uppercase', letterSpacing: 0.6, width: 60, textAlign: 'right' }}>Value</Text>
@@ -1396,13 +1396,13 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                               paddingHorizontal: 14,
                               paddingVertical: 10,
                               borderTopWidth: bi > 0 ? 0.5 : 0,
-                              borderTopColor: 'rgba(123,47,190,0.06)',
+                              borderTopColor: '#E5E7EB',
                               backgroundColor: b.isOccupied ? 'rgba(16,185,129,0.03)' : 'transparent',
                             }}
                           >
                             {/* Bed code */}
                             <View style={{ width: 70 }}>
-                              <View style={{ backgroundColor: 'rgba(123,47,190,0.1)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start' }}>
+                              <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start' }}>
                                 <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep, letterSpacing: 0.3 }}>{b.code}</Text>
                               </View>
                             </View>
@@ -1443,7 +1443,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                                     .catch(() => { setBedHistoryData(null); setBedHistoryLoading(false); });
                                 }}
                                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                                style={{ padding: 4, borderRadius: 6, backgroundColor: 'rgba(123,47,190,0.08)' }}
+                                style={{ padding: 4, borderRadius: 6, backgroundColor: '#EFF6FF' }}
                               >
                                 <Ionicons name="time-outline" size={14} color={VBRAND.purple} />
                               </TouchableOpacity>
@@ -1460,7 +1460,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                                   );
                                 }}
                                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                                style={{ padding: 4, borderRadius: 6, backgroundColor: 'rgba(123,47,190,0.08)' }}
+                                style={{ padding: 4, borderRadius: 6, backgroundColor: '#EFF6FF' }}
                               >
                                 <Ionicons name="ellipsis-horizontal" size={14} color={VBRAND.ink500} />
                               </TouchableOpacity>
@@ -1472,7 +1472,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                       {/* Add bed shortcut */}
                       <TouchableOpacity
                         onPress={() => { setBedAptId(a._id); setShowAddBed(true); }}
-                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.06)', backgroundColor: 'rgba(123,47,190,0.03)' }}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: '#E5E7EB', backgroundColor: '#EFF6FF' }}
                         activeOpacity={0.7}
                       >
                         <Ionicons name="add-circle-outline" size={14} color={VBRAND.purple} />
@@ -1482,7 +1482,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                   )}
 
                   {isExpanded && aptBedList.length === 0 && (
-                    <View style={{ borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.1)', padding: 16, alignItems: 'center', flexDirection: 'row', gap: 10 }}>
+                    <View style={{ borderTopWidth: 0.5, borderTopColor: '#E5E7EB', padding: 16, alignItems: 'center', flexDirection: 'row', gap: 10 }}>
                       <Text style={{ fontSize: 12, color: VBRAND.ink400, flex: 1 }}>No beds in this apartment yet.</Text>
                       <TouchableOpacity
                         onPress={() => { setBedAptId(a._id); setShowAddBed(true); }}
@@ -1514,14 +1514,14 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
             {/* ── Beds search + status filter (mirrors web) ──────────────── */}
             <View style={{ marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(224,213,234,0.8)', paddingHorizontal: 12, height: 40, marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(229,231,235,0.8)', paddingHorizontal: 12, height: 40, marginBottom: 8 }}>
                 <Ionicons name="search-outline" size={15} color={colors.textTertiary} />
                 <TextInput value={bedSearch} onChangeText={setBedSearch} placeholder="Search beds, apartments…" placeholderTextColor={colors.textTertiary} style={{ flex: 1, fontSize: fontSize.sm, color: colors.text }} />
                 {bedSearch.length > 0 && <TouchableOpacity onPress={() => setBedSearch('')}><Ionicons name="close-circle" size={15} color={colors.textTertiary} /></TouchableOpacity>}
               </View>
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 {(['all', 'staying', 'on-notice', 'booked', 'vacant'] as const).map(f => (
-                  <TouchableOpacity key={f} onPress={() => setBedStatusFilter(f as any)} style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1.5, borderColor: bedStatusFilter === f ? colors.primary : colors.border, backgroundColor: bedStatusFilter === f ? colors.primary : 'rgba(255,255,255,0.6)' }}>
+                  <TouchableOpacity key={f} onPress={() => setBedStatusFilter(f as any)} style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, borderWidth: 1.5, borderColor: bedStatusFilter === f ? colors.primary : colors.border, backgroundColor: bedStatusFilter === f ? colors.primary : '#FFFFFF' }}>
                     <Text style={{ fontSize: 11, fontWeight: '700', color: bedStatusFilter === f ? colors.white : colors.primary, textTransform: 'capitalize' }}>{f === 'on-notice' ? 'Notice' : f}</Text>
                   </TouchableOpacity>
                 ))}
@@ -1646,7 +1646,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               <Text style={styles.sectionTitle}>Bed Rates ({bedRates.length})</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(224,213,234,0.8)', paddingHorizontal: 12, height: 40 }}>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(229,231,235,0.8)', paddingHorizontal: 12, height: 40 }}>
                 <Ionicons name="search-outline" size={15} color={colors.textTertiary} />
                 <TextInput
                   value={rateSearch}
@@ -1706,7 +1706,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                         <TouchableOpacity
                           onPress={() => openEditRate(r)}
-                          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}
                         >
                           <Ionicons name="create-outline" size={17} color={VBRAND.purple} />
                         </TouchableOpacity>
@@ -1752,10 +1752,10 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
             {propertyImages.length === 0 ? (
               <View style={[styles.card, { alignItems: 'center', paddingVertical: 36 }]}>
-                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                   <Ionicons name="images-outline" size={28} color={VBRAND.purple} />
                 </View>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#1E1230', marginBottom: 4 }}>No photos yet</Text>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#111827', marginBottom: 4 }}>No photos yet</Text>
                 <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary, textAlign: 'center', marginBottom: 16 }}>
                   Add photos to showcase this property
                 </Text>
@@ -1769,7 +1769,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setShowPhotoAdd(true)}
-                    style={{ backgroundColor: 'rgba(123,47,190,0.1)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 }}
+                    style={{ backgroundColor: '#EFF6FF', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 }}
                   >
                     <Text style={{ color: VBRAND.purpleDeep, fontWeight: '700', fontSize: 13 }}>From URL</Text>
                   </TouchableOpacity>
@@ -1783,8 +1783,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                     style={{
                       width: '47%', flexGrow: 1,
                       backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 14,
-                      overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.1)',
-                      shadowColor: '#3D1A6E', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
+                      overflow: 'hidden', borderWidth: 0.5, borderColor: '#E5E7EB',
+                      shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
                     }}
                   >
                     {/* Cover badge */}
@@ -1798,24 +1798,24 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                     {img.image_url ? (
                       <Image
                         source={{ uri: img.image_url }}
-                        style={{ width: '100%', aspectRatio: 1, backgroundColor: 'rgba(123,47,190,0.06)' }}
+                        style={{ width: '100%', aspectRatio: 1, backgroundColor: '#EFF6FF' }}
                         resizeMode="cover"
                       />
                     ) : (
-                      <View style={{ width: '100%', aspectRatio: 1, backgroundColor: 'rgba(123,47,190,0.06)', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
+                      <View style={{ width: '100%', aspectRatio: 1, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
                         <Ionicons name="image-outline" size={32} color={VBRAND.purple} style={{ opacity: 0.4 }} />
                       </View>
                     )}
                     {/* Caption */}
                     {img.caption ? (
-                      <Text style={{ fontSize: 11, color: '#1E1230', fontWeight: '500', padding: 8, paddingBottom: 4 }} numberOfLines={1}>{img.caption}</Text>
+                      <Text style={{ fontSize: 11, color: '#111827', fontWeight: '500', padding: 8, paddingBottom: 4 }} numberOfLines={1}>{img.caption}</Text>
                     ) : null}
                     {/* Actions */}
-                    <View style={{ flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.08)' }}>
+                    <View style={{ flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: '#E5E7EB' }}>
                       {!img.is_cover && (
                         <TouchableOpacity
                           onPress={() => handleSetCover(img.id)}
-                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRightWidth: 0.5, borderRightColor: 'rgba(123,47,190,0.08)' }}
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRightWidth: 0.5, borderRightColor: '#E5E7EB' }}
                         >
                           <Ionicons name="star-outline" size={13} color="#F59E0B" />
                           <Text style={{ fontSize: 10, fontWeight: '700', color: '#F59E0B' }}>Cover</Text>
@@ -1848,7 +1848,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
           }}
         >
           <LinearGradient
-            colors={[VBRAND.purple, VBRAND.purpleDeep]}
+            colors={[VBRAND.purpleDeep, VBRAND.purple]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
@@ -1902,8 +1902,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
           <ScrollView style={{ padding: spacing.xl }}>
             <PickerSelect label="Select Bed" value={rateBedId} options={bedPickerOptions} onSelect={setRateBedId} />
             <Input label="Monthly Rate (₹)" value={rateAmount} onChangeText={setRateAmount} placeholder="0" keyboardType="numeric" />
-            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>From Date</Text><DateField value={rateDate} onChange={setRateDate} /></View>
-            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>To Date</Text><DateField value={rateToDate} onChange={setRateToDate} /></View>
+            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>From Date</Text><DateField value={rateDate} onChange={setRateDate} /></View>
+            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>To Date</Text><DateField value={rateToDate} onChange={setRateToDate} /></View>
             <Button title="Save Rate" onPress={handleUpdateRate} loading={loading} />
           </ScrollView>
         </SafeAreaView>
@@ -1949,7 +1949,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               const totalRevenue = rows.reduce((s: number, r: any) => s + r.revenue, 0);
               const occColor = getOccupancyColor(overallPct);
               const fmtD = (d: string | null) => formatDate(d, '—');
-              const statusColor = (s: string) => s === 'Staying' ? '#2E7D32' : s === 'On-Notice' ? '#E65100' : s === 'Exited' ? '#C62828' : s === 'Booked' ? '#1565C0' : '#9B8BAE';
+              const statusColor = (s: string) => s === 'Staying' ? '#2E7D32' : s === 'On-Notice' ? '#E65100' : s === 'Exited' ? '#C62828' : s === 'Booked' ? '#1565C0' : '#9CA3AF';
 
               return (
                 <>
@@ -1962,7 +1962,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                       <View style={{ width: '100%', height: 6, backgroundColor: '#D8CCF0', borderRadius: 99, overflow: 'hidden', marginBottom: 4 }}>
                         <View style={{ height: 6, width: `${overallPct}%` as any, backgroundColor: occColor, borderRadius: 99 }} />
                       </View>
-                      <Text style={{ fontSize: 10, color: '#7B2FBE', fontWeight: '700' }}>Overall Occupancy</Text>
+                      <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>Overall Occupancy</Text>
                       <Text style={{ fontSize: 9, color: colors.textTertiary }}>{totalOccupied} / {totalDays} days</Text>
                     </View>
                     <View style={{ flex: 1, gap: 8 }}>
@@ -1983,14 +1983,14 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                       <Text style={{ fontSize: fontSize.sm, color: '#2E7D32' }}>No tenants allotted yet.</Text>
                     </View>
                   ) : rows.map((a: any, idx: number) => (
-                    <View key={a.id} style={{ backgroundColor: 'rgba(255,255,255,0.75)', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' }}>
+                    <View key={a.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#7B2FBE' }}>{idx + 1}</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>{idx + 1}</Text>
                           </View>
                           <View>
-                            <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#1E1230' }}>{a.tenants?.full_name || '—'}</Text>
+                            <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#111827' }}>{a.tenants?.full_name || '—'}</Text>
                             {a.tenants?.phone ? <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>{a.tenants.phone}</Text> : null}
                           </View>
                         </View>
@@ -1999,9 +1999,9 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                         </View>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                        <View><Text style={{ fontSize: 9, color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '600' }}>Onboarded</Text><Text style={{ fontSize: fontSize.xs, fontWeight: '600', color: '#1E1230' }}>{fmtD(a.onboarding_date)}</Text></View>
-                        <View><Text style={{ fontSize: 9, color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '600' }}>Exit</Text><Text style={{ fontSize: fontSize.xs, fontWeight: '600', color: '#1E1230' }}>{fmtD(a.actual_exit_date)}</Text></View>
-                        <View><Text style={{ fontSize: 9, color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '600' }}>Stay Days</Text><Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#7B2FBE' }}>{a.stayDays}</Text></View>
+                        <View><Text style={{ fontSize: 9, color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '600' }}>Onboarded</Text><Text style={{ fontSize: fontSize.xs, fontWeight: '600', color: '#111827' }}>{fmtD(a.onboarding_date)}</Text></View>
+                        <View><Text style={{ fontSize: 9, color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '600' }}>Exit</Text><Text style={{ fontSize: fontSize.xs, fontWeight: '600', color: '#111827' }}>{fmtD(a.actual_exit_date)}</Text></View>
+                        <View><Text style={{ fontSize: 9, color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '600' }}>Stay Days</Text><Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB' }}>{a.stayDays}</Text></View>
                         <View><Text style={{ fontSize: 9, color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '600' }}>Revenue</Text><Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2E7D32' }}>₹{a.revenue.toLocaleString('en-IN')}</Text></View>
                       </View>
                     </View>
@@ -2031,7 +2031,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
             {/* ── Period selector ──────────────────────────────────────────── */}
             <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 10, color: '#9B8BAE', fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+              <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
                 Reporting Period
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -2047,12 +2047,12 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                     onPress={() => setOccupancyPeriod(opt.value)}
                     style={{
                       paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
-                      backgroundColor: occupancyPeriod === opt.value ? '#7B2FBE' : 'rgba(255,255,255,0.7)',
+                      backgroundColor: occupancyPeriod === opt.value ? '#2563EB' : '#FFFFFF',
                       borderWidth: 1,
-                      borderColor: occupancyPeriod === opt.value ? '#7B2FBE' : 'rgba(123,47,190,0.2)',
+                      borderColor: occupancyPeriod === opt.value ? '#2563EB' : '#EFF6FF',
                     }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: occupancyPeriod === opt.value ? '#fff' : '#7B2FBE' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: occupancyPeriod === opt.value ? '#fff' : '#2563EB' }}>
                       {opt.label}
                     </Text>
                   </TouchableOpacity>
@@ -2077,12 +2077,12 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               }, 0);
               const avgPerBed = liveBedCount > 0 ? Math.round(periodRevenue / Math.max(1, liveBedCount)) : 0;
               const KPIs = [
-                { label: 'Apartments',      value: String(aptCount),                              icon: 'grid-outline',       color: '#7B2FBE', bg: '#F3E5F5' },
+                { label: 'Apartments',      value: String(aptCount),                              icon: 'grid-outline',       color: '#2563EB', bg: '#F3E5F5' },
                 { label: 'Live / Total',    value: `${liveBedCount}/${totalBedCount}`,            icon: 'bed-outline',        color: '#2E7D32', bg: '#E8F5E9' },
                 { label: 'Active Tenants',  value: String(activeTenants),                        icon: 'people-outline',     color: '#1565C0', bg: '#E3F2FD' },
                 { label: 'Occupancy',       value: `${occRate}%`,                                icon: 'stats-chart-outline',color: '#E65100', bg: '#FFF3E0' },
                 { label: 'Period Revenue',  value: `₹${periodRevenue.toLocaleString('en-IN')}`,  icon: 'cash-outline',       color: '#2E7D32', bg: '#E8F5E9' },
-                { label: 'Avg Rev / Bed',   value: `₹${avgPerBed.toLocaleString('en-IN')}`,      icon: 'trending-up-outline',color: '#7B2FBE', bg: '#F3E5F5' },
+                { label: 'Avg Rev / Bed',   value: `₹${avgPerBed.toLocaleString('en-IN')}`,      icon: 'trending-up-outline',color: '#2563EB', bg: '#F3E5F5' },
               ];
               return (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
@@ -2108,13 +2108,13 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.text, letterSpacing: -0.2 }}>
                 Apartments Summary
               </Text>
-              <Text style={{ fontSize: 11, fontWeight: '600', color: '#9B8BAE' }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#9CA3AF' }}>
                 {(apartments || []).length} total
               </Text>
             </View>
 
             {(apartments || []).length === 0 ? (
-              <View style={{ backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 12, padding: 20, alignItems: 'center' }}>
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 12, padding: 20, alignItems: 'center' }}>
                 <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>No apartments yet.</Text>
               </View>
             ) : (apartments || []).map((a: any) => {
@@ -2137,18 +2137,18 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               ).length;
               return (
                 <View key={a._id} style={{
-                  backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: 14,
-                  marginBottom: 10, borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.1)',
-                  shadowColor: '#3D1A6E', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+                  backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
+                  marginBottom: 10, borderWidth: 0.5, borderColor: '#E5E7EB',
+                  shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
                 }}>
                   {/* Top row */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E1230' }}>{a.code}</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>{a.code}</Text>
                         {genderBadge(a.label)}
                       </View>
-                      <Text style={{ fontSize: 11, color: '#9B8BAE', fontWeight: '500' }}>
+                      <Text style={{ fontSize: 11, color: '#9CA3AF', fontWeight: '500' }}>
                         {[a.type, a.floor ? `Fl ${a.floor}` : null].filter(Boolean).join(' · ') || 'No details'}
                       </Text>
                     </View>
@@ -2160,22 +2160,22 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                             <Ionicons key={s} name={s <= starBk.stars ? 'star' : 'star-outline'} size={14} color={s <= starBk.stars ? '#F59E0B' : '#D1D5DB'} />
                           ))}
                         </View>
-                        <Text style={{ fontSize: 9, color: '#9B8BAE', fontWeight: '600' }}>{starBk.composite.toFixed(0)}% score</Text>
+                        <Text style={{ fontSize: 9, color: '#9CA3AF', fontWeight: '600' }}>{starBk.composite.toFixed(0)}% score</Text>
                       </View>
                     ) : null}
                   </View>
 
                   {/* Metrics row */}
-                  <View style={{ flexDirection: 'row', gap: 0, borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.08)', paddingTop: 10 }}>
+                  <View style={{ flexDirection: 'row', gap: 0, borderTopWidth: 0.5, borderTopColor: '#E5E7EB', paddingTop: 10 }}>
                     {[
-                      { lbl: 'Beds', val: `${liveBeds.length}/${aptBedList.length}`, color: '#7B2FBE' },
+                      { lbl: 'Beds', val: `${liveBeds.length}/${aptBedList.length}`, color: '#2563EB' },
                       { lbl: 'Occupied', val: String(occupied.length), color: '#E65100' },
                       { lbl: 'Tenants', val: String(aptActiveTenants), color: '#1565C0' },
                       { lbl: 'Revenue', val: aptRevenue > 0 ? `₹${(aptRevenue/1000).toFixed(0)}k` : '₹0', color: '#2E7D32' },
                     ].map((m, i) => (
-                      <View key={m.lbl} style={{ flex: 1, alignItems: 'center', borderRightWidth: i < 3 ? 0.5 : 0, borderRightColor: 'rgba(123,47,190,0.08)' }}>
+                      <View key={m.lbl} style={{ flex: 1, alignItems: 'center', borderRightWidth: i < 3 ? 0.5 : 0, borderRightColor: '#E5E7EB' }}>
                         <Text style={{ fontSize: 14, fontWeight: '800', color: m.color }}>{m.val}</Text>
-                        <Text style={{ fontSize: 9, color: '#9B8BAE', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 }}>{m.lbl}</Text>
+                        <Text style={{ fontSize: 9, color: '#9CA3AF', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 }}>{m.lbl}</Text>
                       </View>
                     ))}
                   </View>
@@ -2205,13 +2205,13 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
         <SafeAreaView style={{ flex: 1 }}>
           {/* Header with gradient */}
           <LinearGradient
-            colors={['#7B2FBE', '#3D1A6E']}
+            colors={['#1D4ED8', '#2563EB']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 20 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
+                <Text style={{ fontSize: 10, color: '#FFFFFF', fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
                   KYC Registration
                 </Text>
                 <Text style={{ fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: -0.4 }} numberOfLines={1}>
@@ -2220,7 +2220,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               </View>
               <TouchableOpacity
                 onPress={() => setKycQrOpen(false)}
-                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 36, height: 36, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}
               >
                 <Ionicons name="close" size={20} color="#fff" />
               </TouchableOpacity>
@@ -2236,21 +2236,21 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               if (!kycQrCode) {
                 return (
                   <View style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
-                    <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: 'rgba(123,47,190,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)' }}>
-                      <Ionicons name="qr-code-outline" size={36} color="#7B2FBE" />
+                    <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                      <Ionicons name="qr-code-outline" size={36} color="#6366F1" />
                     </View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E1230', textAlign: 'center' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', textAlign: 'center' }}>
                       No KYC QR Issued Yet
                     </Text>
-                    <Text style={{ fontSize: 13, color: '#9B8BAE', textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 }}>
+                    <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 }}>
                       {"Generate a KYC QR code from the web app dashboard.\nGo to Properties > select this property > tap KYC QR."}
                     </Text>
-                    <View style={{ backgroundColor: 'rgba(123,47,190,0.06)', borderRadius: 14, padding: 14, width: '100%', borderWidth: 1, borderColor: 'rgba(123,47,190,0.12)' }}>
+                    <View style={{ backgroundColor: '#EFF6FF', borderRadius: 14, padding: 14, width: '100%', borderWidth: 1, borderColor: '#E5E7EB' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Ionicons name="information-circle-outline" size={16} color="#7B2FBE" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#7B2FBE' }}>How it works</Text>
+                        <Ionicons name="information-circle-outline" size={16} color="#6366F1" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>How it works</Text>
                       </View>
-                      <Text style={{ fontSize: 11, color: '#5C4E70', marginTop: 6, lineHeight: 18 }}>
+                      <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 6, lineHeight: 18 }}>
                         The KYC QR links tenants to a secure registration form. Once issued via the web app, the QR appears here and can be shared or printed.
                       </Text>
                     </View>
@@ -2261,18 +2261,18 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               return (
                 <>
                   {/* QR Code card */}
-                  <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 16, borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.1)', shadowColor: '#3D1A6E', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }}>
+                  <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 20, alignItems: 'center', marginBottom: 16, borderWidth: 0.5, borderColor: '#E5E7EB', shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }}>
                     <QRCodeStyled
                       data={kycUrl}
                       style={{ width: 220, height: 220 }}
                       padding={10}
                       pieceSize={7}
-                      color="#1E1230"
+                      color="#111827"
                       outerEyesOptions={{ topLeft: { borderRadius: 12 }, topRight: { borderRadius: 12 }, bottomLeft: { borderRadius: 12 } }}
                       innerEyesOptions={{ borderRadius: 6 }}
                     />
                     <View style={{ marginTop: 12, alignItems: 'center', gap: 2 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', letterSpacing: -0.2 }}>{propertyName}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', letterSpacing: -0.2 }}>{propertyName}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
                         <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>KYC QR Active</Text>
@@ -2281,11 +2281,11 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                   </View>
 
                   {/* URL display */}
-                  <View style={{ backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.1)' }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#9B8BAE', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>
+                  <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 0.5, borderColor: '#E5E7EB' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>
                       KYC Registration URL
                     </Text>
-                    <Text style={{ fontSize: 11, color: '#5C4E70', lineHeight: 18, fontWeight: '500' }} selectable>
+                    <Text style={{ fontSize: 11, color: '#6B7280', lineHeight: 18, fontWeight: '500' }} selectable>
                       {kycUrl}
                     </Text>
                   </View>
@@ -2297,11 +2297,11 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                         await Clipboard.setStringAsync(kycUrl);
                         Alert.alert('Copied', 'KYC URL copied to clipboard.');
                       }}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)' }}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EFF6FF', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: '#E5E7EB' }}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="copy-outline" size={18} color="#7B2FBE" />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#7B2FBE' }}>Copy URL</Text>
+                      <Ionicons name="copy-outline" size={18} color="#6366F1" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Copy URL</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -2309,8 +2309,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(232,132,26,0.08)', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(232,132,26,0.25)' }}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="share-outline" size={18} color="#E8841A" />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#E8841A' }}>Share</Text>
+                      <Ionicons name="share-outline" size={18} color="#6366F1" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Share</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -2321,7 +2321,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                     style={{ borderRadius: 14, overflow: 'hidden' }}
                   >
                     <LinearGradient
-                      colors={['#7B2FBE', '#E8841A']}
+                      colors={['#2563EB', '#2563EB']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15 }}
                     >
@@ -2331,9 +2331,9 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                   </TouchableOpacity>
 
                   {/* Info note */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14, padding: 12, backgroundColor: 'rgba(123,47,190,0.04)', borderRadius: 12, borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.1)' }}>
-                    <Ionicons name="shield-checkmark-outline" size={14} color="#7B2FBE" style={{ marginTop: 1 }} />
-                    <Text style={{ flex: 1, fontSize: 11, color: '#9B8BAE', lineHeight: 17, fontWeight: '500' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14, padding: 12, backgroundColor: '#EFF6FF', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB' }}>
+                    <Ionicons name="shield-checkmark-outline" size={14} color="#6366F1" style={{ marginTop: 1 }} />
+                    <Text style={{ flex: 1, fontSize: 11, color: '#9CA3AF', lineHeight: 17, fontWeight: '500' }}>
                       This QR token is static and secure — it does not expose the raw property ID. Rotate the QR from the web app if needed.
                     </Text>
                   </View>
@@ -2370,8 +2370,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               placeholder="e.g. 8000"
               keyboardType="numeric"
             />
-            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>From Date</Text><DateField value={editRateFrom} onChange={setEditRateFrom} /></View>
-            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>To Date</Text><DateField value={editRateTo} onChange={setEditRateTo} /></View>
+            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>From Date</Text><DateField value={editRateFrom} onChange={setEditRateFrom} /></View>
+            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>To Date</Text><DateField value={editRateTo} onChange={setEditRateTo} /></View>
           </ScrollView>
         </SafeAreaView>
         </GlassBackground>
@@ -2417,7 +2417,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                     </View>
                   </TouchableOpacity>
                   {expanded ? (
-                    <View style={{ paddingHorizontal: 12, paddingBottom: 12, gap: 4, borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.08)', paddingTop: 10 }}>
+                    <View style={{ paddingHorizontal: 12, paddingBottom: 12, gap: 4, borderTopWidth: 0.5, borderTopColor: '#E5E7EB', paddingTop: 10 }}>
                       {([
                         ['Type', row.typeName],
                         ['Brand / Model', [row.brand, row.model].filter(Boolean).join(' ') || '—'],
@@ -2441,7 +2441,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
             const empty = (icon: any, title: string, sub: string) => (
               <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                   <Ionicons name={icon} size={26} color={VBRAND.purple} />
                 </View>
                 <Text style={{ fontSize: 14, fontWeight: '800', color: VBRAND.ink900 }}>{title}</Text>
@@ -2463,7 +2463,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                 </View>
 
                 {/* Total value */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.1)' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }}>
                   <View>
                     <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.ink700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Total Asset Value</Text>
                     <Text style={{ fontSize: 11, color: VBRAND.ink400, marginTop: 2 }}>{nowData.count} assets</Text>
@@ -2544,7 +2544,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
             {/* Format badges */}
             <View style={{ flexDirection: 'row', gap: 6, marginBottom: 20, marginTop: 4 }}>
               {['JPG', 'PNG', 'WEBP'].map(fmt => (
-                <View key={fmt} style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <View key={fmt} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: VBRAND.purple }}>{fmt}</Text>
                 </View>
               ))}
@@ -2635,9 +2635,9 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
             <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purple, letterSpacing: 0.5, marginTop: 8, marginBottom: 10, textTransform: 'uppercase' }}>Contract Dates</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Signing Date</Text><DateField value={editAptForm.signing_date || ''} onChange={v => setEditAptForm({ ...editAptForm, signing_date: v })} /></View></View>
-              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Active Date</Text><DateField value={editAptForm.start_date || ''} onChange={v => setEditAptForm({ ...editAptForm, start_date: v })} /></View></View>
-              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>End Date</Text><DateField value={editAptForm.end_date || ''} onChange={v => setEditAptForm({ ...editAptForm, end_date: v })} /></View></View>
+              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Signing Date</Text><DateField value={editAptForm.signing_date || ''} onChange={v => setEditAptForm({ ...editAptForm, signing_date: v })} /></View></View>
+              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Active Date</Text><DateField value={editAptForm.start_date || ''} onChange={v => setEditAptForm({ ...editAptForm, start_date: v })} /></View></View>
+              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>End Date</Text><DateField value={editAptForm.end_date || ''} onChange={v => setEditAptForm({ ...editAptForm, end_date: v })} /></View></View>
             </View>
 
             <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purple, letterSpacing: 0.5, marginTop: 8, marginBottom: 10, textTransform: 'uppercase' }}>EB (Electricity) Details</Text>
@@ -2685,9 +2685,9 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
             <PickerSelect label="Status" value={aptFormFull.status} options={STATUS_OPTS} onSelect={v => setAptFormFull({ ...aptFormFull, status: v })} />
             {/* Dates */}
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Signing Date</Text><DateField value={aptFormFull.signing_date} onChange={v => setAptFormFull({ ...aptFormFull, signing_date: v })} /></View></View>
-              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Active Date</Text><DateField value={aptFormFull.start_date} onChange={v => setAptFormFull({ ...aptFormFull, start_date: v })} /></View></View>
-              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>End Date</Text><DateField value={aptFormFull.end_date} onChange={v => setAptFormFull({ ...aptFormFull, end_date: v })} /></View></View>
+              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Signing Date</Text><DateField value={aptFormFull.signing_date} onChange={v => setAptFormFull({ ...aptFormFull, signing_date: v })} /></View></View>
+              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Active Date</Text><DateField value={aptFormFull.start_date} onChange={v => setAptFormFull({ ...aptFormFull, start_date: v })} /></View></View>
+              <View style={{ flex: 1 }}><View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>End Date</Text><DateField value={aptFormFull.end_date} onChange={v => setAptFormFull({ ...aptFormFull, end_date: v })} /></View></View>
             </View>
             {/* EB Connection */}
             <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginTop: 12, marginBottom: 6 }}>EB Connection Details</Text>
@@ -2738,98 +2738,96 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 18, paddingTop: 8, paddingBottom: 14,
   },
-  title: { fontSize: 20, fontWeight: '900', color: '#1E1230', letterSpacing: -0.4 },
+  title: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 10, paddingHorizontal: 2,
   },
   sectionTitle: {
-    fontSize: 12, fontWeight: '800', color: '#7B6B90',
+    fontSize: 12, fontWeight: '800', color: '#9CA3AF',
     letterSpacing: 1, textTransform: 'uppercase',
   },
   addSmall: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(123,47,190,0.08)',
+    backgroundColor: '#EFF6FF',
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
-    borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.2)',
+    borderWidth: 0.5, borderColor: '#E5E7EB',
   },
-  // Unified glass card surface
+  // Unified white panel card
   card: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 0.5,
-    borderColor: 'rgba(123,47,190,0.08)',
-    shadowColor: '#3D1A6E',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  cardCode: { fontSize: 11, fontWeight: '800', color: '#7B2FBE', marginBottom: 2, letterSpacing: 0.4 },
-  cardTitle: { fontSize: 15, fontWeight: '800', color: '#1E1230', letterSpacing: -0.2 },
-  cardSub: { fontSize: 12, fontWeight: '500', color: '#7B6B90' },
+  cardCode: { fontSize: 11, fontWeight: '800', color: '#2563EB', marginBottom: 2, letterSpacing: 0.4 },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: '#111827', letterSpacing: -0.2 },
+  cardSub: { fontSize: 12, fontWeight: '500', color: '#9CA3AF' },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 18, paddingVertical: 14,
-    borderBottomWidth: 0.5, borderBottomColor: 'rgba(123,47,190,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.65)',
+    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
-  modalCancel: { fontSize: 14, fontWeight: '600', color: '#9B8BAE' },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: '#1E1230', letterSpacing: -0.2 },
+  modalCancel: { fontSize: 14, fontWeight: '600', color: '#9CA3AF' },
+  modalTitle: { fontSize: 16, fontWeight: '800', color: '#111827', letterSpacing: -0.2 },
   modalContent: { padding: 18, paddingBottom: 40 },
   // Segmented control
   viewToggle: {
     marginBottom: 16,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.1)',
-    shadowColor: '#3D1A6E', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    borderWidth: 0.5, borderColor: '#E5E7EB',
+    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
   },
   toggleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 10,
   },
   toggleBtnActive: {
-    backgroundColor: '#7B2FBE',
-    shadowColor: '#7B2FBE', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
+    backgroundColor: '#EFF6FF',
   },
-  toggleText: { fontSize: 12, fontWeight: '700', color: '#7B2FBE', letterSpacing: 0.2 },
-  toggleTextActive: { color: '#fff' },
+  toggleText: { fontSize: 12, fontWeight: '700', color: '#6B7280', letterSpacing: 0.2 },
+  toggleTextActive: { color: '#1D4ED8' },
   aptMetrics: {
     flexDirection: 'row', gap: 14, marginTop: 12,
-    paddingTop: 12, borderTopWidth: 0.5, borderTopColor: 'rgba(123,47,190,0.08)',
+    paddingTop: 12, borderTopWidth: 0.5, borderTopColor: '#E5E7EB',
     flexWrap: 'wrap',
   },
   aptMetric: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  aptMetricText: { fontSize: 12, fontWeight: '800', color: '#1E1230', letterSpacing: -0.1 },
-  aptMetricSub: { fontSize: 11, fontWeight: '600', color: '#9B8BAE' },
+  aptMetricText: { fontSize: 12, fontWeight: '800', color: '#111827', letterSpacing: -0.1 },
+  aptMetricSub: { fontSize: 11, fontWeight: '600', color: '#9CA3AF' },
   // Refined search pill
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.78)', borderRadius: 14,
+    backgroundColor: '#FFFFFF', borderRadius: 999,
     paddingHorizontal: 14, height: 46,
-    borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.12)',
-    shadowColor: '#3D1A6E', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1, borderColor: '#E5E7EB',
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#1E1230', height: 46, fontWeight: '500' },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827', height: 46, fontWeight: '500' },
   codeBadge: {
-    backgroundColor: 'rgba(123,47,190,0.1)',
+    backgroundColor: '#EFF6FF',
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999,
-    borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.18)',
+    borderWidth: 0.5, borderColor: '#E5E7EB',
   },
-  codeBadgeText: { fontSize: 11, fontWeight: '800', color: '#3D1A6E', letterSpacing: 0.4 },
+  codeBadgeText: { fontSize: 11, fontWeight: '800', color: '#1D4ED8', letterSpacing: 0.4 },
   rateTag: {
-    backgroundColor: 'rgba(123,47,190,0.06)',
+    backgroundColor: '#EFF6FF',
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999,
-    borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.12)',
+    borderWidth: 0.5, borderColor: '#E5E7EB',
   },
-  rateTagText: { fontSize: 11, fontWeight: '700', color: '#5C4E70', textTransform: 'capitalize', letterSpacing: 0.2 },
+  rateTagText: { fontSize: 11, fontWeight: '700', color: '#6B7280', textTransform: 'capitalize', letterSpacing: 0.2 },
   fab: {
     position: 'absolute', bottom: 24, right: 20, width: 58, height: 58,
-    borderRadius: 29, backgroundColor: '#7B2FBE',
+    borderRadius: 29, backgroundColor: '#2563EB',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#7B2FBE', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10,
+    shadowColor: '#0F172A', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
 });

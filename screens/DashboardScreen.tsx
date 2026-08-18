@@ -1,82 +1,92 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, RefreshControl, TouchableOpacity,
-  Dimensions, Image, Animated, StyleSheet, Modal, PanResponder,
-  TouchableWithoutFeedback, TextInput, ActivityIndicator, Platform, StatusBar,
+  Dimensions, Image, Animated, StyleSheet, Modal,
+  TouchableWithoutFeedback, ActivityIndicator, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, RadialGradient as SvgRadialGradient, Stop, Rect } from 'react-native-svg';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
-import { useTheme } from '../lib/ThemeContext';
-import { spacing, fontSize, borderRadius, glass } from '../lib/theme';
-import { StatCard, LoadingScreen, GlassBackground, DateField } from '../components/shared';
-import { formatDate } from '../lib/dateUtils';
+import { spacing, fontSize, mobile, colors as themeColors, shadows } from '../lib/theme';
+import { LoadingScreen, DateField } from '../components/shared';
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerActions, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useMountedRef, isAbortError } from '../lib/safeAsync';
-import { fetchTickets, STATUS_CONFIG, PRIORITY_CONFIG } from '../services/ticketService';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { fetchTickets } from '../services/ticketService';
 import { client, api } from '../lib/convexApi';
 import { getHeroMonthly, getDuesTotals, getTenantPunctuality } from '../lib/dashboardMetrics';
 import { useQuery } from '@tanstack/react-query';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// ─── Brand palette (Vishful) ─────────────────────────────────────────────────
-const BRAND = {
-  purple: '#7B2FBE',
-  purpleDeep: '#3D1A6E',
-  orange: '#E8841A',
-  ink900: '#1E1230',
-  ink500: '#7B6B90',
-  ink400: '#9B8BAE',
-  ink300: '#BFB1CE',
-  surface: '#FAF7FC',
-  panel: 'rgba(255,255,255,0.78)',
-  panelBorder: 'rgba(255,255,255,0.55)',
-  divider: 'rgba(224,213,234,0.4)',
+// ─── Tokens (web dashboard parity) ───────────────────────────────────────────
+const DASH = {
+  bg: '#FFFFFF',
+  ink: '#0F172A',
+  ink2: '#64748B',
+  ink3: '#94A3B8',
+  indigo: '#4F46E5',
+  brandSub: '#556274',
+  blue: '#1856FF',
+  blueInk: '#1240C7',
+  blueSoft: '#EEF3FF',
+  line: '#E2E8F0',
+  panelBorder: '#DFE6F3',
+  good: '#16A34A',
+  goodBg: '#DCFCE7',
+  warn: '#EA580C',
+  warnBg: '#FFEDD5',
+  bad: '#DC2626',
+  badBg: '#FEE2E2',
+  ok: '#CA8A04',
+  soft: '#F8FAFC',
+  finHero: '#F0F4FC',
+  attnDark: '#2449BD',
+  padX: 16,
 };
 
-// ─── Dusk identity (shared with LoginScreen) — the twilight header band ────────
-const DUSK = {
-  plumNight: '#1C0E36',
-  plumMid:   '#2C1751',
-  duskMauve: '#45256E',
-  ember:     '#F0871E',
-  emberGlow: '#FFC073',
-  warmWhite: '#FBF4EC',
-  mauveHaze: '#C6B4DE',
-  mauveDim:  '#9A88B6',
+const BRAND = {
+  purple: mobile.accent,
+  purpleDeep: mobile.brandDeep,
+  orange: mobile.accentStrong,
+  ink900: themeColors.text,
+  ink500: themeColors.textSecondary,
+  ink400: themeColors.textTertiary,
+  ink300: '#CBD5E1',
+  surface: themeColors.background,
+  panel: themeColors.surface,
+  panelBorder: themeColors.border,
+  divider: themeColors.border,
+  soft: mobile.brandSoft,
 };
-const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
-const BAND_H = 470; // height of the twilight band that fades into the light canvas
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtINR(n: number): string {
   if (Math.abs(n) >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (Math.abs(n) >= 1000)   return `₹${(n / 1000).toFixed(1)}k`;
+  if (Math.abs(n) >= 1000) return `₹${(n / 1000).toFixed(1)}k`;
   return `₹${n.toLocaleString('en-IN')}`;
 }
 
-function todayLabel(): string {
-  return new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short' });
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function greetingName(name?: string): string {
-  if (!name) return 'there';
-  return String(name).split(' ')[0];
+function timeGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning.';
+  if (h < 17) return 'Good afternoon.';
+  return 'Good evening.';
 }
 
-// ─── Period presets (match web AccountingPeriodSelector full list) ────────────
+/** Web period presets (+ custom for mobile power users). */
 const PERIODS: { key: string; label: string }[] = [
-  { key: 'current_fy',     label: 'Current FY' },
-  { key: 'last_fy',        label: 'Last FY' },
-  { key: 'last_2fy',       label: 'Last 2 FYs' },
-  { key: 'last_5y',        label: 'Last 5 Years' },
-  { key: 'from_beginning', label: 'Since Beginning' },
-  { key: 'custom',         label: 'Custom Range' },
+  { key: 'current_fy', label: 'Current FY' },
+  { key: 'last_fy', label: 'Last FY' },
+  { key: 'last_6m', label: 'Last 6 months' },
+  { key: 'this_month', label: 'This month' },
+  { key: 'custom', label: 'Custom Range' },
 ];
+
 function periodLabel(key: string, from?: string, to?: string): string {
   if (key === 'custom') {
     if (from && to) {
@@ -89,26 +99,106 @@ function periodLabel(key: string, from?: string, to?: string): string {
   return PERIODS.find(p => p.key === key)?.label || 'Current FY';
 }
 
-// ─── Section label ────────────────────────────────────────────────────────────
-function SectionLabel({ children, action }: { children: string; action?: React.ReactNode }) {
+/** Map UI period keys to API args (Convex + punctuality RPC). */
+function toApiPeriod(period: string, customFrom: string, customTo: string) {
+  const today = new Date();
+  if (period === 'this_month') {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { period: 'custom', customFrom: ymd(from), customTo: ymd(today) };
+  }
+  if (period === 'last_6m') {
+    const from = new Date(today);
+    from.setMonth(from.getMonth() - 6);
+    return { period: 'custom', customFrom: ymd(from), customTo: ymd(today) };
+  }
+  return { period, customFrom, customTo };
+}
+
+// ─── Panel chrome ────────────────────────────────────────────────────────────
+function Panel({
+  title, right, children, darkHead,
+}: {
+  title: string; right?: string; children: React.ReactNode; darkHead?: boolean;
+}) {
   return (
-    <View style={styles.sectionH}>
-      <Text style={styles.sectionTitle}>{children}</Text>
-      {action ? <View>{action}</View> : null}
+    <View style={[styles.panel, darkHead && styles.panelAttention]}>
+      {darkHead ? (
+        <LinearGradient
+          colors={['#6D28D9', '#2449BD'] as const}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.panelHeadDark}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="alert-circle" size={16} color="#fff" />
+            <Text style={styles.panelTitleDark}>{title}</Text>
+          </View>
+        </LinearGradient>
+      ) : (
+        <View style={styles.panelHead}>
+          <Text style={styles.panelTitle}>{title}</Text>
+          {right ? <Text style={styles.panelRight}>{right}</Text> : null}
+        </View>
+      )}
+      <View style={styles.panelBody}>{children}</View>
     </View>
   );
 }
 
-// ─── Card wrapper ─────────────────────────────────────────────────────────────
-function DashCard({ children, style }: { children: React.ReactNode; style?: object }) {
-  return <View style={[styles.dashCard, style]}>{children}</View>;
+function OccupancyRing({ pct, size = 88 }: { pct: number; size?: number }) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const stroke = 8;
+  const inner = size - stroke * 2;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          position: 'absolute', width: size, height: size, borderRadius: size / 2,
+          borderWidth: stroke, borderColor: '#E8EEF8',
+        }}
+      />
+      {/* Approximate ring using 4 arcs via border colors */}
+      <View
+        style={{
+          position: 'absolute', width: size, height: size, borderRadius: size / 2,
+          borderWidth: stroke,
+          borderTopColor: clamped > 12 ? DASH.blue : '#E8EEF8',
+          borderRightColor: clamped > 37 ? DASH.blue : '#E8EEF8',
+          borderBottomColor: clamped > 62 ? DASH.blue : '#E8EEF8',
+          borderLeftColor: clamped > 87 ? DASH.blue : '#E8EEF8',
+          transform: [{ rotate: '-45deg' }],
+        }}
+      />
+      <View
+        style={{
+          width: inner, height: inner, borderRadius: inner / 2,
+          backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: 22, fontWeight: '800', color: DASH.ink, letterSpacing: -0.5 }}>
+          {clamped}%
+        </Text>
+      </View>
+    </View>
+  );
 }
 
-function CardTitle({ icon, children }: { icon: any; children: string }) {
+function MiniSpark({ values }: { values: number[] }) {
+  if (!values.length) return null;
+  const max = Math.max(...values, 1);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-      <Ionicons name={icon} size={15} color={BRAND.purple} />
-      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: BRAND.ink900 }}>{children}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 36 }}>
+      {values.map((v, i) => (
+        <View
+          key={i}
+          style={{
+            width: 6,
+            height: Math.max(4, (v / max) * 36),
+            borderRadius: 3,
+            backgroundColor: i === values.length - 1 ? DASH.blue : '#A5B4FC',
+          }}
+        />
+      ))}
     </View>
   );
 }
@@ -143,23 +233,23 @@ function Tooltip({ label, value, x, y, visible }: { label: string; value: string
     >
       <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{value}</Text>
       <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{label}</Text>
-      <View style={{ position: 'absolute', bottom: -5, left: 36 - 5, width: 10, height: 10,
-        backgroundColor: BRAND.purpleDeep, transform: [{ rotate: '45deg' }], borderRadius: 2 }} />
+      <View style={{
+        position: 'absolute', bottom: -5, left: 36 - 5, width: 10, height: 10,
+        backgroundColor: BRAND.purpleDeep, transform: [{ rotate: '45deg' }], borderRadius: 2,
+      }} />
     </Animated.View>
   );
 }
 
-// ─── Mini bar chart — animated + interactive ─────────────────────────────────
+// ─── Mini bar chart ──────────────────────────────────────────────────────────
 function MiniBarChart({
   data, valueKey, color = BRAND.orange, height = 72,
 }: { data: { label: string; [k: string]: any }[]; valueKey: string; color?: string; height?: number }) {
   const anims = useRef(data.map(() => new Animated.Value(0))).current;
   const [tooltip, setTooltip] = useState<{ idx: number; x: number; y: number } | null>(null);
-  const containerRef = useRef<View>(null);
 
   useEffect(() => {
     if (!data || data.length === 0) return;
-    // Staggered bar grow-in animation
     Animated.stagger(60, anims.map(a =>
       Animated.spring(a, { toValue: 1, useNativeDriver: false, speed: 14, bounciness: 6 })
     )).start();
@@ -167,17 +257,15 @@ function MiniBarChart({
 
   if (!data || data.length === 0) return null;
   const max = Math.max(...data.map((d) => d[valueKey] || 0), 1);
-
   const BAR_WIDTH_RATIO = 0.62;
 
   return (
-    <View ref={containerRef} style={{ position: 'relative' }}>
+    <View style={{ position: 'relative' }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', height, gap: 8, paddingHorizontal: 4 }}>
         {data.map((d, i) => {
-          const pct    = (d[valueKey] || 0) / max;
+          const pct = (d[valueKey] || 0) / max;
           const isPeak = pct > 0.85;
-          const barH   = Math.max(4, pct * height * 0.9);
-
+          const barH = Math.max(4, pct * height * 0.9);
           const animatedH = anims[i]?.interpolate({
             inputRange: [0, 1], outputRange: [0, barH],
           }) ?? barH;
@@ -187,16 +275,7 @@ function MiniBarChart({
               key={i}
               activeOpacity={0.85}
               style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}
-              onPress={(e) => {
-                const tx = e.nativeEvent.pageX;
-                const ty = e.nativeEvent.pageY;
-                containerRef.current?.measure((_fx, _fy, _w, _h, px, py) => {
-                  setTooltip(tooltip?.idx === i ? null : {
-                    idx: i,
-                    x: (i + 0.5) * ((SCREEN_WIDTH - 80) / data.length),
-                    y: height - barH - 8,
-                  });
-                });
+              onPress={() => {
                 setTooltip(prev => prev?.idx === i ? null : {
                   idx: i,
                   x: (i + 0.5) * ((SCREEN_WIDTH - 80) / data.length),
@@ -221,7 +300,6 @@ function MiniBarChart({
           );
         })}
       </View>
-      {/* Tooltip */}
       {tooltip !== null && (
         <Tooltip
           visible
@@ -233,7 +311,16 @@ function MiniBarChart({
       )}
       <View style={{ flexDirection: 'row', marginTop: 6, paddingHorizontal: 4 }}>
         {data.map((d, i) => (
-          <Text key={i} style={{ flex: 1, fontSize: 10, color: tooltip?.idx === i ? BRAND.purple : BRAND.ink400, fontWeight: tooltip?.idx === i ? '800' : '600', textAlign: 'center' }} numberOfLines={1}>
+          <Text
+            key={i}
+            style={{
+              flex: 1, fontSize: 10,
+              color: tooltip?.idx === i ? BRAND.purple : BRAND.ink400,
+              fontWeight: tooltip?.idx === i ? '800' : '600',
+              textAlign: 'center',
+            }}
+            numberOfLines={1}
+          >
             {d.label}
           </Text>
         ))}
@@ -242,11 +329,11 @@ function MiniBarChart({
   );
 }
 
-// ─── Mini line chart — animated + interactive ─────────────────────────────────
+// ─── Mini line chart ─────────────────────────────────────────────────────────
 function MiniLineChart({
   data, valueKey, color = BRAND.purple, height = 60,
 }: { data: { label: string; [k: string]: any }[]; valueKey: string; color?: string; height?: number }) {
-  const drawAnim    = useRef(new Animated.Value(0)).current;
+  const drawAnim = useRef(new Animated.Value(0)).current;
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   useEffect(() => {
@@ -257,40 +344,37 @@ function MiniLineChart({
 
   if (!data || data.length < 2) return null;
 
-  const max    = Math.max(...data.map((d) => d[valueKey] || 0), 1);
-  const min    = Math.min(...data.map((d) => d[valueKey] || 0));
-  const range  = Math.max(max - min, 1);
-  const W      = SCREEN_WIDTH - 80;
-  const step   = W / Math.max(data.length - 1, 1);
-  const THICK  = 2.5;
-  const DOT_R  = 5;
-
+  const max = Math.max(...data.map((d) => d[valueKey] || 0), 1);
+  const min = Math.min(...data.map((d) => d[valueKey] || 0));
+  const range = Math.max(max - min, 1);
+  const W = SCREEN_WIDTH - 80;
+  const step = W / Math.max(data.length - 1, 1);
+  const THICK = 2.5;
+  const DOT_R = 5;
   const yFor = (val: number) => height - ((val - min) / range) * height * 0.85;
 
   const segments = data.slice(1).map((d, i) => {
-    const x1  = i * step;
-    const y1  = yFor(data[i][valueKey] || 0);
-    const x2  = (i + 1) * step;
-    const y2  = yFor(d[valueKey] || 0);
-    const dx  = x2 - x1;
-    const dy  = y2 - y1;
+    const x1 = i * step;
+    const y1 = yFor(data[i][valueKey] || 0);
+    const x2 = (i + 1) * step;
+    const y2 = yFor(d[valueKey] || 0);
+    const dx = x2 - x1;
+    const dy = y2 - y1;
     const len = Math.sqrt(dx * dx + dy * dy);
     const ang = Math.atan2(dy, dx) * (180 / Math.PI);
-    const cx  = (x1 + x2) / 2 - len / 2;
-    const cy  = (y1 + y2) / 2 - THICK / 2;
-    return { x1, y1, x2, y2, len, ang, cx, cy, idx: i };
+    const cx = (x1 + x2) / 2 - len / 2;
+    const cy = (y1 + y2) / 2 - THICK / 2;
+    return { len, ang, cx, cy, idx: i };
   });
 
   return (
     <View style={{ height: height + 24 }}>
       <View style={{ height, position: 'relative' }}>
-
-        {/* Animated line segments */}
         {segments.map((s, i) => {
           const segStart = i / segments.length;
-          const segEnd   = (i + 1) / segments.length;
-          const opacity  = drawAnim.interpolate({
-            inputRange:  [segStart, Math.min(segEnd, 1)],
+          const segEnd = (i + 1) / segments.length;
+          const opacity = drawAnim.interpolate({
+            inputRange: [segStart, Math.min(segEnd, 1)],
             outputRange: [0, 1],
             extrapolate: 'clamp',
           });
@@ -308,11 +392,9 @@ function MiniLineChart({
             />
           );
         })}
-
-        {/* Tappable dots */}
         {data.map((d, i) => {
-          const x   = i * step;
-          const y   = yFor(d[valueKey] || 0);
+          const x = i * step;
+          const y = yFor(d[valueKey] || 0);
           const active = activeIdx === i;
           return (
             <TouchableOpacity
@@ -322,8 +404,8 @@ function MiniLineChart({
               style={{
                 position: 'absolute',
                 left: x - DOT_R * (active ? 1.6 : 1),
-                top:  y - DOT_R * (active ? 1.6 : 1),
-                width:  DOT_R * (active ? 3.2 : 2),
+                top: y - DOT_R * (active ? 1.6 : 1),
+                width: DOT_R * (active ? 3.2 : 2),
                 height: DOT_R * (active ? 3.2 : 2),
                 borderRadius: DOT_R * (active ? 1.6 : 1),
                 backgroundColor: active ? BRAND.orange : color,
@@ -334,8 +416,6 @@ function MiniLineChart({
             />
           );
         })}
-
-        {/* Tooltip for active dot */}
         {activeIdx !== null && (
           <Tooltip
             visible
@@ -346,7 +426,6 @@ function MiniLineChart({
           />
         )}
       </View>
-
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
         {data.map((d, i) => (
           <Text key={i} style={{ fontSize: 9, color: activeIdx === i ? BRAND.purple : BRAND.ink400, fontWeight: activeIdx === i ? '800' : '600' }}>
@@ -355,135 +434,6 @@ function MiniLineChart({
         ))}
       </View>
     </View>
-  );
-}
-
-// ─── Notification Modal ───────────────────────────────────────────────────────
-function NotificationModal({
-  visible, onClose, announcements,
-}: { visible: boolean; onClose: () => void; announcements: any[] }) {
-  const slideAnim = useRef(new Animated.Value(300)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, speed: 18, bounciness: 4 }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 300, duration: 220, useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
-
-  const PRIORITY_BADGE: Record<string, { bg: string; color: string; icon: string }> = {
-    urgent:    { bg: '#FEE2E2', color: '#DC2626', icon: 'alert-circle' },
-    important: { bg: '#FEF3C7', color: '#D97706', icon: 'warning' },
-    normal:    { bg: '#EDE9FE', color: '#7B2FBE', icon: 'information-circle' },
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', opacity: fadeAnim }}>
-          <TouchableWithoutFeedback>
-            <Animated.View
-              style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                backgroundColor: '#FAF7FC',
-                borderTopLeftRadius: 24, borderTopRightRadius: 24,
-                maxHeight: '80%',
-                transform: [{ translateY: slideAnim }],
-                shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 12,
-              }}
-            >
-              {/* Handle */}
-              <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
-                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(123,47,190,0.2)' }} />
-              </View>
-
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="notifications" size={18} color={BRAND.purple} />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND.ink900 }}>Notifications</Text>
-                    <Text style={{ fontSize: 11, color: BRAND.ink400 }}>
-                      {announcements.length} announcement{announcements.length !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={onClose}
-                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Ionicons name="close" size={18} color={BRAND.ink500} />
-                </TouchableOpacity>
-              </View>
-
-              {/* List */}
-              <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
-                showsVerticalScrollIndicator={false}
-              >
-                {announcements.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingTop: 48 }}>
-                    <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                      <Ionicons name="notifications-off-outline" size={28} color={BRAND.purple} />
-                    </View>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND.ink900 }}>All caught up!</Text>
-                    <Text style={{ fontSize: 13, color: BRAND.ink400, marginTop: 4 }}>No announcements right now.</Text>
-                  </View>
-                ) : announcements.map((a: any, i: number) => {
-                  const cfg = PRIORITY_BADGE[a.priority] || PRIORITY_BADGE.normal;
-                  return (
-                    <View
-                      key={a.id || i}
-                      style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 16, padding: 14,
-                        borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)',
-                        shadowColor: BRAND.purple, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: cfg.bg, alignItems: 'center', justifyContent: 'center' }}>
-                          <Ionicons name={cfg.icon as any} size={16} color={cfg.color} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <View style={{ backgroundColor: cfg.bg, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 }}>
-                              <Text style={{ fontSize: 9, fontWeight: '800', color: cfg.color, letterSpacing: 0.4 }}>
-                                {(a.priority || 'normal').toUpperCase()}
-                              </Text>
-                            </View>
-                            {a.published_at && (
-                              <Text style={{ fontSize: 10, color: BRAND.ink400 }}>
-                                {formatDate(a.published_at, '')}
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND.ink900, marginBottom: 4 }}>{a.title}</Text>
-                      {!!a.content && (
-                        <Text style={{ fontSize: 13, color: BRAND.ink500, lineHeight: 18 }}>{a.content}</Text>
-                      )}
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            </Animated.View>
-          </TouchableWithoutFeedback>
-        </Animated.View>
-      </TouchableWithoutFeedback>
-    </Modal>
   );
 }
 
@@ -517,14 +467,11 @@ function PeriodModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 28 }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 28 }}>
           <TouchableWithoutFeedback>
-            <View style={{ backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND.ink900 }}>Select Period</Text>
-                <TouchableOpacity onPress={onClose} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="close" size={16} color={BRAND.ink500} />
-                </TouchableOpacity>
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', maxWidth: 320, alignSelf: 'center', width: '100%' }}>
+              <View style={{ backgroundColor: '#1D4ED8', paddingHorizontal: 16, paddingVertical: 12 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Period</Text>
               </View>
 
               {!showCustom ? (
@@ -533,33 +480,43 @@ function PeriodModal({
                     <TouchableOpacity
                       key={p.key}
                       onPress={() => { if (p.key === 'custom') setShowCustom(true); else onSelectPreset(p.key); }}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.05)' }}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                        paddingHorizontal: 16, paddingVertical: 12,
+                        backgroundColor: period === p.key ? '#EEF2FF' : '#fff',
+                        marginHorizontal: 6, marginVertical: 2, borderRadius: 10,
+                        borderWidth: period === p.key ? 1 : 0, borderColor: '#C7D2FE',
+                      }}
                     >
-                      <Text style={{ fontSize: 14, fontWeight: period === p.key ? '800' : '500', color: period === p.key ? BRAND.purple : BRAND.ink900 }}>{p.label}</Text>
-                      {period === p.key && <Ionicons name="checkmark" size={18} color={BRAND.purple} />}
-                      {p.key === 'custom' && period !== 'custom' && <Ionicons name="chevron-forward" size={16} color={BRAND.ink400} />}
+                      <Text style={{ fontSize: 13, fontWeight: period === p.key ? '700' : '500', color: period === p.key ? '#1E1B4B' : DASH.ink }}>
+                        {p.label}
+                      </Text>
+                      {period === p.key && <Ionicons name="checkmark" size={18} color={DASH.indigo} />}
+                      {p.key === 'custom' && period !== 'custom' && <Ionicons name="chevron-forward" size={16} color={DASH.ink3} />}
                     </TouchableOpacity>
                   ))}
                 </View>
               ) : (
-                <View style={{ padding: 18 }}>
+                <View style={{ padding: 16 }}>
                   <TouchableOpacity onPress={() => setShowCustom(false)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                    <Ionicons name="chevron-back" size={16} color={BRAND.purple} />
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND.purple }}>Back to presets</Text>
+                    <Ionicons name="chevron-back" size={16} color={DASH.blue} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: DASH.blue }}>Back to presets</Text>
                   </TouchableOpacity>
-
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND.ink500, marginBottom: 4 }}>From</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: DASH.ink2, marginBottom: 4 }}>From</Text>
                   <View style={{ marginBottom: 12 }}>
                     <DateField value={from} onChange={setFrom} placeholder="Select start date" />
                   </View>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND.ink500, marginBottom: 4 }}>To</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: DASH.ink2, marginBottom: 4 }}>To</Text>
                   <View style={{ marginBottom: 16 }}>
                     <DateField value={to} onChange={setTo} placeholder="Select end date" />
                   </View>
                   <TouchableOpacity
                     onPress={applyCustom}
                     disabled={!validDate(from) || !validDate(to)}
-                    style={{ backgroundColor: (validDate(from) && validDate(to)) ? BRAND.purple : '#C4B5D8', borderRadius: 12, paddingVertical: 13, alignItems: 'center' }}
+                    style={{
+                      backgroundColor: (validDate(from) && validDate(to)) ? DASH.blue : '#CBD5E1',
+                      borderRadius: 12, paddingVertical: 13, alignItems: 'center',
+                    }}
                   >
                     <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>Apply Custom Range</Text>
                   </TouchableOpacity>
@@ -576,19 +533,13 @@ function PeriodModal({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function DashboardScreen() {
   const { user, token } = useAuth();
-  const { colors }      = useTheme();
-  const navigation      = useNavigation();
-  const mounted         = useMountedRef();
+  const navigation = useNavigation();
 
-  const [notifModalVisible, setNotifModalVisible] = useState(false);
-
-  // ── Period filter (matches web AccountingPeriodSelector) ──
   const [periodOpen, setPeriodOpen] = useState(false);
-  const [period, setPeriod] = useState<string>('current_fy');   // preset key or 'custom'
-  const [customFrom, setCustomFrom] = useState<string>('');     // YYYY-MM-DD
+  const [period, setPeriod] = useState<string>('current_fy');
+  const [customFrom, setCustomFrom] = useState<string>('');
   const [customTo, setCustomTo] = useState<string>('');
 
-  // entrance animation
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(20)).current;
   useEffect(() => {
@@ -618,526 +569,394 @@ export default function DashboardScreen() {
     announcements: [],
   };
 
-  // ── Cache-first data via React Query ──────────────────────────────────────
-  // One query holds the whole dashboard payload. The cache is persisted to
-  // AsyncStorage (see lib/queryClient), so on open we render last-known data
-  // instantly and refresh in the background. Each period is its own cache key.
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', period, customFrom, customTo],
     enabled: !!token,
     queryFn: async () => {
-      const [data, assets, tickets, ext, hero, dues, punc] = await Promise.all([
+      const apiPeriod = toApiPeriod(period, customFrom, customTo);
+      const extArgs = apiPeriod.period === 'custom'
+        ? { period: 'custom', customFrom: apiPeriod.customFrom, customTo: apiPeriod.customTo }
+        : { period: apiPeriod.period };
+
+      const [data, tickets, ext, hero, dues, punc] = await Promise.all([
         sb.getDashboardData(),
-        sb.listAssets().catch(() => []),
         fetchTickets('admin').catch(() => []),
-        client.action(api.dashboard.getExtendedStats, period === 'custom' ? { period, customFrom, customTo } : { period }).catch(() => EMPTY_EXTENDED),
+        client.action(api.dashboard.getExtendedStats, extArgs).catch(() => EMPTY_EXTENDED),
         getHeroMonthly().catch(() => null),
         getDuesTotals().catch(() => null),
-        getTenantPunctuality(token!, period, customFrom, customTo).catch(() => null),
+        getTenantPunctuality(token!, apiPeriod.period, apiPeriod.customFrom, apiPeriod.customTo).catch(() => null),
       ]);
-      const now = new Date().toISOString().split('T')[0];
-      const assetList = assets || [];
-      const inWarranty = assetList.filter((a: any) => a.warrantyExpiry && a.warrantyExpiry > now).length;
-      const expired    = assetList.filter((a: any) => a.warrantyExpiry && a.warrantyExpiry <= now).length;
-      const noInfo     = assetList.length - inWarranty - expired;
       return {
-        stats:         data ?? EMPTY_DASHBOARD,
-        recentTickets: (tickets || []).slice(0, 5),
-        extended:      ext ?? EMPTY_EXTENDED,
-        heroMonthly:   hero,
-        duesTotals:    dues,
-        punctuality:   punc,
-        warrantyStats: { inWarranty, expired, noInfo },
+        stats: data ?? EMPTY_DASHBOARD,
+        tickets: tickets || [],
+        extended: ext ?? EMPTY_EXTENDED,
+        heroMonthly: hero,
+        duesTotals: dues,
+        punctuality: punc,
       };
     },
   });
 
-  // Derived views of the cached payload (existing variable names preserved).
-  const stats         = dashboardQuery.data?.stats ?? null;
-  const recentTickets: any[] = dashboardQuery.data?.recentTickets ?? [];
-  const extended      = dashboardQuery.data?.extended ?? null;
-  const heroMonthly   = dashboardQuery.data?.heroMonthly ?? null;
-  const duesTotals    = dashboardQuery.data?.duesTotals ?? null;
-  const punctuality   = dashboardQuery.data?.punctuality ?? null;
-  const warrantyStats = dashboardQuery.data?.warrantyStats ?? { inWarranty: 0, expired: 0, noInfo: 0 };
-  const isRefreshing         = dashboardQuery.isRefetching;
+  const stats = dashboardQuery.data?.stats ?? null;
+  const tickets: any[] = dashboardQuery.data?.tickets ?? [];
+  const extended = dashboardQuery.data?.extended ?? null;
+  const heroMonthly = dashboardQuery.data?.heroMonthly ?? null;
+  const duesTotals = dashboardQuery.data?.duesTotals ?? null;
+  const punctuality = dashboardQuery.data?.punctuality ?? null;
+  const isRefreshing = dashboardQuery.isRefetching;
   const isBackgroundUpdating = dashboardQuery.isFetching && !!dashboardQuery.data;
 
-  // Refresh on returning to the screen (refetch is stable; the initial mount
-  // fetch and this focus refetch dedupe into one request).
   const { refetch } = dashboardQuery;
-  useFocusEffect(
-    React.useCallback(() => { refetch(); }, [refetch])
-  );
-
-  // Light status-bar icons over the dark twilight header; revert on leaving.
+  useFocusEffect(React.useCallback(() => { refetch(); }, [refetch]));
   useFocusEffect(
     React.useCallback(() => {
-      StatusBar.setBarStyle('light-content');
+      StatusBar.setBarStyle('dark-content');
       return () => StatusBar.setBarStyle('dark-content');
     }, [])
   );
 
   const onRefresh = useCallback(() => { refetch(); }, [refetch]);
 
-  // First-ever launch (no persisted cache yet) shows the splash; afterwards the
-  // cache renders instantly and we never blank the screen again.
   if (!stats) return <LoadingScreen />;
 
-  const occupancy: any[]     = stats.occupancyByProperty || [];
-  const fin                   = extended?.financials ?? EMPTY_EXTENDED.financials;
-  const finSeries: any[]      = extended?.financialSeries ?? [];
-  const bedTypes: any[]       = extended?.bedTypeOccupancy ?? [];
-  const needsAtt: any[]       = extended?.needsAttention ?? [];
-  const tenantPay             = extended?.tenantPayments ?? { paidOnOrBefore7th: 0, starCustomers: [] };
-  const announcements: any[]  = extended?.announcements ?? [];
+  const fin = extended?.financials ?? EMPTY_EXTENDED.financials;
+  const finSeries: any[] = extended?.financialSeries ?? [];
+  const bedTypes: any[] = extended?.bedTypeOccupancy ?? [];
+  const needsAtt: any[] = extended?.needsAttention ?? [];
+  const tenantPay = extended?.tenantPayments ?? { paidOnOrBefore7th: 0, starCustomers: [] };
 
-  // Occupancy & bed counts — prefer the ledger-RPC snapshot (matches web exactly),
-  // fall back to getStats if the RPC snapshot is unavailable.
-  const ps                    = extended?.propertyStatus ?? null;
-  const totalBedsLive         = ps?.total ?? stats.liveBeds ?? 0;
-  const occupiedBedsV         = ps?.occupied ?? stats.occupiedBeds ?? 0;
-  const noticeBedsV           = ps?.notice ?? stats.noticeBeds ?? 0;
-  const liveBeds              = totalBedsLive;
-  // Web occupancy = (occupied + notice) / total
-  const occupancyPct          = ps?.occupancyPct != null
+  const ps = extended?.propertyStatus ?? null;
+  const totalBedsLive = ps?.total ?? stats.liveBeds ?? 0;
+  const occupiedBedsV = ps?.occupied ?? stats.occupiedBeds ?? 0;
+  const noticeBedsV = ps?.notice ?? stats.noticeBeds ?? 0;
+  const bookedBedsV = ps?.booked ?? stats.bookedBeds ?? 0;
+  const vacantBedsV = ps?.vacant ?? Math.max(0, totalBedsLive - occupiedBedsV - noticeBedsV - bookedBedsV);
+  const occupancyPct = ps?.occupancyPct != null
     ? Math.round(Number(ps.occupancyPct))
     : Math.round(((occupiedBedsV + noticeBedsV) / Math.max(1, totalBedsLive)) * 100);
-  // Active tenants (web parity = tenants.activeTenants from the ledger RPC).
-  // Fall back to the lifecycle "Staying" count — NEVER the raw totalTenants row
-  // count (that includes historical/exited tenants and reads as e.g. "1000").
-  const activeTenantsV        = extended?.rpcTenants?.activeTenants ?? stats.lifecycle?.staying ?? 0;
-  const activeTicketsV        = extended?.rpcTickets?.activeCount ?? recentTickets.length;
 
-  // ── Hero + tiles — all driven by the period-aware `fin` (extended financials)
-  //    so the whole card follows the selected period filter. `duesTotals`/
-  //    `heroMonthly` remain only as fallbacks when the period fetch is empty.
   const depositsHeldV = fin.depositCollections ?? heroMonthly?.depositsHeld ?? 0;
-  const pendingDuesV  = (fin.pendingAmount ?? 0) > 0
+  const pendingDuesV = (fin.pendingAmount ?? 0) > 0
     ? fin.pendingAmount
     : (duesTotals?.receivables ?? 0);
 
-  // ── Tenant punctuality (web parity) — authenticated get_tenant_punctuality RPC.
-  //    Falls back to the (approximate) Convex-computed values if unavailable.
-  const punc         = punctuality ?? null;
-  const onTimeV      = punc?.onTimeTenants ?? tenantPay.paidOnOrBefore7th ?? 0;
-  const lateV        = punc?.lateTenants ?? 0;
-  const unpaidV      = punc?.unpaidTenants ?? 0;
-  const invoicedV    = punc?.invoicedTenants ?? 0;
-  const collRateV    = punc?.collectionRatePct != null ? Math.round(Number(punc.collectionRatePct)) : null;
+  const punc = punctuality ?? null;
+  const onTimeV = punc?.onTimeTenants ?? tenantPay.paidOnOrBefore7th ?? 0;
+  const lateV = punc?.lateTenants ?? 0;
+  const unpaidV = punc?.unpaidTenants ?? 0;
+  const unpaidInvoicesV = punc?.unpaidInvoices ?? 0;
+  const invoicedV = punc?.invoicedTenants ?? 0;
+  const collRateV = punc?.collectionRatePct != null ? Math.round(Number(punc.collectionRatePct)) : null;
   const awesomeList: any[] = Array.isArray(punc?.awesome) ? punc.awesome : [];
-  const starList: any[]    = Array.isArray(punc?.stars) ? punc.stars : (tenantPay.starCustomers ?? []);
+  const starList: any[] = Array.isArray(punc?.stars) ? punc.stars : (tenantPay.starCustomers ?? []);
 
-  const PRIORITY_BADGE: Record<string, { bg: string; color: string }> = {
-    urgent:    { bg: '#fee2e2', color: '#dc2626' },
-    important: { bg: '#fef3c7', color: '#d97706' },
-    normal:    { bg: '#f1f5f9', color: '#64748b' },
+  const revenueHeadline = heroMonthly?.revenueThisMonth ?? fin.operationalCollections ?? fin.totalRevenue ?? stats.monthlyRevenue ?? 0;
+  const momPct = heroMonthly?.momPct;
+  const sparkVals = finSeries.slice(-6).map((d: any) => Number(d.revenue || 0));
+
+  const profitMargin = fin.totalRevenue > 0
+    ? Math.round((fin.totalProfit / fin.totalRevenue) * 100)
+    : 0;
+  const ebMarginPct = fin.ebBilled > 0
+    ? Math.round((fin.ebMargin / fin.ebBilled) * 100)
+    : 0;
+
+  // Action queue — mirror web chip labels, driven by live ticket statuses
+  const tenantApprovalN = tickets.filter(t => t.status === 'pending_tenant_approval').length;
+  const costApprovalN = tickets.filter(t => t.status === 'waiting_for_cost_approval').length;
+  const adminApprovalN = tickets.filter(t => t.status === 'pending_admin_approval').length;
+  const openTicketsN = tickets.filter(t => !['closed', 'completed', 'cancelled'].includes(t.status)).length;
+  const actionChips = [
+    { id: 'tenant', label: 'Tenant approval', count: tenantApprovalN || openTicketsN, icon: 'ticket-outline' as const, route: 'Tickets' },
+    { id: 'multi-bed', label: 'Beds with multiple active tenants', count: 0, icon: 'warning-outline' as const, route: 'Tenants' },
+    { id: 'multi-tenant', label: 'Tenants with multiple active beds', count: 0, icon: 'warning-outline' as const, route: 'Tenants' },
+    { id: 'cost', label: 'Cost approval', count: costApprovalN, icon: 'cash-outline' as const, route: 'Tickets' },
+    { id: 'admin', label: 'Admin approval', count: adminApprovalN, icon: 'shield-checkmark-outline' as const, route: 'Tickets' },
+  ].filter(c => c.count > 0 || ['tenant', 'cost', 'admin'].includes(c.id));
+  const actionOpenSum = actionChips.reduce((s, c) => s + c.count, 0);
+
+  const go = (route: string) => {
+    try { (navigation as any).navigate(route); } catch { /* noop */ }
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: DUSK.plumNight }}>
+    <View style={{ flex: 1, backgroundColor: DASH.bg }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        {/* ── Top bar (logo centered) ── */}
+        {/* Sticky header — brand | period + avatar (no bell — web parity) */}
         <View style={styles.topBar}>
-          {/* Brand lockup — flame mark + wordmark, left-aligned (sidebar retired) */}
           <View style={styles.brandRow}>
-            <View style={styles.markClip}>
-              <Image
-                source={require('../assets/vishful-logo-DPK24n8p.webp')}
-                style={styles.markImg}
-              />
+            <Image
+              source={require('../assets/vishful-logo-DPK24n8p.webp')}
+              style={styles.markImg}
+            />
+            <View>
+              <Text style={styles.brandName}>Vishful</Text>
+              <Text style={styles.brandTag}>Stay · Belong · Succeed</Text>
             </View>
-            <Text style={styles.brandName}>VISHFUL</Text>
           </View>
 
-          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7} onPress={() => setNotifModalVisible(true)}>
-            <Ionicons name="notifications-outline" size={20} color={DUSK.warmWhite} />
-            {announcements.length > 0 && (
-              <View style={[styles.notifDot, { minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ fontSize: 9, fontWeight: '900', color: '#fff' }}>
-                  {announcements.length > 9 ? '9+' : announcements.length}
-                </Text>
-              </View>
-            )}
-            {announcements.length === 0 && <View style={styles.notifDot} />}
-          </TouchableOpacity>
+          <View style={styles.dashActions}>
+            {isBackgroundUpdating && <ActivityIndicator size="small" color={DASH.blue} />}
+            <TouchableOpacity style={styles.periodPill} activeOpacity={0.75} onPress={() => setPeriodOpen(true)}>
+              <Ionicons name="calendar-outline" size={14} color={DASH.blue} />
+              <Text style={styles.periodPillText} numberOfLines={1}>
+                {periodLabel(period, customFrom, customTo)}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(user?.userName || 'V')[0].toUpperCase()}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <Animated.ScrollView
-          style={{ flex: 1, backgroundColor: BRAND.surface, opacity: fadeIn, transform: [{ translateY: slideUp }] }}
-          contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
+          style={{ flex: 1, opacity: fadeIn, transform: [{ translateY: slideUp }] }}
+          contentContainerStyle={{ paddingHorizontal: DASH.padX, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={DUSK.ember} />}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={DASH.blue} />}
         >
-          {/* Twilight band — scrolls with the header, then resolves to the light canvas */}
-          <View pointerEvents="none" style={styles.duskBand}>
-            <LinearGradient
-              colors={[DUSK.plumNight, DUSK.plumMid, DUSK.duskMauve, BRAND.surface]}
-              locations={[0, 0.42, 0.72, 1]}
-              style={StyleSheet.absoluteFill}
-            />
-            {/* Signature: ember bloom, the warm light carried over from sign-in */}
-            <View style={{ position: 'absolute', top: 30, left: 18, right: 0 }}>
-              <Svg width={SCREEN_WIDTH} height={300}>
-                <Defs>
-                  <SvgRadialGradient id="dashEmber" cx="50%" cy="38%" rx="58%" ry="48%">
-                    <Stop offset="0%" stopColor={DUSK.emberGlow} stopOpacity={0.4} />
-                    <Stop offset="38%" stopColor={DUSK.ember} stopOpacity={0.15} />
-                    <Stop offset="100%" stopColor={DUSK.ember} stopOpacity={0} />
-                  </SvgRadialGradient>
-                </Defs>
-                <Rect x={0} y={0} width={SCREEN_WIDTH} height={300} fill="url(#dashEmber)" />
-              </Svg>
+          {/* Command deck */}
+          <View style={styles.commandDeck}>
+            <View style={styles.dashTitleRow}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={styles.deckGreeting}>{timeGreeting()}</Text>
+                <Text style={styles.deckSub}>Here is what needs your attention today.</Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.askAiBtn}
+                onPress={() => { /* Floating AI FAB remains primary assistant entry */ }}
+              >
+                <Ionicons name="sparkles" size={12} color="#fff" />
+                <Text style={styles.askAiText}>Ask AI</Text>
+              </TouchableOpacity>
             </View>
-          </View>
 
-          {/* ── Greeting block (on the twilight band) ── */}
-          <View style={{ marginBottom: 18 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 11, color: DUSK.mauveHaze, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                {todayLabel()}
-              </Text>
-              {isBackgroundUpdating && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <ActivityIndicator size="small" color={DUSK.emberGlow} />
-                  <Text style={{ fontSize: 10, color: DUSK.mauveHaze, fontWeight: '600' }}>Updating…</Text>
+            {/* Action queue */}
+            <View style={styles.attentionBanner}>
+              <View style={styles.attentionTop}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="flash" size={14} color={DASH.ink} />
+                  <Text style={styles.attentionTitle}>Action queue</Text>
                 </View>
-              )}
-            </View>
-            <Text style={{ fontSize: 32, fontWeight: '900', color: DUSK.warmWhite, letterSpacing: -0.8, marginTop: 3 }}>
-              Hi {greetingName(user?.userName)}<Text style={{ color: DUSK.ember }}>.</Text>
-            </Text>
-            <Text style={{ fontSize: 13, color: DUSK.mauveHaze, marginTop: 5 }}>
-              {stats.totalProperties} properties · {activeTicketsV} tickets need attention
-            </Text>
-            {/* Period selector */}
-            <TouchableOpacity
-              onPress={() => setPeriodOpen(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 12, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)' }}
-            >
-              <Ionicons name="calendar-outline" size={13} color={DUSK.emberGlow} />
-              <Text style={{ fontSize: 12, fontWeight: '800', color: DUSK.warmWhite }}>{periodLabel(period, customFrom, customTo)}</Text>
-              <Ionicons name="chevron-down" size={12} color={DUSK.mauveHaze} />
-            </TouchableOpacity>
-          </View>
-
-          {/* ── Hero gradient card: collected this period (dusk→ember focal) ── */}
-          <View style={styles.heroShadow}>
-            <LinearGradient
-              colors={['#4A2472', '#8340A8', DUSK.ember]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.heroCard}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.heroLabel}>Collected · {periodLabel(period, customFrom, customTo)}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 6 }}>
-                    <Text style={styles.heroAmount}>{fmtINR(fin.operationalCollections ?? fin.totalRevenue ?? stats.monthlyRevenue ?? 0)}</Text>
-                  </View>
-                </View>
-                <View style={styles.heroIconWrap}>
-                  <Ionicons name="wallet-outline" size={22} color="#fff" />
+                <View style={styles.warnBadge}>
+                  <Text style={styles.warnBadgeText}>{actionOpenSum} open</Text>
                 </View>
               </View>
-
-              <View style={styles.heroPillRow}>
-                <View style={styles.heroPill}>
-                  <Text style={styles.heroPillLbl}>Pending</Text>
-                  <Text style={styles.heroPillVal}>{fmtINR(fin.pendingAmount || stats.pendingPayments || 0)}</Text>
-                </View>
-                <View style={styles.heroPill}>
-                  <Text style={styles.heroPillLbl}>Profit</Text>
-                  <Text style={styles.heroPillVal}>{fmtINR(fin.totalProfit || 0)}</Text>
-                </View>
-                <View style={styles.heroPill}>
-                  <Text style={styles.heroPillLbl}>Beds</Text>
-                  <Text style={styles.heroPillVal}>
-                    {occupiedBedsV}/{totalBedsLive}
-                  </Text>
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
-
-          {/* ── Announcements ── */}
-          {announcements.length > 0 && (
-            <>
-              <SectionLabel>Announcements</SectionLabel>
-              <DashCard>
-                {announcements.slice(0, 3).map((a: any, i: number) => {
-                  const pCfg = PRIORITY_BADGE[a.priority] || PRIORITY_BADGE.normal;
-                  return (
-                    <View
-                      key={a.id}
-                      style={{
-                        padding: 12, borderRadius: 12,
-                        borderWidth: 1, borderColor: BRAND.divider,
-                        marginBottom: i < Math.min(announcements.length, 3) - 1 ? 8 : 0,
-                        backgroundColor: 'rgba(255,255,255,0.55)',
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <View style={{ backgroundColor: pCfg.bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '800', color: pCfg.color, letterSpacing: 0.4 }}>
-                            {a.priority?.toUpperCase()}
-                          </Text>
-                        </View>
-                        {a.published_at && (
-                          <Text style={{ fontSize: 9, color: BRAND.ink400 }}>
-                            {formatDate(a.published_at, '')}
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: BRAND.ink900 }}>{a.title}</Text>
-                      <Text style={{ fontSize: fontSize.xs, color: BRAND.ink500, marginTop: 2 }} numberOfLines={2}>
-                        {a.content}
-                      </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+              >
+                {actionChips.map((chip) => (
+                  <TouchableOpacity
+                    key={chip.id}
+                    style={styles.attnChip}
+                    activeOpacity={0.8}
+                    onPress={() => go(chip.route)}
+                  >
+                    <View style={styles.attnChipIco}>
+                      <Ionicons name={chip.icon} size={16} color={DASH.blue} />
                     </View>
-                  );
-                })}
-              </DashCard>
-            </>
-          )}
+                    <Text style={styles.attnChipLabel} numberOfLines={2}>{chip.label}</Text>
+                    <View style={styles.attnChipCount}>
+                      <Text style={styles.attnChipCountText}>{chip.count}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={14} color={DASH.ink3} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
 
           {/* ── Financials ── */}
-          <SectionLabel>Financials (Last 6 Months)</SectionLabel>
-          <DashCard>
-            {/* KPI grid */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-              {[
-                { label: 'Revenue',      value: fmtINR(fin.totalRevenue),           color: BRAND.ink900 },
-                { label: 'Expenses',     value: fmtINR(fin.totalExpenses),          color: '#DC2626' },
-                { label: 'Collections',  value: fmtINR(fin.operationalCollections), color: '#2E7D32' },
-                { label: 'Pending Dues', value: fmtINR(pendingDuesV),               color: '#D97706' },
-                { label: 'Deposits Held',value: fmtINR(depositsHeldV),              color: BRAND.purple },
-                { label: 'Profit',       value: fmtINR(fin.totalProfit),            color: fin.totalProfit >= 0 ? '#2E7D32' : '#DC2626' },
-                { label: 'EB Profit',    value: fmtINR(fin.ebMargin),               color: fin.ebMargin >= 0 ? '#2E7D32' : '#DC2626' },
-                { label: 'Rev / Bed',    value: `₹${(fin.revPerBed ?? 0).toLocaleString('en-IN')}`, color: BRAND.ink900 },
-              ].map((item) => (
-                <View key={item.label} style={styles.kpiTile}>
-                  <Text style={{ fontSize: 9, color: BRAND.ink400, marginBottom: 3, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                    {item.label}
+          <Panel title="Financials">
+            <View style={styles.finHero}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.mutedSm}>Revenue this month</Text>
+                <Text style={styles.finBig}>{fmtINR(revenueHeadline)}</Text>
+                {momPct != null && (
+                  <Text style={[styles.delta, momPct >= 0 ? styles.deltaUp : styles.deltaDown]}>
+                    {momPct >= 0 ? '+' : ''}{momPct}% vs last month
                   </Text>
-                  <Text style={{ fontSize: 15, fontWeight: '900', color: item.color, letterSpacing: -0.3 }}>{item.value}</Text>
+                )}
+              </View>
+              <MiniSpark values={sparkVals.length ? sparkVals : [1, 2, 1.5, 2.2, 1.8, 2.5]} />
+            </View>
+
+            <View style={styles.finGrid}>
+              {[
+                { label: 'Revenue', value: fmtINR(fin.totalRevenue), tone: 'indigo' as const, icon: 'trending-up-outline' as const },
+                { label: 'Expenses', value: fmtINR(fin.totalExpenses), tone: 'rose' as const, icon: 'card-outline' as const },
+                { label: 'Pending dues', value: fmtINR(pendingDuesV), tone: 'amber' as const, icon: 'time-outline' as const },
+                { label: 'Deposits held', value: fmtINR(depositsHeldV), tone: 'green' as const, icon: 'wallet-outline' as const },
+              ].map((c) => {
+                const tone = {
+                  indigo: { bg: '#E0E7FFE6', fg: '#4338CA' },
+                  rose: { bg: '#FFF1F2', fg: '#BE123C' },
+                  amber: { bg: '#FFFBEB', fg: '#B45309' },
+                  green: { bg: '#F0FDF4', fg: '#15803D' },
+                }[c.tone];
+                return (
+                  <View key={c.label} style={styles.finCard}>
+                    <View style={[styles.finCardIco, { backgroundColor: tone.bg }]}>
+                      <Ionicons name={c.icon} size={18} color={tone.fg} />
+                    </View>
+                    <Text style={styles.mutedSm}>{c.label}</Text>
+                    <Text style={styles.finVal}>{c.value}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.ringRow}>
+              {[
+                { label: 'Collection rate', sub: 'by 7th', value: collRateV != null ? `${collRateV}%` : '—' },
+                { label: 'Profit margin', sub: periodLabel(period, customFrom, customTo), value: `${profitMargin}%` },
+                { label: 'EB margin', sub: 'electricity', value: `${ebMarginPct}%` },
+                { label: 'Avg rev / bed / mo', sub: 'live beds', value: `₹${Math.round(fin.revPerBed ?? 0).toLocaleString('en-IN')}` },
+              ].map((r) => (
+                <View key={r.label} style={styles.ringStat}>
+                  <Text style={styles.ringVal}>{r.value}</Text>
+                  <Text style={styles.ringLabel}>{r.label}</Text>
+                  <Text style={styles.mutedSm}>{r.sub}</Text>
                 </View>
               ))}
             </View>
 
             {finSeries.length > 0 && (
-              <>
-                <Text style={styles.miniHead}>Monthly Profitability</Text>
-                <MiniLineChart data={finSeries} valueKey="profit" color={BRAND.purple} height={60} />
-                <Text style={[styles.miniHead, { marginTop: 18 }]}>Revenue Trend</Text>
-                <MiniBarChart data={finSeries} valueKey="revenue" color={BRAND.orange} height={72} />
-              </>
-            )}
-          </DashCard>
-
-          {/* ── Occupancy by Bed Type ── */}
-          {bedTypes.length > 0 && (
-            <>
-              <SectionLabel>Bed Type Occupancy</SectionLabel>
-              <DashCard>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                  {bedTypes.slice(0, 6).map((b: any) => (
-                    <View key={b.type} style={styles.kpiTile}>
-                      <Text style={{ fontSize: 9, color: BRAND.ink400, marginBottom: 3, fontWeight: '700' }} numberOfLines={1}>
-                        {b.type}
-                      </Text>
-                      <Text style={{ fontSize: 20, fontWeight: '900', color: BRAND.ink900, letterSpacing: -0.4 }}>{b.pct}%</Text>
-                      <Text style={{ fontSize: 9, color: BRAND.ink400 }}>{b.total} beds</Text>
-                    </View>
-                  ))}
+              <View style={{ marginTop: 14, gap: 16 }}>
+                <View>
+                  <Text style={styles.chartHead}>Monthly profitability</Text>
+                  <MiniLineChart data={finSeries} valueKey="profit" color={DASH.indigo} height={60} />
                 </View>
-              </DashCard>
-            </>
-          )}
+                <View>
+                  <Text style={styles.chartHead}>Revenue trend</Text>
+                  <MiniBarChart data={finSeries} valueKey="revenue" color={DASH.blue} height={72} />
+                </View>
+              </View>
+            )}
+          </Panel>
 
-          {/* ── Tenant Payments (web parity: On-time / Late / Unpaid + Awesome & Star) ── */}
-          <SectionLabel>Tenant Payments</SectionLabel>
-          <DashCard>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-              <View style={[styles.payTile, { backgroundColor: 'rgba(46,125,50,0.06)', borderColor: 'rgba(46,125,50,0.18)' }]}>
-                <Text style={styles.payTileLbl}>On time (≤7th)</Text>
-                <Text style={[styles.payTileVal, { color: '#2E7D32' }]}>{onTimeV}</Text>
-                <Text style={styles.payTileSub}>Cleared by the 7th</Text>
-              </View>
-              <View style={[styles.payTile, { backgroundColor: 'rgba(217,119,6,0.06)', borderColor: 'rgba(217,119,6,0.18)' }]}>
-                <Text style={styles.payTileLbl}>Later ({'>'}7th)</Text>
-                <Text style={[styles.payTileVal, { color: '#D97706' }]}>{lateV}</Text>
-                <Text style={styles.payTileSub}>Cleared after the 7th</Text>
-              </View>
-              <View style={[styles.payTile, { backgroundColor: 'rgba(220,38,38,0.06)', borderColor: 'rgba(220,38,38,0.18)' }]}>
-                <Text style={styles.payTileLbl}>Unpaid</Text>
-                <Text style={[styles.payTileVal, { color: '#DC2626' }]}>{unpaidV}</Text>
-                <Text style={styles.payTileSub}>{punc?.unpaidInvoices ?? 0} invoices owing</Text>
+          {/* ── Occupancy ── */}
+          <Panel title="Occupancy">
+            <View style={styles.occTop}>
+              <OccupancyRing pct={occupancyPct} />
+              <View style={styles.occStats}>
+                <View style={styles.occPill}>
+                  <Text style={styles.occPillStrong}>{occupancyPct}%</Text>
+                  <Text style={styles.occPillSpan}>Current</Text>
+                </View>
+                <View style={styles.occPill}>
+                  <Text style={styles.occPillStrong}>{occupancyPct}%</Text>
+                  <Text style={styles.occPillSpan}>Month</Text>
+                </View>
+                {bedTypes.slice(0, 4).map((b: any) => (
+                  <View key={b.type} style={styles.typeHit}>
+                    <Text style={styles.typeName} numberOfLines={1}>{b.type}</Text>
+                    <Text style={styles.typePct}>{b.pct}%</Text>
+                  </View>
+                ))}
               </View>
             </View>
 
-            <Text style={{ fontSize: 11, color: BRAND.ink500, marginBottom: 4 }}>
-              {invoicedV} tenants invoiced{collRateV != null ? ` · Collection rate ${collRateV}%` : ''}
+            <View style={styles.statusStrip}>
+              {[
+                { label: 'Occupied', value: occupiedBedsV, color: DASH.good },
+                { label: 'Booked', value: bookedBedsV, color: DASH.blue },
+                { label: 'Notice', value: noticeBedsV, color: DASH.warn },
+                { label: 'Vacant', value: vacantBedsV, color: DASH.ink3 },
+              ].map((s) => (
+                <View key={s.label} style={styles.statusCell}>
+                  <Text style={[styles.statusVal, { color: s.color }]}>{s.value}</Text>
+                  <Text style={styles.statusLbl}>{s.label}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={[styles.mutedSm, { marginTop: 10 }]}>Total live: {totalBedsLive}</Text>
+          </Panel>
+
+          {/* ── Tenant payments ── */}
+          <Panel title="Tenant payments">
+            <View style={styles.payRow}>
+              <View style={[styles.payCard, styles.payGood]}>
+                <Text style={styles.payStrong}>{onTimeV}</Text>
+                <Text style={styles.paySpan}>Cleared by 7th</Text>
+              </View>
+              <View style={[styles.payCard, styles.payWarn]}>
+                <Text style={styles.payStrong}>{lateV}</Text>
+                <Text style={styles.paySpan}>Cleared after 7th</Text>
+              </View>
+              <View style={[styles.payCard, styles.payBad]}>
+                <Text style={styles.payStrong}>{unpaidV}</Text>
+                <Text style={styles.paySpan}>Owing {unpaidInvoicesV} invoices</Text>
+              </View>
+            </View>
+            <Text style={[styles.mutedSm, { marginTop: 10 }]}>
+              {invoicedV} tenants involved in {periodLabel(period, customFrom, customTo)}
+              {collRateV != null ? ` · Collection rate ${collRateV}%` : ''}.
             </Text>
+          </Panel>
 
-            {awesomeList.length > 0 && (
-              <>
-                <Text style={[styles.miniHead, { marginTop: 12 }]}>🏆 Awesome Customers · by 1st</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    {awesomeList.map((t: any, i: number) => (
-                      <View key={`aw-${i}`} style={{ minWidth: 160, backgroundColor: 'rgba(46,125,50,0.06)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(46,125,50,0.18)' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: BRAND.ink900 }} numberOfLines={1}>{t.name}</Text>
-                        <Text style={{ fontSize: 10, color: BRAND.ink500, marginTop: 4 }}>
-                          <Text style={{ fontWeight: '800', color: '#2E7D32' }}>{t.months}</Text> / {t.occupiedMonths} mo
-                        </Text>
-                        <Text style={{ fontSize: 10, color: BRAND.ink400 }}>{t.pct}% punctual</Text>
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              </>
-            )}
+          {/* ── Awesome customers ── */}
+          {awesomeList.length > 0 && (
+            <Panel title="Awesome customers" right={`By 1st · ${awesomeList.length}`}>
+              {awesomeList.slice(0, 8).map((t: any, i: number) => (
+                <View key={`aw-${i}`} style={styles.custHit}>
+                  <Text style={styles.rank}>{i + 1}</Text>
+                  <Text style={styles.custName} numberOfLines={1}>{t.name}</Text>
+                  <Text style={styles.mutedSm}>{t.months} / {t.occupiedMonths} mo</Text>
+                  <Text style={[styles.score, styles.scoreGood]}>{t.pct}%</Text>
+                </View>
+              ))}
+            </Panel>
+          )}
 
-            {starList.length > 0 && (
-              <>
-                <Text style={[styles.miniHead, { marginTop: 16 }]}>⭐ Star Customers · by 7th</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    {starList.map((t: any, i: number) => (
-                      <View key={`st-${i}`} style={{ minWidth: 160, backgroundColor: 'rgba(123,47,190,0.06)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.18)' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: BRAND.ink900 }} numberOfLines={1}>{t.name}</Text>
-                        <Text style={{ fontSize: 10, color: BRAND.ink500, marginTop: 4 }}>
-                          <Text style={{ fontWeight: '800', color: BRAND.purple }}>{t.months ?? t.firstCount ?? 0}</Text> / {t.occupiedMonths ?? t.paidMonths ?? 0} mo
-                        </Text>
-                        {t.pct != null && <Text style={{ fontSize: 10, color: BRAND.ink400 }}>{t.pct}% punctual</Text>}
-                      </View>
-                    ))}
+          {/* ── Star customers ── */}
+          {starList.length > 0 && (
+            <Panel title="Star customers" right={`By 7th · ${starList.length}`}>
+              {starList.slice(0, 8).map((t: any, i: number) => {
+                const months = t.months ?? t.firstCount ?? 0;
+                const occupied = t.occupiedMonths ?? t.paidMonths ?? 0;
+                const pct = t.pct != null ? Number(t.pct) : (occupied > 0 ? Math.round((months / occupied) * 100) : 0);
+                return (
+                  <View key={`st-${i}`} style={styles.custHit}>
+                    <Text style={styles.rank}>{i + 1}</Text>
+                    <Text style={styles.custName} numberOfLines={1}>{t.name}</Text>
+                    <Text style={styles.mutedSm}>{months} / {occupied} mo</Text>
+                    <Text style={[styles.score, pct >= 95 ? styles.scoreGood : styles.scoreOk]}>{pct}%</Text>
                   </View>
-                </ScrollView>
-              </>
-            )}
-          </DashCard>
+                );
+              })}
+            </Panel>
+          )}
 
           {/* ── Needs Attention ── */}
           {needsAtt.length > 0 && (
-            <>
-              <SectionLabel>Needs Attention</SectionLabel>
-              <DashCard>
-                <Text style={{ fontSize: 11, color: BRAND.ink400, marginBottom: 10 }}>
-                  Apartments needing occupancy focus
-                </Text>
-                {needsAtt.map((a: any, i: number) => (
-                  <View
-                    key={a.id}
-                    style={[
-                      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, gap: 10 },
-                      i < needsAtt.length - 1 && { borderBottomWidth: 1, borderBottomColor: BRAND.divider },
-                    ]}
-                  >
+            <Panel title="Needs Attention" darkHead>
+              <Text style={[styles.mutedSm, { marginBottom: 10 }]}>Lowest occupancy apartments</Text>
+              <View style={styles.unitGrid}>
+                {needsAtt.map((a: any) => (
+                  <View key={a.id} style={styles.unitCard}>
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: BRAND.ink900 }} numberOfLines={1}>
-                        {a.code}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: BRAND.ink400, marginTop: 2 }} numberOfLines={1}>{a.propertyName}</Text>
+                      <Text style={styles.unitCode} numberOfLines={1}>{a.code}</Text>
+                      <Text style={styles.mutedSm} numberOfLines={1}>{a.propertyName}</Text>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 17, fontWeight: '900', color: a.occupancyPct < 70 ? '#DC2626' : '#2E7D32', letterSpacing: -0.3 }}>
+                    <View style={styles.unitRight}>
+                      <Text style={[styles.unitPct, { color: a.occupancyPct < 70 ? DASH.bad : DASH.good }]}>
                         {a.occupancyPct}%
                       </Text>
-                      <Text style={{ fontSize: 9, color: BRAND.ink400 }}>{a.occupiedBeds}/{a.totalBeds} occupied</Text>
+                      <Text style={styles.mutedSm}>{a.occupiedBeds}/{a.totalBeds}</Text>
                     </View>
                   </View>
                 ))}
-              </DashCard>
-            </>
+              </View>
+            </Panel>
           )}
 
-          {/* ── Occupancy by Property ── */}
-          <SectionLabel>Occupancy by Property</SectionLabel>
-          {occupancy.length === 0 ? (
-            <DashCard>
-              <Text style={{ fontSize: fontSize.sm, color: BRAND.ink400, textAlign: 'center', paddingVertical: spacing.lg }}>
-                No properties found
-              </Text>
-            </DashCard>
-          ) : (
-            <DashCard>
-              {occupancy.map((p: any, i: number) => (
-                <View
-                  key={p.id}
-                  style={[
-                    { paddingVertical: 12 },
-                    i < occupancy.length - 1 && { borderBottomWidth: 1, borderBottomColor: BRAND.divider },
-                  ]}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: BRAND.ink900 }} numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                    <Text style={{ fontSize: fontSize.xs, color: BRAND.ink500, fontWeight: '600' }}>
-                      {p.occupiedBeds}/{p.totalBeds} beds
-                    </Text>
-                  </View>
-                  <View style={{ height: 8, backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 999, overflow: 'hidden' }}>
-                    <LinearGradient
-                      colors={
-                        p.occupancyRate >= 90 ? ['#DC2626', '#F87171'] :
-                        p.occupancyRate >= 60 ? [BRAND.orange, '#FFB05A'] : ['#22C55E', '#86EFAC']
-                      }
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={{ height: 8, width: `${p.occupancyRate}%`, borderRadius: 999 }}
-                    />
-                  </View>
-                  <Text style={{ fontSize: fontSize.xs, color: BRAND.ink400, marginTop: 4, fontWeight: '600' }}>
-                    {p.occupancyRate}% occupied
-                  </Text>
-                </View>
-              ))}
-            </DashCard>
-          )}
-
-          {/* ── Asset Warranty ── */}
-          <SectionLabel>Asset Warranty</SectionLabel>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <View style={{ flex: 1 }}>
-              <StatCard title="In Warranty"  value={warrantyStats.inWarranty} icon="shield-checkmark-outline" color={colors.success} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <StatCard title="Expired"      value={warrantyStats.expired}    icon="alert-circle-outline"     color={colors.danger} />
-            </View>
-          </View>
-          <StatCard title="No Warranty Info" value={warrantyStats.noInfo} icon="help-circle-outline" color={colors.textTertiary} />
-
-          {/* ── Recent Tickets ── */}
-          {recentTickets.length > 0 && (
-            <>
-              <SectionLabel>Recent Tickets</SectionLabel>
-              {recentTickets.map((t: any) => {
-                const isClosed = ['closed', 'completed'].includes(t.status);
-                const overdue  = !isClosed && t.sla_deadline && new Date(t.sla_deadline) < new Date();
-                const stripe   = isClosed ? colors.success : overdue ? colors.danger : colors.primary;
-                return (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={styles.ticketCard}
-                    activeOpacity={0.85}
-                    onPress={() => { try { (navigation as any).navigate('Tickets'); } catch {} }}
-                  >
-                    <View style={[styles.ticketStripe, { backgroundColor: stripe }]} />
-                    <View style={{ flex: 1, paddingLeft: 14 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>{t.ticket_number || 'Ticket'}</Text>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary, textTransform: 'capitalize' }}>{String(t.status || '').replace(/_/g, ' ')}</Text>
-                      </View>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginTop: 3 }} numberOfLines={1}>{t.issue_type || 'Maintenance Issue'}</Text>
-                      {t.property_name ? <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{t.property_name}</Text> : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </>
-          )}
-
-          <View style={{ height: 40 }} />
+          <View style={{ height: spacing.lg }} />
         </Animated.ScrollView>
       </SafeAreaView>
 
@@ -1150,142 +969,207 @@ export default function DashboardScreen() {
         onSelectPreset={(k) => { setPeriod(k); setPeriodOpen(false); }}
         onApplyCustom={(f, t) => { setCustomFrom(f); setCustomTo(t); setPeriod('custom'); setPeriodOpen(false); }}
       />
-
-      <NotificationModal
-        visible={notifModalVisible}
-        onClose={() => setNotifModalVisible(false)}
-        announcements={announcements}
-      />
     </View>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  blob: { position: 'absolute', width: 300, height: 300, borderRadius: 999, opacity: 0.55 },
-  duskBand: { position: 'absolute', top: -18, left: -18, right: -18, height: BAND_H },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12,
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: DASH.line,
   },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+  markImg: { width: 36, height: 36, resizeMode: 'contain' },
+  brandName: {
+    fontSize: 15, fontWeight: '700', letterSpacing: -0.2, color: DASH.indigo,
+  },
+  brandTag: {
+    fontSize: 10, color: DASH.brandSub, letterSpacing: 0.8, fontWeight: '700',
+    textTransform: 'uppercase', marginTop: 1,
+  },
+  dashActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  periodPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1, borderColor: DASH.line,
+    maxWidth: 140, minHeight: 36,
+  },
+  periodPillText: { fontSize: 12, fontWeight: '600', color: DASH.blueInk, flexShrink: 1 },
+  avatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1, borderColor: DASH.line,
   },
-  // Brand lockup — flame mark (clipped above the baked wordmark, ~0.7 ratio) + name
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  markClip: { width: 50, height: 36, overflow: 'hidden', alignItems: 'center' },
-  markImg: { width: 50, height: 56, resizeMode: 'contain' },
-  brandName: { fontSize: 18, fontWeight: '800', letterSpacing: 3, color: DUSK.warmWhite },
-  notifDot: {
-    position: 'absolute', top: 9, right: 11, width: 7, height: 7, borderRadius: 999,
-    backgroundColor: DUSK.emberGlow, borderWidth: 1.5, borderColor: DUSK.plumMid,
-  },
-  // Hero
-  heroShadow: {
-    borderRadius: 22, marginBottom: 16,
-    shadowColor: BRAND.purple, shadowOpacity: 0.32, shadowRadius: 20, shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
-  },
-  heroCard: {
-    borderRadius: 22, padding: 18, overflow: 'hidden',
-  },
-  heroLabel: {
-    color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700',
-    letterSpacing: 0.8, textTransform: 'uppercase',
-  },
-  heroAmount: {
-    color: '#fff', fontSize: 33, fontWeight: '800', letterSpacing: -0.5, fontFamily: MONO,
-  },
-  heroDelta: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999,
-    paddingHorizontal: 8, paddingVertical: 3, marginLeft: 10, marginBottom: 4,
-  },
-  heroIconWrap: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  heroPillRow: {
-    flexDirection: 'row', gap: 8, marginTop: 16,
-  },
-  heroPill: {
-    flex: 1, backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 12, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)',
-  },
-  heroPillLbl: { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  heroPillVal: { color: '#fff', fontSize: 14, fontWeight: '800', marginTop: 3 },
+  avatarText: { fontSize: 12, fontWeight: '700', color: DASH.blueInk },
 
-  // Stat rail
-  statRail: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4,
+  commandDeck: {
+    paddingTop: 18, paddingBottom: 8,
   },
-  statCard: {
-    width: '48%', flexGrow: 1,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: BRAND.panel,
-    borderRadius: 16, padding: 12,
-    borderWidth: 0.5, borderColor: BRAND.panelBorder,
-    shadowColor: BRAND.purpleDeep, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+  dashTitleRow: {
+    flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
+    marginBottom: 18, gap: 12,
   },
-  statIco: {
-    width: 38, height: 38, borderRadius: 11,
-    alignItems: 'center', justifyContent: 'center',
+  deckGreeting: {
+    fontSize: 26, fontWeight: '800', color: DASH.ink,
+    letterSpacing: -0.6, maxWidth: 240,
   },
-  statNum: { fontSize: 19, fontWeight: '900', color: BRAND.ink900, letterSpacing: -0.5 },
-  statLbl: { fontSize: 10, color: BRAND.ink500, fontWeight: '700', marginTop: 1 },
+  deckSub: {
+    fontSize: 13, color: '#475569', marginTop: 4, lineHeight: 18,
+  },
+  askAiBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
+    backgroundColor: DASH.blue, minHeight: 28,
+  },
+  askAiText: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
-  // Section header
-  sectionH: {
+  attentionBanner: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1, borderColor: DASH.line,
+    borderRadius: 18, padding: 12,
+  },
+  attentionTop: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 22, marginBottom: 10,
+    marginBottom: 10,
   },
-  sectionTitle: {
-    fontSize: 11, fontWeight: '800', color: BRAND.ink400,
-    letterSpacing: 1.2, textTransform: 'uppercase',
+  attentionTitle: { fontSize: 13, fontWeight: '700', color: DASH.ink },
+  warnBadge: {
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
   },
+  warnBadgeText: { fontSize: 11, fontWeight: '700', color: '#92400E' },
+  attnChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+    minHeight: 44, maxWidth: 280,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: DASH.soft,
+    borderWidth: 1, borderColor: '#EEF2F7',
+  },
+  attnChipIco: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: DASH.blueSoft, alignItems: 'center', justifyContent: 'center',
+  },
+  attnChipLabel: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: DASH.ink, maxWidth: 140 },
+  attnChipCount: {
+    minWidth: 24, height: 22, paddingHorizontal: 7, borderRadius: 999,
+    backgroundColor: DASH.blueSoft, alignItems: 'center', justifyContent: 'center',
+  },
+  attnChipCountText: { fontSize: 11, fontWeight: '800', color: DASH.blueInk },
 
-  // Card
-  dashCard: {
-    borderRadius: 18,
-    backgroundColor: BRAND.panel,
-    padding: 16, marginBottom: 12,
-    shadowColor: BRAND.purpleDeep, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-    borderWidth: 0.5, borderColor: BRAND.panelBorder,
+  panel: {
+    backgroundColor: '#fff',
+    borderRadius: 14, borderWidth: 1, borderColor: DASH.panelBorder,
+    marginBottom: 10, overflow: 'hidden',
+    ...shadows.card,
   },
+  panelAttention: { borderColor: '#C7D2FE' },
+  panelHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingTop: 12, paddingBottom: 4,
+  },
+  panelHeadDark: {
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  panelTitle: { fontSize: 20, fontWeight: '600', color: DASH.ink },
+  panelTitleDark: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  panelRight: { fontSize: 12, fontWeight: '600', color: DASH.ink2 },
+  panelBody: { padding: 12, paddingTop: 8 },
 
-  // KPI tile (for financials grid + bed type)
-  kpiTile: {
-    width: '30%', flexGrow: 1,
-    backgroundColor: 'rgba(123,47,190,0.05)',
-    borderRadius: 12, padding: 10,
-    borderWidth: 0.5, borderColor: 'rgba(123,47,190,0.1)',
+  mutedSm: { fontSize: 12, color: DASH.ink2, fontWeight: '500' },
+  finHero: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: DASH.finHero, borderRadius: 12, padding: 14, marginBottom: 10,
   },
+  finBig: { fontSize: 30, fontWeight: '800', color: DASH.ink, letterSpacing: -0.6, marginTop: 2 },
+  delta: { fontSize: 12, fontWeight: '700', marginTop: 4 },
+  deltaUp: { color: '#15803D' },
+  deltaDown: { color: '#B91C1C' },
 
-  miniHead: { fontSize: 11, fontWeight: '800', color: BRAND.ink900, marginBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' },
+  finGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  finCard: {
+    width: '47%', flexGrow: 1,
+    borderRadius: 13, padding: 12, minHeight: 100,
+    backgroundColor: DASH.soft, borderWidth: 1, borderColor: DASH.line,
+  },
+  finCardIco: {
+    width: 38, height: 38, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+  },
+  finVal: { fontSize: 18, fontWeight: '800', color: DASH.ink, marginTop: 4, letterSpacing: -0.3 },
 
-  // Payments
-  payTile: {
-    flex: 1, borderRadius: 14, padding: 14, borderWidth: 1,
+  ringRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  ringStat: {
+    width: '47%', flexGrow: 1,
+    borderRadius: 12, padding: 12,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: DASH.line,
   },
-  payTileLbl: { fontSize: 10, color: BRAND.ink500, fontWeight: '700', letterSpacing: 0.4 },
-  payTileVal: { fontSize: 28, fontWeight: '900', marginTop: 4, letterSpacing: -0.6 },
-  payTileSub: { fontSize: 9, color: BRAND.ink400, marginTop: 2, fontWeight: '600' },
+  ringVal: { fontSize: 20, fontWeight: '800', color: DASH.ink, letterSpacing: -0.4 },
+  ringLabel: { fontSize: 12, fontWeight: '600', color: DASH.ink, marginTop: 2 },
+  chartHead: { fontSize: 12, fontWeight: '700', color: DASH.ink, marginBottom: 8 },
 
-  // Ticket
-  ticketCard: {
-    flexDirection: 'row',
-    backgroundColor: BRAND.panel,
-    borderRadius: 16, marginBottom: 10,
-    padding: 14, paddingLeft: 0,
-    borderWidth: 0.5, borderColor: BRAND.panelBorder,
-    shadowColor: BRAND.purpleDeep, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
+  occTop: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  occStats: { flex: 1, gap: 6 },
+  occPill: {
+    flexDirection: 'row', alignItems: 'baseline', gap: 8,
+    backgroundColor: DASH.soft, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderColor: DASH.line,
   },
-  ticketStripe: {
-    width: 4, borderTopLeftRadius: 16, borderBottomLeftRadius: 16, marginRight: 0,
+  occPillStrong: { fontSize: 18, fontWeight: '800', color: DASH.ink },
+  occPillSpan: { fontSize: 12, color: DASH.ink2, fontWeight: '600' },
+  typeHit: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 4, paddingHorizontal: 4,
   },
+  typeName: { fontSize: 12, color: DASH.ink2, fontWeight: '600', flex: 1 },
+  typePct: { fontSize: 12, fontWeight: '800', color: DASH.ink },
+
+  statusStrip: {
+    flexDirection: 'row', marginTop: 14, gap: 6,
+    backgroundColor: DASH.soft, borderRadius: 12, padding: 10,
+    borderWidth: 1, borderColor: DASH.line,
+  },
+  statusCell: { flex: 1, alignItems: 'center' },
+  statusVal: { fontSize: 16, fontWeight: '800' },
+  statusLbl: { fontSize: 10, color: DASH.ink2, fontWeight: '600', marginTop: 2 },
+
+  payRow: { flexDirection: 'row', gap: 8 },
+  payCard: {
+    flex: 1, minHeight: 92, borderRadius: 13, padding: 12,
+    justifyContent: 'center', borderWidth: 1,
+  },
+  payGood: { backgroundColor: DASH.goodBg, borderColor: '#BBF7D0' },
+  payWarn: { backgroundColor: DASH.warnBg, borderColor: '#FED7AA' },
+  payBad: { backgroundColor: DASH.badBg, borderColor: '#FECACA' },
+  payStrong: { fontSize: 24, fontWeight: '800', color: DASH.ink, letterSpacing: -0.5 },
+  paySpan: { fontSize: 11, fontWeight: '600', color: DASH.ink2, marginTop: 4 },
+
+  custHit: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    minHeight: 52, paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: DASH.line,
+  },
+  rank: {
+    width: 22, textAlign: 'center', fontSize: 13, fontWeight: '800', color: DASH.ink3,
+  },
+  custName: { flex: 1, fontSize: 13, fontWeight: '600', color: DASH.ink },
+  score: { fontSize: 13, fontWeight: '800', minWidth: 38, textAlign: 'right' },
+  scoreGood: { color: DASH.good },
+  scoreOk: { color: DASH.ok },
+
+  unitGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  unitCard: {
+    width: '47%', flexGrow: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: DASH.soft, borderRadius: 12, padding: 12,
+    borderWidth: 1, borderColor: DASH.line, minHeight: 64,
+  },
+  unitCode: { fontSize: 14, fontWeight: '700', color: DASH.ink },
+  unitRight: { alignItems: 'flex-end' },
+  unitPct: { fontSize: 16, fontWeight: '800' },
 });

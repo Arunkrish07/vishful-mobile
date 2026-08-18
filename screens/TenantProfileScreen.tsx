@@ -15,11 +15,11 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   staying:    { bg: '#dcfce7', text: '#16a34a' },
   onboarding: { bg: '#dbeafe', text: '#2563eb' },
   'on-notice':{ bg: '#ffedd5', text: '#ea580c' },
-  new:        { bg: '#ede9fe', text: '#7c3aed' },
+  new:        { bg: '#EEF2FF', text: '#6366F1' },
   exited:     { bg: '#f1f5f9', text: '#64748b' },
 };
 const statusStyle = (s?: string) =>
-  STATUS_COLORS[(s || '').toLowerCase()] ?? { bg: '#ede9fe', text: '#7c3aed' };
+  STATUS_COLORS[(s || '').toLowerCase()] ?? { bg: '#EEF2FF', text: '#6366F1' };
 
 // ── Section label ─────────────────────────────────────────────────────────────
 function SectionLabel({ title }: { title: string }) {

@@ -52,25 +52,26 @@ export function toISODate(value: any): string {
 }
 export function todayISO(): string { return toISODate(new Date()); }
 
-/** Background wrapper for all screens */
+/** Background wrapper for all screens — reference light slate */
 export function GlassBackground({ children, style }: { children: React.ReactNode; style?: any }) {
   return (
-    <View style={[{ flex: 1, backgroundColor: '#F7F3F9' }, style]}>
+    <View style={[{ flex: 1, backgroundColor: '#F8FAFC' }, style]}>
       {children}
     </View>
   );
 }
 
-/** Frosted glass header */
+/** Sticky page header (reference page-header) */
 export function GlassHeader({ children, style }: { children: React.ReactNode; style?: any }) {
   if (Platform.OS === 'ios') {
     return (
-      <BlurView intensity={60} tint="light" style={[{ overflow: 'hidden' }, style]}>
+      <BlurView intensity={48} tint="light" style={[{ overflow: 'hidden' }, style]}>
         <View style={[{
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.lg,
-          borderBottomWidth: 0.5,
-          borderBottomColor: 'rgba(255,255,255,0.35)',
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
+          backgroundColor: 'rgba(255,255,255,0.72)',
         }]}>
           {children}
         </View>
@@ -78,41 +79,14 @@ export function GlassHeader({ children, style }: { children: React.ReactNode; st
     );
   }
   return (
-    <View style={[glass.header, { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }, style]}>
+    <View style={[glass.header, { paddingHorizontal: spacing.lg, paddingVertical: spacing.md }, style]}>
       {children}
     </View>
   );
 }
 
-/** Frosted glass card with blur effect */
+/** White panel card (reference panel / ticket card) */
 export function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
-  if (Platform.OS === 'ios') {
-    return (
-      <BlurView
-        intensity={35}
-        tint="light"
-        style={[{
-          borderRadius: 20,
-          overflow: 'hidden',
-          marginBottom: 12,
-          shadowColor: '#3D1A6E',
-          shadowOpacity: 0.05,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 8 },
-        }, style]}
-      >
-        <View style={{
-          padding: 16,
-          backgroundColor: 'rgba(255,255,255,0.3)',
-          borderWidth: 0.5,
-          borderColor: 'rgba(255,255,255,0.45)',
-          borderRadius: 20,
-        }}>
-          {children}
-        </View>
-      </BlurView>
-    );
-  }
   return (
     <View style={[glass.card, style]}>
       {children}
@@ -180,15 +154,15 @@ export function Button({ title, onPress, variant = 'primary', loading, icon, dis
         disabled={loading || disabled}
         activeOpacity={0.85}
         style={[{
-          height: 52, borderRadius: 16,
+          height: 48, borderRadius: 14,
           alignItems: 'center', justifyContent: 'center',
           backgroundColor: bgColor,
           borderWidth: variant === 'outline' ? 1.5 : 0,
           borderColor: variant === 'outline' ? colors.primary : bgColor,
           opacity: disabled ? 0.45 : 1,
-          shadowColor: variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : '#000',
-          shadowOpacity: (variant === 'primary' || variant === 'danger') ? 0.3 : 0,
-          shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: (variant === 'primary' || variant === 'danger') ? 6 : 0,
+          shadowColor: variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : '#0F172A',
+          shadowOpacity: (variant === 'primary' || variant === 'danger') ? 0.22 : 0,
+          shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: (variant === 'primary' || variant === 'danger') ? 4 : 0,
           flexDirection: 'row', gap: 8,
         }, style]}
       >
@@ -218,8 +192,8 @@ export function Input({ label, value, onChangeText, placeholder, keyboardType, m
       )}
       <View style={{
         flexDirection: 'row', alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.6)',
-        borderRadius: 14, borderWidth: 1, borderColor: 'rgba(224,213,234,0.5)',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB',
         paddingHorizontal: spacing.md,
       }}>
         {icon && <Ionicons name={icon as any} size={18} color={colors.textTertiary} style={{ marginRight: 8 }} />}
@@ -332,19 +306,28 @@ export function LoadingScreen() {
   }, [pulseAnim]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F7F3F9', alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ flex: 1, backgroundColor: '#0F1224', alignItems: 'center', justifyContent: 'center' }}>
       <RNAnimated.View style={{ transform: [{ scale: pulseAnim }] }}>
-        <Image
-          source={require('../assets/vishful-logo-DPK24n8p.webp')}
-          style={{ width: 100, height: 100, resizeMode: 'contain' }}
-        />
+        <View style={{
+          width: 120, height: 120, borderRadius: 36,
+          backgroundColor: 'rgba(255,255,255,0.06)',
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Image
+            source={require('../assets/vishful-logo-DPK24n8p.webp')}
+            style={{ width: 88, height: 88, resizeMode: 'contain' }}
+          />
+        </View>
       </RNAnimated.View>
-      <Text style={{ fontSize: 22, fontWeight: '900', color: '#1E1230', marginTop: 12, letterSpacing: 1 }}>
-        <Text style={{ color: '#7B2FBE' }}>VISH</Text>
-        <Text style={{ color: '#E8841A' }}>FUL</Text>
+      <Text style={{ fontSize: 34, fontWeight: '800', color: '#F8FAFC', marginTop: 16, letterSpacing: -0.8 }}>
+        Vishful
       </Text>
-      <Text style={{ fontSize: 10, color: '#5C4B70', letterSpacing: 2.5, marginTop: 4 }}>STAY | BELONG | SUCCEED</Text>
-      <ActivityIndicator size="small" color="#E8841A" style={{ marginTop: 28 }} />
+      <Text style={{ fontSize: 12, color: 'rgba(226,232,240,0.58)', letterSpacing: 2.4, marginTop: 8, fontWeight: '600', textTransform: 'uppercase' }}>
+        Stay · Belong · Succeed
+      </Text>
+      <ActivityIndicator size="small" color="#6366F1" style={{ marginTop: 28 }} />
+      <Text style={{ fontSize: 12, color: 'rgba(203,213,225,0.45)', marginTop: 24 }}>Property OS</Text>
     </View>
   );
 }
@@ -384,7 +367,7 @@ export function PickerSelect({ label, value, options, onSelect }: {
           activeOpacity={1}
         >
           <View style={{
-            backgroundColor: '#F7F3F9',
+            backgroundColor: '#F8FAFC',
             borderTopLeftRadius: 24, borderTopRightRadius: 24,
             padding: spacing.xl, paddingBottom: 40,
           }}>
@@ -459,7 +442,7 @@ export function DateField({
     setOpen(false);
   };
 
-  const purple = '#7B2FBE';
+  const purple = '#6366F1';
   const ink = colors?.text || '#1E1230';
   const muted = colors?.textSecondary || '#9B8BAE';
 
@@ -559,9 +542,205 @@ function DateNavBtn({ icon, onPress, small }: { icon: any; onPress: () => void; 
   return (
     <TouchableOpacity onPress={onPress} style={{
       width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
-      backgroundColor: 'rgba(123,47,190,0.08)',
+      backgroundColor: 'rgba(37,99,235,0.08)',
     }}>
-      <Ionicons name={icon} size={small ? 14 : 18} color="#7B2FBE" />
+      <Ionicons name={icon} size={small ? 14 : 18} color="#2563EB" />
     </TouchableOpacity>
   );
+}
+
+// ═══ Web mobile chrome (vishful-mobile-app.vercel.app page-header system) ═══
+
+export const WEB = {
+  primary: '#2563EB',
+  primaryDeep: '#1D4ED8',
+  primarySoft: '#EFF6FF',
+  primaryLine: '#DBEAFE',
+  ink: '#0F172A',
+  ink2: '#64748B',
+  ink3: '#94A3B8',
+  paper: '#F8FAFC',
+  surface: '#FFFFFF',
+  line: '#E2E8F0',
+  softLine: '#EEF2F7',
+  cardBorder: '#E5E7EB',
+  good: '#16A34A',
+  warn: '#D97706',
+  bad: '#DC2626',
+} as const;
+
+/** Sticky page header: title + optional subtitle + right actions */
+export function PageHeader({
+  title, subtitle, onBack, right, style,
+}: {
+  title: string; subtitle?: string; onBack?: () => void; right?: React.ReactNode; style?: any;
+}) {
+  return (
+    <View style={[{
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
+      backgroundColor: 'rgba(255,255,255,0.96)',
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8EDF5',
+    }, style]}>
+      {onBack ? (
+        <TouchableOpacity
+          onPress={onBack}
+          activeOpacity={0.85}
+          style={{
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: '#fff', borderWidth: 1, borderColor: WEB.line,
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="arrow-back" size={20} color={WEB.ink} />
+        </TouchableOpacity>
+      ) : null}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: WEB.ink, letterSpacing: -0.4 }} numberOfLines={1}>
+          {title}
+        </Text>
+        {!!subtitle && (
+          <Text style={{ fontSize: 12, color: WEB.ink2, fontWeight: '500', marginTop: 2, lineHeight: 16 }} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
+      {right}
+    </View>
+  );
+}
+
+/** Solid primary + icon button (web icon-btn solid) */
+export function IconBtnSolid({
+  onPress, icon = 'add', label, disabled,
+}: {
+  onPress: () => void; icon?: string; label?: string; disabled?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.85}
+      style={{
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+        minHeight: 40, paddingHorizontal: label ? 12 : 0,
+        width: label ? undefined : 40, height: 40, borderRadius: 12,
+        backgroundColor: WEB.primary, opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Ionicons name={icon as any} size={18} color="#fff" />
+      {!!label && <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{label}</Text>}
+    </TouchableOpacity>
+  );
+}
+
+/** Ghost text action (web ghost-link) */
+export function GhostLink({ title, onPress }: { title: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75} hitSlop={8}>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: WEB.primaryDeep }}>{title}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/** Web search-field */
+export function SearchField({
+  value, onChangeText, placeholder = 'Search...', style,
+}: {
+  value: string; onChangeText: (t: string) => void; placeholder?: string; style?: any;
+}) {
+  return (
+    <View style={[{
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      minHeight: 46, paddingHorizontal: 12,
+      backgroundColor: '#fff', borderRadius: 13,
+      borderWidth: 1, borderColor: WEB.line,
+    }, style]}>
+      <Ionicons name="search-outline" size={16} color={WEB.ink3} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={WEB.ink3}
+        style={{ flex: 1, fontSize: 14, color: WEB.ink, fontWeight: '500', paddingVertical: 10 }}
+      />
+      {!!value && (
+        <TouchableOpacity onPress={() => onChangeText('')} hitSlop={8}>
+          <Ionicons name="close-circle" size={16} color={WEB.ink3} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+/** Pill filter chip (web .filter / .filter.is-on) */
+export function FilterChip({
+  label, active, onPress, count,
+}: {
+  label: string; active?: boolean; onPress: () => void; count?: number;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={{
+        minHeight: 36, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+        backgroundColor: active ? WEB.primary : WEB.surface,
+        borderWidth: 1, borderColor: active ? WEB.primary : WEB.line,
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+      }}
+    >
+      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : WEB.ink }}>
+        {label}
+      </Text>
+      {count != null && (
+        <View style={{
+          minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 999,
+          backgroundColor: active ? 'rgba(255,255,255,0.22)' : WEB.primarySoft,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#fff' : WEB.primaryDeep }}>{count}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+/** Empty dashed panel */
+export function EmptyPanel({ message, actionLabel, onAction }: {
+  message: string; actionLabel?: string; onAction?: () => void;
+}) {
+  return (
+    <View style={{
+      borderWidth: 1, borderStyle: 'dashed', borderColor: WEB.line,
+      backgroundColor: WEB.paper, borderRadius: 16, padding: 28, alignItems: 'center',
+    }}>
+      <Text style={{ fontSize: 14, color: '#475569', fontWeight: '600', textAlign: 'center' }}>{message}</Text>
+      {!!actionLabel && !!onAction && (
+        <TouchableOpacity onPress={onAction} style={{ marginTop: 12 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: WEB.primaryDeep }}>{actionLabel}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+/** Compact list/module card shell */
+export function ModuleCard({ children, onPress, style }: {
+  children: React.ReactNode; onPress?: () => void; style?: any;
+}) {
+  const body = (
+    <View style={[{
+      backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: WEB.cardBorder,
+      padding: 12, marginBottom: 8,
+      shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
+    }, style]}>
+      {children}
+    </View>
+  );
+  if (onPress) {
+    return <TouchableOpacity activeOpacity={0.85} onPress={onPress}>{body}</TouchableOpacity>;
+  }
+  return body;
 }

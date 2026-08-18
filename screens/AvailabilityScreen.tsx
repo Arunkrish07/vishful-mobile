@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as sb from '../lib/supabaseService';
-import { GlassBackground } from '../components/shared';
+import { GlassBackground, FilterChip } from '../components/shared';
 import { recommendBeds, type AvailabilityInput, type BedTypeBCD } from '../lib/availabilityRecommender';
 
 // ── bed type bucketing (web parity) ──
@@ -40,7 +40,7 @@ const MATCH_TYPE_LABEL: Record<string, string> = {
 };
 const TYPE_LABEL: Record<BedTypeBCD, string> = { B: 'Single', C: 'Double', D: 'Triple+' };
 
-const scoreBorder = (s: number) => s >= 70 ? '#16a34a' : s >= 40 ? '#E8841A' : '#9B8BAE';
+const scoreBorder = (s: number) => s >= 70 ? '#16a34a' : s >= 40 ? '#2563EB' : '#6B7280';
 const confidenceBg = (c: string) => c === 'High' ? '#DCFCE7' : c === 'Medium' ? '#FEF3C7' : '#F3F4F6';
 const confidenceColor = (c: string) => c === 'High' ? '#16a34a' : c === 'Medium' ? '#92400E' : '#6B7280';
 
@@ -66,6 +66,7 @@ export default function AvailabilityScreen() {
 
   // result
   const [output, setOutput] = useState<any>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'vacant' | 'notice' | 'booked'>('all');
 
   // load scoped properties
   useEffect(() => {
@@ -188,55 +189,71 @@ export default function AvailabilityScreen() {
             <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
           </View>
           <View>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: '#1E1230' }}>Availability</Text>
-            <Text style={{ fontSize: 11, color: '#9B8BAE' }}>Best vacant beds by type & compatibility</Text>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Availability</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Vacant, notice & booked beds</Text>
           </View>
         </View>
 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 44, marginBottom: 4 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}>
+          {([
+            { key: 'all', label: 'All' },
+            { key: 'vacant', label: 'Vacant' },
+            { key: 'notice', label: 'Notice' },
+            { key: 'booked', label: 'Booked' },
+          ] as const).map((f) => (
+            <FilterChip
+              key={f.key}
+              label={f.label}
+              active={statusFilter === f.key}
+              onPress={() => setStatusFilter(f.key)}
+            />
+          ))}
+        </ScrollView>
+
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
           {/* Property selector */}
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70', marginBottom: 4 }}>Property *</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274', marginBottom: 4 }}>Property *</Text>
           <TouchableOpacity onPress={() => setPropOpen(true)} disabled={loadingProps}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', paddingHorizontal: 12, paddingVertical: 12, marginBottom: 16 }}>
-            <Text style={{ fontSize: 14, color: selectedPropertyId ? '#1E1230' : '#9B8BAE' }}>{loadingProps ? 'Loading…' : selectedPropName}</Text>
-            <Ionicons name="chevron-down" size={16} color="#7B2FBE" />
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 12, marginBottom: 16 }}>
+            <Text style={{ fontSize: 14, color: selectedPropertyId ? '#111827' : '#6B7280' }}>{loadingProps ? 'Loading…' : selectedPropName}</Text>
+            <Ionicons name="chevron-down" size={16} color="#2563EB" />
           </TouchableOpacity>
 
           {/* Tenant criteria */}
-          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230', marginBottom: 12 }}>Tenant Criteria</Text>
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Tenant Criteria</Text>
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70', marginBottom: 4 }}>Gender *</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274', marginBottom: 4 }}>Gender *</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {(['male', 'female'] as const).map(g => (
                 <TouchableOpacity key={g} onPress={() => { setTenantGender(g); setOutput(null); }}
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: tenantGender === g ? '#7B2FBE' : 'rgba(123,47,190,0.1)' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: tenantGender === g ? '#fff' : '#7B2FBE', textTransform: 'capitalize' }}>{g}</Text>
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: tenantGender === g ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: tenantGender === g ? '#fff' : '#2563EB', textTransform: 'capitalize' }}>{g}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70', marginBottom: 4 }}>Job Type</Text>
-            <TextInput value={tenantJobType} onChangeText={(v) => { setTenantJobType(v); setOutput(null); }} placeholder="e.g. Software Engineer" placeholderTextColor="#9B8BAE"
-              style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 12 }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274', marginBottom: 4 }}>Job Type</Text>
+            <TextInput value={tenantJobType} onChangeText={(v) => { setTenantJobType(v); setOutput(null); }} placeholder="e.g. Software Engineer" placeholderTextColor="#6B7280"
+              style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 12 }} />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70', marginBottom: 4 }}>State (optional)</Text>
-            <TextInput value={tenantState} onChangeText={(v) => { setTenantState(v); setOutput(null); }} placeholder="e.g. Tamil Nadu" placeholderTextColor="#9B8BAE"
-              style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 12 }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274', marginBottom: 4 }}>State (optional)</Text>
+            <TextInput value={tenantState} onChangeText={(v) => { setTenantState(v); setOutput(null); }} placeholder="e.g. Tamil Nadu" placeholderTextColor="#6B7280"
+              style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 12 }} />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70', marginBottom: 4 }}>Company (optional)</Text>
-            <TextInput value={tenantCompany} onChangeText={(v) => { setTenantCompany(v); setOutput(null); }} placeholder="e.g. Infosys" placeholderTextColor="#9B8BAE"
-              style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 12 }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274', marginBottom: 4 }}>Company (optional)</Text>
+            <TextInput value={tenantCompany} onChangeText={(v) => { setTenantCompany(v); setOutput(null); }} placeholder="e.g. Infosys" placeholderTextColor="#6B7280"
+              style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 12 }} />
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#5C4B70', marginBottom: 6 }}>Preferred Bed Types (B / C / D)</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274', marginBottom: 6 }}>Preferred Bed Types (B / C / D)</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {(['B', 'C', 'D'] as BedTypeBCD[]).map(t => {
                 const active = preferredBedTypes.includes(t);
                 return (
                   <TouchableOpacity key={t} onPress={() => toggleBedType(t)}
-                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1.5, borderColor: '#7B2FBE', backgroundColor: active ? '#7B2FBE' : 'transparent' }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: active ? '#fff' : '#7B2FBE' }}>{t}</Text>
-                    <Text style={{ fontSize: 9, color: active ? 'rgba(255,255,255,0.85)' : '#9B8BAE' }}>{TYPE_LABEL[t]}</Text>
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1.5, borderColor: '#2563EB', backgroundColor: active ? '#2563EB' : 'transparent' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: active ? '#fff' : '#2563EB' }}>{t}</Text>
+                    <Text style={{ fontSize: 9, color: active ? 'rgba(255,255,255,0.85)' : '#6B7280' }}>{TYPE_LABEL[t]}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -245,15 +262,15 @@ export default function AvailabilityScreen() {
 
           {/* Run button */}
           <TouchableOpacity onPress={runRecommendations} disabled={!recommendationInput || loadingData}
-            style={{ backgroundColor: (!recommendationInput || loadingData) ? '#aaa' : '#7B2FBE', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginBottom: 16 }}>
+            style={{ backgroundColor: (!recommendationInput || loadingData) ? '#aaa' : '#2563EB', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginBottom: 16 }}>
             {loadingData ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>Generate Recommendations</Text>}
           </TouchableOpacity>
 
           {/* Inferred states (when state left blank) */}
           {output?.inferredStates?.length > 0 && (
-            <View style={{ backgroundColor: 'rgba(123,47,190,0.06)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#7B2FBE', marginBottom: 4 }}>Inferred states (from name):</Text>
-              <Text style={{ fontSize: 12, color: '#5C4B70' }}>
+            <View style={{ backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB', marginBottom: 4 }}>Inferred states (from name):</Text>
+              <Text style={{ fontSize: 12, color: '#556274' }}>
                 {output.inferredStates.map((s: any) => `${s.state} (${Math.round(s.confidence * 100)}%)`).join(', ')}
               </Text>
             </View>
@@ -264,16 +281,16 @@ export default function AvailabilityScreen() {
             const list: any[] = output.recommendations?.[t] ?? [];
             if (!preferredBedTypes.includes(t)) return null;
             return (
-              <View key={t} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
+              <View key={t} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1E1230' }}>Type {t}</Text>
-                  <Text style={{ fontSize: 12, color: '#9B8BAE' }}>({TYPE_LABEL[t]})</Text>
-                  <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(123,47,190,0.1)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#7B2FBE' }}>{list.length}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>Type {t}</Text>
+                  <Text style={{ fontSize: 12, color: '#6B7280' }}>({TYPE_LABEL[t]})</Text>
+                  <View style={{ marginLeft: 'auto', backgroundColor: '#EFF6FF', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#2563EB' }}>{list.length}</Text>
                   </View>
                 </View>
                 {list.length === 0 ? (
-                  <Text style={{ fontSize: 12, color: '#9B8BAE' }}>No vacant beds of this type.</Text>
+                  <Text style={{ fontSize: 12, color: '#6B7280' }}>No vacant beds of this type.</Text>
                 ) : (
                   list.map((r: any) => {
                     const aptCode = apartmentCodeById.get(r.apartmentId) || r.apartmentId?.slice(0, 6);
@@ -282,29 +299,29 @@ export default function AvailabilityScreen() {
                     if (r.matchedLanguage && r.matchedLanguage !== 'Unknown') signals.push(r.matchedLanguage);
                     if (r.matchedProfession && r.matchedProfession !== 'Unknown') signals.push(r.matchedProfession);
                     return (
-                      <View key={r.bedId} style={{ borderLeftWidth: 4, borderLeftColor: scoreBorder(r.compatibilityScore), backgroundColor: 'rgba(123,47,190,0.03)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8 }}>
+                      <View key={r.bedId} style={{ borderLeftWidth: 4, borderLeftColor: scoreBorder(r.compatibilityScore), backgroundColor: 'rgba(37,99,235,0.03)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#9B8BAE' }}>#{r.rank}</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E1230' }}>{aptCode} · {r.bedCode || r.bedId?.slice(0, 8)}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#6B7280' }}>#{r.rank}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{aptCode} · {r.bedCode || r.bedId?.slice(0, 8)}</Text>
                           <View style={{ marginLeft: 'auto', backgroundColor: confidenceBg(r.confidence), borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
                             <Text style={{ fontSize: 11, fontWeight: '800', color: confidenceColor(r.confidence) }}>{r.compatibilityScore}%</Text>
                           </View>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                          <View style={{ backgroundColor: 'rgba(123,47,190,0.1)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#7B2FBE' }}>{MATCH_TYPE_LABEL[r.matchType] ?? r.matchType}</Text>
+                          <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB' }}>{MATCH_TYPE_LABEL[r.matchType] ?? r.matchType}</Text>
                           </View>
                           {signals.map((s) => (
                             <View key={s} style={{ backgroundColor: '#F3F4F6', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
                               <Text style={{ fontSize: 10, color: '#6B7280' }}>{s}</Text>
                             </View>
                           ))}
-                          <Text style={{ fontSize: 10, color: '#9B8BAE', marginLeft: 'auto' }}>{r.vacancyDays}d vac</Text>
+                          <Text style={{ fontSize: 10, color: '#6B7280', marginLeft: 'auto' }}>{r.vacancyDays}d vac</Text>
                         </View>
                         {r.adjacentTenantNames?.length > 0 && (
-                          <Text style={{ fontSize: 10, color: '#9B8BAE', marginTop: 4 }} numberOfLines={1}>adj: {r.adjacentTenantNames.join(', ')}</Text>
+                          <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 4 }} numberOfLines={1}>adj: {r.adjacentTenantNames.join(', ')}</Text>
                         )}
-                        {!!r.reason && <Text style={{ fontSize: 10, color: '#5C4B70', marginTop: 4 }}>{r.reason}</Text>}
+                        {!!r.reason && <Text style={{ fontSize: 10, color: '#556274', marginTop: 4 }}>{r.reason}</Text>}
                       </View>
                     );
                   })
@@ -318,15 +335,15 @@ export default function AvailabilityScreen() {
         <Modal visible={propOpen} transparent animationType="fade" onRequestClose={() => setPropOpen(false)}>
           <TouchableOpacity activeOpacity={1} onPress={() => setPropOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 28 }}>
             <View style={{ backgroundColor: '#fff', borderRadius: 18, maxHeight: '70%' }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E1230', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' }}>Select Property</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>Select Property</Text>
               <ScrollView>
                 {properties.length === 0 ? (
-                  <Text style={{ fontSize: 13, color: '#9B8BAE', padding: 16 }}>No live properties found.</Text>
+                  <Text style={{ fontSize: 13, color: '#6B7280', padding: 16 }}>No live properties found.</Text>
                 ) : properties.map(p => (
                   <TouchableOpacity key={p.id} onPress={() => { setSelectedPropertyId(p.id); setPropOpen(false); }}
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.05)' }}>
-                    <Text style={{ fontSize: 14, fontWeight: selectedPropertyId === p.id ? '800' : '500', color: selectedPropertyId === p.id ? '#7B2FBE' : '#1E1230' }}>{p.name}</Text>
-                    {selectedPropertyId === p.id && <Ionicons name="checkmark" size={18} color="#7B2FBE" />}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                    <Text style={{ fontSize: 14, fontWeight: selectedPropertyId === p.id ? '800' : '500', color: selectedPropertyId === p.id ? '#2563EB' : '#111827' }}>{p.name}</Text>
+                    {selectedPropertyId === p.id && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                   </TouchableOpacity>
                 ))}
               </ScrollView>

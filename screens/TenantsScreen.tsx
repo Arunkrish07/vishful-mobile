@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, glass } from '../lib/theme';
-import { Button, Input, EmptyState, LoadingScreen, GlassBackground, DateField } from '../components/shared';
+import { Button, Input, EmptyState, LoadingScreen, GlassBackground, DateField, PageHeader, IconBtnSolid, SearchField, FilterChip } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -24,28 +24,28 @@ import { client as convexClient, api as convexApi } from '../lib/convexApi';
 interface StatusDef { label: string; color: string; bg: string; icon: string; }
 
 const STATUS: Record<string, StatusDef> = {
-  staying:    { label: 'Staying',    color: '#16a34a', bg: '#dcfce7', icon: 'home'         },
-  onboarding: { label: 'Onboarding', color: '#2563eb', bg: '#dbeafe', icon: 'person-add'   },
-  'on-notice':{ label: 'On Notice',  color: '#ea580c', bg: '#ffedd5', icon: 'warning'      },
-  new:        { label: 'New',        color: '#7c3aed', bg: '#ede9fe', icon: 'star-outline'  },
-  kyc_pending:{ label: 'KYC Pending',color: '#d97706', bg: '#fef3c7', icon: 'hourglass-outline' },
-  exited:     { label: 'Exited',     color: '#64748b', bg: '#f1f5f9', icon: 'exit'         },
+  staying:    { label: 'Staying',    color: '#22C55E', bg: '#ECFDF5', icon: 'home'         },
+  onboarding: { label: 'Onboarding', color: '#2563EB', bg: '#EFF6FF', icon: 'person-add'   },
+  'on-notice':{ label: 'On Notice',  color: '#F59E0B', bg: '#FFFBEB', icon: 'warning'      },
+  new:        { label: 'New',        color: '#2563EB', bg: '#EFF6FF', icon: 'star-outline'  },
+  booked:     { label: 'Booked',     color: '#2563EB', bg: '#EFF6FF', icon: 'calendar'     },
+  kyc_pending:{ label: 'KYC Pending',color: '#F59E0B', bg: '#FFFBEB', icon: 'hourglass-outline' },
+  exited:     { label: 'Exited',     color: '#6B7280', bg: '#F1F5F9', icon: 'exit'         },
 };
 
 const getStatus = (s?: string): StatusDef =>
-  STATUS[s || 'new'] || { label: s || 'New', color: '#7c3aed', bg: '#ede9fe', icon: 'star-outline' };
+  STATUS[s || 'new'] || { label: s || 'New', color: '#2563EB', bg: '#EFF6FF', icon: 'star-outline' };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STAT CHIPS  — order matters (most useful first)
+// STAT CHIPS — web order: All Status | New | Booked | Staying | On Notice | Exited
 // ─────────────────────────────────────────────────────────────────────────────
 const STAT_CHIPS = [
-  { key: 'all',        label: 'All',        color: '#0ea5e9' },
-  { key: 'staying',    label: 'Staying',    color: '#16a34a' },
-  { key: 'on-notice',  label: 'On Notice',  color: '#ea580c' },
-  { key: 'onboarding', label: 'Onboarding', color: '#2563eb' },
-  { key: 'new',        label: 'New',        color: '#7c3aed' },
-  { key: 'kyc_pending',label: 'KYC Pending',color: '#d97706' },
-  { key: 'exited',     label: 'Exited',     color: '#64748b' },
+  { key: 'all',        label: 'All Status', color: '#2563EB' },
+  { key: 'new',        label: 'New',        color: '#2563EB' },
+  { key: 'booked',     label: 'Booked',     color: '#2563EB' },
+  { key: 'staying',    label: 'Staying',    color: '#22C55E' },
+  { key: 'on-notice',  label: 'On Notice',  color: '#F59E0B' },
+  { key: 'exited',     label: 'Exited',     color: '#6B7280' },
 ];
 
 type TabKey = 'tenants' | 'allotments';
@@ -433,7 +433,7 @@ export default function TenantsScreen() {
         title:       remarkForm.title,
         description: remarkForm.description || undefined,
         severity:    remarkForm.severity,
-        createdBy:   user?.id || 'unknown',
+        createdBy:   user?.supabaseUserId || user?.userId || 'unknown',
       });
       setShowAddRemark(false);
       setRemarkForm({ remark_type: 'neutral', title: '', description: '', severity: 'medium' });
@@ -522,41 +522,39 @@ export default function TenantsScreen() {
       <SafeAreaView style={tenantStyles.root} edges={['top']}>
 
         {/* ── Header ── */}
-        <View style={[glass.header, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: 14 }]}>
-          <View style={{ width: 38, height: 28, overflow: 'hidden', alignItems: 'center', marginRight: 10 }}>
-            <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
-          </View>
-          <Text style={tenantStyles.headerTitle}>Tenants</Text>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {/* Compute All Ratings (mirrors web) */}
-            <TouchableOpacity
-              style={[tenantStyles.iconBtn, { backgroundColor: '#F59E0B', width: 36, height: 36 }]}
-              onPress={handleComputeAllRatings}
-              disabled={!!batchRatingProgress}
-            >
-              <Ionicons name="star-outline" size={17} color="#fff" />
-            </TouchableOpacity>
-            {/* List Multiple Records — duplicate detection */}
-            <TouchableOpacity
-              style={[tenantStyles.iconBtn, { backgroundColor: '#0284C7', width: 36, height: 36 }]}
-              onPress={() => { setDupPhone(''); setDupResults([]); setDupGroups([]); setShowDuplicates(true); runDuplicateScanAll(); }}
-            >
-              <Ionicons name="copy-outline" size={17} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[tenantStyles.iconBtn, { backgroundColor: '#16a34a' }]}
-              onPress={() => nav.dispatch(DrawerActions.jumpTo('Tenant Lifecycle'))}
-            >
-              <Ionicons name="log-in-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={tenantStyles.iconBtn}
-              onPress={() => { setForm({ ...EMPTY_FORM }); setShowAdd(true); }}
-            >
-              <Ionicons name="add" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <PageHeader
+          title="Tenants"
+          subtitle="Manage tenant KYC records"
+          right={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {/* Compute All Ratings — outline/ghost */}
+              <TouchableOpacity
+                style={tenantStyles.ghostIconBtn}
+                onPress={handleComputeAllRatings}
+                disabled={!!batchRatingProgress}
+              >
+                <Ionicons name="star-outline" size={17} color="#D97706" />
+              </TouchableOpacity>
+              {/* List Multiple Records — outline/ghost */}
+              <TouchableOpacity
+                style={tenantStyles.ghostIconBtn}
+                onPress={() => { setDupPhone(''); setDupResults([]); setDupGroups([]); setShowDuplicates(true); runDuplicateScanAll(); }}
+              >
+                <Ionicons name="copy-outline" size={17} color="#2563EB" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={tenantStyles.ghostIconBtn}
+                onPress={() => nav.dispatch(DrawerActions.jumpTo('Tenant Lifecycle'))}
+              >
+                <Ionicons name="log-in-outline" size={18} color="#16A34A" />
+              </TouchableOpacity>
+              <IconBtnSolid
+                icon="add"
+                onPress={() => { setForm({ ...EMPTY_FORM }); setShowAdd(true); }}
+              />
+            </View>
+          }
+        />
 
         {/* Batch rating progress bar */}
         {batchRatingProgress && (
@@ -610,48 +608,25 @@ export default function TenantsScreen() {
                 style={{ marginBottom: 14 }}
               >
                 <View style={{ flexDirection: 'row', gap: 8, paddingRight: 8 }}>
-                  {STAT_CHIPS.map(chip => {
-                    const count  = countFor(chip.key);
-                    const active = statusFilter === chip.key;
-                    return (
-                      <TouchableOpacity
-                        key={chip.key}
-                        onPress={() => setStatusFilter(chip.key)}
-                        style={[tenantStyles.chip, {
-                          backgroundColor: active ? chip.color + '20' : colors.surface,
-                          borderColor:     active ? chip.color        : colors.border,
-                        }]}
-                      >
-                        <Text style={[tenantStyles.chipCount, { color: chip.color }]}>
-                          {count}
-                        </Text>
-                        <Text style={[tenantStyles.chipLabel, {
-                          color: active ? chip.color : colors.textSecondary,
-                        }]}>
-                          {chip.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {STAT_CHIPS.map(chip => (
+                    <FilterChip
+                      key={chip.key}
+                      label={chip.label}
+                      active={statusFilter === chip.key}
+                      count={countFor(chip.key)}
+                      onPress={() => setStatusFilter(chip.key)}
+                    />
+                  ))}
                 </View>
               </ScrollView>
 
               {/* Search bar */}
-              <View style={tenantStyles.searchRow}>
-                <Ionicons name="search-outline" size={15} color={colors.textTertiary} />
-                <TextInput
-                  style={tenantStyles.searchInput}
-                  placeholder="Search name, phone, company..."
-                  placeholderTextColor={colors.textTertiary}
-                  value={search}
-                  onChangeText={setSearch}
-                />
-                {!!search && (
-                  <TouchableOpacity onPress={() => setSearch('')}>
-                    <Ionicons name="close-circle" size={15} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                )}
-              </View>
+              <SearchField
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search tenants..."
+                style={{ marginBottom: 8 }}
+              />
 
               {/* Result count */}
               <Text style={tenantStyles.resultLabel}>
@@ -1431,7 +1406,7 @@ function TenantFormModal({
           <Input label="Mobile *" value={form.phone} onChangeText={v => setF('phone')(v.replace(/\D/g,'').slice(0,10))} placeholder="10 digit mobile" keyboardType="phone-pad" maxLength={10} />
           <Input label="Email *" value={form.email} onChangeText={setF('email')} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" />
           <Input label="S/W/D of (Relationship)" value={form.relation_name} onChangeText={setF('relation_name')} placeholder="e.g. S/o Ramesh Kumar" />
-          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Date of Birth *</Text><DateField value={form.date_of_birth} onChange={setF('date_of_birth')} /></View>
+          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Date of Birth *</Text><DateField value={form.date_of_birth} onChange={setF('date_of_birth')} /></View>
           <PillSelect label="Gender *" value={form.gender} options={GENDER_OPTS} onSelect={setF('gender')} required />
           <PillSelect label="Food Preference" value={form.food_preference} options={FOOD_OPTS} onSelect={setF('food_preference')} />
           <Input label="Profession *" value={form.profession} onChangeText={setF('profession')} placeholder="e.g. Software Engineer, Student" />
@@ -1451,7 +1426,7 @@ function TenantFormModal({
           {/* ══ SECTION 3: Professional Information ══ */}
           <FormSection icon="briefcase-outline" title="Professional Information" />
           <Input label="Company / College" value={form.company_name} onChangeText={setF('company_name')} placeholder="Employer or institution" />
-          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Date of Joining</Text><DateField value={form.date_of_joining} onChange={setF('date_of_joining')} /></View>
+          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Date of Joining</Text><DateField value={form.date_of_joining} onChange={setF('date_of_joining')} /></View>
           <Input label="Designation / Course" value={form.designation} onChangeText={setF('designation')} placeholder="Job title or course" />
           <Input label="Company Address" value={form.company_address} onChangeText={setF('company_address')} placeholder="Office address" multiline />
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1538,19 +1513,25 @@ const tenantStyles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
   },
-  headerTitle: { flex: 1, fontSize: 20, fontWeight: '800', color: colors.text },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
   iconBtn: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: colors.primary,
+    backgroundColor: '#1D4ED8',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ghostIconBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: '#E5E7EB',
     alignItems: 'center', justifyContent: 'center',
   },
 
   tabBar: {
-    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.5)',
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    flexDirection: 'row', backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
   },
   tabItem: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
@@ -1571,22 +1552,22 @@ const tenantStyles = StyleSheet.create({
 
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 14,
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', marginBottom: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 8,
   },
   searchInput: { flex: 1, fontSize: 13, color: colors.text, paddingVertical: 0 },
   resultLabel: { fontSize: 11, color: colors.textTertiary, marginBottom: 10, marginLeft: 2 },
 
   card: {
-    backgroundColor: 'rgba(255,255,255,0.72)', borderRadius: 22,
+    backgroundColor: '#FFFFFF', borderRadius: 14,
     padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)',
-    shadowColor: '#7B2FBE', shadowOpacity: 0.06,
-    shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+    borderWidth: 1, borderColor: '#E5E7EB',
+    shadowColor: '#0F172A', shadowOpacity: 0.04,
+    shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1,
   },
   avatar: {
-    width: 44, height: 44, borderRadius: 22,
+    width: 44, height: 44, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
   },
   avatarText: { fontSize: 18, fontWeight: '800' },
@@ -1598,18 +1579,18 @@ const tenantStyles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     flexWrap: 'wrap', gap: 5,
     marginTop: 8, paddingTop: 8,
-    borderTopWidth: 1, borderTopColor: 'rgba(224,213,234,0.3)',
+    borderTopWidth: 1, borderTopColor: '#E5E7EB',
   },
   noticeBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    marginTop: 8, backgroundColor: '#fff7ed',
+    marginTop: 8, backgroundColor: '#FFFBEB',
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
   },
 
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: 7, paddingVertical: 3,
-    borderRadius: 20, borderWidth: 1, marginLeft: 6,
+    borderRadius: 14, borderWidth: 1, marginLeft: 6,
   },
   pillText: { fontSize: 10, fontWeight: '700' },
 

@@ -1,37 +1,89 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity,
-  ActivityIndicator, TextInput, Image, Animated, Easing, ScrollView,
-  Dimensions, AccessibilityInfo,
+  ActivityIndicator, TextInput, Image, Animated, Easing, ScrollView, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-// ── "Coming home at dusk" — the brand's flame→purple logo gradient, turned into
-// atmosphere. A twilight sky, an ember horizon glow behind the mark (the light of
-// home), and monospaced numerals for the one job this screen has: a number + a code.
+type Portal = 'tenant' | 'technician' | 'staff';
+type Step = 'role' | 'phone' | 'otp';
+
 const C = {
-  plumNight: '#1C0E36',
-  plumMid: '#2C1751',
-  duskMauve: '#45256E',
-  ember: '#F0871E',
-  emberGlow: '#FFC073',
-  warmWhite: '#FBF4EC',
-  mauveHaze: '#B9A6D4',
-  mauveDim: '#8A78A6',
+  night: '#0F1224',
+  nightMid: '#1A1F3A',
+  nightTo: '#232846',
+  brand: '#1D4ED8',
+  brandDeep: '#1E3A8A',
+  accent: '#2563EB',
+  text: '#F8FAFC',
+  muted: 'rgba(226,232,240,0.68)',
+  dim: 'rgba(203,213,225,0.5)',
+  ink: '#111827',
+  inkMuted: '#6B7280',
+  line: '#E5E7EB',
+  white: '#FFFFFF',
+  card: '#FFFFFF',
+  danger: '#DC2626',
 };
 
-const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
-const { width: WIN_W, height: WIN_H } = Dimensions.get('window');
+const STAFF_ROLES = new Set([
+  'super_admin', 'org_admin', 'property_manager', 'admin', 'manager', 'pm', 'team_member',
+]);
+
+const PORTALS: {
+  id: Portal;
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { id: 'tenant', title: 'Tenant', subtitle: 'Tickets, stay and notices', icon: 'home-outline' },
+  { id: 'technician', title: 'Technician', subtitle: 'Assigned jobs and visits', icon: 'construct-outline' },
+  { id: 'staff', title: 'Staff', subtitle: 'Property OS for the team', icon: 'grid-outline' },
+];
+
+function portalCopy(portal: Portal) {
+  if (portal === 'tenant') {
+    return {
+      eyebrow: 'TENANT',
+      title: 'Sign in to your stay',
+      sub: 'We’ll text a one-time code to your registered mobile number.',
+    };
+  }
+  if (portal === 'technician') {
+    return {
+      eyebrow: 'TECHNICIAN',
+      title: 'Sign in to your jobs',
+      sub: 'We’ll text a one-time code to your work mobile number.',
+    };
+  }
+  return {
+    eyebrow: 'STAFF',
+    title: 'Welcome back',
+    sub: 'We’ll text a one-time code to confirm it’s you.',
+  };
+}
+
+function roleFitsPortal(role: string, portal: Portal): boolean {
+  if (portal === 'tenant') return role === 'tenant';
+  if (portal === 'technician') return role === 'technician';
+  return STAFF_ROLES.has(role);
+}
+
+function mismatchMessage(role: string, portal: Portal): string {
+  if (role === 'tenant') return 'This number is a tenant account. Choose Tenant to continue.';
+  if (role === 'technician') return 'This number is a technician account. Choose Technician to continue.';
+  return 'This number is a staff account. Choose Staff to continue.';
+}
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [step, setStep] = useState<Step>('role');
+  const [portal, setPortal] = useState<Portal | null>(null);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +94,8 @@ export default function LoginScreen() {
   const resendTimer = useRef<any>(null);
   const { login } = useAuth();
 
-  // ── Resend cooldown ──────────────────────────────────────────────────────
+  const copy = portal ? portalCopy(portal) : portalCopy('staff');
+
   const RESEND_SECONDS = 30;
   const startResendCountdown = () => {
     if (resendTimer.current) clearInterval(resendTimer.current);
@@ -56,42 +109,31 @@ export default function LoginScreen() {
   };
   useEffect(() => () => { if (resendTimer.current) clearInterval(resendTimer.current); }, []);
 
-  // ── Entrance + ambient glow breathe (reduced-motion aware) ───────────────
   const fadeIn = useRef(new Animated.Value(0)).current;
-  const slideUp = useRef(new Animated.Value(24)).current;
-  const glow = useRef(new Animated.Value(1)).current;
-  const float = useRef(new Animated.Value(0)).current;
-
+  const slideUp = useRef(new Animated.Value(16)).current;
   useEffect(() => {
-    let loop: Animated.CompositeAnimation | undefined;
-    AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
-      Animated.parallel([
-        Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(slideUp, { toValue: 0, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]).start();
-
-      if (!reduce) {
-        loop = Animated.loop(
-          Animated.sequence([
-            Animated.timing(glow, { toValue: 0.82, duration: 2600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-            Animated.timing(glow, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-          ])
-        );
-        loop.start();
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(float, { toValue: 1, duration: 2400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-            Animated.timing(float, { toValue: 0, duration: 2400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-          ])
-        ).start();
-      }
-    });
-    return () => loop?.stop();
+    Animated.parallel([
+      Animated.timing(fadeIn, { toValue: 1, duration: 420, useNativeDriver: true }),
+      Animated.timing(slideUp, { toValue: 0, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
   }, []);
 
-  const floatY = float.interpolate({ inputRange: [0, 1], outputRange: [0, -7] });
+  const pickPortal = (id: Portal) => {
+    setPortal(id);
+    setError('');
+    setShowSignupPrompt(false);
+    setStep('phone');
+  };
 
-  // ── Logic preserved exactly from original ────────────────────────────────
+  const backToRole = () => {
+    setStep('role');
+    setPortal(null);
+    setPhone('');
+    setOtp('');
+    setError('');
+    setShowSignupPrompt(false);
+  };
+
   const handleSendOTP = async () => {
     const trimmed = phone.trim().replace(/\D/g, '').slice(-10);
     if (trimmed.length < 10) {
@@ -119,24 +161,24 @@ export default function LoginScreen() {
 
   const handleVerifyOTP = async () => {
     if (otp.trim().length !== 6) {
-      setError('Enter the valid 6-digit OTP sent to your phone');
-      return;
-    }
-    if (otp.length < 4) {
-      setError('Enter the OTP sent to your phone');
+      setError('Enter the 6-digit OTP sent to your phone');
       return;
     }
     setLoading(true);
     setError('');
     setShowSignupPrompt(false);
-
     try {
       const cleanPhone = phone.trim().replace(/\D/g, '').slice(-10);
       const result = await sb.verifyOtpAndLogin(cleanPhone, otp.trim());
       if (result.success && result.token) {
+        const role = String(result.user?.role || '');
+        if (portal && !roleFitsPortal(role, portal)) {
+          setError(mismatchMessage(role, portal));
+          return;
+        }
         await login(result.token, result.user as any, result.refreshToken);
       } else {
-        setError(result.message || 'Something went wrong. Please try again.');
+        setError(result.message || 'Could not verify. Please try again.');
       }
     } catch (err: any) {
       const msg = (err?.message || '').toLowerCase();
@@ -146,7 +188,7 @@ export default function LoginScreen() {
         setError('This number is not registered. Please contact admin.');
         setShowSignupPrompt(true);
       } else {
-        setError('Something went wrong. Please try again.');
+        setError('Could not verify. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -174,7 +216,6 @@ export default function LoginScreen() {
     }
   };
 
-  // Render OTP cells (visual only — actual value held in `otp`)
   const renderOtpCells = () => {
     const cells = [];
     for (let i = 0; i < 6; i++) {
@@ -190,7 +231,7 @@ export default function LoginScreen() {
             isActive && styles.otpCellActive,
           ]}
         >
-          <Text style={[styles.otpCellText, !isFilled && styles.otpCellDot]}>{ch || '·'}</Text>
+          <Text style={[styles.otpCellText, !isFilled && styles.otpCellDot]}>{ch || ''}</Text>
         </View>
       );
     }
@@ -199,212 +240,194 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Twilight sky — the brand flame→purple gradient as atmosphere */}
+      <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={[C.plumNight, C.plumMid, C.duskMauve]}
-        locations={[0, 0.55, 1]}
+        colors={[C.night, C.nightMid, C.nightTo]}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-
-      {/* Signature: ember horizon bloom behind the mark — the light of home */}
-      <Animated.View style={[styles.glowWrap, { opacity: glow }]} pointerEvents="none">
-        <Svg width={WIN_W} height={WIN_H * 0.6}>
-          <Defs>
-            <RadialGradient id="ember" cx="50%" cy="42%" rx="62%" ry="52%">
-              <Stop offset="0%" stopColor={C.emberGlow} stopOpacity={0.55} />
-              <Stop offset="34%" stopColor={C.ember} stopOpacity={0.22} />
-              <Stop offset="70%" stopColor={C.ember} stopOpacity={0.05} />
-              <Stop offset="100%" stopColor={C.ember} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Rect x={0} y={0} width={WIN_W} height={WIN_H * 0.6} fill="url(#ember)" />
-        </Svg>
-      </Animated.View>
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            {/* Hero — flame mark backlit by the bloom, clean wordmark below */}
             <Animated.View style={[styles.hero, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
-              <Animated.View style={{ transform: [{ translateY: floatY }], alignItems: 'center' }}>
-                {/* Clip the webp to just the flame — its baked wordmark goes muddy on dark */}
-                <View style={styles.markClip}>
-                  <Image
-                    source={require('../assets/vishful-logo-DPK24n8p.webp')}
-                    style={styles.markImg}
-                  />
-                </View>
-                <Text style={styles.wordmark}>VISHFUL</Text>
-              </Animated.View>
+              <Image
+                source={require('../assets/vishful-logo-DPK24n8p.webp')}
+                style={styles.logo}
+              />
+              <Text style={styles.wordmark}>Vishful</Text>
+              <Text style={styles.tagline}>Stay · Belong · Succeed</Text>
             </Animated.View>
 
-            {/* Content */}
-            <Animated.View style={[styles.body, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
-              {step === 'phone' && (
+            <Animated.View style={[styles.card, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+              {step === 'role' && (
                 <>
-                  <Text style={styles.eyebrow}>SECURE SIGN-IN</Text>
-                  <Text style={styles.display}>Welcome back</Text>
-                  <Text style={styles.sub}>
-                    Enter your mobile number — we'll text a one-time code to confirm it's you.
-                  </Text>
+                  <Text style={styles.cardEyebrow}>SIGN IN</Text>
+                  <Text style={styles.cardTitle}>Who’s signing in?</Text>
+                  <Text style={styles.cardSub}>Choose your portal. You’ll enter your mobile number next.</Text>
 
-                  <View style={styles.panel}>
-                    <Text style={styles.fieldLabel}>MOBILE NUMBER</Text>
-                    <View style={[styles.inputField, phoneFocused && styles.inputFieldActive]}>
-                      <Text style={styles.inputPrefix}>+91</Text>
-                      <View style={styles.inputDivider} />
-                      <TextInput
-                        style={styles.inputControl}
-                        value={phone}
-                        onFocus={() => setPhoneFocused(true)}
-                        onBlur={() => setPhoneFocused(false)}
-                        onChangeText={(t: string) => {
-                          setPhone(t.replace(/\D/g, '').slice(0, 10));
-                          setError('');
-                          setShowSignupPrompt(false);
-                        }}
-                        placeholder="98765 43210"
-                        placeholderTextColor={C.mauveDim}
-                        keyboardType="phone-pad"
-                        maxLength={10}
-                      />
-                    </View>
-
-                    {error ? (
-                      <View style={styles.errorBox}>
-                        <Ionicons name="alert-circle" size={18} color="#FCA5A5" style={{ marginTop: 1 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.errorMsg}>{error}</Text>
-                        </View>
+                  {PORTALS.map((p) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      activeOpacity={0.88}
+                      onPress={() => pickPortal(p.id)}
+                      style={styles.portalRow}
+                    >
+                      <View style={styles.portalIcon}>
+                        <Ionicons name={p.icon} size={20} color={C.brand} />
                       </View>
-                    ) : null}
-
-                    {showSignupPrompt && (
-                      <View style={styles.infoBox}>
-                        <Ionicons name="information-circle-outline" size={20} color={C.emberGlow} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.infoTitle}>Not registered?</Text>
-                          <Text style={styles.infoMsg}>Ask your property admin to add you, then sign in here.</Text>
-                        </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.portalTitle}>{p.title}</Text>
+                        <Text style={styles.portalSub}>{p.subtitle}</Text>
                       </View>
-                    )}
-
-                    <TouchableOpacity activeOpacity={0.9} onPress={handleSendOTP} disabled={loading} style={{ marginTop: 18 }}>
-                      <LinearGradient
-                        colors={loading ? ['#B9691A', '#B9691A'] : ['#FF9E3D', C.ember]}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                        style={styles.btnPrimary}
-                      >
-                        {loading ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <>
-                            <Text style={styles.btnPrimaryText}>Send code</Text>
-                            <Ionicons name="arrow-forward" size={16} color="#fff" />
-                          </>
-                        )}
-                      </LinearGradient>
+                      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
                     </TouchableOpacity>
+                  ))}
+                </>
+              )}
 
-                    <View style={styles.trustBox}>
-                      <Ionicons name="shield-checkmark" size={13} color={C.mauveHaze} />
-                      <Text style={styles.trustText}>End-to-end encrypted. We never share or sell your number.</Text>
-                    </View>
+              {step === 'phone' && portal && (
+                <>
+                  <Text style={styles.cardEyebrow}>{copy.eyebrow}</Text>
+                  <Text style={styles.cardTitle}>{copy.title}</Text>
+                  <Text style={styles.cardSub}>{copy.sub}</Text>
+
+                  <Text style={styles.fieldLabel}>Mobile number</Text>
+                  <View style={[styles.inputField, phoneFocused && styles.inputFieldActive]}>
+                    <Text style={styles.inputPrefix}>+91</Text>
+                    <View style={styles.inputDivider} />
+                    <TextInput
+                      style={styles.inputControl}
+                      value={phone}
+                      onFocus={() => setPhoneFocused(true)}
+                      onBlur={() => setPhoneFocused(false)}
+                      onChangeText={(t: string) => {
+                        setPhone(t.replace(/\D/g, '').slice(0, 10));
+                        setError('');
+                        setShowSignupPrompt(false);
+                      }}
+                      placeholder="98765 43210"
+                      placeholderTextColor={C.inkMuted}
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                    />
                   </View>
 
-                  <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.linkBtn}>
-                    <Text style={styles.linkText}>Privacy Policy</Text>
+                  {error ? (
+                    <View style={styles.errorBox}>
+                      <Ionicons name="alert-circle" size={16} color={C.danger} />
+                      <Text style={styles.errorMsg}>{error}</Text>
+                    </View>
+                  ) : null}
+
+                  {showSignupPrompt ? (
+                    <View style={styles.infoBox}>
+                      <Ionicons name="information-circle-outline" size={18} color={C.accent} />
+                      <Text style={styles.infoMsg}>Ask your property admin to add you, then sign in here.</Text>
+                    </View>
+                  ) : null}
+
+                  <TouchableOpacity activeOpacity={0.88} onPress={handleSendOTP} disabled={loading} style={{ marginTop: 18 }}>
+                    <View style={[styles.btn, loading && styles.btnDisabled]}>
+                      {loading ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <>
+                          <Text style={styles.btnText}>Send code</Text>
+                          <Ionicons name="arrow-forward" size={16} color="#fff" />
+                        </>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={backToRole} style={styles.backBtn}>
+                    <Ionicons name="chevron-back" size={16} color={C.inkMuted} />
+                    <Text style={styles.backText}>Change portal</Text>
                   </TouchableOpacity>
                 </>
               )}
 
-              {step === 'otp' && (
+              {step === 'otp' && portal && (
                 <>
-                  <Text style={styles.eyebrow}>ENTER CODE</Text>
-                  <Text style={styles.display}>Check your phone</Text>
-                  <Text style={styles.sub}>
-                    We sent a 6-digit code to <Text style={styles.subStrong}>+91 {phone}</Text>
+                  <Text style={styles.cardEyebrow}>{copy.eyebrow}</Text>
+                  <Text style={styles.cardTitle}>Check your phone</Text>
+                  <Text style={styles.cardSub}>
+                    6-digit code sent to <Text style={styles.cardSubStrong}>+91 {phone}</Text>
                   </Text>
 
-                  <View style={styles.panel}>
-                    <View style={{ position: 'relative' }}>
-                      <View style={styles.otpRow}>{renderOtpCells()}</View>
-                      <TextInput
-                        style={styles.otpHidden}
-                        value={otp}
-                        onChangeText={(t: string) => {
-                          setOtp(t.replace(/\D/g, '').slice(0, 6));
-                          setError('');
-                          setShowSignupPrompt(false);
-                        }}
-                        keyboardType="number-pad"
-                        maxLength={6}
-                        autoFocus
-                        caretHidden
-                      />
+                  <View style={{ position: 'relative', marginTop: 6 }}>
+                    <View style={styles.otpRow}>{renderOtpCells()}</View>
+                    <TextInput
+                      style={styles.otpHidden}
+                      value={otp}
+                      onChangeText={(t: string) => {
+                        setOtp(t.replace(/\D/g, '').slice(0, 6));
+                        setError('');
+                        setShowSignupPrompt(false);
+                      }}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      autoFocus
+                      caretHidden
+                    />
+                  </View>
+
+                  {error ? (
+                    <View style={styles.errorBox}>
+                      <Ionicons name="alert-circle" size={16} color={C.danger} />
+                      <Text style={styles.errorMsg}>{error}</Text>
                     </View>
+                  ) : null}
 
-                    {error ? (
-                      <View style={[styles.errorBox, { marginTop: 16 }]}>
-                        <Ionicons name="alert-circle" size={18} color="#FCA5A5" style={{ marginTop: 1 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.errorMsg}>{error}</Text>
-                        </View>
-                      </View>
-                    ) : null}
-
-                    <TouchableOpacity activeOpacity={0.9} onPress={handleVerifyOTP} disabled={loading} style={{ marginTop: 18 }}>
-                      <LinearGradient
-                        colors={loading ? ['#B9691A', '#B9691A'] : ['#FF9E3D', C.ember]}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                        style={styles.btnPrimary}
-                      >
-                        {loading ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <>
-                            <Text style={styles.btnPrimaryText}>Verify &amp; enter</Text>
-                            <Ionicons name="arrow-forward" size={16} color="#fff" />
-                          </>
-                        )}
-                      </LinearGradient>
-                    </TouchableOpacity>
-
-                    <View style={styles.resendRow}>
-                      {resendIn > 0 ? (
-                        <Text style={styles.resendMuted}>
-                          Didn't get it? Resend in{' '}
-                          <Text style={styles.resendClock}>0:{String(resendIn).padStart(2, '0')}</Text>
-                        </Text>
+                  <TouchableOpacity activeOpacity={0.88} onPress={handleVerifyOTP} disabled={loading} style={{ marginTop: 18 }}>
+                    <View style={[styles.btn, loading && styles.btnDisabled]}>
+                      {loading ? (
+                        <ActivityIndicator color="#fff" />
                       ) : (
-                        <TouchableOpacity onPress={handleResend} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <Text style={styles.resendActive}>Resend code</Text>
-                        </TouchableOpacity>
+                        <>
+                          <Text style={styles.btnText}>Verify & enter</Text>
+                          <Ionicons name="arrow-forward" size={16} color="#fff" />
+                        </>
                       )}
                     </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.resendRow}>
+                    {resendIn > 0 ? (
+                      <Text style={styles.resendMuted}>
+                        Resend in 0:{String(resendIn).padStart(2, '0')}
+                      </Text>
+                    ) : (
+                      <TouchableOpacity onPress={handleResend} disabled={loading}>
+                        <Text style={styles.resendActive}>Resend code</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   <TouchableOpacity
                     onPress={() => { setStep('phone'); setOtp(''); setError(''); setShowSignupPrompt(false); }}
-                    style={styles.linkBtn}
+                    style={styles.backBtn}
                   >
-                    <Text style={styles.linkText}>← Change number</Text>
+                    <Ionicons name="chevron-back" size={16} color={C.inkMuted} />
+                    <Text style={styles.backText}>Change number</Text>
                   </TouchableOpacity>
                 </>
               )}
             </Animated.View>
 
-            {/* Tagline spine — the brand journey, quiet at the foot */}
-            <Text style={styles.spine}>STAY · BELONG · SUCCEED</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.privacyBtn}>
+              <Text style={styles.privacyText}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <Text style={styles.foot}>Property OS</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -413,141 +436,146 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.plumNight },
-
-  glowWrap: { position: 'absolute', top: 0, left: 0, right: 0 },
-
-  scrollContent: {
+  root: { flex: 1, backgroundColor: C.night },
+  scroll: {
     flexGrow: 1,
-    paddingHorizontal: 28,
-    paddingBottom: 40,
+    paddingHorizontal: 22,
+    paddingTop: 28,
+    paddingBottom: 28,
   },
 
-  hero: { alignItems: 'center', marginTop: 48 },
-  markClip: {
-    width: 150,
-    height: 104,        // clip below the flame, above the baked wordmark
-    overflow: 'hidden',
-    alignItems: 'center',
-  },
-  markImg: {
-    width: 150,
-    height: 168,        // full art; only the top (flame) shows through the clip
-    resizeMode: 'contain',
-  },
+  hero: { alignItems: 'center', marginBottom: 28 },
+  logo: { width: 72, height: 72, resizeMode: 'contain' },
   wordmark: {
     marginTop: 10,
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '800',
-    letterSpacing: 6,
-    color: C.warmWhite,
-    paddingLeft: 6,      // optical balance for the tracked caps
+    letterSpacing: -0.6,
+    color: C.text,
   },
-
-  body: { marginTop: 30 },
-
-  eyebrow: {
+  tagline: {
+    marginTop: 6,
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 2.5,
-    color: C.mauveHaze,
-    marginBottom: 8,
+    fontWeight: '600',
+    letterSpacing: 2.2,
+    color: C.muted,
+    textTransform: 'uppercase',
   },
-  display: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: C.warmWhite,
-    letterSpacing: -1,
-    lineHeight: 38,
-  },
-  sub: {
-    fontSize: 14,
-    color: C.mauveHaze,
-    marginTop: 10,
-    lineHeight: 21,
-  },
-  subStrong: { color: C.warmWhite, fontWeight: '700' },
 
-  // Lamplit panel
-  panel: {
-    marginTop: 26,
-    backgroundColor: 'rgba(255,255,255,0.055)',
+  card: {
+    backgroundColor: C.card,
     borderRadius: 22,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 22,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
-
-  fieldLabel: {
+  cardEyebrow: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    color: C.mauveDim,
-    marginBottom: 10,
+    fontWeight: '800',
+    letterSpacing: 1.6,
+    color: C.accent,
+    marginBottom: 6,
   },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: C.ink,
+    letterSpacing: -0.5,
+  },
+  cardSub: {
+    fontSize: 14,
+    color: C.inkMuted,
+    marginTop: 8,
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  cardSubStrong: { color: C.ink, fontWeight: '700' },
 
-  inputField: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.10)',
+  portalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: C.line,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  portalIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  portalTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
+  portalSub: { fontSize: 12, color: C.inkMuted, marginTop: 2, fontWeight: '600' },
+
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.ink,
+    marginBottom: 8,
+  },
+  inputField: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: C.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
   },
   inputFieldActive: {
-    borderColor: C.ember,
-    backgroundColor: 'rgba(240,135,30,0.08)',
+    borderColor: C.accent,
+    backgroundColor: C.white,
   },
   inputPrefix: {
     fontSize: 15,
     fontWeight: '700',
-    color: C.warmWhite,
-    fontFamily: MONO,
-    marginRight: 12,
+    color: C.ink,
   },
   inputDivider: {
     width: 1,
-    height: 22,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    marginRight: 12,
+    height: 20,
+    backgroundColor: C.line,
+    marginHorizontal: 12,
   },
   inputControl: {
     flex: 1,
     fontSize: 16,
-    color: C.warmWhite,
-    fontFamily: MONO,
-    letterSpacing: 1.5,
+    color: C.ink,
+    letterSpacing: 0.6,
     paddingVertical: 0,
   },
 
-  // OTP
   otpRow: { flexDirection: 'row', gap: 8 },
   otpCell: {
     flex: 1,
-    height: 58,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: C.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
   otpCellFilled: {
-    borderColor: C.ember,
-    backgroundColor: 'rgba(240,135,30,0.12)',
+    borderColor: C.accent,
+    backgroundColor: '#EFF6FF',
   },
-  otpCellActive: {
-    borderColor: C.emberGlow,
-  },
-  otpCellText: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: C.warmWhite,
-    fontFamily: MONO,
-  },
-  otpCellDot: { color: 'rgba(185,166,212,0.35)', fontWeight: '400' },
+  otpCellActive: { borderColor: C.accent },
+  otpCellText: { fontSize: 20, fontWeight: '800', color: C.ink },
+  otpCellDot: { color: '#CBD5E1' },
   otpHidden: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
@@ -555,86 +583,58 @@ const styles = StyleSheet.create({
     color: 'transparent',
   },
 
-  // CTA
-  btnPrimary: {
-    height: 54,
+  btn: {
+    height: 52,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: C.ember,
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    backgroundColor: C.brand,
   },
-  btnPrimaryText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
+  btnDisabled: { opacity: 0.7 },
+  btnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
-  trustBox: {
-    marginTop: 16,
+  resendRow: { alignItems: 'center', marginTop: 16 },
+  resendMuted: { color: C.inkMuted, fontSize: 13, fontWeight: '600' },
+  resendActive: { color: C.accent, fontSize: 13, fontWeight: '800' },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+    gap: 2,
+  },
+  backText: { color: C.inkMuted, fontSize: 13, fontWeight: '700' },
+
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  trustText: {
-    flex: 1,
-    fontSize: 11.5,
-    color: C.mauveHaze,
-    lineHeight: 16,
-  },
-
-  resendRow: { alignItems: 'center', marginTop: 16 },
-  resendMuted: { color: C.mauveDim, fontSize: 13, fontWeight: '600' },
-  resendClock: { color: C.mauveHaze, fontFamily: MONO, letterSpacing: 0.5 },
-  resendActive: { color: C.emberGlow, fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
-
-  linkBtn: { alignItems: 'center', marginTop: 18, paddingVertical: 6 },
-  linkText: {
-    color: C.mauveHaze,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-
-  // Feedback boxes
-  errorBox: {
-    backgroundColor: 'rgba(220,38,38,0.14)',
+  errorMsg: { flex: 1, color: C.danger, fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  infoBox: {
+    backgroundColor: '#EFF6FF',
     borderRadius: 12,
     padding: 12,
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(252,165,165,0.28)',
-  },
-  errorMsg: { color: '#FCA5A5', fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  infoBox: {
-    backgroundColor: 'rgba(240,135,30,0.10)',
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 14,
+    marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,192,115,0.28)',
+    gap: 8,
   },
-  infoTitle: { color: C.emberGlow, fontSize: 13, fontWeight: '800' },
-  infoMsg: { color: C.mauveHaze, fontSize: 12, marginTop: 2, lineHeight: 17 },
+  infoMsg: { flex: 1, color: C.brandDeep, fontSize: 13, lineHeight: 18, fontWeight: '600' },
 
-  spine: {
+  privacyBtn: { alignItems: 'center', marginTop: 22, paddingVertical: 6 },
+  privacyText: { color: C.muted, fontSize: 13, fontWeight: '700' },
+  foot: {
     textAlign: 'center',
-    marginTop: 36,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 3,
-    color: 'rgba(185,166,212,0.5)',
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.dim,
   },
 });

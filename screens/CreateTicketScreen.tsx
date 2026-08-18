@@ -21,7 +21,10 @@ import {
 } from '../services/ticketService';
 // Web parity: tenant's room-allocated asset, resolved server-side and scoped
 // to just their bed (avoids shipping the org's whole allocation table).
-import { getAllocationForBed } from '../lib/supabaseService';
+import { getAllocationForBed, listAllocations, listAssets } from '../lib/supabaseService';
+// Web parity: admin/staff "Linked Asset" picker — ranks the location's
+// allocated assets against the issue (ported from the web resolver).
+import { computeTicketAssetSuggestion, formatTicketAssetLabel } from '../lib/ticketAssetResolution';
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low', color: '#16A34A', bg: '#DCFCE7' },
@@ -64,6 +67,17 @@ export default function CreateTicketScreen({ navigation }: any) {
 
   // Web parity: read-only "Linked to your room's allocated asset" line (tenant only).
   const [linkedAsset, setLinkedAsset] = useState<{ id: string; name: string } | null>(null);
+
+  // Web parity: admin/staff "Linked Asset" picker. `assetAllocations` is the
+  // org's allocations joined with full asset rows (resolver shape); recomputed
+  // into location-scoped `candidateAssets` as the form changes. `selectedAssetId`
+  // uses '' = unset, '__none' = explicitly no asset, else the chosen asset id.
+  const [assetAllocations, setAssetAllocations] = useState<any[]>([]);
+  const [candidateAssets, setCandidateAssets] = useState<any[]>([]);
+  const [selectedAssetId, setSelectedAssetId] = useState<string>('');
+  // True once the user hand-picks an asset — suppresses auto-suggestion until
+  // the location/issue type changes (see the reset effect below).
+  const assetManuallyPickedRef = useRef(false);
 
   // ── AI Issue Classifier (mirrors web useIssueClassifier) ──────────────────
   // CONFIDENCE thresholds: ≥85 = auto_select, 60–84 = suggest, <60 = manual
@@ -207,6 +221,48 @@ export default function CreateTicketScreen({ navigation }: any) {
     return () => { cancelled = true; };
   }, [isTenant, tenantLocation?.bedId]);
 
+  // Web parity (admin/staff): when the location or issue type changes, drop any
+  // prior pick + manual-pick flag so the next resolve re-suggests for the new
+  // context (prevents a stale asset id leaking into submit). Description edits do
+  // NOT reset it — a hand-picked asset survives further typing.
+  useEffect(() => {
+    if (isTenant) return;
+    assetManuallyPickedRef.current = false;
+    setSelectedAssetId('');
+  }, [isTenant, selectedProperty?.id, selectedApartment?.id, selectedBed?.id, selectedIssueType?.id]);
+
+  // Web parity (admin/staff): resolve candidate assets for the selected
+  // apartment/bed + issue type, auto-selecting the best match. Debounced so it
+  // rides along with description typing (mirrors the web resolve effect).
+  useEffect(() => {
+    if (isTenant) return;
+    const apartmentId = selectedApartment?.id || '';
+    const bedId = selectedBed?.id || '';
+    const propertyId = selectedProperty?.id || '';
+    const issueTypeId = selectedIssueType?.id || '';
+    if (!apartmentId || !issueTypeId || assetAllocations.length === 0) {
+      setCandidateAssets([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const { candidates, suggestedId } = computeTicketAssetSuggestion({
+        apartmentId, bedId, propertyId, issueTypeId,
+        description,
+        issueTypes,
+        assetAllocations,
+        apartmentBedIds: beds.map((b: any) => b.id),
+      });
+      setCandidateAssets(candidates);
+      if (!assetManuallyPickedRef.current) {
+        setSelectedAssetId(suggestedId || '');
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [
+    isTenant, selectedApartment?.id, selectedBed?.id, selectedProperty?.id,
+    selectedIssueType?.id, description, assetAllocations, issueTypes, beds,
+  ]);
+
   async function loadInitialData() {
     try {
       const [types, props, members] = await Promise.all([
@@ -220,6 +276,44 @@ export default function CreateTicketScreen({ navigation }: any) {
       if (isTenant && tenantLocation?.tenantId) {
         const { hasPending } = await checkTenantPendingTickets(tenantLocation.tenantId);
         if (hasPending) setPendingBlock(true);
+      }
+      // Admin/staff only: load org allocations + full asset rows and join them
+      // into the resolver's snake_case shape. `listAllocations` omits
+      // asset_type_id/status, so we pull those from `listAssets` (best-effort —
+      // the picker just stays hidden if this fails).
+      if (!isTenant) {
+        try {
+          const [allocs, assets] = await Promise.all([listAllocations(), listAssets()]);
+          const assetById: Record<string, any> = {};
+          for (const a of (assets as any[]) || []) {
+            assetById[a._id] = {
+              id: a._id,
+              asset_code: a.assetCode ?? null,
+              brand: a.brand ?? null,
+              model: a.model ?? null,
+              serial_number: a.serialNumber ?? null,
+              condition: a.condition ?? null,
+              status: a.status ?? null,
+              asset_type_id: a.assetTypeId ?? null,
+              notes: a.notes ?? null,
+              created_at: a._creationTime ?? 0,
+              asset_types: { name: a.typeName ?? null },
+            };
+          }
+          const joined = ((allocs as any[]) || [])
+            .filter((al: any) => al.asset_id && assetById[al.asset_id])
+            .map((al: any) => ({
+              allocation_type: al.allocation_type,
+              apartment_id: al.apartment_id,
+              bed_id: al.bed_id,
+              property_id: al.property_id,
+              asset_id: al.asset_id,
+              assets: assetById[al.asset_id],
+            }));
+          setAssetAllocations(joined);
+        } catch (e: any) {
+          console.warn('[CreateTicketScreen] asset allocation load failed:', e?.message);
+        }
       }
     } finally {
       setLoading(false);
@@ -352,6 +446,25 @@ export default function CreateTicketScreen({ navigation }: any) {
         ticketData.apartment_id = selectedApartment?.id || null;
         ticketData.bed_id = selectedBed?.id || null;
         ticketData.apartment_code = selectedBed?.bed_code || selectedApartment?.apartment_code || null;
+        // Web parity: linked asset. Respect an explicit "No specific asset"
+        // (__none) as null; otherwise use the pick, falling back to a fresh
+        // suggestion in case candidates resolved after the last render.
+        let resolvedAssetId: string | null =
+          selectedAssetId && selectedAssetId !== '__none' ? selectedAssetId : null;
+        if (!resolvedAssetId && selectedAssetId !== '__none' && selectedApartment?.id && selectedIssueType?.id) {
+          const { suggestedId } = computeTicketAssetSuggestion({
+            apartmentId: selectedApartment.id,
+            bedId: selectedBed?.id || '',
+            propertyId: selectedProperty?.id || '',
+            issueTypeId: selectedIssueType.id,
+            description: description.trim(),
+            issueTypes,
+            assetAllocations,
+            apartmentBedIds: beds.map((b: any) => b.id),
+          });
+          if (suggestedId) resolvedAssetId = suggestedId;
+        }
+        ticketData.asset_id = resolvedAssetId;
       }
 
       const ticket = await createTicket(ticketData);
@@ -387,7 +500,7 @@ export default function CreateTicketScreen({ navigation }: any) {
     return (
       <GlassBackground>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#7B2FBE" />
+          <ActivityIndicator size="large" color="#312E81" />
         </View>
       </GlassBackground>
     );
@@ -442,10 +555,10 @@ export default function CreateTicketScreen({ navigation }: any) {
 
             {/* Tenant: auto-filled location card */}
             {isTenant && tenantLocation && (
-              <View style={[glass.card, { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD', borderWidth: 1, marginBottom: spacing.lg }]}>
+              <View style={[glass.card, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE', borderWidth: 1, marginBottom: spacing.lg }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <Ionicons name="location-outline" size={16} color="#7B2FBE" />
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#7B2FBE' }}>Your Location</Text>
+                  <Ionicons name="location-outline" size={16} color="#312E81" />
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#312E81' }}>Your Location</Text>
                 </View>
                 <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>{tenantLocation.propertyName}</Text>
                 <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
@@ -465,7 +578,7 @@ export default function CreateTicketScreen({ navigation }: any) {
                 {/* Step 1: Describe the problem */}
                 <View style={[glass.card, { marginBottom: spacing.lg }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                    <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
                       <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>1</Text>
                     </View>
                     <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>What's the problem?</Text>
@@ -483,8 +596,8 @@ export default function CreateTicketScreen({ navigation }: any) {
                   {/* AI scanning indicator */}
                   {description.trim().length >= 4 && classifying && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                      <ActivityIndicator size="small" color="#7B2FBE" />
-                      <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE' }}>Identifying issue type…</Text>
+                      <ActivityIndicator size="small" color="#312E81" />
+                      <Text style={{ fontSize: fontSize.xs, color: '#312E81' }}>Identifying issue type…</Text>
                     </View>
                   )}
                 </View>
@@ -493,31 +606,31 @@ export default function CreateTicketScreen({ navigation }: any) {
                 {(selectedIssueType || classifierAction === 'auto_select' || classifierAction === 'manual') && (
                   <View style={[glass.card, { marginBottom: spacing.lg }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>2</Text>
                       </View>
                       <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Issue Type</Text>
                       {selectedIssueType && (
-                        <View style={{ backgroundColor: 'rgba(123,47,190,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, color: '#7B2FBE', fontWeight: '700' }}>AUTO-DETECTED</Text>
+                        <View style={{ backgroundColor: 'rgba(49,46,129,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, color: '#312E81', fontWeight: '700' }}>AUTO-DETECTED</Text>
                         </View>
                       )}
                     </View>
 
                     {selectedIssueType ? (
                       /* Auto-selected result — tap X to change */
-                      <View style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Ionicons name="sparkles" size={18} color="#7B2FBE" />
+                      <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Ionicons name="sparkles" size={18} color="#312E81" />
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#7B2FBE' }}>{selectedIssueType.name}</Text>
+                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#312E81' }}>{selectedIssueType.name}</Text>
                           {selectedIssueType.sla_hours && (
-                            <Text style={{ fontSize: 11, color: '#9B8BAE', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h</Text>
+                            <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h</Text>
                           )}
                         </View>
                         <TouchableOpacity
                           onPress={() => { setSelectedIssueType(null); setSelectedSubType(null); setSubTypes([]); setClassifierOverridden(true); setClassifierAction('idle'); lastClassifiedDescRef.current = ''; }}
                           style={{ padding: 6 }}>
-                          <Ionicons name="close-circle" size={20} color="#9B8BAE" />
+                          <Ionicons name="close-circle" size={20} color="#6B7280" />
                         </TouchableOpacity>
                       </View>
                     ) : (
@@ -539,13 +652,13 @@ export default function CreateTicketScreen({ navigation }: any) {
                 {selectedIssueType && (
                   <View style={[glass.card, { marginBottom: spacing.lg }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>3</Text>
                       </View>
                       <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Issue Details</Text>
                       {selectedSubType && (
-                        <View style={{ backgroundColor: 'rgba(123,47,190,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, color: '#7B2FBE', fontWeight: '700' }}>AUTO-DETECTED</Text>
+                        <View style={{ backgroundColor: 'rgba(49,46,129,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, color: '#312E81', fontWeight: '700' }}>AUTO-DETECTED</Text>
                         </View>
                       )}
                     </View>
@@ -554,11 +667,11 @@ export default function CreateTicketScreen({ navigation }: any) {
                     ) : subTypes.length === 0 ? (
                       <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>No sub-categories for this issue type.</Text>
                     ) : selectedSubType ? (
-                      <View style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Ionicons name="sparkles" size={16} color="#7B2FBE" />
-                        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: '#7B2FBE' }}>{selectedSubType.name}</Text>
+                      <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Ionicons name="sparkles" size={16} color="#312E81" />
+                        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: '#312E81' }}>{selectedSubType.name}</Text>
                         <TouchableOpacity onPress={() => setSelectedSubType(null)} style={{ padding: 4 }}>
-                          <Ionicons name="close-circle" size={18} color="#9B8BAE" />
+                          <Ionicons name="close-circle" size={18} color="#6B7280" />
                         </TouchableOpacity>
                       </View>
                     ) : (
@@ -592,6 +705,7 @@ export default function CreateTicketScreen({ navigation }: any) {
                   onSelect={onPropertySelect}
                   colors={colors}
                   icon="business-outline"
+                  selectedId={selectedProperty?.id}
                 />
 
                 {/* Step 2: Apartment — shown after property selected */}
@@ -609,6 +723,7 @@ export default function CreateTicketScreen({ navigation }: any) {
                         onSelect={onApartmentSelect}
                         colors={colors}
                         icon="grid-outline"
+                        selectedId={selectedApartment?.id}
                       />
                     ) : (
                       <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
@@ -635,6 +750,7 @@ export default function CreateTicketScreen({ navigation }: any) {
                         onSelect={(b: any) => setSelectedBed(b)}
                         colors={colors}
                         icon="bed-outline"
+                        selectedId={selectedBed?.id}
                       />
                     ) : (
                       <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
@@ -661,8 +777,8 @@ export default function CreateTicketScreen({ navigation }: any) {
                     />
                     {description.trim().length >= 4 && classifying && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: spacing.lg }}>
-                        <ActivityIndicator size="small" color="#7B2FBE" />
-                        <Text style={{ fontSize: fontSize.xs, color: '#7B2FBE' }}>Analyzing issue description…</Text>
+                        <ActivityIndicator size="small" color="#312E81" />
+                        <Text style={{ fontSize: fontSize.xs, color: '#312E81' }}>Analyzing issue description…</Text>
                       </View>
                     )}
                     {!(description.trim().length >= 4 && classifying) && <View style={{ marginBottom: spacing.lg }} />}
@@ -672,16 +788,16 @@ export default function CreateTicketScreen({ navigation }: any) {
                       <>
                         <SectionLabel>Issue Type *</SectionLabel>
                         {selectedIssueType ? (
-                          <View style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
-                            <Ionicons name="sparkles" size={18} color="#7B2FBE" />
+                          <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
+                            <Ionicons name="sparkles" size={18} color="#312E81" />
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#7B2FBE', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
-                              <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#7B2FBE' }}>{selectedIssueType.name}</Text>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#312E81', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
+                              <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#312E81' }}>{selectedIssueType.name}</Text>
                             </View>
                             <TouchableOpacity
                               onPress={() => { setSelectedIssueType(null); setSelectedSubType(null); setSubTypes([]); setClassifierOverridden(true); setClassifierAction('idle'); lastClassifiedDescRef.current = ''; }}
                               style={{ padding: 6 }}>
-                              <Ionicons name="close-circle" size={20} color="#9B8BAE" />
+                              <Ionicons name="close-circle" size={20} color="#6B7280" />
                             </TouchableOpacity>
                           </View>
                         ) : (
@@ -706,14 +822,14 @@ export default function CreateTicketScreen({ navigation }: any) {
                           <LoadingRow colors={colors} label="Identifying issue details…" />
                         ) : subTypes.length > 0 ? (
                           selectedSubType ? (
-                            <View style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
-                              <Ionicons name="sparkles" size={16} color="#7B2FBE" />
+                            <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
+                              <Ionicons name="sparkles" size={16} color="#312E81" />
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#7B2FBE', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
-                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#7B2FBE' }}>{selectedSubType.name}</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#312E81', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
+                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#312E81' }}>{selectedSubType.name}</Text>
                               </View>
                               <TouchableOpacity onPress={() => setSelectedSubType(null)} style={{ padding: 4 }}>
-                                <Ionicons name="close-circle" size={18} color="#9B8BAE" />
+                                <Ionicons name="close-circle" size={18} color="#6B7280" />
                               </TouchableOpacity>
                             </View>
                           ) : (
@@ -735,6 +851,45 @@ export default function CreateTicketScreen({ navigation }: any) {
                             <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>No sub-categories for this type</Text>
                           </View>
                         )}
+                      </>
+                    )}
+
+                    {/* Linked Asset — web parity. Shown only when the selected
+                        location has allocated assets matching the issue. */}
+                    {selectedIssueType && candidateAssets.length > 0 && (
+                      <>
+                        <SectionLabel>Linked Asset</SectionLabel>
+                        <DropdownPicker
+                          placeholder="Select asset (optional)"
+                          value={
+                            selectedAssetId === '__none'
+                              ? 'No specific asset'
+                              : selectedAssetId
+                                ? (formatTicketAssetLabel(candidateAssets.find((a: any) => a.id === selectedAssetId))
+                                    || candidateAssets.find((a: any) => a.id === selectedAssetId)?.asset_code
+                                    || null)
+                                : null
+                          }
+                          items={[{ id: '__none' }, ...candidateAssets]}
+                          labelKey="asset_code"
+                          labelFormatter={(a: any) =>
+                            a.id === '__none'
+                              ? 'No specific asset'
+                              : (formatTicketAssetLabel(a) || a.asset_code || 'Asset')
+                          }
+                          onSelect={(a: any) => {
+                            assetManuallyPickedRef.current = true;
+                            setSelectedAssetId(a.id === '__none' ? '__none' : a.id);
+                          }}
+                          colors={colors}
+                          icon="cube-outline"
+                          selectedId={selectedAssetId || undefined}
+                        />
+                        <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: -spacing.md, marginBottom: spacing.lg }}>
+                          {candidateAssets.length === 1
+                            ? 'Auto-linked from this location — tap to change.'
+                            : `${candidateAssets.length} assets found for this location — best match auto-selected.`}
+                        </Text>
                       </>
                     )}
 
@@ -780,19 +935,19 @@ export default function CreateTicketScreen({ navigation }: any) {
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity
                     onPress={takePhoto}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#7B2FBE', backgroundColor: '#F5F3FF' }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#312E81', backgroundColor: '#EEF2FF' }}
                   >
-                    <Ionicons name="camera-outline" size={18} color="#7B2FBE" />
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#7B2FBE' }}>
+                    <Ionicons name="camera-outline" size={18} color="#312E81" />
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#312E81' }}>
                       {isTenant && selectedPhotos.length > 0 ? 'Retake' : 'Camera'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={pickPhotos}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#7B2FBE', backgroundColor: '#F5F3FF' }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#312E81', backgroundColor: '#EEF2FF' }}
                   >
-                    <Ionicons name="image-outline" size={18} color="#7B2FBE" />
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#7B2FBE' }}>
+                    <Ionicons name="image-outline" size={18} color="#312E81" />
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#312E81' }}>
                       {isTenant && selectedPhotos.length > 0 ? 'Replace' : 'Gallery'}
                     </Text>
                   </TouchableOpacity>
@@ -807,9 +962,9 @@ export default function CreateTicketScreen({ navigation }: any) {
 
             {/* SLA info */}
             {selectedIssueType && (
-              <View style={{ backgroundColor: '#EDE9FE', borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="timer-outline" size={16} color="#7B2FBE" />
-                <Text style={{ fontSize: fontSize.sm, color: '#7B2FBE', fontWeight: '600' }}>
+              <View style={{ backgroundColor: '#EEF2FF', borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="timer-outline" size={16} color="#312E81" />
+                <Text style={{ fontSize: fontSize.sm, color: '#312E81', fontWeight: '600' }}>
                   SLA: {selectedIssueType.sla_hours}h from creation
                 </Text>
               </View>
@@ -819,7 +974,7 @@ export default function CreateTicketScreen({ navigation }: any) {
             <TouchableOpacity
               onPress={handleSubmit}
               disabled={submitting}
-              style={{ backgroundColor: '#7B2FBE', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', opacity: submitting ? 0.6 : 1 }}
+              style={{ backgroundColor: '#312E81', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', opacity: submitting ? 0.6 : 1 }}
             >
               {submitting ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -866,7 +1021,7 @@ function LoadingRow({ colors, label }: { colors: any; label: string }) {
       borderColor: colors.border, backgroundColor: colors.surface,
       marginBottom: spacing.lg,
     }}>
-      <ActivityIndicator size="small" color="#7B2FBE" />
+      <ActivityIndicator size="small" color="#312E81" />
       <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>{label}</Text>
     </View>
   );
@@ -899,16 +1054,16 @@ function DropdownPicker({ placeholder, value, items, labelKey, labelFormatter, o
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: spacing.md, paddingVertical: 14,
           borderRadius: borderRadius.md, borderWidth: 1,
-          borderColor: value ? '#7B2FBE' : colors.border,
-          backgroundColor: value ? '#F5F3FF' : colors.surface,
+          borderColor: value ? '#312E81' : colors.border,
+          backgroundColor: value ? '#EEF2FF' : colors.surface,
           marginBottom: spacing.lg, gap: 10,
         }}
       >
-        {icon && <Ionicons name={icon as any} size={18} color={value ? '#7B2FBE' : colors.textTertiary} />}
-        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: value ? '700' : '400', color: value ? '#7B2FBE' : colors.textTertiary }}>
+        {icon && <Ionicons name={icon as any} size={18} color={value ? '#312E81' : colors.textTertiary} />}
+        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: value ? '700' : '400', color: value ? '#312E81' : colors.textTertiary }}>
           {value || placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={16} color={value ? '#7B2FBE' : colors.textTertiary} />
+        <Ionicons name="chevron-down" size={16} color={value ? '#312E81' : colors.textTertiary} />
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -940,7 +1095,10 @@ function DropdownPicker({ placeholder, value, items, labelKey, labelFormatter, o
                 keyExtractor={(item) => String(item.id ?? item[labelKey])}
                 renderItem={({ item }) => {
                   const label = getLabel(item);
-                  const isSelected = allowDeselect ? selectedId === item.id : value === label;
+                  // Match on unique id when we have one — comparing by display label
+                  // marks EVERY row that shares a label (e.g. two apartments both "A23")
+                  // as selected. Fall back to label only when no id is provided.
+                  const isSelected = selectedId != null ? selectedId === item.id : value === label;
                   return (
                     <TouchableOpacity
                       onPress={() => { onSelect(item); setOpen(false); }}
@@ -948,13 +1106,13 @@ function DropdownPicker({ placeholder, value, items, labelKey, labelFormatter, o
                         flexDirection: 'row', alignItems: 'center',
                         paddingHorizontal: spacing.lg, paddingVertical: 14,
                         borderBottomWidth: 1, borderBottomColor: colors.border,
-                        backgroundColor: isSelected ? '#EDE9FE' : 'transparent',
+                        backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
                       }}
                     >
-                      <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#7B2FBE' : colors.text }}>
+                      <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#312E81' : colors.text }}>
                         {label}
                       </Text>
-                      {isSelected && <Ionicons name="checkmark-circle" size={18} color="#7B2FBE" />}
+                      {isSelected && <Ionicons name="checkmark-circle" size={18} color="#312E81" />}
                     </TouchableOpacity>
                   );
                 }}

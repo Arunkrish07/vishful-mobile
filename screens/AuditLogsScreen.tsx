@@ -26,7 +26,7 @@ const ACTION_OPTIONS = ['all', 'created', 'updated', 'deleted'];
 const PAGE_SIZE = 50;
 
 const ACTION_COLOR: Record<string, string> = {
-  created: '#16a34a', updated: '#E8841A', deleted: '#DC2626',
+  created: '#16a34a', updated: '#2563EB', deleted: '#DC2626',
 };
 
 function fmtTs(s: string | null) {
@@ -92,8 +92,8 @@ export default function AuditLogsScreen() {
             <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: '#1E1230' }}>Audit Logs</Text>
-            <Text style={{ fontSize: 12, color: '#9B8BAE' }}>{total} records · all data changes</Text>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Audit Logs</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Who changed what</Text>
           </View>
         </View>
 
@@ -101,17 +101,17 @@ export default function AuditLogsScreen() {
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
             <TouchableOpacity onPress={() => setTablePickerOpen(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)' }}>
-              <Ionicons name="filter" size={13} color="#7B2FBE" />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#7B2FBE' }}>
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <Ionicons name="filter" size={13} color="#2563EB" />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
                 {tableFilter === 'all' ? 'All tables' : tableFilter.replace(/_/g, ' ')}
               </Text>
-              <Ionicons name="chevron-down" size={12} color="#7B2FBE" />
+              <Ionicons name="chevron-down" size={12} color="#2563EB" />
             </TouchableOpacity>
             {ACTION_OPTIONS.map(a => (
               <TouchableOpacity key={a} onPress={() => setActionFilter(a)}
-                style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: actionFilter === a ? '#7B2FBE' : 'rgba(123,47,190,0.1)' }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'capitalize', color: actionFilter === a ? '#fff' : '#7B2FBE' }}>{a}</Text>
+                style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: actionFilter === a ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', textTransform: 'capitalize', color: actionFilter === a ? '#fff' : '#2563EB' }}>{a}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -122,59 +122,59 @@ export default function AuditLogsScreen() {
               value={performedBy}
               onChangeText={setPerformedBy}
               placeholder="Performed by (user id)"
-              placeholderTextColor="#9B8BAE"
+              placeholderTextColor="#6B7280"
               autoCapitalize="none"
-              style={{ flex: 1.4, fontSize: 12, color: '#1E1230', backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
+              style={{ flex: 1.4, fontSize: 12, color: '#111827', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
             />
             <TextInput
               value={fromDate}
               onChangeText={setFromDate}
               placeholder="From (YYYY-MM-DD)"
-              placeholderTextColor="#9B8BAE"
+              placeholderTextColor="#6B7280"
               autoCapitalize="none"
-              style={{ flex: 1, fontSize: 12, color: '#1E1230', backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
+              style={{ flex: 1, fontSize: 12, color: '#111827', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
             />
             <TextInput
               value={toDate}
               onChangeText={setToDate}
               placeholder="To (YYYY-MM-DD)"
-              placeholderTextColor="#9B8BAE"
+              placeholderTextColor="#6B7280"
               autoCapitalize="none"
-              style={{ flex: 1, fontSize: 12, color: '#1E1230', backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(123,47,190,0.2)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
+              style={{ flex: 1, fontSize: 12, color: '#111827', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
             />
           </View>
         </View>
 
         {loading && !refreshing ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#7B2FBE" />
-            <Text style={{ marginTop: 12, color: '#5C4B70' }}>Loading audit logs…</Text>
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text style={{ marginTop: 12, color: '#556274' }}>Loading audit logs…</Text>
           </View>
         ) : (
           <ScrollView
             contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#7B2FBE" />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
           >
             {rows.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                <Ionicons name="document-text-outline" size={56} color="rgba(123,47,190,0.18)" />
-                <Text style={{ marginTop: 12, color: '#9B8BAE' }}>No audit logs found</Text>
+                <Ionicons name="document-text-outline" size={56} color="rgba(37,99,235,0.18)" />
+                <Text style={{ marginTop: 12, color: '#6B7280' }}>No audit logs found</Text>
               </View>
             ) : rows.map((log) => (
-              <View key={log.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' }}>
+              <View key={log.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-                    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: (ACTION_COLOR[log.action] || '#7B2FBE') + '22' }}>
-                      <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'capitalize', color: ACTION_COLOR[log.action] || '#7B2FBE' }}>{log.action}</Text>
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: (ACTION_COLOR[log.action] || '#2563EB') + '22' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'capitalize', color: ACTION_COLOR[log.action] || '#2563EB' }}>{log.action}</Text>
                     </View>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E1230' }} numberOfLines={1}>{(log.tableName || '').replace(/_/g, ' ')}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{(log.tableName || '').replace(/_/g, ' ')}</Text>
                   </View>
-                  <Text style={{ fontSize: 10, color: '#9B8BAE' }}>{fmtTs(log.performedAt)}</Text>
+                  <Text style={{ fontSize: 10, color: '#6B7280' }}>{fmtTs(log.performedAt)}</Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#5C4B70', marginBottom: 4 }}>{renderChanges(log.changes)}</Text>
+                <Text style={{ fontSize: 12, color: '#556274', marginBottom: 4 }}>{renderChanges(log.changes)}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 11, color: '#7B2FBE', fontWeight: '600' }}>{log.performerName}</Text>
-                  {log.recordId ? <Text style={{ fontSize: 10, color: '#9B8BAE', fontFamily: 'monospace' as any }}>{String(log.recordId).slice(0, 8)}…</Text> : null}
+                  <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '600' }}>{log.performerName}</Text>
+                  {log.recordId ? <Text style={{ fontSize: 10, color: '#6B7280', fontFamily: 'monospace' as any }}>{String(log.recordId).slice(0, 8)}…</Text> : null}
                 </View>
               </View>
             ))}
@@ -184,12 +184,12 @@ export default function AuditLogsScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 8 }}>
                 <TouchableOpacity disabled={page <= 0} onPress={() => setPage(p => Math.max(0, p - 1))}
                   style={{ opacity: page <= 0 ? 0.35 : 1, padding: 8 }}>
-                  <Ionicons name="chevron-back" size={22} color="#7B2FBE" />
+                  <Ionicons name="chevron-back" size={22} color="#2563EB" />
                 </TouchableOpacity>
-                <Text style={{ fontSize: 13, color: '#5C4B70', fontWeight: '700' }}>Page {page + 1} of {totalPages}</Text>
+                <Text style={{ fontSize: 13, color: '#556274', fontWeight: '700' }}>Page {page + 1} of {totalPages}</Text>
                 <TouchableOpacity disabled={page + 1 >= totalPages} onPress={() => setPage(p => p + 1)}
                   style={{ opacity: page + 1 >= totalPages ? 0.35 : 1, padding: 8 }}>
-                  <Ionicons name="chevron-forward" size={22} color="#7B2FBE" />
+                  <Ionicons name="chevron-forward" size={22} color="#2563EB" />
                 </TouchableOpacity>
               </View>
             )}
@@ -200,13 +200,13 @@ export default function AuditLogsScreen() {
         <Modal visible={tablePickerOpen} transparent animationType="fade" onRequestClose={() => setTablePickerOpen(false)}>
           <TouchableOpacity activeOpacity={1} onPress={() => setTablePickerOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 32 }}>
             <View style={{ backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', maxHeight: '70%' }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#1E1230', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' }}>Filter by table</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>Filter by table</Text>
               <ScrollView>
                 {TABLE_OPTIONS.map(t => (
                   <TouchableOpacity key={t} onPress={() => { setTableFilter(t); setTablePickerOpen(false); }}
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.05)' }}>
-                    <Text style={{ fontSize: 14, fontWeight: tableFilter === t ? '800' : '500', color: tableFilter === t ? '#7B2FBE' : '#1E1230', textTransform: t === 'all' ? 'none' : 'capitalize' }}>{t === 'all' ? 'All tables' : t.replace(/_/g, ' ')}</Text>
-                    {tableFilter === t && <Ionicons name="checkmark" size={18} color="#7B2FBE" />}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                    <Text style={{ fontSize: 14, fontWeight: tableFilter === t ? '800' : '500', color: tableFilter === t ? '#2563EB' : '#111827', textTransform: t === 'all' ? 'none' : 'capitalize' }}>{t === 'all' ? 'All tables' : t.replace(/_/g, ' ')}</Text>
+                    {tableFilter === t && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                   </TouchableOpacity>
                 ))}
               </ScrollView>

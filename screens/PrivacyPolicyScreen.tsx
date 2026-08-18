@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, fontSize } from '../lib/theme';
+import { spacing, fontSize } from '../lib/theme';
 
 export default function PrivacyPolicyScreen() {
   const nav = useNavigation();
@@ -12,7 +12,7 @@ export default function PrivacyPolicyScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
+          <Ionicons name="arrow-back" size={22} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Privacy Policy</Text>
         <View style={{ width: 36 }} />
@@ -78,7 +78,7 @@ export default function PrivacyPolicyScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -86,49 +86,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
   backBtn: {
     width: 36, height: 36,
-    borderRadius: 18,
+    borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
     fontSize: fontSize.lg,
     fontWeight: '700',
-    color: colors.text,
+    color: '#111827',
   },
   content: {
     padding: spacing.xxl,
   },
   lastUpdated: {
     fontSize: fontSize.xs,
-    color: colors.textTertiary,
+    color: '#6B7280',
     marginBottom: spacing.xl,
   },
   sectionTitle: {
     fontSize: fontSize.md,
     fontWeight: '700',
-    color: colors.text,
+    color: '#111827',
     marginTop: spacing.xl,
     marginBottom: spacing.sm,
   },
   body: {
     fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    color: '#556274',
     lineHeight: 22,
     marginBottom: spacing.sm,
   },
   bullet: {
     fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    color: '#556274',
     lineHeight: 22,
     marginBottom: spacing.xs,
     paddingLeft: spacing.sm,
   },
   bold: {
     fontWeight: '600',
-    color: colors.text,
+    color: '#111827',
   },
 });

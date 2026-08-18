@@ -56,8 +56,8 @@ export default function TechnicianProfileScreen() {
           <View style={[glass.card, { alignItems: 'center', paddingVertical: spacing.xxl }]}>
             <View style={{
               width: 80, height: 80, borderRadius: 24,
-              backgroundColor: '#7B2FBE', alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#7B2FBE', shadowOpacity: 0.35, shadowRadius: 16, elevation: 8,
+              backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#312E81', shadowOpacity: 0.35, shadowRadius: 16, elevation: 8,
               marginBottom: spacing.lg,
             }}>
               <Text style={{ fontSize: 36, fontWeight: '900', color: '#fff' }}>{initials}</Text>
@@ -69,7 +69,7 @@ export default function TechnicianProfileScreen() {
               {user?.phone || ''}
             </Text>
             <View style={{ marginTop: spacing.md }}>
-              <Badge text="Technician" color="#7B2FBE" />
+              <Badge text="Technician" color="#312E81" />
             </View>
             <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: spacing.sm }}>
               {user?.organizationName || 'Vishful Spaces LLP'}
@@ -82,7 +82,7 @@ export default function TechnicianProfileScreen() {
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
             {[
-              { label: 'Total', value: stats.total, color: '#7B2FBE', icon: 'layers-outline' },
+              { label: 'Total', value: stats.total, color: '#312E81', icon: 'layers-outline' },
               { label: 'Active', value: stats.active, color: colors.primary, icon: 'construct-outline' },
               { label: 'Done', value: stats.completed, color: '#10B981', icon: 'checkmark-circle-outline' },
               { label: 'Avg Time', value: stats.avgResolution, color: '#F59E0B', icon: 'time-outline' },
@@ -116,7 +116,7 @@ export default function TechnicianProfileScreen() {
               return (
                 <View key={status} style={{
                   flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                  paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(224,213,234,0.2)',
+                  paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(229,231,235,0.2)',
                 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cfg.color }} />
