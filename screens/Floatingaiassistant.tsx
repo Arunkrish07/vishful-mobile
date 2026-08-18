@@ -148,9 +148,10 @@ export default function FloatingAIAssistant() {
     setBusy(false);
   };
 
-  // Only show for admin / employee roles (not tenant)
+  // Web parity: only show for known staff roles — never for tenants, and never
+  // before a role has loaded (previously an empty role still rendered the FAB).
   const role = (user as any)?.role || (user as any)?.userType || '';
-  if (role === 'tenant') return null;
+  if (!role || role === 'tenant') return null;
 
   return (
     <>
