@@ -4,10 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, borderRadius, fontSize, glass } from '../lib/theme';
-import { Button, Input, Badge, EmptyState, LoadingScreen, PickerSelect, GlassBackground, DateField } from '../components/shared';
+import { Button, Input, Badge, EmptyState, LoadingScreen, PickerSelect, GlassBackground, DateField, SearchField, IconBtnSolid } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 
 const statusColor = (s: string) => {
@@ -17,11 +16,6 @@ const statusColor = (s: string) => {
 
 export default function AccountingScreen() {
   const { token } = useAuth();
-  
-  
-  
-  
-  const nav = useNavigation();
   const mounted = useMountedRef();
 
   const [invoices, setInvoices] = useState<any[] | null>(null);
@@ -39,8 +33,10 @@ export default function AccountingScreen() {
   const [dueDate, setDueDate] = useState('');
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState('cash');
+  const [payRef, setPayRef] = useState('');
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -83,7 +79,8 @@ export default function AccountingScreen() {
         rentAmount,
         electricityAmount: Number(elec) || 0,
         otherCharges: Number(other) || 0,
-        dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        // Web parity: default due date is the 7th of the billing month (not now+7d).
+        dueDate: dueDate || (/^\d{4}-\d{2}$/.test(month) ? `${month}-07` : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]),
       });
       setShowAdd(false);
       setTenantId(''); setMonth(''); setRent(''); setElec('0'); setOther('0');
@@ -94,6 +91,10 @@ export default function AccountingScreen() {
 
   const handlePayment = async () => {
     if (!payAmount || !showPay) return;
+    const balance = Number(showPay.totalAmount || 0) - Number(showPay.paidAmount || 0);
+    const amt = Number(payAmount);
+    if (!(amt > 0)) { Alert.alert('Invalid amount', 'Enter a payment amount greater than 0.'); return; }
+    if (amt > balance + 0.01) { Alert.alert('Amount too high', `Payment cannot exceed the outstanding balance of Rs ${balance.toLocaleString('en-IN')}.`); return; }
     setLoading(true);
     try {
       await sb.recordPayment({
@@ -101,9 +102,10 @@ export default function AccountingScreen() {
         invoiceId: showPay._id,
         paymentDate: new Date().toISOString().split('T')[0],
         paymentMode: payMode,
-        amountPaid: Number(payAmount),
+        amountPaid: amt,
+        referenceNumber: payRef.trim() || null,
       });
-      setShowPay(null); setPayAmount('');
+      setShowPay(null); setPayAmount(''); setPayRef('');
       setRefreshKey((k: number) => k + 1);
     } catch (e: any) { Alert.alert('Error', e.message); }
     setLoading(false);
@@ -111,7 +113,13 @@ export default function AccountingScreen() {
 
   if (!invoices) return <LoadingScreen />;
 
-  const filtered = filter === 'all' ? invoices : invoices.filter((i: any) => i.status === filter);
+  const filtered = (filter === 'all' ? invoices : invoices.filter((i: any) => i.status === filter))
+    .filter((i: any) => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      return [i.invoiceNumber, i.tenantName, i.propertyName, i.billingMonth, i.status]
+        .filter(Boolean).some((v: any) => String(v).toLowerCase().includes(q));
+    });
   const activeStays = stays.filter((s: any) => s.status === 'active');
   const tenantOpts = activeStays.map((s: any) => ({ label: `${s.tenantName} (${s.bedCode})`, value: s.tenantId }));
   const payModes = [
@@ -131,10 +139,10 @@ export default function AccountingScreen() {
         <View style={{ width: 38, height: 28, overflow: 'hidden', alignItems: 'center', marginRight: 10 }}>
           <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
         </View>
-        <Text style={{ flex: 1, fontSize: fontSize.xl, fontWeight: '800', color: colors.text, letterSpacing: -0.3 }}>Accounting</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
-          <Ionicons name="add" size={24} color={colors.white} />
-        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Accounts</Text>
+        </View>
+        <IconBtnSolid onPress={() => setShowAdd(true)} />
       </View>
       {totalPending > 0 && (
         <View style={styles.pendingBanner}>
@@ -142,6 +150,9 @@ export default function AccountingScreen() {
           <Text style={styles.pendingText}>Pending: Rs {totalPending.toLocaleString()}</Text>
         </View>
       )}
+      <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
+        <SearchField value={search} onChangeText={setSearch} placeholder="Search accounts..." />
+      </View>
       <ScrollView horizontal style={styles.filters} showsHorizontalScrollIndicator={false}>
         {['all', 'sent', 'partial', 'paid', 'overdue'].map(f => (
           <TouchableOpacity key={f} style={[styles.filterChip, filter === f && styles.filterActive]} onPress={() => setFilter(f)}>
@@ -192,7 +203,7 @@ export default function AccountingScreen() {
             <Input label="Electricity Amount" value={elec} onChangeText={setElec} placeholder="0" keyboardType="numeric" />
             <Input label="Other Charges" value={other} onChangeText={setOther} placeholder="0" keyboardType="numeric" />
             <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#5C4B70', marginBottom: 6 }}>Due Date</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Due Date</Text>
               <DateField value={dueDate} onChange={setDueDate} />
             </View>
             <Button title="Create Invoice" onPress={handleCreate} loading={loading} icon="receipt-outline" />
@@ -227,6 +238,7 @@ export default function AccountingScreen() {
                   <Input label="Amount" value={payAmount} onChangeText={setPayAmount}
                     placeholder={String(showPay.totalAmount - showPay.paidAmount)} keyboardType="numeric" />
                   <PickerSelect label="Payment Mode" value={payMode} options={payModes} onSelect={setPayMode} />
+                  <Input label="Reference No. (UTR / txn ref)" value={payRef} onChangeText={setPayRef} placeholder="Optional — bank/UPI reference" />
                   <Button title="Record Payment" onPress={handlePayment} loading={loading} icon="cash-outline" />
                 </>
               )}
@@ -259,20 +271,20 @@ const styles = StyleSheet.create({
   filterText: { fontSize: fontSize.sm, color: colors.textSecondary, textTransform: 'capitalize', fontWeight: '600' },
   filterTextActive: { color: colors.white, fontWeight: '700' },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 22, padding: spacing.lg,
-    marginBottom: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-    shadowColor: '#7B2FBE', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: spacing.lg,
+    marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB',
+    shadowColor: '#1D4ED8', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3,
   },
   invNum: { fontSize: fontSize.xs, fontWeight: '700', color: colors.primary },
   cardTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   cardSub: { fontSize: fontSize.sm, color: colors.textSecondary },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
   },
   summaryCard: {
-    backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 22, padding: spacing.xl, marginBottom: spacing.xl,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: spacing.xl, marginBottom: spacing.xl,
+    borderWidth: 1, borderColor: '#E5E7EB',
   },
   summaryLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 8 },
   summaryValue: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text },
