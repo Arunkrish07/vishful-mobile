@@ -7,7 +7,7 @@
  */
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Image,
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Image, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,30 +21,42 @@ const fmtInr = (v: number) => `₹${(Number(v) || 0).toLocaleString('en-IN')}`;
 // Web parity: competitor segment filter chips.
 const SEGMENTS = ['all', 'budget', 'mid-range', 'premium', 'luxury'];
 
+// Group tracked localities by city for the Settings tab.
+const groupByCity = (list: any[]): [string, any[]][] => {
+  const m: Record<string, any[]> = {};
+  list.forEach((t) => { const c = t.locality?.city || 'Other'; (m[c] = m[c] || []).push(t); });
+  return Object.entries(m);
+};
+
 export default function MarketScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const canManage = user?.role === 'admin' || user?.role === 'super_admin';
-  const [tab, setTab] = useState<'competitors' | 'expansion'>('competitors');
+  const [tab, setTab] = useState<'competitors' | 'expansion' | 'settings'>('competitors');
   const [competitors, setCompetitors] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [localities, setLocalities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [seg, setSeg] = useState('all');
   const [expandedCompetitor, setExpandedCompetitor] = useState<string | null>(null);
+  const [locName, setLocName] = useState('');
+  const [locCity, setLocCity] = useState('');
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const [comp, opps] = await Promise.all([
+      const [comp, opps, locs] = await Promise.all([
         sb.getMarketCompetitors({}).catch(() => []),
         sb.getExpansionOpportunities().catch(() => []),
+        sb.getTrackedLocalities().catch(() => []),
       ]);
       setCompetitors(Array.isArray(comp) ? comp : []);
       setOpportunities(Array.isArray(opps) ? opps : []);
+      setLocalities(Array.isArray(locs) ? locs : []);
     } catch {
-      setCompetitors([]); setOpportunities([]);
+      setCompetitors([]); setOpportunities([]); setLocalities([]);
     } finally {
       setLoading(false); setRefreshing(false);
     }
@@ -79,6 +91,45 @@ export default function MarketScreen() {
     } finally { setBusy(null); }
   }, []);
 
+  // ── Tracked-locality CRUD (Settings tab) ──
+  const doAddLocality = useCallback(async () => {
+    const name = locName.trim(), city = locCity.trim();
+    if (!name || !city) { Alert.alert('Missing info', 'Enter both a locality name and a city.'); return; }
+    setBusy('addLoc');
+    try {
+      const r = await sb.upsertTrackedLocality(name, city);
+      if (r?.ok === false) { Alert.alert('Could not add', r.reason || 'Unknown error'); return; }
+      setLocName(''); setLocCity('');
+    } catch (e: any) { Alert.alert('Could not add', e?.message || 'Unknown error'); }
+    finally { setBusy(null); await load(true); }
+  }, [locName, locCity, load]);
+
+  const doToggleLocality = useCallback(async (id: string) => {
+    setBusy('tog:' + id);
+    try { const r = await sb.toggleTrackedLocality(id); if (r?.ok === false) Alert.alert('Failed', r.reason || 'Error'); }
+    catch (e: any) { Alert.alert('Failed', e?.message || 'Error'); }
+    finally { setBusy(null); await load(true); }
+  }, [load]);
+
+  const doRemoveLocality = useCallback((id: string, name?: string) => {
+    Alert.alert('Remove locality', `Stop tracking ${name || 'this locality'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        setBusy('rm:' + id);
+        try { const r = await sb.removeTrackedLocality(id); if (r?.ok === false) Alert.alert('Failed', r.reason || 'Error'); }
+        catch (e: any) { Alert.alert('Failed', e?.message || 'Error'); }
+        finally { setBusy(null); await load(true); }
+      } },
+    ]);
+  }, [load]);
+
+  const doToggleCityWide = useCallback(async (city: string) => {
+    setBusy('cw:' + city);
+    try { const r = await sb.toggleCityWideScan(city); if (r?.ok === false) Alert.alert('Failed', r.reason || 'Error'); }
+    catch (e: any) { Alert.alert('Failed', e?.message || 'Error'); }
+    finally { setBusy(null); await load(true); }
+  }, [load]);
+
   const deepIntelCount = competitors.filter((c) => c.crawlStatus === 'success').length;
   const shownCompetitors = seg === 'all'
     ? competitors
@@ -110,7 +161,8 @@ export default function MarketScreen() {
           {([
             { k: 'competitors', label: `Competitors${competitors.length ? ` (${competitors.length})` : ''}` },
             { k: 'expansion', label: `Expansion${opportunities.length ? ` (${opportunities.length})` : ''}` },
-          ] as const).map(x => (
+            ...(canManage ? [{ k: 'settings', label: 'Settings' }] : []),
+          ] as { k: string; label: string }[]).map(x => (
             <TouchableOpacity key={x.k} onPress={() => setTab(x.k as any)}
               style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: tab === x.k ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: tab === x.k ? '#fff' : '#2563EB' }}>{x.label}</Text>
@@ -264,6 +316,57 @@ export default function MarketScreen() {
                   </View>
                 </View>
               ))
+            )}
+
+            {tab === 'settings' && (
+              <>
+                {/* Add a tracked locality */}
+                <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', marginBottom: 8 }}>Track a locality</Text>
+                  <TextInput value={locName} onChangeText={setLocName} placeholder="Locality name (e.g. Koramangala)" placeholderTextColor="#9CA3AF"
+                    style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827', marginBottom: 8 }} />
+                  <TextInput value={locCity} onChangeText={setLocCity} placeholder="City (e.g. Bengaluru)" placeholderTextColor="#9CA3AF"
+                    style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827', marginBottom: 10 }} />
+                  <TouchableOpacity disabled={!!busy} onPress={doAddLocality}
+                    style={{ backgroundColor: '#2563EB', borderRadius: 10, paddingVertical: 11, alignItems: 'center', opacity: busy ? 0.6 : 1 }}>
+                    {busy === 'addLoc' ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Add locality</Text>}
+                  </TouchableOpacity>
+                </View>
+
+                {localities.length === 0 ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                    <Ionicons name="location-outline" size={48} color="rgba(37,99,235,0.18)" />
+                    <Text style={{ marginTop: 10, color: '#6B7280' }}>No tracked localities yet</Text>
+                    <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Add one above to start tracking competitors there.</Text>
+                  </View>
+                ) : groupByCity(localities).map(([city, items]) => (
+                  <View key={city} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: 'rgba(37,99,235,0.05)' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{city} <Text style={{ color: '#6B7280', fontWeight: '600' }}>({items.filter((i: any) => i.isActive).length}/{items.length})</Text></Text>
+                      <TouchableOpacity disabled={!!busy} onPress={() => doToggleCityWide(city)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: busy ? 0.5 : 1 }}>
+                        <Ionicons name={items.some((i: any) => i.cityWideScan) ? 'checkbox' : 'square-outline'} size={16} color="#2563EB" />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>City-wide scan</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {items.map((t: any) => (
+                      <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                        <View style={{ flexShrink: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{t.locality?.name || '—'}</Text>
+                          <Text style={{ fontSize: 11, color: t.isActive ? '#16a34a' : '#9CA3AF', fontWeight: '700' }}>{t.isActive ? 'Active' : 'Paused'}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TouchableOpacity disabled={!!busy} onPress={() => doToggleLocality(t.id)} style={{ padding: 6, opacity: busy ? 0.5 : 1 }}>
+                            <Ionicons name={t.isActive ? 'pause' : 'play'} size={16} color="#D97706" />
+                          </TouchableOpacity>
+                          <TouchableOpacity disabled={!!busy} onPress={() => doRemoveLocality(t.id, t.locality?.name)} style={{ padding: 6, opacity: busy ? 0.5 : 1 }}>
+                            <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </>
             )}
           </ScrollView>
         )}

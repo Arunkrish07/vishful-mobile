@@ -125,3 +125,99 @@ export const retryMarketIntel = action({
     }
   },
 });
+
+// ─── TRACKED LOCALITIES (Settings tab CRUD) ──────────────────────────────────
+// Web parity: wraps the same RPCs as web useMarketLocalities — the only way to
+// add/pause/remove the localities the scraper tracks. Mutating RPCs (not the
+// deferred market-trigger edge fn), so these work once deployed.
+export const getTrackedLocalities = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    try {
+      const { data, error } = await (sb.rpc as any)("get_tracked_localities", { p_organization_id: ORG_ID });
+      if (error) throw error;
+      const rows: any[] = Array.isArray(data) ? data : [];
+      return rows.map((t) => ({
+        id: t.id,
+        isActive: t.is_active ?? true,
+        cityWideScan: t.city_wide_scan ?? false,
+        createdAt: t.created_at || null,
+        locality: {
+          id: t.locality?.id || null,
+          name: t.locality?.name || null,
+          city: t.locality?.city || null,
+          state: t.locality?.state || null,
+        },
+      }));
+    } catch (e: any) {
+      console.warn("[market] get_tracked_localities failed:", e?.message);
+      return [];
+    }
+  },
+});
+
+export const upsertTrackedLocality = action({
+  args: { localityName: v.string(), city: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { localityName, city }) => {
+    const sb = getSupabase();
+    try {
+      const { data, error } = await (sb.rpc as any)("upsert_tracked_locality", {
+        p_organization_id: ORG_ID,
+        p_locality_name: localityName,
+        p_city: city,
+      });
+      if (error) return { ok: false, reason: error.message || "Could not add locality" };
+      return { ok: true, data };
+    } catch (e: any) {
+      return { ok: false, reason: e?.message || "Could not add locality" };
+    }
+  },
+});
+
+export const toggleTrackedLocality = action({
+  args: { trackingId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { trackingId }) => {
+    const sb = getSupabase();
+    try {
+      const { error } = await (sb.rpc as any)("toggle_tracked_locality", { p_tracking_id: trackingId, p_organization_id: ORG_ID });
+      if (error) return { ok: false, reason: error.message };
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, reason: e?.message || "toggle failed" };
+    }
+  },
+});
+
+export const removeTrackedLocality = action({
+  args: { trackingId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { trackingId }) => {
+    const sb = getSupabase();
+    try {
+      const { error } = await (sb.rpc as any)("remove_tracked_locality", { p_tracking_id: trackingId, p_organization_id: ORG_ID });
+      if (error) return { ok: false, reason: error.message };
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, reason: e?.message || "remove failed" };
+    }
+  },
+});
+
+export const toggleCityWideScan = action({
+  args: { city: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { city }) => {
+    const sb = getSupabase();
+    try {
+      const { error } = await (sb.rpc as any)("toggle_city_wide_scan", { p_organization_id: ORG_ID, p_city: city });
+      if (error) return { ok: false, reason: error.message };
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, reason: e?.message || "toggle failed" };
+    }
+  },
+});

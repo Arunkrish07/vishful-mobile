@@ -587,6 +587,22 @@ export async function triggerMarketScan() {
 export async function retryMarketIntel() {
   return client.action((api as any).market.retryMarketIntel, {});
 }
+// Tracked-locality CRUD (Market Settings tab)
+export async function getTrackedLocalities() {
+  return client.action((api as any).market.getTrackedLocalities, {});
+}
+export async function upsertTrackedLocality(localityName: string, city: string) {
+  return client.action((api as any).market.upsertTrackedLocality, { localityName, city });
+}
+export async function toggleTrackedLocality(trackingId: string) {
+  return client.action((api as any).market.toggleTrackedLocality, { trackingId });
+}
+export async function removeTrackedLocality(trackingId: string) {
+  return client.action((api as any).market.removeTrackedLocality, { trackingId });
+}
+export async function toggleCityWideScan(city: string) {
+  return client.action((api as any).market.toggleCityWideScan, { city });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERIC CRUD (kept for backward compatibility)
