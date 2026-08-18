@@ -32,10 +32,12 @@ export default function MarketScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const canManage = user?.role === 'admin' || user?.role === 'super_admin';
-  const [tab, setTab] = useState<'competitors' | 'expansion' | 'settings'>('competitors');
+  const [tab, setTab] = useState<'competitors' | 'benchmark' | 'expansion' | 'settings'>('competitors');
   const [competitors, setCompetitors] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [localities, setLocalities] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
+  const [benchmark, setBenchmark] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -47,16 +49,20 @@ export default function MarketScreen() {
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const [comp, opps, locs] = await Promise.all([
+      const [comp, opps, locs, summ, bench] = await Promise.all([
         sb.getMarketCompetitors({}).catch(() => []),
         sb.getExpansionOpportunities().catch(() => []),
         sb.getTrackedLocalities().catch(() => []),
+        sb.getMarketSummary().catch(() => null),
+        sb.getMarketBenchmark().catch(() => []),
       ]);
       setCompetitors(Array.isArray(comp) ? comp : []);
       setOpportunities(Array.isArray(opps) ? opps : []);
       setLocalities(Array.isArray(locs) ? locs : []);
+      setSummary(summ || null);
+      setBenchmark(Array.isArray(bench) ? bench : []);
     } catch {
-      setCompetitors([]); setOpportunities([]); setLocalities([]);
+      setCompetitors([]); setOpportunities([]); setLocalities([]); setSummary(null); setBenchmark([]);
     } finally {
       setLoading(false); setRefreshing(false);
     }
@@ -145,7 +151,14 @@ export default function MarketScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Market AI</Text>
-            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Competitor pricing & locality trends</Text>
+            {summary && (summary.competitorCount > 0 || summary.trackedLocalities > 0) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, alignSelf: 'flex-start', backgroundColor: 'rgba(22,163,74,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                <Ionicons name="checkmark-circle" size={12} color="#16a34a" />
+                <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>{summary.competitorCount} competitors · {summary.trackedLocalities} localities</Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Competitor pricing & locality trends</Text>
+            )}
           </View>
           {canManage && (
             <TouchableOpacity disabled={!!busy} onPress={doScan}
@@ -160,6 +173,7 @@ export default function MarketScreen() {
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 }}>
           {([
             { k: 'competitors', label: `Competitors${competitors.length ? ` (${competitors.length})` : ''}` },
+            { k: 'benchmark', label: 'Benchmark' },
             { k: 'expansion', label: `Expansion${opportunities.length ? ` (${opportunities.length})` : ''}` },
             ...(canManage ? [{ k: 'settings', label: 'Settings' }] : []),
           ] as { k: string; label: string }[]).map(x => (
@@ -313,6 +327,33 @@ export default function MarketScreen() {
                   </View>
                   <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: op.opportunityScore >= 70 ? '#2563EB' : 'rgba(37,99,235,0.12)' }}>
                     <Text style={{ fontSize: 12, fontWeight: '900', color: op.opportunityScore >= 70 ? '#fff' : '#2563EB' }}>Score {op.opportunityScore}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {tab === 'benchmark' && (
+              benchmark.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 60 }}>
+                  <Ionicons name="stats-chart-outline" size={56} color="rgba(37,99,235,0.18)" />
+                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No pricing benchmark yet</Text>
+                  <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Pricing data populates after room-type extraction completes.</Text>
+                </View>
+              ) : benchmark.map((row, i) => (
+                <View key={`${row.localityName}-${row.roomTypeLabel}-${i}`} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 10 }}>{row.localityName || '—'}{row.roomTypeLabel ? ` — ${row.roomTypeLabel}` : ''}</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    {[
+                      { l: 'P25', v: row.priceP25 != null ? fmtInr(row.priceP25) : '—', tone: '#374151' },
+                      { l: 'Median', v: row.priceMedian != null ? fmtInr(row.priceMedian) : '—', tone: '#2563EB' },
+                      { l: 'P75', v: row.priceP75 != null ? fmtInr(row.priceP75) : '—', tone: '#374151' },
+                      { l: 'Properties', v: String(row.propertyCount ?? 0), tone: '#374151' },
+                    ].map((c) => (
+                      <View key={c.l} style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 2 }}>{c.l}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: c.tone }}>{c.v}</Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
               ))

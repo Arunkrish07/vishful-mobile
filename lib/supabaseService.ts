@@ -603,6 +603,12 @@ export async function removeTrackedLocality(trackingId: string) {
 export async function toggleCityWideScan(city: string) {
   return client.action((api as any).market.toggleCityWideScan, { city });
 }
+export async function getMarketSummary() {
+  return client.action((api as any).market.getMarketSummary, {});
+}
+export async function getMarketBenchmark() {
+  return client.action((api as any).market.getMarketBenchmark, {});
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERIC CRUD (kept for backward compatibility)

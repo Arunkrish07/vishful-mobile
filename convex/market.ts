@@ -221,3 +221,51 @@ export const toggleCityWideScan = action({
     }
   },
 });
+
+// ─── SUMMARY + PRICING BENCHMARK (web get_market_summary_v1 / _benchmark_v1) ──
+export const getMarketSummary = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    try {
+      const { data, error } = await (sb.rpc as any)("get_market_summary_v1", { p_organization_id: ORG_ID });
+      if (error) throw error;
+      const d: any = data || {};
+      return {
+        competitorCount: d.competitorCount ?? d.competitor_count ?? 0,
+        trackedLocalities: d.trackedLocalities ?? d.tracked_localities ?? 0,
+        lastScrapedAt: d.lastScrapedAt ?? d.last_scraped_at ?? null,
+        avgMarketPrice: d.avgMarketPrice ?? d.avg_market_price ?? null,
+      };
+    } catch (e: any) {
+      console.warn("[market] get_market_summary_v1 failed:", e?.message);
+      return null;
+    }
+  },
+});
+
+export const getMarketBenchmark = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    try {
+      const { data, error } = await (sb.rpc as any)("get_market_benchmark_v1", { p_organization_id: ORG_ID });
+      if (error) throw error;
+      const rows: any[] = Array.isArray(data?.localities) ? data.localities : (Array.isArray(data) ? data : []);
+      return rows.map((r) => ({
+        localityName: r.locality_name || null,
+        roomTypeLabel: r.room_type_label || null,
+        priceMedian: r.price_median ?? null,
+        priceP25: r.price_p25 ?? null,
+        priceP75: r.price_p75 ?? null,
+        priceAvg: r.price_avg ?? null,
+        propertyCount: r.property_count ?? 0,
+      }));
+    } catch (e: any) {
+      console.warn("[market] get_market_benchmark_v1 failed:", e?.message);
+      return [];
+    }
+  },
+});
