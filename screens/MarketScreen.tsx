@@ -32,6 +32,7 @@ export default function MarketScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [seg, setSeg] = useState('all');
+  const [expandedCompetitor, setExpandedCompetitor] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -161,23 +162,86 @@ export default function MarketScreen() {
                   </ScrollView>
                   {shownCompetitors.length === 0 ? (
                     <Text style={{ fontSize: 12, color: '#6B7280', textAlign: 'center', paddingVertical: 20 }}>No competitors in this segment.</Text>
-                  ) : shownCompetitors.map((c) => (
-                    <View key={c.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', flexShrink: 1 }} numberOfLines={1}>{c.name}</Text>
-                        {c.rating != null && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <Ionicons name="star" size={12} color="#2563EB" />
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{c.rating}{c.reviewCount != null ? ` (${c.reviewCount})` : ''}</Text>
+                  ) : shownCompetitors.map((c) => {
+                    const intel = c.intelligence || {};
+                    const isOpen = expandedCompetitor === c.id;
+                    const hasIntel = intel.pricingMin != null || intel.pricingMax != null || (intel.roomTypes && intel.roomTypes.length) || intel.amenityScore != null || (intel.amenities && intel.amenities.length) || intel.phone || intel.email || (intel.uspTags && intel.uspTags.length);
+                    const chip = (label: string, tone = '#2563EB') => (
+                      <View key={label} style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: tone + '14', marginRight: 6, marginBottom: 6 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: tone }}>{label}</Text>
+                      </View>
+                    );
+                    return (
+                      <TouchableOpacity key={c.id} activeOpacity={hasIntel ? 0.7 : 1} onPress={() => hasIntel && setExpandedCompetitor(isOpen ? null : c.id)}
+                        style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', flexShrink: 1 }} numberOfLines={1}>{c.name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            {c.rating != null && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                <Ionicons name="star" size={12} color="#2563EB" />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{c.rating}{c.reviewCount != null ? ` (${c.reviewCount})` : ''}</Text>
+                              </View>
+                            )}
+                            {hasIntel && <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#9CA3AF" />}
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>
+                          {[c.localityName, c.city].filter(Boolean).join(', ') || '—'}
+                          {c.marketSegment ? `  ·  ${c.marketSegment}` : ''}
+                        </Text>
+                        {(intel.pricingMin != null || intel.pricingMax != null) && (
+                          <Text style={{ fontSize: 12, color: '#111827', fontWeight: '700', marginTop: 6 }}>
+                            {intel.pricingMin != null && intel.pricingMax != null ? `${fmtInr(intel.pricingMin)}–${fmtInr(intel.pricingMax)}/mo` : `${fmtInr(intel.pricingMin ?? intel.pricingMax)}/mo`}
+                          </Text>
+                        )}
+                        {isOpen && (
+                          <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10, gap: 8 }}>
+                            {Array.isArray(intel.roomTypes) && intel.roomTypes.length > 0 && (
+                              <View>
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#9CA3AF', letterSpacing: 0.4, marginBottom: 2 }}>ROOM TYPES</Text>
+                                {intel.roomTypes.map((rt: any, i: number) => (
+                                  <Text key={i} style={{ fontSize: 12, color: '#374151' }}>
+                                    {(rt.label || rt.type || 'Room')}{rt.price != null ? ` · ${fmtInr(rt.price)}` : ''}{rt.occupancy != null ? ` · ${rt.occupancy}` : ''}
+                                  </Text>
+                                ))}
+                              </View>
+                            )}
+                            {(intel.amenityScore != null || intel.digitalMaturityScore != null) && (
+                              <View style={{ flexDirection: 'row', gap: 16 }}>
+                                {intel.amenityScore != null && <Text style={{ fontSize: 12, color: '#374151' }}>Amenity <Text style={{ fontWeight: '800' }}>{intel.amenityScore}</Text></Text>}
+                                {intel.digitalMaturityScore != null && <Text style={{ fontSize: 12, color: '#374151' }}>Digital <Text style={{ fontWeight: '800' }}>{intel.digitalMaturityScore}</Text></Text>}
+                              </View>
+                            )}
+                            {intel.targetDemographic ? <Text style={{ fontSize: 12, color: '#374151' }}>Target: {intel.targetDemographic}</Text> : null}
+                            {(intel.hasOnlineBooking || intel.hasVirtualTour || intel.hasPhotos) && (
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                                {intel.hasOnlineBooking ? chip('Online booking', '#16a34a') : null}
+                                {intel.hasVirtualTour ? chip('Virtual tour', '#16a34a') : null}
+                                {intel.hasPhotos ? chip('Photos', '#16a34a') : null}
+                              </View>
+                            )}
+                            {Array.isArray(intel.uspTags) && intel.uspTags.length > 0 && (
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{intel.uspTags.map((t: any) => chip(String(t), '#7C3AED'))}</View>
+                            )}
+                            {Array.isArray(intel.amenities) && intel.amenities.length > 0 && (
+                              <Text style={{ fontSize: 11, color: '#6B7280' }}>Amenities: {intel.amenities.join(', ')}</Text>
+                            )}
+                            {(intel.phone || intel.email || c.website) && (
+                              <View style={{ gap: 2 }}>
+                                {intel.phone ? <Text style={{ fontSize: 12, color: '#2563EB' }}>{intel.phone}</Text> : null}
+                                {intel.email ? <Text style={{ fontSize: 12, color: '#2563EB' }}>{intel.email}</Text> : null}
+                                {c.website ? <Text style={{ fontSize: 11, color: '#2563EB' }} numberOfLines={1}>{c.website}</Text> : null}
+                              </View>
+                            )}
+                            {intel.crawlStatus === 'failed' && intel.errorMessage ? (
+                              <Text style={{ fontSize: 11, color: '#DC2626' }}>Analysis failed: {String(intel.errorMessage).slice(0, 80)}</Text>
+                            ) : null}
                           </View>
                         )}
-                      </View>
-                      <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>
-                        {[c.localityName, c.city].filter(Boolean).join(', ') || '—'}
-                        {c.marketSegment ? `  ·  ${c.marketSegment}` : ''}
-                      </Text>
-                    </View>
-                  ))}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </>
               )
             )}

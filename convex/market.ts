@@ -21,18 +21,42 @@ export const getMarketCompetitors = action({
       });
       if (error) throw error;
       const rows: any[] = Array.isArray(data) ? data : [];
-      return rows.map((c) => ({
-        id: c.id,
-        name: c.name || "Unknown",
-        rating: c.rating ?? null,
-        reviewCount: c.review_count ?? null,
-        website: c.website_url || null,
-        lastScrapedAt: c.last_scraped_at || null,
-        localityName: c.locality?.name || null,
-        city: c.locality?.city || null,
-        marketSegment: c.intelligence?.market_segment || null,
-        crawlStatus: c.intelligence?.crawl_status || null,
-      }));
+      return rows.map((c) => {
+        const intel = c.intelligence || {};
+        return {
+          id: c.id,
+          name: c.name || "Unknown",
+          rating: c.rating ?? null,
+          reviewCount: c.review_count ?? null,
+          website: c.website_url || null,
+          lastScrapedAt: c.last_scraped_at || null,
+          localityName: c.locality?.name || null,
+          city: c.locality?.city || null,
+          marketSegment: intel.market_segment || null,
+          crawlStatus: intel.crawl_status || null,
+          // Web parity: pass through the full intelligence block (was discarded) so the
+          // mobile competitor card can expand to show pricing/rooms/scores/contact/etc.
+          intelligence: {
+            marketSegment: intel.market_segment || null,
+            crawlStatus: intel.crawl_status || null,
+            pricingMin: intel.pricing_min ?? null,
+            pricingMax: intel.pricing_max ?? null,
+            roomTypes: intel.room_types || null,
+            amenityScore: intel.amenity_score ?? null,
+            digitalMaturityScore: intel.digital_maturity_score ?? null,
+            targetDemographic: intel.target_demographic || null,
+            hasOnlineBooking: intel.has_online_booking ?? null,
+            hasVirtualTour: intel.has_virtual_tour ?? null,
+            hasPhotos: intel.has_photos ?? null,
+            uspTags: intel.usp_tags || null,
+            amenities: intel.amenities || null,
+            phone: intel.phone || null,
+            email: intel.email || null,
+            errorMessage: intel.error_message || null,
+            crawledUrl: intel.crawled_url || null,
+          },
+        };
+      });
     } catch (e: any) {
       console.warn("[market] get_market_competitors failed:", e?.message);
       return [];
