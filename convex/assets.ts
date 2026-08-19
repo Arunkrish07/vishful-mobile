@@ -950,3 +950,48 @@ export const listForecasts = action({
     }));
   },
 });
+
+// ─── Maintenance tickets grouped by asset (web AssetMaintenanceTab parity) ─────
+// Returns a flat, enriched ticket list (only tickets linked to an asset);
+// the client groups by asset_id to build per-asset ticket lists + KPIs.
+export const listAssetMaintenance = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const [tickets, resolutions, issueTypes] = await Promise.all([
+      fetchAllPages((from, to) =>
+        sb.from("maintenance_tickets")
+          .select("id, ticket_number, asset_id, issue_type_id, status, created_at, resolved_at, closed_at, closure_cost")
+          .eq("organization_id", ORG_ID)
+          .not("asset_id", "is", null)
+          .range(from, to)),
+      fetchAllPages((from, to) =>
+        sb.from("ticket_resolutions")
+          .select("ticket_id, resolution_type, service_type, total_cost, closure_summary, resolved_at")
+          .range(from, to)),
+      fetchAllPages((from, to) =>
+        sb.from("issue_types").select("id, name").eq("organization_id", ORG_ID).range(from, to)),
+    ]);
+    const resByTicket: Record<string, any> = {};
+    for (const r of resolutions || []) resByTicket[r.ticket_id] = r;
+    const typeName: Record<string, string> = {};
+    for (const t of issueTypes || []) typeName[t.id] = t.name;
+    return (tickets || []).map((t: any) => {
+      const res = resByTicket[t.id];
+      return {
+        id: t.id,
+        asset_id: t.asset_id,
+        ticket_number: t.ticket_number || null,
+        status: t.status || null,
+        created_at: t.created_at || null,
+        resolved_at: t.resolved_at || t.closed_at || null,
+        issue_type: (t.issue_type_id && typeName[t.issue_type_id]) || null,
+        closure_cost: t.closure_cost ?? (res?.total_cost ?? null),
+        resolution_type: res?.resolution_type || null,
+        service_type: res?.service_type || null,
+        closure_summary: res?.closure_summary || null,
+      };
+    });
+  },
+});

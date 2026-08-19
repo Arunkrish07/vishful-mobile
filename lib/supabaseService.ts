@@ -262,6 +262,11 @@ export async function listAssets(status?: string) {
   return client.action(api.assets.listAssets, { status });
 }
 
+// Maintenance tickets linked to assets (grouped client-side by asset_id)
+export async function listAssetMaintenance() {
+  return client.action((api as any).assets.listAssetMaintenance, {});
+}
+
 export async function getAssetStats() {
   return client.action(api.assets.getAssetStats, {});
 }
@@ -399,6 +404,11 @@ export async function getTeamMembers() {
   return client.action(api.settings.getTeamMembers, {});
 }
 
+// Org member profiles (id / full_name / email) — used for name dropdowns (e.g. Audit Logs "Performed by")
+export async function getOrgProfiles() {
+  return client.action((api as any).settings.getOrgProfiles, {});
+}
+
 export async function createTeamMember(data: any) {
   return client.action(api.settings.createTeamMember, { data });
 }
@@ -409,6 +419,23 @@ export async function updateTeamMember(id: string, data: any) {
 
 export async function deleteTeamMember(id: string) {
   return client.action(api.settings.deleteTeamMember, { id });
+}
+
+// Team departments (real CRUD) + org tickets for Performance tab
+export async function listTeamDepartments() {
+  return client.action((api as any).settings.listTeamDepartments, {});
+}
+export async function createTeamDepartment(data: any) {
+  return client.action((api as any).settings.createTeamDepartment, { data });
+}
+export async function updateTeamDepartment(id: string, data: any) {
+  return client.action((api as any).settings.updateTeamDepartment, { id, data });
+}
+export async function deleteTeamDepartment(id: string) {
+  return client.action((api as any).settings.deleteTeamDepartment, { id });
+}
+export async function listOrgTickets() {
+  return client.action((api as any).settings.listOrgTickets, {});
 }
 
 // Team payments & attendance (real persistence — replace getAll/insertRow stubs)

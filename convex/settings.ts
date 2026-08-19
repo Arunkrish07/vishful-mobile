@@ -42,6 +42,54 @@ export const deleteTeamMember = action({
   },
 });
 
+// ─── TEAM DEPARTMENTS (real CRUD — replaces generic getAll/insertRow stubs) ──────
+export const listTeamDepartments = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    return safeList(
+      sb.from("team_departments").select("*").eq("organization_id", ORG_ID).order("name", { ascending: true })
+    );
+  },
+});
+
+export const createTeamDepartment = action({
+  args: { data: v.any() },
+  returns: v.any(),
+  handler: async (_ctx, { data }) => {
+    return insertRow("team_departments", { ...data, organization_id: ORG_ID });
+  },
+});
+
+export const updateTeamDepartment = action({
+  args: { id: v.string(), data: v.any() },
+  returns: v.any(),
+  handler: async (_ctx, { id, data }) => {
+    return updateRow("team_departments", id, data);
+  },
+});
+
+export const deleteTeamDepartment = action({
+  args: { id: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { id }) => {
+    return deleteRow("team_departments", id);
+  },
+});
+
+// Minimal org-wide ticket list (id/assignee/status) for the Team Performance tab
+export const listOrgTickets = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    return safeList(
+      sb.from("maintenance_tickets").select("id, assigned_to, status").eq("organization_id", ORG_ID)
+    );
+  },
+});
+
 // ─── TEAM PAYMENTS ───────────────────────────────────────────────────
 // Mobile parity: previously the screen hit the generic getAll/insertRow stubs
 // (no-ops), so Save Payment silently discarded data. These persist for real.
