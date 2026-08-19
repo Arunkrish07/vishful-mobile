@@ -38,7 +38,10 @@ export const listProperties = action({
 });
 
 export const createProperty = action({
-  args: { name: v.string(), address: v.optional(v.string()), city: v.optional(v.string()), status: v.string() },
+  args: {
+    name: v.string(), address: v.optional(v.string()), city: v.optional(v.string()), status: v.string(),
+    start_date: v.optional(v.string()), state: v.optional(v.string()), pincode: v.optional(v.string()),
+  },
   returns: v.any(),
   handler: async (_ctx, args) => {
     const sb = getSupabase();
@@ -47,6 +50,9 @@ export const createProperty = action({
     const row = await insertRow("properties", {
       code, name: args.name, property_name: args.name,
       address: args.address || null, city: args.city || null, status: args.status,
+      ...(args.start_date ? { start_date: args.start_date } : {}),
+      ...(args.state ? { state: args.state } : {}),
+      ...(args.pincode ? { pincode: args.pincode } : {}),
     });
     return row.id;
   },

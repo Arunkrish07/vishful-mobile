@@ -1252,6 +1252,12 @@ const TENANT_WRITABLE = [
   "emergency_contact_name", "emergency_contact_phone",
   "id_proof_type", "id_proof_number", "id_proof_url", "photo_url",
   "kyc_completed", "pan_number",
+  // Previously dropped KYC columns (web writes these to `tenants`) — fixes silent data-loss
+  "aadhar_image_url", "id_card_url", "age", "date_of_joining", "food_preference",
+  "relation_name", "emergency_contact_relation",
+  "company_city", "company_state", "company_pincode",
+  "bank_name", "bank_account_holder", "bank_account_number", "bank_branch", "bank_ifsc",
+  "gst_number", "gst_name",
 ];
 
 // Pick only real columns from an arbitrary payload; map the Aadhaar field into
