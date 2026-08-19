@@ -1,7 +1,7 @@
 ﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, RefreshControl, TouchableOpacity,
-  Dimensions, Image, Animated, StyleSheet, Modal,
+  Dimensions, Image, Animated, StyleSheet, Modal, TextInput,
   TouchableWithoutFeedback, ActivityIndicator, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -65,6 +65,13 @@ function fmtINR(n: number): string {
   if (Math.abs(n) >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
   if (Math.abs(n) >= 1000) return `₹${(n / 1000).toFixed(1)}k`;
   return `₹${n.toLocaleString('en-IN')}`;
+}
+
+function fmtDate(s?: string): string {
+  if (!s) return '';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return String(s).slice(0, 10);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function ymd(d: Date): string {
@@ -540,6 +547,13 @@ export default function DashboardScreen() {
   const [customFrom, setCustomFrom] = useState<string>('');
   const [customTo, setCustomTo] = useState<string>('');
 
+  // Ask AI modal state
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(20)).current;
   useEffect(() => {
@@ -679,6 +693,42 @@ export default function DashboardScreen() {
     try { (navigation as any).navigate(route); } catch { /* noop */ }
   };
 
+  const announcements: any[] = Array.isArray(extended?.announcements) ? extended!.announcements : [];
+
+  // KPI snapshot fed to the AI assistant so it can reason about live figures.
+  const kpiContext = [
+    `Period: ${periodLabel(period, customFrom, customTo)}`,
+    `Occupancy: ${occupancyPct}% (${occupiedBedsV} occupied, ${bookedBedsV} booked, ${noticeBedsV} on notice, ${vacantBedsV} vacant of ${totalBedsLive} live beds)`,
+    `Revenue this month: ${fmtINR(revenueHeadline)}${momPct != null ? ` (${momPct >= 0 ? '+' : ''}${momPct}% vs last month)` : ''}`,
+    `Total revenue (period): ${fmtINR(fin.totalRevenue)}`,
+    `Total expenses: ${fmtINR(fin.totalExpenses)}`,
+    `Net profit: ${fmtINR(fin.totalProfit)} (margin ${profitMargin}%)`,
+    `Pending dues: ${fmtINR(pendingDuesV)}`,
+    `Deposits held: ${fmtINR(depositsHeldV)}`,
+    `Collection rate by 7th: ${collRateV != null ? `${collRateV}%` : 'n/a'}`,
+    `Tenant payments: ${onTimeV} cleared by 7th, ${lateV} cleared after 7th, ${unpaidV} unpaid`,
+    `EB margin: ${ebMarginPct}% · Avg revenue per bed: ₹${Math.round(fin.revPerBed ?? 0).toLocaleString('en-IN')}`,
+    `Open action items: ${actionOpenSum}`,
+  ].join('\n');
+
+  const askAi = async () => {
+    const q = aiQuestion.trim();
+    if (!q || aiLoading) return;
+    setAiLoading(true);
+    setAiError('');
+    setAiAnswer('');
+    try {
+      const { client: convexClient, api: convexApi } = await import('../lib/convexApi') as any;
+      const composed = `Here is my current dashboard snapshot:\n${kpiContext}\n\nQuestion: ${q}`;
+      const res = await convexClient.action((convexApi as any).aiAssistant.askAssistant, { question: composed, history: [] });
+      setAiAnswer((res && res.answer) ? String(res.answer) : 'No response.');
+    } catch (e: any) {
+      setAiError('Could not reach the AI assistant. Please try again.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: DASH.bg }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -727,7 +777,7 @@ export default function DashboardScreen() {
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.askAiBtn}
-                onPress={() => { /* Floating AI FAB remains primary assistant entry */ }}
+                onPress={() => { setAiError(''); setAiOpen(true); }}
               >
                 <Ionicons name="sparkles" size={12} color="#fff" />
                 <Text style={styles.askAiText}>Ask AI</Text>
@@ -956,6 +1006,37 @@ export default function DashboardScreen() {
             </Panel>
           )}
 
+          {/* ── Announcements ── */}
+          <Panel title="Announcements" right={announcements.length ? `${announcements.length} recent` : undefined}>
+            {announcements.length === 0 ? (
+              <Text style={styles.mutedSm}>No announcements yet.</Text>
+            ) : (
+              announcements.slice(0, 5).map((a: any, i: number) => {
+                const pr = String(a?.priority || 'normal').toLowerCase();
+                const tone = (pr === 'high' || pr === 'urgent')
+                  ? { bg: DASH.badBg, fg: DASH.bad }
+                  : pr === 'low'
+                    ? { bg: DASH.soft, fg: DASH.ink2 }
+                    : { bg: DASH.blueSoft, fg: DASH.blueInk };
+                return (
+                  <View
+                    key={a?.id ?? i}
+                    style={[styles.annRow, i === Math.min(announcements.length, 5) - 1 && { borderBottomWidth: 0 }]}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <Text style={styles.annTitle} numberOfLines={1}>{a?.title || 'Untitled'}</Text>
+                      <View style={[styles.annBadge, { backgroundColor: tone.bg }]}>
+                        <Text style={[styles.annBadgeText, { color: tone.fg }]}>{pr}</Text>
+                      </View>
+                    </View>
+                    {!!a?.content && <Text style={styles.annBody} numberOfLines={2}>{a.content}</Text>}
+                    {!!a?.published_at && <Text style={[styles.mutedSm, { marginTop: 4 }]}>{fmtDate(a.published_at)}</Text>}
+                  </View>
+                );
+              })
+            )}
+          </Panel>
+
           <View style={{ height: spacing.lg }} />
         </Animated.ScrollView>
       </SafeAreaView>
@@ -969,6 +1050,76 @@ export default function DashboardScreen() {
         onSelectPreset={(k) => { setPeriod(k); setPeriodOpen(false); }}
         onApplyCustom={(f, t) => { setCustomFrom(f); setCustomTo(t); setPeriod('custom'); setPeriodOpen(false); }}
       />
+
+      {/* Ask AI modal */}
+      <Modal visible={aiOpen} transparent animationType="fade" onRequestClose={() => setAiOpen(false)}>
+        <TouchableWithoutFeedback onPress={() => setAiOpen(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 24 }}>
+            <TouchableWithoutFeedback>
+              <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', maxWidth: 400, width: '100%', alignSelf: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: DASH.blue, paddingHorizontal: 16, paddingVertical: 12 }}>
+                  <Ionicons name="sparkles" size={16} color="#fff" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', flex: 1 }}>Ask AI about your dashboard</Text>
+                  <TouchableOpacity onPress={() => setAiOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ padding: 16 }}>
+                  <TextInput
+                    value={aiQuestion}
+                    onChangeText={setAiQuestion}
+                    placeholder="e.g. Which figures should I worry about this month?"
+                    placeholderTextColor={DASH.ink3}
+                    multiline
+                    style={{
+                      minHeight: 64, maxHeight: 120,
+                      borderWidth: 1, borderColor: DASH.line, borderRadius: 12,
+                      paddingHorizontal: 12, paddingVertical: 10,
+                      fontSize: 14, color: DASH.ink, textAlignVertical: 'top',
+                      backgroundColor: DASH.soft,
+                    }}
+                  />
+
+                  {(aiLoading || !!aiAnswer || !!aiError) && (
+                    <View style={{
+                      marginTop: 12, borderRadius: 12, padding: 12,
+                      backgroundColor: DASH.finHero, borderWidth: 1, borderColor: DASH.panelBorder,
+                    }}>
+                      {aiLoading ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <ActivityIndicator size="small" color={DASH.blue} />
+                          <Text style={styles.mutedSm}>Thinking…</Text>
+                        </View>
+                      ) : aiError ? (
+                        <Text style={{ fontSize: 13, color: DASH.bad, fontWeight: '600' }}>{aiError}</Text>
+                      ) : (
+                        <ScrollView style={{ maxHeight: 220 }}>
+                          <Text style={{ fontSize: 14, color: DASH.ink, lineHeight: 20 }}>{aiAnswer}</Text>
+                        </ScrollView>
+                      )}
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    onPress={askAi}
+                    disabled={aiLoading || !aiQuestion.trim()}
+                    activeOpacity={0.85}
+                    style={{
+                      marginTop: 14, borderRadius: 12, paddingVertical: 13, alignItems: 'center',
+                      flexDirection: 'row', justifyContent: 'center', gap: 6,
+                      backgroundColor: (aiLoading || !aiQuestion.trim()) ? '#CBD5E1' : DASH.blue,
+                    }}
+                  >
+                    <Ionicons name="sparkles" size={14} color="#fff" />
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>{aiLoading ? 'Asking…' : 'Ask'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -1172,4 +1323,13 @@ const styles = StyleSheet.create({
   unitCode: { fontSize: 14, fontWeight: '700', color: DASH.ink },
   unitRight: { alignItems: 'flex-end' },
   unitPct: { fontSize: 16, fontWeight: '800' },
+
+  annRow: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: DASH.line,
+  },
+  annTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: DASH.ink },
+  annBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  annBadgeText: { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
+  annBody: { fontSize: 12, color: DASH.ink2, lineHeight: 17 },
 });

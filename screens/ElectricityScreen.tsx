@@ -316,6 +316,34 @@ function billingMonthToYM(m: string | null | undefined): string | null {
   } catch { return null; }
 }
 
+// Short month label "MMMyy" from a 'YYYY-MM-DD' date string, e.g. "Feb26"
+function mmmYY(s: string | null | undefined): string {
+  if (!s) return '';
+  try {
+    // Parse the Y/M explicitly to avoid UTC→local day shifts on date-only strings
+    const y = parseInt(s.slice(0, 4));
+    const m = parseInt(s.slice(5, 7)) - 1;
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (isNaN(y) || isNaN(m) || m < 0 || m > 11) return s;
+    return MON[m] + String(y).slice(2);
+  } catch { return s; }
+}
+
+// Derive a billing period (calendar-month bounds) from a 'YYYY-MM-DD' bill date.
+// Mirrors how the single-payment form carries an explicit period — here we infer
+// the month that contains the chosen bill date. Returns '' pair on bad input.
+function monthPeriodFromDate(dateStr: string | null | undefined): { start: string; end: string } {
+  if (!dateStr || dateStr.length < 7) return { start: '', end: '' };
+  try {
+    const y = parseInt(dateStr.slice(0, 4));
+    const m = parseInt(dateStr.slice(5, 7)); // 1-based
+    if (isNaN(y) || isNaN(m) || m < 1 || m > 12) return { start: '', end: '' };
+    const ym = dateStr.slice(0, 7);
+    const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last day of this month
+    return { start: `${ym}-01`, end: `${ym}-${String(lastDay).padStart(2, '0')}` };
+  } catch { return { start: '', end: '' }; }
+}
+
 // ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
 
 export default function ElectricityScreen() {
@@ -461,6 +489,7 @@ export default function ElectricityScreen() {
     ]);
   };
   const [ebPayments,       setEbPayments]       = useState<any[]>([]);
+  const [expandedEbGroup,  setExpandedEbGroup]  = useState<string | null>(null);
 
   // ── Period filter derived values (must be after all state declarations) ───
   const groupsInPeriod = useMemo(() => {
@@ -481,6 +510,36 @@ export default function ElectricityScreen() {
   const totalCostFiltered     = useMemo(() => groupsInPeriod.reduce((s: number, g: any) => s + (g.total_amount || 0), 0), [groupsInPeriod]);
   const totalReadingsFiltered = useMemo(() => groupsInPeriod.reduce((s: number, g: any) => s + (g.readings?.length || 0), 0), [groupsInPeriod]);
   const totalEbPaidFiltered   = useMemo(() => ebPaymentsInPeriod.reduce((s: number, p: any) => s + Number(p.bill_amount || 0), 0), [ebPaymentsInPeriod]);
+
+  // Group EB payments by property + billing period so the list shows one summed
+  // collapsible row per cycle (e.g. "Feb26 – Apr26"), expandable into each payment.
+  // Presentation only — mirrors web Electricity ebPaymentGroups.
+  const ebPaymentGroups = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const p of (ebPayments || []) as any[]) {
+      const start = p.billing_period_start || '';
+      const end = p.billing_period_end || '';
+      const key = `${p.property_id}|${start}|${end}`;
+      let g = map.get(key);
+      if (!g) {
+        const periodLabel = start && end
+          ? `${mmmYY(start)} – ${mmmYY(end)}`
+          : (p.bill_date ? mmmYY(p.bill_date) : 'No period');
+        g = {
+          key,
+          property_name: p.property_name || p.name || '—',
+          periodLabel,
+          sortDate: start || p.bill_date || '',
+          payments: [] as any[],
+          total: 0,
+        };
+        map.set(key, g);
+      }
+      g.payments.push(p);
+      g.total += Number(p.bill_amount || 0);
+    }
+    return Array.from(map.values()).sort((a, b) => String(b.sortDate || '').localeCompare(String(a.sortDate || '')));
+  }, [ebPayments]);
   const [paymentOpen,      setPaymentOpen]      = useState(false);
   const [paymentForm,      setPaymentForm]      = useState({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', billing_period_start: '', billing_period_end: '', notes: '' });
   const [paymentSaving,    setPaymentSaving]    = useState(false);
@@ -795,6 +854,10 @@ export default function ElectricityScreen() {
     if (!toSave.length) { Alert.alert('Error', 'Enter at least one bill amount'); return; }
     setBulkPaySaving(true);
     try {
+      // Derive the billing period from the chosen bill date's calendar month so the
+      // bulk save persists billing_period_start/end (the single-payment form already
+      // carries these; the backend saveEbPayment stores them).
+      const { start: periodStart, end: periodEnd } = monthPeriodFromDate(bulkPayBillDate);
       for (const row of toSave) {
         await sb.saveEbPayment({
           id: row.existing_id || '',
@@ -805,6 +868,8 @@ export default function ElectricityScreen() {
           payment_date: bulkPayDate || null,
           payment_mode: bulkPayMode || null,
           reference_number: row.reference_number || null,
+          billing_period_start: periodStart || null,
+          billing_period_end: periodEnd || null,
         });
       }
       Alert.alert('Success', `${toSave.length} payment(s) saved`);
@@ -1105,49 +1170,75 @@ export default function ElectricityScreen() {
           <Ionicons name="card-outline" size={36} color="#C4B5A0" />
           <Text style={{ color: colors.textTertiary, marginTop: 8 }}>No EB payments recorded</Text>
         </Card>
-      ) : ebPayments.map((p: any) => (
-        <Card key={p.id} style={{ marginBottom: spacing.sm }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0284C7' }}>
-                  {fmtAmt(p.bill_amount)}
-                </Text>
-                {p.payment_mode && (
-                  <View style={{ backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#0284C7' }}>{p.payment_mode}</Text>
-                  </View>
-                )}
+      ) : ebPaymentGroups.map((g: any) => {
+        const expanded = expandedEbGroup === g.key;
+        return (
+          <Card key={g.key} style={{ marginBottom: spacing.sm }}>
+            {/* Group header — property + billing cycle + summed total */}
+            <TouchableOpacity onPress={() => setExpandedEbGroup(expanded ? null : g.key)} activeOpacity={0.7}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.text }}>{g.periodLabel}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 }}>
+                    {g.property_name} · {g.payments.length} payment{g.payments.length === 1 ? '' : 's'}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0284C7' }}>{fmtAmt(g.total)}</Text>
+                  <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />
+                </View>
               </View>
-              <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{p.property_name || p.name || ""}</Text>
-              <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: 3 }}>
-                Bill: {fmtDate(p.bill_date)}
-                {p.payment_date ? `  ·  Paid: ${fmtDate(p.payment_date)}` : ''}
-              </Text>
-              {p.reference_number ? (
-                <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>Ref: {p.reference_number}</Text>
-              ) : null}
-              {p.billing_period_start ? (
-                <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>
-                  Period: {fmtDate(p.billing_period_start)} → {fmtDate(p.billing_period_end)}
-                </Text>
-              ) : null}
-              {p.notes ? <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: 2 }}>{p.notes}</Text> : null}
-            </View>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <TouchableOpacity style={S.iconBtn} onPress={() => {
-                setPaymentForm({ id: p.id, property_id: p.property_id, bill_date: p.bill_date, bill_amount: String(p.bill_amount), payment_date: p.payment_date || '', payment_mode: p.payment_mode || '', reference_number: p.reference_number || '', billing_period_start: p.billing_period_start || '', billing_period_end: p.billing_period_end || '', notes: p.notes || '' });
-                setPaymentOpen(true);
-              }}>
-                <Ionicons name="pencil-outline" size={16} color={colors.textTertiary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[S.iconBtn, { backgroundColor: 'rgba(220,38,38,0.08)' }]} onPress={() => handleDeletePayment(p.id)}>
-                <Ionicons name="trash-outline" size={16} color={colors.danger} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Card>
-      ))}
+            </TouchableOpacity>
+
+            {/* Expanded — individual payments in this cycle (edit / delete intact) */}
+            {expanded && (
+              <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 10, gap: 10 }}>
+                {g.payments.map((p: any) => (
+                  <View key={p.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)', paddingBottom: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0284C7' }}>
+                          {fmtAmt(p.bill_amount)}
+                        </Text>
+                        {p.payment_mode && (
+                          <View style={{ backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#0284C7' }}>{p.payment_mode}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{p.property_name || p.name || ""}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: 3 }}>
+                        Bill: {fmtDate(p.bill_date)}
+                        {p.payment_date ? `  ·  Paid: ${fmtDate(p.payment_date)}` : ''}
+                      </Text>
+                      {p.reference_number ? (
+                        <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>Ref: {p.reference_number}</Text>
+                      ) : null}
+                      {p.billing_period_start ? (
+                        <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>
+                          Period: {fmtDate(p.billing_period_start)} → {fmtDate(p.billing_period_end)}
+                        </Text>
+                      ) : null}
+                      {p.notes ? <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: 2 }}>{p.notes}</Text> : null}
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity style={S.iconBtn} onPress={() => {
+                        setPaymentForm({ id: p.id, property_id: p.property_id, bill_date: p.bill_date, bill_amount: String(p.bill_amount), payment_date: p.payment_date || '', payment_mode: p.payment_mode || '', reference_number: p.reference_number || '', billing_period_start: p.billing_period_start || '', billing_period_end: p.billing_period_end || '', notes: p.notes || '' });
+                        setPaymentOpen(true);
+                      }}>
+                        <Ionicons name="pencil-outline" size={16} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[S.iconBtn, { backgroundColor: 'rgba(220,38,38,0.08)' }]} onPress={() => handleDeletePayment(p.id)}>
+                        <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Card>
+        );
+      })}
     </ScrollView>
   );
 

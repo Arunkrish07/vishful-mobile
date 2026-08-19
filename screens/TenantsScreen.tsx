@@ -274,6 +274,19 @@ export default function TenantsScreen() {
           emergency_contact_name:   form.emergencyContactName || null,
           emergency_contact_phone:  form.emergencyContactPhone || null,
           pan_number:               form.pan_number || null,
+          // ── Full KYC field set (data-loss fix: form collected these but they
+          //    were previously dropped). Backend whitelist expanded to persist. ──
+          bank_name:                  form.bank_name || null,
+          bank_account_number:        form.bank_account_number || null,
+          bank_ifsc:                  form.bank_ifsc || null,
+          gst_number:                 form.gst_number || null,
+          food_preference:            form.food_preference || null,
+          relation_name:              form.relation_name || null,
+          date_of_joining:            form.date_of_joining || null,
+          company_city:               form.company_city || null,
+          company_state:              form.company_state || null,
+          company_pincode:            form.company_pincode || null,
+          emergency_contact_relation: form.emergencyContactRelation || null,
           ...(form.aadhar_number ? { id_proof_number: form.aadhar_number, id_proof_type: 'aadhaar' } : {}),
           ...(idProofUrl ? { id_proof_url: idProofUrl } : {}),
           ...(photoUrl ? { photo_url: photoUrl } : {}),
@@ -327,6 +340,18 @@ export default function TenantsScreen() {
         emergency_contact_name:   form.emergencyContactName || null,
         emergency_contact_phone:  form.emergencyContactPhone || null,
         pan_number:               form.pan_number || null,
+        // ── Full KYC field set (data-loss fix: previously dropped on edit). ──
+        bank_name:                  form.bank_name || null,
+        bank_account_number:        form.bank_account_number || null,
+        bank_ifsc:                  form.bank_ifsc || null,
+        gst_number:                 form.gst_number || null,
+        food_preference:            form.food_preference || null,
+        relation_name:              form.relation_name || null,
+        date_of_joining:            form.date_of_joining || null,
+        company_city:               form.company_city || null,
+        company_state:              form.company_state || null,
+        company_pincode:            form.company_pincode || null,
+        emergency_contact_relation: form.emergencyContactRelation || null,
         ...(idProofUrl ? { id_proof_url: idProofUrl } : {}),
         photo_url:                photoUrl,
       });
@@ -1038,31 +1063,61 @@ export default function TenantsScreen() {
                       <Text style={{ fontSize: 11, fontWeight: '700', color: '#D97706' }}>{g.tenants.length} records</Text>
                     </View>
                   </View>
-                  {g.tenants.map((t: any) => (
+                  {g.tenants.map((t: any) => {
+                    const match = (tenants || []).find((ten: any) => ten._id === t.id);
+                    const hasAllotment = !!(match?.allotmentId || t.allotmentId || t.tenant_allotment_id);
+                    return (
                     <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border }}>
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{t.full_name || '—'}</Text>
                         <Text style={{ fontSize: 11, color: colors.textSecondary }}>{t.email || '—'} · {(t.staying_status || 'new').toUpperCase()}</Text>
+                        <View style={{ flexDirection: 'row', marginTop: 3 }}>
+                          <View style={{ backgroundColor: hasAllotment ? '#ECFDF5' : '#F1F5F9', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: hasAllotment ? '#059669' : '#6B7280' }}>{hasAllotment ? 'Allocated' : 'No allotment'}</Text>
+                          </View>
+                        </View>
                       </View>
-                      <TouchableOpacity onPress={() => { setShowDuplicates(false); const match = (tenants || []).find((ten: any) => ten._id === t.id); if (match) openEdit(match); }}
-                        style={{ backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Open</Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity onPress={() => { setShowDuplicates(false); if (match) openEdit(match); }}
+                          style={{ backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Open</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDeleteTenant({ _id: t.id, name: t.full_name })} disabled={hasAllotment}
+                          style={{ backgroundColor: hasAllotment ? colors.border : '#FEE2E2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, opacity: hasAllotment ? 0.5 : 1 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: hasAllotment ? colors.textTertiary : '#DC2626' }}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  ))}
+                    );
+                  })}
                 </View>
-              )) : dupResults.length > 0 ? dupResults.map((t: any) => (
+              )) : dupResults.length > 0 ? dupResults.map((t: any) => {
+                const match = (tenants || []).find((ten: any) => ten._id === t.id);
+                const hasAllotment = !!(match?.allotmentId || t.allotmentId || t.tenant_allotment_id);
+                return (
                 <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: colors.surface, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{t.full_name || '—'}</Text>
                     <Text style={{ fontSize: 11, color: colors.textSecondary }}>{t.phone} · {t.email || '—'} · {(t.staying_status || 'new').toUpperCase()}</Text>
+                    <View style={{ flexDirection: 'row', marginTop: 3 }}>
+                      <View style={{ backgroundColor: hasAllotment ? '#ECFDF5' : '#F1F5F9', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: hasAllotment ? '#059669' : '#6B7280' }}>{hasAllotment ? 'Allocated' : 'No allotment'}</Text>
+                      </View>
+                    </View>
                   </View>
-                  <TouchableOpacity onPress={() => { setShowDuplicates(false); const match = (tenants || []).find((ten: any) => ten._id === t.id); if (match) openEdit(match); }}
-                    style={{ backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Open</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TouchableOpacity onPress={() => { setShowDuplicates(false); if (match) openEdit(match); }}
+                      style={{ backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Open</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteTenant({ _id: t.id, name: t.full_name })} disabled={hasAllotment}
+                      style={{ backgroundColor: hasAllotment ? colors.border : '#FEE2E2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, opacity: hasAllotment ? 0.5 : 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: hasAllotment ? colors.textTertiary : '#DC2626' }}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              )) : !dupLoading ? (
+                );
+              }) : !dupLoading ? (
                 <Text style={{ fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingVertical: 24 }}>No duplicate records found.</Text>
               ) : null}
             </ScrollView>

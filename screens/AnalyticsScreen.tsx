@@ -109,6 +109,24 @@ function TrendBars({ data, valueKey, suffix }: { data: any[]; valueKey: string; 
     </ScrollView>
   );
 }
+// per-bed 12-month occupancy strip (green = occupied, grey = vacant)
+function OccupancyStrip({ months }: { months: any[] }) {
+  if (!months?.length) return null;
+  return (
+    <View style={{ marginTop: 10 }}>
+      <View style={{ flexDirection: 'row', gap: 3 }}>
+        {months.map((m: any, i: number) => (
+          <View key={i} style={{ flex: 1, height: 7, borderRadius: 2, backgroundColor: m.occupied ? '#16a34a' : '#E5E7EB' }} />
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 3 }}>
+        <Text style={{ fontSize: 8, color: '#9CA3AF' }}>{monthLabel(months[0].month)}</Text>
+        <Text style={{ fontSize: 8, color: '#9CA3AF' }}>{monthLabel(months[months.length - 1].month)}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  MAIN SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
@@ -189,6 +207,8 @@ export default function AnalyticsScreen() {
             const onb = a.onboarding_date ?? a.onboardingDate;
             if (!onb) return false;
             const start = new Date(onb);
+            // Task 5(a) VERIFIED: listAllotments returns `exitDate` mapped from the
+            // real `actual_exit_date` column — this is the correct exit date to use.
             const exit = a.exitDate ? new Date(a.exitDate) : new Date();
             return !(start > me) && !(exit < ms);
           });
@@ -202,6 +222,11 @@ export default function AnalyticsScreen() {
           id: bedId, bedCode: bed.bed_code ?? bed.code ?? '—', aptCode: apt?.apartment_code ?? apt?.code ?? '—',
           propName: prop?.property_name ?? prop?.name ?? '—', totalRevenue, rentRevenue, ebRevenue,
           occupancyPct, avgMonthly, currentStatus: active ? (active.staying_status ?? active.stayingStatus) : 'Vacant',
+          // extras for the occupancy strip (Task 4) + vacancy-risk table (Task 1)
+          monthlyStatus,
+          monthlyRent: Number(bed.monthlyRent ?? bed.monthly_rent ?? bed.currentRate ?? 0),
+          bedType: bed.type ?? bed.bed_type ?? '',
+          toiletType: bed.toiletType ?? bed.toilet_type ?? '',
         };
       })
       .filter((b: any) => {
@@ -289,6 +314,106 @@ export default function AnalyticsScreen() {
     }).filter(Boolean) as any[];
   }, [properties, flatReadings, hist6, next3, propertyFilter]);
 
+  // ── PREDICTIVE: VACANCY-RISK TABLE (Task 1) ──
+  // DATA NOTE: mobile getAnalyticsData() returns only ACTIVE allotments
+  // (Staying/On-Notice/Booked) and invoices WITHOUT a bed_id, so a vacant bed's
+  // true last-exit date and per-bed invoice revenue are not in the payload.
+  // We estimate the last-occupied month from each bed's already-computed 12-month
+  // occupancy history and use the bed's rate-card rent as the revenue at risk.
+  const vacancyRisk = useMemo(() => {
+    const today = new Date();
+    return bedData
+      .filter((b: any) => b.currentStatus === 'Vacant')
+      .map((b: any) => {
+        const occ: any[] = b.monthlyStatus || [];
+        let lastOccMonth: string | null = null;
+        for (let i = occ.length - 1; i >= 0; i--) { if (occ[i].occupied) { lastOccMonth = occ[i].month; break; } }
+        let daysVacant: number | null;
+        let lastExitLabel: string;
+        if (lastOccMonth) {
+          const exitApprox = monthEnd(lastOccMonth);
+          daysVacant = Math.max(0, Math.round((today.getTime() - exitApprox.getTime()) / 86400000));
+          lastExitLabel = monthLabel(lastOccMonth);
+        } else {
+          daysVacant = null;          // no occupancy in the last 12 months
+          lastExitLabel = '12+ mo';
+        }
+        const risk: 'High' | 'Medium' | 'Low' =
+          (daysVacant === null || daysVacant > 30) ? 'High' : daysVacant > 14 ? 'Medium' : 'Low';
+        return {
+          id: b.id, bedCode: b.bedCode, aptCode: b.aptCode, propName: b.propName,
+          lastExitLabel, daysVacant, risk, lastRevenue: b.monthlyRent || 0,
+        };
+      })
+      .sort((a: any, b: any) => {
+        const order: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
+        if (order[a.risk] !== order[b.risk]) return order[a.risk] - order[b.risk];
+        return (b.daysVacant ?? 999999) - (a.daysVacant ?? 999999);
+      });
+  }, [bedData]);
+
+  // ── PREDICTIVE: REVENUE-FORECAST KPIs (Task 2) ──
+  // Projected next-month revenue = Σ active-allotment monthly_rental (property-filtered)
+  // + trailing 3-month EB average (uses ebMonthly, already property-filtered).
+  const predictiveSummary = useMemo(() => {
+    const activeStatuses = ['staying', 'on-notice', 'booked'];
+    const activeAllots = allotments.filter((a: any) => {
+      if (!activeStatuses.includes(String(a.staying_status ?? a.stayingStatus ?? '').toLowerCase())) return false;
+      if (propertyFilter !== 'all' && (a.property_id ?? a.propertyId) !== propertyFilter) return false;
+      return true;
+    });
+    const rentBase = activeAllots.reduce((s: number, a: any) => s + Number(a.monthly_rental ?? a.monthlyRental ?? 0), 0);
+    const last3 = ebMonthly.slice(-3);
+    const eb3avg = last3.length ? last3.reduce((s, m) => s + m.ebCollected, 0) / last3.length : 0;
+    return {
+      projectedNextMonth: rentBase + eb3avg,
+      eb3avg,
+      highRisk: vacancyRisk.filter((v: any) => v.risk === 'High').length,
+      totalVacant: bedSummary.vacantBeds,
+    };
+  }, [allotments, propertyFilter, ebMonthly, vacancyRisk, bedSummary]);
+
+  // ── EB ANALYTICS: APARTMENT-LEVEL DRILL-DOWN (Task 3) ──
+  // units/unit-cost/actual-cost come straight from flatReadings (reliable).
+  // "collected"/"tenants" are joined via allotment → apartment because invoices
+  // carry no apartment_id; only ACTIVE allotments are available, so invoices for
+  // already-exited tenants won't map (best-effort, may undercount older months).
+  const ebApartmentDrill = useMemo(() => {
+    const allotApt = new Map<string, any>();
+    allotments.forEach((a: any) => allotApt.set(a.id || a._id, a.apartment_id ?? a.apartmentId));
+    const fApts = apartments.filter((a: any) => propertyFilter === 'all' || aptPropId(a) === propertyFilter);
+    return fApts.map((apt: any) => {
+      const aptId = apt.id || apt._id;
+      const readings = flatReadings.filter((r: any) => (r.apartmentId ?? r.apartment_id) === aptId);
+      if (!readings.length) return null;
+      const byMonth = new Map<string, any>();
+      readings.forEach((r: any) => {
+        const m = (r.billingMonth ?? r.billing_month ?? '').slice(0, 7);
+        if (!m) return;
+        const units = Number(r.unitsConsumed ?? r.units_consumed ?? 0);
+        const unitCost = Number(r.unitCost ?? r.unit_cost ?? 0);
+        // mobile flatReadings has no `amount` column → derive actual cost from units × unit-cost
+        const actualCost = Number(r.amount ?? 0) || units * unitCost;
+        const prev = byMonth.get(m) || { month: m, units: 0, unitCost, actualCost: 0 };
+        prev.units += units; prev.actualCost += actualCost; prev.unitCost = unitCost || prev.unitCost;
+        byMonth.set(m, prev);
+      });
+      const aptInvoices = invoices.filter((i: any) => allotApt.get(i.allotmentId ?? i.allotment_id) === aptId);
+      const rows = [...byMonth.values()]
+        .sort((a: any, b: any) => String(b.month).localeCompare(String(a.month)))
+        .slice(0, 12)
+        .map((mr: any) => {
+          const mInv = aptInvoices.filter((i: any) => (i.billingMonth ?? i.billing_month ?? '').slice(0, 7) === mr.month);
+          const collected = mInv.reduce((s: number, i: any) => s + Number(i.electricityAmount ?? i.electricity_amount ?? 0), 0);
+          const tenants = new Set(mInv.map((i: any) => i.tenantId ?? i.tenant_id).filter(Boolean)).size;
+          return { ...mr, label: monthLabel(mr.month), collected, variance: collected - mr.actualCost, tenants };
+        });
+      if (!rows.length) return null;
+      const prop = properties.find((p: any) => (p.id || p._id) === aptPropId(apt));
+      return { aptId, aptCode: apt.apartment_code ?? apt.code ?? apt.name ?? '—', propName: prop?.property_name ?? prop?.name ?? '', rows };
+    }).filter(Boolean) as any[];
+  }, [apartments, flatReadings, invoices, allotments, properties, propertyFilter]);
+
   // ── CASH FLOW ──
   const depositsHeld = useMemo(() => allotments
     .filter((a: any) => ['staying', 'on-notice', 'booked'].includes(String(a.staying_status ?? a.stayingStatus ?? '').toLowerCase()))
@@ -298,6 +423,8 @@ export default function AnalyticsScreen() {
     let cumulative = 0;
     return months12.map((month) => {
       const monthReceipts = receipts.filter((r: any) => {
+        // Task 5(c) VERIFIED: receipts expose no dedicated `receipt_date`; `payment_date`
+        // IS the receipt date and is already used first (created_at is a null fallback). No change.
         const rm = (r.payment_date ?? r.paymentDate ?? r.created_at ?? r.createdAt ?? '').slice(0, 7);
         if (rm !== month) return false;
         if (propertyFilter !== 'all') {
@@ -314,6 +441,12 @@ export default function AnalyticsScreen() {
         return true;
       });
       const totalExpenses = monthExpenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+      // Task 5(b) NOTED — NOT changed: spec asks to attribute owner payouts by
+      // bill-month using `escalated_amount || base_amount`, but listOwnerPayments
+      // returns only { owner_id, amount, payment_date, payment_mode, notes, created_at }.
+      // There is no bill_month / escalated_amount / base_amount on the mobile payload,
+      // so attribution stays on payment_date + amount (the only fields available).
+      // Fixing this would require the backend to expose those columns.
       const monthOwner = ownerPayments.filter((op: any) => {
         const pm = (op.payment_date ?? op.paymentDate ?? '').slice(0, 7);
         return pm === month;
@@ -382,6 +515,7 @@ export default function AnalyticsScreen() {
               <SummaryCard value={fmtAmt(bedSummary.totalRevenue)} label="Total Revenue" color="#16a34a" icon="cash-outline" />
               <SummaryCard value={`${bedSummary.avgOccupancy}%`} label="Avg Occupancy" color="#2563EB" icon="bed-outline" />
               <SummaryCard value={bedSummary.vacantBeds} label="Vacant Beds" color="#2563EB" icon="alert-circle-outline" />
+              <SummaryCard value={bedData.length} label="Total Beds Analysed" color="#7C3AED" icon="grid-outline" />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 10, marginBottom: 10 }}>
               <Ionicons name="search-outline" size={16} color="#6B7280" />
@@ -389,7 +523,7 @@ export default function AnalyticsScreen() {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {([['revenue', 'Revenue'], ['occupancy', 'Occupancy']] as const).map(([k, lbl]) => (
+                {([['revenue', 'Revenue'], ['occupancy', 'Occupancy'], ['avg_monthly', 'Avg/mo']] as const).map(([k, lbl]) => (
                   <TouchableOpacity key={k} onPress={() => setSortBy(k as any)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: sortBy === k ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: sortBy === k ? '#fff' : '#2563EB' }}>{lbl}</Text>
                   </TouchableOpacity>
@@ -403,6 +537,7 @@ export default function AnalyticsScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{b.aptCode} · {b.bedCode}</Text>
                       <Text style={{ fontSize: 11, color: '#6B7280' }}>{b.propName}</Text>
+                      {(b.bedType || b.toiletType) ? <Text style={{ fontSize: 10, color: '#9CA3AF', marginTop: 1, textTransform: 'capitalize' }}>{[b.bedType, b.toiletType].filter(Boolean).join(' · ')}</Text> : null}
                     </View>
                     <View style={{ backgroundColor: b.currentStatus === 'Vacant' ? '#FEE2E2' : '#DCFCE7', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
                       <Text style={{ fontSize: 10, fontWeight: '800', color: b.currentStatus === 'Vacant' ? '#DC2626' : '#16a34a' }}>{b.currentStatus}</Text>
@@ -413,6 +548,7 @@ export default function AnalyticsScreen() {
                     <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Occupancy</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>{b.occupancyPct}%</Text></View>
                     <View><Text style={{ fontSize: 9, color: '#6B7280' }}>Avg/mo</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>{fmtAmt(b.avgMonthly)}</Text></View>
                   </View>
+                  <OccupancyStrip months={b.monthlyStatus} />
                 </View>
               ))}
           </>)}
@@ -437,10 +573,95 @@ export default function AnalyticsScreen() {
                 </View>
               ))}
             </View>
+
+            {/* Apartment-level drill-down (Task 3) */}
+            {ebApartmentDrill.length > 0 && (<>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#556274', marginTop: 16, marginBottom: 8 }}>By Apartment</Text>
+              {ebApartmentDrill.map((apt: any) => (
+                <View key={apt.aptId} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{apt.aptCode}</Text>
+                  {!!apt.propName && <Text style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 6 }}>{apt.propName}</Text>}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View>
+                      {/* header */}
+                      <View style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                        <Text style={{ width: 54, fontSize: 9, fontWeight: '800', color: '#9CA3AF' }}>MONTH</Text>
+                        <Text style={{ width: 52, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>UNITS</Text>
+                        <Text style={{ width: 54, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>₹/UNIT</Text>
+                        <Text style={{ width: 68, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>EB COST</Text>
+                        <Text style={{ width: 68, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>COLLECTED</Text>
+                        <Text style={{ width: 62, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>VARIANCE</Text>
+                        <Text style={{ width: 44, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>TEN.</Text>
+                      </View>
+                      {apt.rows.map((r: any) => (
+                        <View key={r.month} style={{ flexDirection: 'row', paddingVertical: 6, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.05)' }}>
+                          <Text style={{ width: 54, fontSize: 11, color: '#556274' }}>{r.label}</Text>
+                          <Text style={{ width: 52, fontSize: 11, color: '#111827', textAlign: 'right' }}>{r.units}</Text>
+                          <Text style={{ width: 54, fontSize: 11, color: '#556274', textAlign: 'right' }}>₹{r.unitCost}</Text>
+                          <Text style={{ width: 68, fontSize: 11, color: '#111827', textAlign: 'right' }}>{fmtAmt(r.actualCost)}</Text>
+                          <Text style={{ width: 68, fontSize: 11, color: '#16a34a', textAlign: 'right' }}>{fmtAmt(r.collected)}</Text>
+                          <Text style={{ width: 62, fontSize: 11, fontWeight: '700', color: r.variance >= 0 ? '#16a34a' : '#DC2626', textAlign: 'right' }}>{r.variance >= 0 ? '+' : ''}{fmtAmt(r.variance)}</Text>
+                          <Text style={{ width: 44, fontSize: 11, color: '#556274', textAlign: 'right' }}>{r.tenants}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+              ))}
+              <Text style={{ fontSize: 9, color: '#9CA3AF', marginTop: -4, marginBottom: 4 }}>Collected/tenants are matched via active allotments; invoices for exited tenants may not appear.</Text>
+            </>)}
           </>)}
 
           {/* ── PREDICTIVE ── */}
           {tab === 'predictive' && (<>
+            {/* Revenue-Forecast KPIs (Task 2) */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              <SummaryCard value={fmtAmt(predictiveSummary.projectedNextMonth)} label="Projected Next Month" color="#16a34a" icon="cash-outline" />
+              <SummaryCard value={predictiveSummary.highRisk} label="High-Risk Vacancies" color="#DC2626" icon="warning-outline" />
+              <SummaryCard value={predictiveSummary.totalVacant} label="Total Vacant Beds" color="#2563EB" icon="bed-outline" />
+            </View>
+            <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 12 }}>
+              Projection = active rent (₹{Math.round(predictiveSummary.projectedNextMonth - predictiveSummary.eb3avg).toLocaleString('en-IN')}) + 3-mo EB avg ({fmtAmt(predictiveSummary.eb3avg)})
+            </Text>
+
+            {/* Vacancy-Risk table (Task 1) */}
+            <Text style={{ fontSize: 13, fontWeight: '800', color: '#556274', marginBottom: 8 }}>Vacancy Risk</Text>
+            {vacancyRisk.length === 0 ? (
+              <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <Text style={{ color: '#16a34a', textAlign: 'center', fontWeight: '700', fontSize: 12 }}>No vacant beds — full occupancy</Text>
+              </View>
+            ) : (
+              <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                {/* header */}
+                <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                  <Text style={{ flex: 2, fontSize: 9, fontWeight: '800', color: '#9CA3AF' }}>BED</Text>
+                  <Text style={{ flex: 1.4, fontSize: 9, fontWeight: '800', color: '#9CA3AF' }}>LAST EXIT</Text>
+                  <Text style={{ flex: 1, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>DAYS</Text>
+                  <Text style={{ flex: 1.3, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>RENT</Text>
+                  <Text style={{ flex: 1.1, fontSize: 9, fontWeight: '800', color: '#9CA3AF', textAlign: 'right' }}>RISK</Text>
+                </View>
+                {vacancyRisk.map((v: any) => {
+                  const rc = v.risk === 'High' ? '#DC2626' : v.risk === 'Medium' ? '#D97706' : '#16a34a';
+                  return (
+                    <View key={v.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.05)' }}>
+                      <View style={{ flex: 2 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#111827' }}>{v.aptCode} · {v.bedCode}</Text>
+                        <Text style={{ fontSize: 9, color: '#9CA3AF' }} numberOfLines={1}>{v.propName}</Text>
+                      </View>
+                      <Text style={{ flex: 1.4, fontSize: 11, color: '#556274' }}>{v.lastExitLabel}</Text>
+                      <Text style={{ flex: 1, fontSize: 11, color: '#556274', textAlign: 'right' }}>{v.daysVacant == null ? '—' : v.daysVacant}</Text>
+                      <Text style={{ flex: 1.3, fontSize: 11, fontWeight: '600', color: '#111827', textAlign: 'right' }}>{fmtAmt(v.lastRevenue)}</Text>
+                      <View style={{ flex: 1.1, alignItems: 'flex-end' }}>
+                        <View style={{ backgroundColor: rc + '18', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '800', color: rc }}>{v.risk}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
             <Text style={{ fontSize: 13, fontWeight: '800', color: '#556274', marginBottom: 8 }}>Occupancy Forecast (3 mo)</Text>
             {occForecast.length === 0 ? <Text style={{ color: '#6B7280', textAlign: 'center', marginVertical: 16 }}>No occupancy data</Text>
               : occForecast.map((f: any, i: number) => (

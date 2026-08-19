@@ -30,6 +30,11 @@ const STATUS_COLOR: Record<string, string> = {
 };
 const statusColor = (s: string) => STATUS_COLOR[(s || '').toLowerCase()] || '#2563EB';
 
+// Web parity (WhatsAppDeliveryHistoryCard.tsx:82-100): auto-resume stalled send jobs.
+const STALL_MS = 90_000;              // no progress (updatedAt) for >90s ⇒ treat as stalled
+const RESUME_COOLDOWN_MS = 120_000;   // per-job 2-min cooldown so we don't spam resume
+const AUTO_RESUME_INTERVAL_MS = 30_000; // re-check loaded jobs every ~30s while focused
+
 function fmtTs(s: string | null) {
   if (!s) return '—';
   const d = new Date(s);
@@ -50,6 +55,10 @@ export default function WhatsAppLogsScreen() {
   const didAutoExpand = useRef(false); // auto-expand the first failing/running job once per mount
   const [editPhone, setEditPhone] = useState<{ deliveryId: string; tenantId: string; jobId: string } | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
+  // Auto-resume bookkeeping (read from an interval, so mirror live state into refs).
+  const lastAutoResumeRef = useRef<Record<string, number>>({}); // jobId -> last auto-resume ms
+  const jobsRef = useRef<any[]>([]);
+  const busyRef = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -64,6 +73,55 @@ export default function WhatsAppLogsScreen() {
   }, [jobType]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Mirror live state into refs so the auto-resume interval always sees fresh values
+  // without re-arming the timer on every render.
+  useEffect(() => { jobsRef.current = jobs; }, [jobs]);
+  useEffect(() => { busyRef.current = busy; }, [busy]);
+
+  // Silent refetch (no spinner / no pull-to-refresh flag) — used after an auto-resume so
+  // the stall clock (updatedAt) refreshes without disturbing the user's view.
+  const quietRefresh = useCallback(async () => {
+    try {
+      const r = await sb.listWhatsappJobs(jobType === 'all' ? {} : { jobType });
+      setJobs(Array.isArray(r) ? r : []);
+    } catch { /* ignore — next interval / manual refresh will retry */ }
+  }, [jobType]);
+
+  // Web parity (WhatsAppDeliveryHistoryCard.tsx:82-100): while focused, periodically
+  // re-trigger any running/pending job that has made no progress for >STALL_MS, honouring
+  // a per-job 2-minute cooldown so a genuinely-stuck job isn't spammed. Skipped entirely
+  // while a manual write is in flight so it never fights the user's own action.
+  const autoResumeTick = useCallback(async () => {
+    if (busyRef.current) return; // a manual resume/resend is running — stay out of its way
+    const now = Date.now();
+    const list = Array.isArray(jobsRef.current) ? jobsRef.current : [];
+    let didResume = false;
+    for (const job of list) {
+      try {
+        if (!job || !job.id) continue;
+        const st = String(job.status || '').toLowerCase();
+        if (st !== 'running' && st !== 'pending') continue;
+        if (!Number(job.totalCount)) continue;
+        const updatedAt = job.updatedAt ? new Date(job.updatedAt).getTime() : 0;
+        const stalledMs = now - (Number.isFinite(updatedAt) ? updatedAt : 0);
+        const lastResume = lastAutoResumeRef.current[job.id] ?? 0;
+        if (stalledMs > STALL_MS && now - lastResume > RESUME_COOLDOWN_MS) {
+          lastAutoResumeRef.current[job.id] = now; // start cooldown before awaiting
+          await sb.resumeWhatsappJob(job.id);
+          didResume = true;
+        }
+      } catch { /* one bad job shouldn't stop the rest */ }
+    }
+    if (didResume) await quietRefresh();
+  }, [quietRefresh]);
+
+  // Run the checker on an interval only while the screen is focused; tear it down on
+  // blur/unmount so it never runs in the background.
+  useFocusEffect(useCallback(() => {
+    const id = setInterval(() => { void autoResumeTick(); }, AUTO_RESUME_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [autoResumeTick]));
 
   const loadDeliveries = useCallback(async (jobId: string) => {
     setDLoading(true);
@@ -247,6 +305,24 @@ export default function WhatsAppLogsScreen() {
                       <Text style={{ fontSize: 12, color: job.failedCount > 0 ? '#DC2626' : '#6B7280' }}>Failed <Text style={{ fontWeight: '800' }}>{job.failedCount}</Text></Text>
                       <Text style={{ fontSize: 10, color: '#6B7280', marginLeft: 'auto' }}>{fmtTs(job.createdAt)}</Text>
                     </View>
+                    {/* Per-job progress: share of recipients already sent (green) with failed share (red). */}
+                    {Number(job.totalCount) > 0 && (() => {
+                      const total = Number(job.totalCount) || 0;
+                      const sent = Math.max(0, Math.min(total, Number(job.sentCount) || 0));
+                      const failed = Math.max(0, Math.min(total - sent, Number(job.failedCount) || 0));
+                      const sentPct = Math.round((sent / total) * 100);
+                      const failedPct = Math.round((failed / total) * 100);
+                      const done = sent >= total;
+                      return (
+                        <View style={{ marginTop: 8 }}>
+                          <View style={{ height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden', flexDirection: 'row' }}>
+                            {sentPct > 0 && <View style={{ width: `${sentPct}%`, backgroundColor: done ? '#16a34a' : '#2563EB' }} />}
+                            {failedPct > 0 && <View style={{ width: `${failedPct}%`, backgroundColor: '#DC2626' }} />}
+                          </View>
+                          <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 3 }}>{sentPct}% sent{failed > 0 ? ` · ${failedPct}% failed` : ''}</Text>
+                        </View>
+                      );
+                    })()}
                   </TouchableOpacity>
 
                   {expanded && (

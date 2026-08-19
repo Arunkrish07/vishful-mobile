@@ -76,6 +76,7 @@ const blankAptForm = {
   gender_allowed: '', status: 'live', signing_date: '', start_date: '', end_date: '',
   eb_card_number: '', eb_consumer_number: '', eb_connection_type: 'LT',
   property_tax_id: '', property_tax_amount: '', water_tax_id: '', water_tax_amount: '',
+  star_rating: '', star_rating_override: false,
 };
 
 // ─── Occupancy inception helpers (exact match of web BedHistoryDialog logic) ─
@@ -368,6 +369,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
   // ── Per-apartment Assets panel (current allocated assets) ───────────────────
   const [assetPanelApt, setAssetPanelApt] = useState<any>(null);
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
+  // Per-asset maintenance history (flat tickets keyed by asset_id)
+  const [assetMaint, setAssetMaint] = useState<any[]>([]);
   const [showAddApt, setShowAddApt] = useState(false);
   const [showAddBed, setShowAddBed] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
@@ -527,6 +530,31 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
     setPerfApartments(d.perfApartments);
     setPerfProperty(d.perfProperty);
   }, [detailQuery.data]);
+
+  // Load per-asset maintenance history once (flat tickets grouped by asset_id).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await sb.listAssetMaintenance();
+        if (alive) setAssetMaint(Array.isArray(rows) ? rows : []);
+      } catch { if (alive) setAssetMaint([]); }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // asset_id → { tickets[], total } for the assets panel.
+  const maintByAsset = useMemo(() => {
+    const map: Record<string, { tickets: any[]; total: number }> = {};
+    for (const t of assetMaint || []) {
+      const key = t?.asset_id;
+      if (!key) continue;
+      const entry = map[key] || (map[key] = { tickets: [], total: 0 });
+      entry.tickets.push(t);
+      entry.total += Number(t?.closure_cost) || 0;
+    }
+    return map;
+  }, [assetMaint]);
 
   // Mutations trigger a refetch. setRefreshKey is kept as a shim so every
   // existing `setRefreshKey(k => k + 1)` call site works untouched.
@@ -1326,6 +1354,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                               property_tax_amount: a.property_tax_amount != null ? String(a.property_tax_amount) : '',
                               water_tax_id: a.water_tax_id || '',
                               water_tax_amount: a.water_tax_amount != null ? String(a.water_tax_amount) : '',
+                              star_rating: a.star_rating != null ? String(a.star_rating) : '',
+                              star_rating_override: !!a.star_rating_override,
                             });
                             setShowEditApt(true);
                           }}
@@ -2433,6 +2463,45 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                           <Text style={{ fontSize: 11, color: VBRAND.ink700, fontWeight: '600', maxWidth: '62%', textAlign: 'right' }} numberOfLines={1}>{String(v)}</Text>
                         </View>
                       ))}
+
+                      {/* Maintenance history for this asset */}
+                      {(() => {
+                        const mh = maintByAsset[row.assetId];
+                        const tks = mh?.tickets || [];
+                        return (
+                          <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#E5E7EB' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: VBRAND.ink500, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                                Maintenance ({tks.length})
+                              </Text>
+                              {mh && mh.total > 0 ? (
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep }}>Total {money(mh.total)}</Text>
+                              ) : null}
+                            </View>
+                            {tks.length ? tks.map((t: any) => {
+                              const st = String(t.status || '').toLowerCase();
+                              const stColor = (st === 'closed' || st === 'resolved' || st === 'completed') ? '#10B981'
+                                : (st === 'open' || st === 'pending') ? '#F59E0B' : VBRAND.ink400;
+                              return (
+                                <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 3 }}>
+                                  <Text style={{ fontSize: 11, fontWeight: '700', color: VBRAND.ink700 }} numberOfLines={1}>
+                                    {t.ticket_number || t.id}
+                                  </Text>
+                                  <View style={{ backgroundColor: stColor + '22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
+                                    <Text style={{ fontSize: 9, fontWeight: '800', color: stColor, textTransform: 'capitalize' }}>{t.status || '—'}</Text>
+                                  </View>
+                                  {t.issue_type ? (
+                                    <Text style={{ fontSize: 10, color: VBRAND.ink400, flex: 1 }} numberOfLines={1}>{t.issue_type}</Text>
+                                  ) : <View style={{ flex: 1 }} />}
+                                  <Text style={{ fontSize: 11, fontWeight: '700', color: VBRAND.ink900 }}>{money(t.closure_cost)}</Text>
+                                </View>
+                              );
+                            }) : (
+                              <Text style={{ fontSize: 11, color: VBRAND.ink400 }}>No maintenance tickets.</Text>
+                            )}
+                          </View>
+                        );
+                      })()}
                     </View>
                   ) : null}
                 </View>
@@ -2611,6 +2680,8 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                     property_tax_amount: editAptForm.property_tax_amount ? parseFloat(editAptForm.property_tax_amount) : null,
                     water_tax_id: editAptForm.water_tax_id || null,
                     water_tax_amount: editAptForm.water_tax_amount ? parseFloat(editAptForm.water_tax_amount) : null,
+                    star_rating: editAptForm.star_rating_override && editAptForm.star_rating ? parseInt(editAptForm.star_rating) : null,
+                    star_rating_override: !!editAptForm.star_rating_override,
                   });
                   setShowEditApt(false);
                   setRefreshKey((k: number) => k + 1);
@@ -2656,6 +2727,35 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
               <View style={{ flex: 1 }}><Input label="Water Tax ID" value={editAptForm.water_tax_id || ''} onChangeText={v => setEditAptForm({ ...editAptForm, water_tax_id: v })} /></View>
               <View style={{ flex: 1 }}><Input label="Water Tax Amount (₹)" value={editAptForm.water_tax_amount || ''} onChangeText={v => setEditAptForm({ ...editAptForm, water_tax_amount: v })} keyboardType="numeric" /></View>
             </View>
+
+            {/* Manual star-rating override */}
+            <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purple, letterSpacing: 0.5, marginTop: 8, marginBottom: 10, textTransform: 'uppercase' }}>Star Rating</Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setEditAptForm({ ...editAptForm, star_rating_override: !editAptForm.star_rating_override })}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}
+            >
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }}>Manual Override</Text>
+                <Text style={{ fontSize: 11, color: VBRAND.ink500, marginTop: 2 }}>Set the rating manually instead of the computed score.</Text>
+              </View>
+              <View style={{ width: 46, height: 28, borderRadius: 14, padding: 3, backgroundColor: editAptForm.star_rating_override ? VBRAND.purple : '#D1D5DB', justifyContent: 'center' }}>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', alignSelf: editAptForm.star_rating_override ? 'flex-end' : 'flex-start' }} />
+              </View>
+            </TouchableOpacity>
+            {editAptForm.star_rating_override ? (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 4 }}>
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const filled = Number(editAptForm.star_rating || 0) >= n;
+                  return (
+                    <TouchableOpacity key={n} onPress={() => setEditAptForm({ ...editAptForm, star_rating: String(n) })} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Ionicons name={filled ? 'star' : 'star-outline'} size={30} color={filled ? '#F59E0B' : VBRAND.ink400} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : null}
+
             <View style={{ height: 40 }} />
           </ScrollView>
         </SafeAreaView>

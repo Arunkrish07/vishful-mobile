@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassBackground, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { fetchTickets, tenantApproveCompletion, checkTenantPendingTickets, Ticket } from '../services/ticketService';
-import { getTenantNotices, recordNotice, getTenantLocation } from '../lib/supabaseService';
+import { getTenantNotices, recordNotice, getTenantLocation, listInvoices, listAnnouncements } from '../lib/supabaseService';
 import { client, api } from '../lib/convexApi';
 import { CONVEX_SITE_URL } from '../lib/config';
 
@@ -207,6 +207,13 @@ export default function TenantHomeScreen({ navigation }: any) {
   const [detailsLoading, setDetailsLoading]       = useState(false);
   const [accountNotLinked, setAccountNotLinked]   = useState(false);
 
+  // ── Dues / tickets / announcements (parity with web TenantDashboard) ──────
+  const [totalDue, setTotalDue]                   = useState(0);
+  const [pendingInvoiceCount, setPendingInvoiceCount] = useState(0);
+  const [openTicketCount, setOpenTicketCount]     = useState(0);
+  const [announcements, setAnnouncements]         = useState<any[]>([]);
+  const [expandedAnnouncement, setExpandedAnnouncement] = useState<string | null>(null);
+
   // ── Voice state ──────────────────────────────────────────────────────────
   const [voiceStep, setVoiceStep]                 = useState<VoiceStep>('idle');
   const [voiceModalOpen, setVoiceModalOpen]       = useState(false);
@@ -272,8 +279,41 @@ export default function TenantHomeScreen({ navigation }: any) {
     try {
       const all = await fetchTickets('tenant', undefined, tenantId);
       setPendingTickets(all.filter((t: Ticket) => t.status === 'pending_tenant_approval'));
+      // TASK 2 — reuse the same fetch to count open tickets (not completed/closed/resolved)
+      const closedStatuses = ['completed', 'closed', 'resolved'];
+      setOpenTicketCount(
+        all.filter((t: Ticket) => !closedStatuses.includes(String(t.status || '').toLowerCase())).length
+      );
     } catch {}
   }, [tenantId]);
+
+  // TASK 1 — Dues summary from real invoices
+  const loadDues = useCallback(async () => {
+    if (!tenantId) return;
+    try {
+      const invoices: any[] = (await listInvoices({ tenantId })) || [];
+      let due = 0;
+      let pending = 0;
+      for (const inv of invoices) {
+        const status = String(inv?.status || '').toLowerCase();
+        if (status === 'paid') continue;
+        pending += 1;
+        const balance = Number(inv?.totalAmount ?? 0) - Number(inv?.paidAmount ?? 0);
+        if (balance > 0) due += balance;
+      }
+      setTotalDue(due);
+      setPendingInvoiceCount(pending);
+    } catch { setTotalDue(0); setPendingInvoiceCount(0); }
+  }, [tenantId]);
+
+  // TASK 3 — Published announcements
+  const loadAnnouncements = useCallback(async () => {
+    try {
+      const all: any[] = (await listAnnouncements()) || [];
+      const published = all.filter((a: any) => a?.is_published || a?.published_at);
+      setAnnouncements(published);
+    } catch { setAnnouncements([]); }
+  }, []);
 
   const loadNotices = useCallback(async () => {
     if (!tenantId) return;
@@ -285,12 +325,14 @@ export default function TenantHomeScreen({ navigation }: any) {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([loadPending(), loadNotices(), loadTenantDetails()]).finally(() => setRefreshing(false));
-  }, [loadPending, loadNotices, loadTenantDetails]);
+    Promise.all([loadPending(), loadNotices(), loadTenantDetails(), loadDues(), loadAnnouncements()]).finally(() => setRefreshing(false));
+  }, [loadPending, loadNotices, loadTenantDetails, loadDues, loadAnnouncements]);
 
   useEffect(() => { loadPending(); },       [loadPending]);
   useEffect(() => { loadNotices(); },       [loadNotices]);
   useEffect(() => { loadTenantDetails(); }, [loadTenantDetails]);
+  useEffect(() => { loadDues(); },          [loadDues]);
+  useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
 
   // Load issue types when voice modal opens
   useEffect(() => {
@@ -896,6 +938,34 @@ export default function TenantHomeScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color="#312E81" />
           </TouchableOpacity>
 
+          {/* Dues + Open Tickets stat tiles (parity with web TenantDashboard) */}
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {/* Total Due */}
+            <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 14, padding: spacing.lg, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.5)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Ionicons name="wallet-outline" size={14} color={totalDue > 0 ? '#DC2626' : '#16a34a'} />
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#6B7280', letterSpacing: 0.8 }}>TOTAL DUE</Text>
+              </View>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: totalDue > 0 ? '#DC2626' : '#16a34a' }} numberOfLines={1}>
+                ₹{Number(totalDue).toLocaleString('en-IN')}
+              </Text>
+              <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 2 }}>
+                {pendingInvoiceCount} pending {pendingInvoiceCount === 1 ? 'invoice' : 'invoices'}
+              </Text>
+            </View>
+            {/* Open Tickets */}
+            <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 14, padding: spacing.lg, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.5)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Ionicons name="construct-outline" size={14} color="#312E81" />
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#6B7280', letterSpacing: 0.8 }}>OPEN TICKETS</Text>
+              </View>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>{openTicketCount}</Text>
+              <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 2 }}>
+                {openTicketCount === 0 ? 'All resolved' : 'In progress'}
+              </Text>
+            </View>
+          </View>
+
           {/* Pending Approval Alerts */}
           <View onLayout={captureSectionOffset('more')} style={{ gap: 8 }}>
             {pendingTickets.length > 0 && (
@@ -971,6 +1041,44 @@ export default function TenantHomeScreen({ navigation }: any) {
             </View>
           )}
           </View>
+
+          {/* Announcements (parity with web TenantDashboard) */}
+          {announcements.length > 0 && (
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="megaphone-outline" size={14} color="#312E81" />
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#6B7280', letterSpacing: 1 }}>ANNOUNCEMENTS</Text>
+              </View>
+              {announcements.map((a: any) => {
+                const key = String(a.id ?? a._id);
+                const expanded = expandedAnnouncement === key;
+                const when = a.published_at || a.created_at;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    activeOpacity={0.8}
+                    onPress={() => setExpandedAnnouncement(expanded ? null : key)}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 14, padding: spacing.lg, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.5)', gap: 4 }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: '800', color: '#111827' }} numberOfLines={expanded ? undefined : 1}>
+                        {a.title || 'Announcement'}
+                      </Text>
+                      <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#6B7280" />
+                    </View>
+                    {when ? (
+                      <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{formatDate(when, '')}</Text>
+                    ) : null}
+                    {a.content ? (
+                      <Text style={{ fontSize: fontSize.sm, color: '#556274', marginTop: 2, lineHeight: 20 }} numberOfLines={expanded ? undefined : 2}>
+                        {a.content}
+                      </Text>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {/* Notice read-only */}
           <View onLayout={captureSectionOffset('notices')}>

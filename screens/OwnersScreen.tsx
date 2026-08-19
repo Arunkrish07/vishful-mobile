@@ -29,6 +29,23 @@ const fmtMonth = (m: string | null) => {
 const contractColor = (status: string) =>
   status === 'active' ? '#16A34A' : status === 'upcoming' ? '#0284C7' : status === 'expired' ? '#DC2626' : '#64748B';
 
+// Contract expiring within 60 days (web parity: isExpiringSoon)
+const isExpiringSoon = (endDate: string | null | undefined) => {
+  if (!endDate) return false;
+  try {
+    const days = Math.floor((new Date(endDate).getTime() - Date.now()) / 86400000);
+    return days >= 0 && days <= 60;
+  } catch { return false; }
+};
+
+// Auto payment note (web parity: generatePaymentNote)
+const generatePaymentNote = (p: any, aptCode?: string) => {
+  const billDate = p?.bill_date ? fmtDate(p.bill_date) : '';
+  const month = fmtMonth(p?.payment_month);
+  const apt = aptCode || p?.apartments?.apartment_code || '';
+  return `Bills Raised${billDate ? ` on ${billDate}` : ''} and paid for the Month of ${month}${apt ? ` for the ${apt}` : ''}`;
+};
+
 const PAYMENT_MODES = [
   { key: 'transfer',    label: 'Bank Transfer' },
   { key: 'cash',        label: 'Cash'          },
@@ -416,8 +433,8 @@ function OwnerFormModal({ mode, initial, onClose, onSaved }: {
 }
 
 // ─── Record / Edit Payment Modal ────────────────────────────────────────────────
-function PaymentModal({ payment, mode, onClose, onSaved }: {
-  payment: any; mode: 'record' | 'edit'; onClose: () => void; onSaved: () => void;
+function PaymentModal({ payment, mode, aptCode, onClose, onSaved }: {
+  payment: any; mode: 'record' | 'edit'; aptCode?: string; onClose: () => void; onSaved: () => void;
 }) {
   const [form, setForm] = useState<any>(() => ({
     escalated_amount: String(payment.escalated_amount || ''),
@@ -427,7 +444,8 @@ function PaymentModal({ payment, mode, onClose, onSaved }: {
     paid_date:        payment.paid_date || new Date().toISOString().split('T')[0],
     payment_mode:     payment.payment_mode || 'transfer',
     reference_number: payment.reference_number || '',
-    notes:            payment.notes || '',
+    // Record mode: prefill an auto-generated note when none exists (web parity)
+    notes:            payment.notes || (mode === 'record' ? generatePaymentNote(payment, aptCode) : ''),
   }));
   const [saving, setSaving] = useState(false);
   const setF = (k: string) => (v: any) => setForm((p: any) => ({ ...p, [k]: v }));
@@ -612,6 +630,7 @@ function ContractDetailModal({ contract, onClose }: { contract: any; onClose: ()
             <PaymentModal
               payment={payTarget.p}
               mode={payTarget.mode}
+              aptCode={contract.apartmentCode || ''}
               onClose={() => setPayTarget(null)}
               onSaved={() => { setPayTarget(null); load(); }}
             />
@@ -631,6 +650,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
   const [showEditOwner, setShowEditOwner]        = useState(false);
   const [contractSearch, setContractSearch]      = useState('');
   const [editContract, setEditContract]          = useState<any>(null);
+  const [renewContract, setRenewContract]        = useState<any>(null);
   const [contractDetail, setContractDetail]      = useState<any>(null);
   // All payments
   const [allPayments, setAllPayments]   = useState<any[]>([]);
@@ -731,8 +751,9 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
     const dt = new Date(d.length === 7 ? d + '-01' : d);
     return dt >= from && dt <= to;
   });
+  const totalBilled  = filteredAllPayments.reduce((s: number, p: any) => s + Number(p.escalated_amount || 0), 0);
   const totalPaid    = filteredAllPayments.filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + Number(p.escalated_amount || 0), 0);
-  const totalPending = filteredAllPayments.filter((p: any) => p.status !== 'paid').reduce((s: number, p: any) => s + Number(p.escalated_amount || 0), 0);
+  const totalPending = totalBilled - totalPaid; // Balance Due
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -860,12 +881,18 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                     <TouchableOpacity key={c.id} activeOpacity={0.85} onPress={() => setContractDetail(c)}
                       style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: contractColor(c.status) + '30' }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                           <ContractBadge type={c.contractType} />
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: contractColor(c.status) }} />
                             <Text style={{ fontSize: 11, fontWeight: '700', color: contractColor(c.status) }}>{c.status}</Text>
                           </View>
+                          {isExpiringSoon(c.endDate) && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FEF3C7', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                              <Ionicons name="alert-circle" size={11} color="#B45309" />
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#B45309' }}>Expiring Soon</Text>
+                            </View>
+                          )}
                         </View>
                         <Text style={{ fontSize: 16, fontWeight: '900', color: '#2563EB' }}>{fmtAmt(c.monthlyRent)}/mo</Text>
                       </View>
@@ -882,6 +909,11 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                           <Ionicons name="receipt-outline" size={14} color="#2563EB" />
                           <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>View Payments</Text>
                         </View>
+                        <TouchableOpacity onPress={(e: any) => { e?.stopPropagation?.(); setRenewContract(c); }}
+                          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: 'rgba(22,163,74,0.10)', borderRadius: 8 }}>
+                          <Ionicons name="refresh" size={14} color="#16A34A" />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#16A34A' }}>Renew</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => setEditContract(c)}
                           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#EFF6FF', borderRadius: 8 }}>
                           <Ionicons name="create-outline" size={14} color="#2563EB" />
@@ -909,15 +941,19 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
-                    {/* Summary + actions */}
+                    {/* Summary: Total Billed / Total Paid / Balance Due */}
                     <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: '#EFF6FF', borderRadius: 10, padding: 10 }}>
+                        <Text style={{ fontSize: 9, color: '#2563EB', fontWeight: '700' }}>BILLED</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: '#2563EB' }}>{fmtAmt(totalBilled)}</Text>
+                      </View>
                       <View style={{ flex: 1, backgroundColor: '#DCFCE7', borderRadius: 10, padding: 10 }}>
                         <Text style={{ fontSize: 9, color: '#16A34A', fontWeight: '700' }}>PAID</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#16A34A' }}>{fmtAmt(totalPaid)}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: '#16A34A' }}>{fmtAmt(totalPaid)}</Text>
                       </View>
                       <View style={{ flex: 1, backgroundColor: '#FEF9C3', borderRadius: 10, padding: 10 }}>
-                        <Text style={{ fontSize: 9, color: '#A16207', fontWeight: '700' }}>PENDING</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#A16207' }}>{fmtAmt(totalPending)}</Text>
+                        <Text style={{ fontSize: 9, color: '#A16207', fontWeight: '700' }}>BALANCE DUE</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: '#A16207' }}>{fmtAmt(totalPending)}</Text>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
@@ -993,6 +1029,16 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
               onSaved={() => { setEditContract(null); loadDetail(); }}
             />
           )}
+          {renewContract && (
+            <AddContractModal
+              ownerId={ownerId}
+              ownerName={owner?.name || ''}
+              ownerGst={owner?.gstNumber || ''}
+              renewFrom={renewContract}
+              onClose={() => setRenewContract(null)}
+              onSaved={() => { setRenewContract(null); loadDetail(); }}
+            />
+          )}
           {contractDetail && (
             <ContractDetailModal contract={contractDetail} onClose={() => { setContractDetail(null); if (tab === 'payments') loadPayments(); }} />
           )}
@@ -1006,11 +1052,12 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
 }
 
 // ─── ADD / EDIT CONTRACT MODAL ──────────────────────────────────────────────────
-function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, onClose, onSaved }: {
-  ownerId: string; ownerName: string; ownerGst: string; editTarget?: any;
+function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom, onClose, onSaved }: {
+  ownerId: string; ownerName: string; ownerGst: string; editTarget?: any; renewFrom?: any;
   onClose: () => void; onSaved: () => void;
 }) {
   const isEdit = !!editTarget;
+  const isRenew = !editTarget && !!renewFrom;   // add-mode, pre-filled from an old contract
   const EMPTY = {
     apartment_ids: [] as string[],
     contract_type: 'lease', start_date: '', end_date: '',
@@ -1020,28 +1067,37 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, onClose, o
     notes: '', payment_schedule: 'monthly', renewal_periods: '', agreement_url: '',
   };
   const [form, setForm] = useState<any>(() => {
-    if (isEdit) {
-      // getOwnerDetail now returns the full contract terms, so every field is
-      // pre-populated and none get nulled on save.
-      return {
+    // Both editTarget and renewFrom are getOwnerDetail contract objects (camelCase).
+    const src = editTarget || renewFrom;
+    if (src) {
+      const terms = {
         ...EMPTY,
-        contract_type: editTarget.contractType || 'lease',
-        start_date: editTarget.startDate || '',
-        end_date: editTarget.endDate || '',
-        monthly_rent: editTarget.monthlyRent ? String(editTarget.monthlyRent) : '',
-        revenue_share_percentage: editTarget.revenueSharePercentage != null ? String(editTarget.revenueSharePercentage) : '',
-        security_deposit: editTarget.securityDeposit ? String(editTarget.securityDeposit) : '',
-        lock_in_months: editTarget.lockInMonths != null ? String(editTarget.lockInMonths) : '',
-        escalation_percentage: editTarget.escalationPercentage != null ? String(editTarget.escalationPercentage) : '',
-        escalation_interval_months: editTarget.escalationIntervalMonths != null ? String(editTarget.escalationIntervalMonths) : '',
-        payment_due_day: editTarget.paymentDueDay ? String(editTarget.paymentDueDay) : '1',
-        rent_paid_in_advance: !!editTarget.rentPaidInAdvance,
-        rent_includes_gst: !!editTarget.rentIncludesGst,
-        payment_schedule: editTarget.paymentSchedule || 'monthly',
-        renewal_periods: editTarget.renewalPeriods != null ? String(editTarget.renewalPeriods) : '',
-        agreement_url: editTarget.agreementUrl || '',
-        notes: editTarget.notes || '',
+        contract_type: src.contractType || 'lease',
+        monthly_rent: src.monthlyRent ? String(src.monthlyRent) : '',
+        revenue_share_percentage: src.revenueSharePercentage != null ? String(src.revenueSharePercentage) : '',
+        security_deposit: src.securityDeposit ? String(src.securityDeposit) : '',
+        lock_in_months: src.lockInMonths != null ? String(src.lockInMonths) : '',
+        escalation_percentage: src.escalationPercentage != null ? String(src.escalationPercentage) : '',
+        escalation_interval_months: src.escalationIntervalMonths != null ? String(src.escalationIntervalMonths) : '',
+        payment_due_day: src.paymentDueDay ? String(src.paymentDueDay) : '1',
+        rent_paid_in_advance: !!src.rentPaidInAdvance,
+        rent_includes_gst: !!src.rentIncludesGst,
+        payment_schedule: src.paymentSchedule || 'monthly',
+        renewal_periods: src.renewalPeriods != null ? String(src.renewalPeriods) : '',
       };
+      if (isEdit) {
+        // Edit: keep this contract's own dates / agreement / notes.
+        return {
+          ...terms,
+          start_date: src.startDate || '',
+          end_date: src.endDate || '',
+          agreement_url: src.agreementUrl || '',
+          notes: src.notes || '',
+        };
+      }
+      // Renew: copy all terms, start where the old contract ends, fresh dates /
+      // apartment / agreement so the user finishes the new period.
+      return { ...terms, start_date: src.endDate || '', end_date: '', agreement_url: '', notes: '' };
     }
     return { ...EMPTY };
   });
@@ -1110,13 +1166,21 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, onClose, o
         <SafeAreaView style={{ flex: 1 }}>
           <View style={S.modalHeader}>
             <View>
-              <Text style={S.modalTitle}>{isEdit ? 'Edit Contract' : 'Add Contract'}</Text>
+              <Text style={S.modalTitle}>{isEdit ? 'Edit Contract' : isRenew ? 'Renew Contract' : 'Add Contract'}</Text>
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>{ownerName}</Text>
             </View>
             <TouchableOpacity onPress={onClose}><Ionicons name="close-circle" size={28} color={colors.textTertiary} /></TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+            {isRenew && (
+              <View style={{ backgroundColor: 'rgba(22,163,74,0.08)', borderRadius: 10, padding: 12, marginBottom: 4, flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderColor: 'rgba(22,163,74,0.2)' }}>
+                <Ionicons name="refresh-circle" size={18} color="#16A34A" />
+                <Text style={{ flex: 1, fontSize: 12, color: '#166534', fontWeight: '600', lineHeight: 17 }}>
+                  Renewing terms from the previous contract{renewFrom?.apartmentCode ? ` (${renewFrom.apartmentCode})` : ''}. Start date is set to the old end date — pick the apartment(s) and confirm the dates below.
+                </Text>
+              </View>
+            )}
             <FL text="Contract Identity" />
             <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>Contract Type *</Text>
             <PillRow options={CONTRACT_TYPES} value={form.contract_type} onChange={setF('contract_type')} />

@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { spacing, fontSize } from '../lib/theme';
-import { GlassBackground, Input, LoadingScreen, PickerSelect, PageHeader, IconBtnSolid, SearchField } from '../components/shared';
+import { GlassBackground, Input, LoadingScreen, PickerSelect, PageHeader, IconBtnSolid, SearchField, DateField } from '../components/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
@@ -179,6 +179,9 @@ export default function PropertiesScreen({ navigation }: any) {
   const [addName, setAddName] = useState('');
   const [addAddress, setAddAddress] = useState('');
   const [addCity, setAddCity] = useState('');
+  const [addState, setAddState] = useState('');
+  const [addPincode, setAddPincode] = useState('');
+  const [addStartDate, setAddStartDate] = useState('');
   const [addStatus, setAddStatus] = useState('live');
   const [addLoading, setAddLoading] = useState(false);
 
@@ -188,6 +191,9 @@ export default function PropertiesScreen({ navigation }: any) {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editCity, setEditCity] = useState('');
+  const [editState, setEditState] = useState('');
+  const [editPincode, setEditPincode] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
   const [editStatus, setEditStatus] = useState('live');
   const [editLoading, setEditLoading] = useState(false);
 
@@ -216,10 +222,14 @@ export default function PropertiesScreen({ navigation }: any) {
         name: addName.trim(),
         address: addAddress.trim() || undefined,
         city: addCity.trim() || undefined,
+        state: addState.trim() || undefined,
+        pincode: addPincode.trim() || undefined,
+        start_date: addStartDate || undefined,
         status: addStatus as any,
-      });
+      } as any);
       setShowAdd(false);
       setAddName(''); setAddAddress(''); setAddCity(''); setAddStatus('live');
+      setAddState(''); setAddPincode(''); setAddStartDate('');
       refresh();
     } catch (e: any) { Alert.alert('Error', e.message); }
     setAddLoading(false);
@@ -230,6 +240,9 @@ export default function PropertiesScreen({ navigation }: any) {
     setEditName(p.name || '');
     setEditAddress(p.address || '');
     setEditCity(p.city || '');
+    setEditState(p.state || '');
+    setEditPincode(p.pincode != null ? String(p.pincode) : '');
+    setEditStartDate(p.start_date || '');
     setEditStatus(p.status || 'live');
     setShowEdit(true);
   };
@@ -243,6 +256,9 @@ export default function PropertiesScreen({ navigation }: any) {
         property_name: editName.trim(),
         address: editAddress.trim() || null,
         city:    editCity.trim()    || null,
+        state:   editState.trim()   || null,
+        pincode: editPincode.trim() || null,
+        start_date: editStartDate   || null,
         status:  editStatus,
       });
       setShowEdit(false);
@@ -387,6 +403,14 @@ export default function PropertiesScreen({ navigation }: any) {
                   <Input label="Property Name *" value={addName} onChangeText={setAddName} placeholder="e.g. Sunrise Villa" />
                   <Input label="Address" value={addAddress} onChangeText={setAddAddress} placeholder="Full address" />
                   <Input label="City" value={addCity} onChangeText={setAddCity} placeholder="City" />
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}><Input label="State" value={addState} onChangeText={setAddState} placeholder="State" /></View>
+                    <View style={{ flex: 1 }}><Input label="Pincode" value={addPincode} onChangeText={setAddPincode} placeholder="600001" keyboardType="numeric" /></View>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: VBRAND.ink600, marginBottom: 6 }}>Start Date</Text>
+                    <DateField value={addStartDate} onChange={setAddStartDate} placeholder="Select start date" />
+                  </View>
                   <PickerSelect label="Status" value={addStatus} options={STATUS_OPTS} onSelect={setAddStatus} />
                 </View>
 
@@ -443,6 +467,14 @@ export default function PropertiesScreen({ navigation }: any) {
                   <Input label="Property Name *" value={editName} onChangeText={setEditName} placeholder="e.g. Sunrise Villa" />
                   <Input label="Address" value={editAddress} onChangeText={setEditAddress} placeholder="Full address" />
                   <Input label="City" value={editCity} onChangeText={setEditCity} placeholder="City" />
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}><Input label="State" value={editState} onChangeText={setEditState} placeholder="State" /></View>
+                    <View style={{ flex: 1 }}><Input label="Pincode" value={editPincode} onChangeText={setEditPincode} placeholder="600001" keyboardType="numeric" /></View>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: VBRAND.ink600, marginBottom: 6 }}>Start Date</Text>
+                    <DateField value={editStartDate} onChange={setEditStartDate} placeholder="Select start date" />
+                  </View>
                   <PickerSelect label="Status" value={editStatus} options={STATUS_OPTS} onSelect={setEditStatus} />
                 </View>
 
