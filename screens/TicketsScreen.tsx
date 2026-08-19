@@ -1002,7 +1002,7 @@ export default function TicketsScreen({ navigation }: any) {
     if (regularRules.length > 0 || regularLoading) return;
     setRegularLoading(true);
     try {
-      const { default: client, api } = await import('../lib/convexApi') as any;
+      const { client, api } = await import('../lib/convexApi') as any;
       const rules = await client.action(api.tickets.getIssueTypes, {});
       setRegularRules(Array.isArray(rules) ? rules : []);
     } catch {
@@ -1549,18 +1549,18 @@ export default function TicketsScreen({ navigation }: any) {
                     const open    = tickets.filter(t=>!['completed','closed'].includes(t.status)).length;
                     const breached= tickets.filter(t=>t.sla_deadline&&new Date(t.sla_deadline)<new Date()&&!['completed','closed'].includes(t.status)).length;
                     const summary = `Total: ${tickets.length}, Open: ${open}, SLA Breached: ${breached}.\nTop issues: ${Object.entries(issueDist).sort(([,a],[,b])=>b-a).slice(0,5).map(([k,v])=>`${k}(${v})`).join(', ')}.\nProperties: ${Object.entries(propDist).slice(0,3).map(([k,v])=>`${k}(${v})`).join(', ')}.`;
-                    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        model: 'claude-sonnet-4-20250514',
-                        max_tokens: 1000,
-                        messages: [{ role: 'user', content: `You are a property maintenance analyst. Analyse these ticket stats and give 3-5 concise actionable insights. Keep each point under 2 sentences. Stats: ${summary}` }],
-                      }),
-                    });
-                    const d = await resp.json();
-                    const text = d.content?.map((c:any)=>c.text||'').join('') || 'No analysis returned.';
-                    setAiAnalysis(text);
+                    const question = `You are a property maintenance analyst. Analyse these ticket stats and give 3-5 concise actionable insights. Keep each point under 2 sentences. Stats: ${summary}`;
+                    const { client, api } = await import('../lib/convexApi') as any;
+                    const res = await client.action(
+                      (api as any).aiAssistant.askAssistant,
+                      { question, history: [] }
+                    );
+                    const text = (res?.answer || '').trim();
+                    if (!text) {
+                      setAiAnalysis('Could not load AI insights: the assistant returned an empty response. Please try again.');
+                    } else {
+                      setAiAnalysis(text);
+                    }
                   } catch (e: any) {
                     setAiAnalysis('Could not load AI insights: ' + (e?.message || 'Unknown error'));
                   } finally {

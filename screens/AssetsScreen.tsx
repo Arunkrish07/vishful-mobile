@@ -1373,6 +1373,7 @@ const TABS = [
   { key: 'payments',    label: 'Asset Payments', icon: 'cash-outline' },
   { key: 'vendors',     label: 'Vendors',        icon: 'people-outline' },
   { key: 'allocations', label: 'Allocations',    icon: 'location-outline' },
+  { key: 'maintenance', label: 'Maintenance',    icon: 'construct-outline' },
   { key: 'categories',  label: 'Categories',     icon: 'folder-outline' },
   { key: 'analytics',   label: 'Analytics',      icon: 'bar-chart-outline' },
   { key: 'forecasts',   label: 'Forecasts',      icon: 'trending-up-outline' },
@@ -1404,8 +1405,16 @@ export default function AssetsScreen() {
   const [fetchError,   setFetchError]   = useState('');
   const [search,       setSearch]       = useState('');
   const [typeFilter,   setTypeFilter]   = useState('all');
+  // Inventory list grouping mode (web parity: listModeSelect) — flat | asset | apartment
+  const [listMode,     setListMode]     = useState<'flat' | 'asset' | 'apartment'>('flat');
   const [vendorSearch, setVendorSearch] = useState('');
   const [visibleTabKeys, setVisibleTabKeys] = useState<Set<string> | null>(null);
+  // Maintenance tab (asset-linked tickets, grouped client-side)
+  const [maintTickets,   setMaintTickets]   = useState<any[]>([]);
+  const [maintLoading,   setMaintLoading]   = useState(false);
+  const [maintLoaded,    setMaintLoaded]    = useState(false);
+  const [onlyWithTickets,setOnlyWithTickets]= useState(true);
+  const [expandedMaint,  setExpandedMaint]  = useState<Set<string>>(new Set());
   // Inventory paging — avoids blocking the JS thread rendering ~1700 cards at once.
   const ASSET_PAGE = 30;
   const [assetLimit, setAssetLimit] = useState(ASSET_PAGE);
@@ -1475,6 +1484,20 @@ export default function AssetsScreen() {
     setBrands(v(rBrands, []));
     setForecasts(v(rForecasts, []));
   }, []);
+
+  // Maintenance tickets load lazily the first time the tab is opened (or after refresh).
+  const loadMaintenance = useCallback(async () => {
+    setMaintLoading(true);
+    try {
+      const t = await sb.listAssetMaintenance();
+      if (mountedRef.current) setMaintTickets(Array.isArray(t) ? t : []);
+    } catch {
+      if (mountedRef.current) setMaintTickets([]);
+    } finally {
+      if (mountedRef.current) { setMaintLoading(false); setMaintLoaded(true); }
+    }
+  }, []);
+  useEffect(() => { if (activeTab === 'maintenance' && !maintLoaded) loadMaintenance(); }, [activeTab, maintLoaded, loadMaintenance]);
 
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
 
@@ -1556,57 +1579,131 @@ export default function AssetsScreen() {
     return vendors.filter((v: any) => [v.name, v.vendor_name, v.phone, v.email, v.gst_number, v.gstNumber].some((x: any) => x && String(x).toLowerCase().includes(s)));
   }, [vendors, vendorSearch]);
 
+  // ── Maintenance grouping (flat tickets → per-asset), cross-referenced to loaded assets ──
+  const maintTicketOpen = (s: any) => !['completed', 'closed', 'resolved'].includes(String(s || '').toLowerCase());
+  const maintGroups = useMemo(() => {
+    const assetById = new Map<string, any>();
+    for (const a of assets) if (a && a._id != null) assetById.set(String(a._id), a);
+    const byAsset = new Map<string, any[]>();
+    for (const t of maintTickets) {
+      const k = String(t?.asset_id ?? '');
+      if (!k) continue;
+      const arr = byAsset.get(k) || [];
+      arr.push(t);
+      byAsset.set(k, arr);
+    }
+    const groups = Array.from(byAsset.entries()).map(([assetId, tickets]) => {
+      const asset = assetById.get(assetId) || null;
+      const openCount = tickets.filter((t: any) => maintTicketOpen(t.status)).length;
+      const spend = tickets.reduce((s: number, t: any) => s + (Number(t.closure_cost) || 0), 0);
+      const price = asset && asset.purchasePrice != null ? Number(asset.purchasePrice) : 0;
+      const pct = price > 0 ? Math.round((spend / price) * 100) : null;
+      return { assetId, asset, tickets, openCount, spend, price, pct };
+    });
+    // Most-serviced assets first.
+    groups.sort((a, b) => b.tickets.length - a.tickets.length);
+    return groups;
+  }, [maintTickets, assets]);
+
+  const maintKpis = useMemo(() => ({
+    assetsWithTickets: maintGroups.length,
+    totalOpen: maintGroups.reduce((s, g) => s + g.openCount, 0),
+    repeatOffenders: maintGroups.filter((g) => g.tickets.length >= 2).length,
+  }), [maintGroups]);
+
+  // Repair-vs-replace: cumulative repair spend ≥ 60% of purchase price (only assets with cost data).
+  const replaceFlags = useMemo(() =>
+    maintGroups
+      .filter((g) => g.price > 0 && g.spend >= 0.6 * g.price)
+      .sort((a, b) => (b.pct || 0) - (a.pct || 0)),
+  [maintGroups]);
+
   // ── render: INVENTORY ──
-  const renderInventory = () => (
-    <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 10, marginBottom: 10 }}>
-        <Ionicons name="search-outline" size={16} color="#6B7280" />
-        <TextInput value={search} onChangeText={setSearch} placeholder="Search inventory…" placeholderTextColor="#6B7280" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#111827' }} />
-        {!!search && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={16} color="#6B7280" /></TouchableOpacity>}
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity onPress={() => setTypeFilter('all')} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: typeFilter === 'all' ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: typeFilter === 'all' ? '#fff' : '#2563EB' }}>All Types</Text>
-          </TouchableOpacity>
-          {types.map((t: any) => (
-            <TouchableOpacity key={t._id} onPress={() => setTypeFilter(t._id)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: typeFilter === t._id ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: typeFilter === t._id ? '#fff' : '#2563EB' }}>{t.name}</Text>
-            </TouchableOpacity>
-          ))}
+  const renderInventory = () => {
+    // Only the paged window is rendered/grouped — keeps the JS thread light on large inventories.
+    const visible = filteredAssets.slice(0, assetLimit);
+    const typeOptions = [{ label: 'All types', value: 'all' }, ...types.map((t: any) => ({ label: t.name, value: t._id }))];
+    const modeOptions = [
+      { label: 'Flat list',           value: 'flat' },
+      { label: 'Group by asset',      value: 'asset' },
+      { label: 'Group by apartment',  value: 'apartment' },
+    ];
+    // Renders one inventory card — shared by flat + grouped modes.
+    const renderCard = (a: any) => (
+      <AssetCard key={a._id} a={a}
+        onView={() => { setDetailAssetId(a._id); setDetailOpen(true); }}
+        onQR={() => { setQrAsset(a); setQrOpen(true); }}
+        onEdit={() => { setEditAsset({
+          assetTypeId: a.assetTypeId, brand: a.brand, model: a.model, serialNumber: a.serialNumber,
+          purchasePrice: a.purchasePrice ? String(a.purchasePrice) : '', purchaseDate: a.purchaseDate || '',
+          warrantyMonths: a.warrantyMonths ? String(a.warrantyMonths) : '', invoiceNumber: a.invoiceNumber || '',
+          invoiceDate: a.invoiceDate || '', invoiceUrl: a.invoiceUrl || '', capacityValue: a.capacityValue || '',
+          capacityUnit: a.capacityUnit || '', condition: a.condition || 'new', status: a.status || 'inventory',
+          notes: a.notes || '', supplierId: a.supplierId || '', vendorNameManual: a.vendorNameManual || '',
+          isGeneralVendor: !!a.vendorNameManual, productPhotoUrl: a.productPhotoUrl || '', _id: a._id,
+        }); setAssetModalOpen(true); }}
+        onAlloc={() => { setEditAllocInit(null); setAllocAsset(a); setAllocOpen(true); }}
+        onDealloc={() => handleDeallocate(a)}
+        onDelete={() => handleDeleteAsset(a._id)} />
+    );
+    // Group the visible window by asset type name or apartment/location for grouped modes.
+    let groups: { title: string; items: any[] }[] = [];
+    if (listMode !== 'flat') {
+      const map = new Map<string, any[]>();
+      for (const a of visible) {
+        const key = listMode === 'asset'
+          ? (a.typeName || 'Unspecified')
+          : (a.locationName || 'Unallocated');
+        const arr = map.get(key) || [];
+        arr.push(a);
+        map.set(key, arr);
+      }
+      groups = Array.from(map.entries())
+        .sort((x, y) => x[0].localeCompare(y[0]))
+        .map(([title, items]) => ({ title, items }));
+    }
+    return (
+      <View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 10, marginBottom: 10 }}>
+          <Ionicons name="search-outline" size={16} color="#6B7280" />
+          <TextInput value={search} onChangeText={setSearch} placeholder="Search inventory…" placeholderTextColor="#6B7280" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#111827' }} />
+          {!!search && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={16} color="#6B7280" /></TouchableOpacity>}
         </View>
-      </ScrollView>
-      {filteredAssets.length === 0
-        ? <View style={{ alignItems: 'center', paddingVertical: 48 }}><Ionicons name="cube-outline" size={52} color="#e0d9ec" /><Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No assets found</Text></View>
-        : filteredAssets.slice(0, assetLimit).map((a: any) => (
-          <AssetCard key={a._id} a={a}
-            onView={() => { setDetailAssetId(a._id); setDetailOpen(true); }}
-            onQR={() => { setQrAsset(a); setQrOpen(true); }}
-            onEdit={() => { setEditAsset({
-              assetTypeId: a.assetTypeId, brand: a.brand, model: a.model, serialNumber: a.serialNumber,
-              purchasePrice: a.purchasePrice ? String(a.purchasePrice) : '', purchaseDate: a.purchaseDate || '',
-              warrantyMonths: a.warrantyMonths ? String(a.warrantyMonths) : '', invoiceNumber: a.invoiceNumber || '',
-              invoiceDate: a.invoiceDate || '', invoiceUrl: a.invoiceUrl || '', capacityValue: a.capacityValue || '',
-              capacityUnit: a.capacityUnit || '', condition: a.condition || 'new', status: a.status || 'inventory',
-              notes: a.notes || '', supplierId: a.supplierId || '', vendorNameManual: a.vendorNameManual || '',
-              isGeneralVendor: !!a.vendorNameManual, productPhotoUrl: a.productPhotoUrl || '', _id: a._id,
-            }); setAssetModalOpen(true); }}
-            onAlloc={() => { setEditAllocInit(null); setAllocAsset(a); setAllocOpen(true); }}
-            onDealloc={() => handleDeallocate(a)}
-            onDelete={() => handleDeleteAsset(a._id)} />
-        ))}
-      {filteredAssets.length > assetLimit && (
-        <TouchableOpacity
-          onPress={() => setAssetLimit(l => l + ASSET_PAGE)}
-          style={{ marginTop: 4, marginBottom: 12, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#EFF6FF', alignItems: 'center' }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: '800', color: '#2563EB' }}>
-            Load more ({Math.min(assetLimit, filteredAssets.length)} of {filteredAssets.length})
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+        {/* View mode + Asset Type dropdowns (web parity: listModeSelect + type filter) */}
+        <Row>
+          <View style={{ flex: 1 }}>
+            <PickerSelect label="View" value={listMode} options={modeOptions} onSelect={(v: string) => setListMode(v as any)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <PickerSelect label="Asset Type" value={typeFilter} options={typeOptions} onSelect={setTypeFilter} />
+          </View>
+        </Row>
+        {filteredAssets.length === 0
+          ? <View style={{ alignItems: 'center', paddingVertical: 48 }}><Ionicons name="cube-outline" size={52} color="#e0d9ec" /><Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No assets found</Text></View>
+          : listMode === 'flat'
+            ? visible.map(renderCard)
+            : groups.map((g) => (
+              <View key={g.title} style={{ marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', flex: 1 }} numberOfLines={1}>{g.title}</Text>
+                  <Pill label={String(g.items.length)} color="#2563EB" bg="rgba(37,99,235,0.12)" />
+                </View>
+                {g.items.map(renderCard)}
+              </View>
+            ))}
+        {filteredAssets.length > assetLimit && (
+          <TouchableOpacity
+            onPress={() => setAssetLimit(l => l + ASSET_PAGE)}
+            style={{ marginTop: 4, marginBottom: 12, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#EFF6FF', alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#2563EB' }}>
+              Load more ({Math.min(assetLimit, filteredAssets.length)} of {filteredAssets.length})
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   // ── render: VENDORS ──
   const renderVendors = () => (
@@ -1814,12 +1911,138 @@ export default function AssetsScreen() {
     );
   };
 
+  // ── render: MAINTENANCE (asset-linked tickets grouped by asset + repair-vs-replace insights) ──
+  const renderMaintenance = () => {
+    if (maintLoading && !maintLoaded) {
+      return <View style={{ alignItems: 'center', paddingVertical: 48 }}><ActivityIndicator size="large" color="#2563EB" /><Text style={{ marginTop: 12, color: '#6B7280' }}>Loading maintenance…</Text></View>;
+    }
+    const tStColor = (s: any) => {
+      const x = String(s || '').toLowerCase();
+      if (['completed', 'closed', 'resolved'].includes(x)) return '#16a34a';
+      if (['open', 'new', 'pending', 'reopened'].includes(x)) return '#DC2626';
+      if (['in_progress', 'in progress', 'assigned', 'accepted', 'scheduled'].includes(x)) return '#2563EB';
+      return '#F59E0B';
+    };
+    const toggleExpand = (id: string) => setExpandedMaint((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+    // When the toggle is off, also surface loaded assets that have zero tickets.
+    const withTicketIds = new Set(maintGroups.map((g) => g.assetId));
+    const extraGroups = onlyWithTickets ? [] : assets
+      .filter((a: any) => a && a._id != null && !withTicketIds.has(String(a._id)))
+      .map((a: any) => ({ assetId: String(a._id), asset: a, tickets: [] as any[], openCount: 0, spend: 0, price: a.purchasePrice != null ? Number(a.purchasePrice) : 0, pct: null }));
+    const displayGroups = [...maintGroups, ...extraGroups];
+
+    return (
+      <View>
+        {/* KPI strip */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '800', textTransform: 'uppercase' }}>Assets w/ Tickets</Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', marginTop: 4 }}>{maintKpis.assetsWithTickets}</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '800', textTransform: 'uppercase' }}>Open Tickets</Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#DC2626', marginTop: 4 }}>{maintKpis.totalOpen}</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: '800', textTransform: 'uppercase' }}>Repeat (≥2)</Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#F59E0B', marginTop: 4 }}>{maintKpis.repeatOffenders}</Text>
+          </View>
+        </View>
+
+        {/* Repair-vs-Replace insights (pure compute, no AI) */}
+        {replaceFlags.length > 0 && (
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#F59E0B40' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <Ionicons name="bulb-outline" size={16} color="#F59E0B" />
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>Repair vs Replace</Text>
+            </View>
+            <Text style={{ fontSize: 11, color: '#6B7280', marginBottom: 10 }}>Repair spend has reached 60%+ of purchase price on these assets.</Text>
+            {replaceFlags.map((g) => (
+              <View key={g.assetId} style={{ borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>{g.asset?.assetCode || 'Unknown asset'}</Text>
+                  <Text style={{ fontSize: 12, color: '#556274' }}>{g.asset?.typeName || '—'}</Text>
+                  <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>Spend {fmtFull(g.spend)} of {fmtFull(g.price)}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <Pill label="Consider replacing" color="#B45309" bg="#FEF3C7" />
+                  <Text style={{ fontSize: 15, fontWeight: '900', color: '#DC2626' }}>{g.pct}%</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Filter toggle */}
+        <Checkbox checked={onlyWithTickets} onToggle={() => setOnlyWithTickets((v) => !v)} label="Only assets with tickets" />
+
+        {/* Per-asset groups */}
+        {displayGroups.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+            <Ionicons name="construct-outline" size={52} color="#e0d9ec" />
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No maintenance tickets</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Asset-linked tickets appear here</Text>
+          </View>
+        ) : displayGroups.map((g) => {
+          const expanded = expandedMaint.has(g.assetId);
+          const apt = g.asset?.locationName;
+          return (
+            <View key={g.assetId} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => g.tickets.length > 0 && toggleExpand(g.assetId)} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>{g.asset?.assetCode || 'Unknown asset'}</Text>
+                    <Pill label={`${g.tickets.length} ticket${g.tickets.length !== 1 ? 's' : ''}`} color="#2563EB" bg="rgba(37,99,235,0.12)" />
+                    {g.openCount > 0 && <Pill label={`${g.openCount} open`} color="#DC2626" bg="#FEE2E2" />}
+                  </View>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827', marginTop: 2 }}>{g.asset?.typeName || '—'}</Text>
+                  {!!apt && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 }}>
+                      <Ionicons name="location-outline" size={11} color="#6B7280" />
+                      <Text style={{ fontSize: 12, color: '#6B7280' }}>{apt}</Text>
+                    </View>
+                  )}
+                  {g.spend > 0 && <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a', marginTop: 3 }}>Repair spend {fmtFull(g.spend)}</Text>}
+                </View>
+                {g.tickets.length > 0 && <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" style={{ padding: 4 }} />}
+              </TouchableOpacity>
+              {expanded && g.tickets.length > 0 && (
+                <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 10, paddingTop: 8 }}>
+                  {g.tickets.map((t: any) => (
+                    <View key={t.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#111827' }}>{t.ticket_number || '—'}</Text>
+                          <Pill label={t.status || 'open'} color={tStColor(t.status)} bg={tStColor(t.status) + '18'} />
+                        </View>
+                        {t.closure_cost != null && Number(t.closure_cost) > 0 && (
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#16a34a' }}>{fmtFull(Number(t.closure_cost))}</Text>
+                        )}
+                      </View>
+                      {!!t.issue_type && <Text style={{ fontSize: 12, color: '#556274', marginTop: 2 }}>{t.issue_type}</Text>}
+                      {!!t.created_at && <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Raised {fmtDate(t.created_at)}{t.resolved_at ? ` · Resolved ${fmtDate(t.resolved_at)}` : ''}</Text>}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
   const renderTab = () => {
     switch (activeTab) {
       case 'inventory':   return renderInventory();
       case 'payments':    return <AssetPaymentsTab />;
       case 'vendors':     return renderVendors();
       case 'allocations': return renderAllocations();
+      case 'maintenance': return renderMaintenance();
       case 'categories':  return renderCategories();
       case 'analytics':   return renderAnalytics();
       case 'forecasts':   return renderForecasts();
@@ -1890,7 +2113,7 @@ export default function AssetsScreen() {
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchAll(true)} tintColor="#2563EB" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (activeTab === 'maintenance') loadMaintenance(); else setMaintLoaded(false); fetchAll(true); }} tintColor="#2563EB" />}
           keyboardShouldPersistTaps="handled"
         >
           {!!fetchError && (

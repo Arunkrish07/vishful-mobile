@@ -55,8 +55,37 @@ export default function AuditLogsScreen() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
+  const [performerPickerOpen, setPerformerPickerOpen] = useState(false);
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Load org member profiles once for the "Performed by" dropdown.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const p = await sb.getOrgProfiles();
+        if (alive) setProfiles(Array.isArray(p) ? p : []);
+      } catch {
+        if (alive) setProfiles([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const profileLabel = (p: any) => p?.full_name || p?.email || p?.id || 'Unknown';
+  const selectedProfile = performedBy ? profiles.find((p) => p?.id === performedBy) : undefined;
+  const performerLabel = performedBy ? (selectedProfile ? profileLabel(selectedProfile) : performedBy) : 'All users';
+  const anyFilterActive =
+    tableFilter !== 'all' || actionFilter !== 'all' || !!performedBy || !!fromDate.trim() || !!toDate.trim();
+  const clearFilters = () => {
+    setTableFilter('all');
+    setActionFilter('all');
+    setPerformedBy('');
+    setFromDate('');
+    setToDate('');
+  };
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -118,14 +147,14 @@ export default function AuditLogsScreen() {
 
           {/* Performed-by + date-range filters */}
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-            <TextInput
-              value={performedBy}
-              onChangeText={setPerformedBy}
-              placeholder="Performed by (user id)"
-              placeholderTextColor="#6B7280"
-              autoCapitalize="none"
-              style={{ flex: 1.4, fontSize: 12, color: '#111827', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
-            />
+            <TouchableOpacity onPress={() => setPerformerPickerOpen(true)}
+              style={{ flex: 1.4, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <Ionicons name="person" size={13} color="#2563EB" />
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, fontWeight: '700', color: performedBy ? '#2563EB' : '#6B7280' }}>
+                {performerLabel}
+              </Text>
+              <Ionicons name="chevron-down" size={12} color="#2563EB" />
+            </TouchableOpacity>
             <TextInput
               value={fromDate}
               onChangeText={setFromDate}
@@ -142,6 +171,18 @@ export default function AuditLogsScreen() {
               autoCapitalize="none"
               style={{ flex: 1, fontSize: 12, color: '#111827', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}
             />
+          </View>
+
+          {/* Records count + clear filters */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+            <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600' }}>{total} records</Text>
+            {anyFilterActive && (
+              <TouchableOpacity onPress={clearFilters}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(220,38,38,0.1)' }}>
+                <Ionicons name="close-circle" size={13} color="#DC2626" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Clear filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -209,6 +250,32 @@ export default function AuditLogsScreen() {
                     {tableFilter === t && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                   </TouchableOpacity>
                 ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Performed-by picker modal */}
+        <Modal visible={performerPickerOpen} transparent animationType="fade" onRequestClose={() => setPerformerPickerOpen(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => setPerformerPickerOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 32 }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', maxHeight: '70%' }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>Filter by user</Text>
+              <ScrollView>
+                <TouchableOpacity onPress={() => { setPerformedBy(''); setPerformerPickerOpen(false); }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                  <Text style={{ fontSize: 14, fontWeight: !performedBy ? '800' : '500', color: !performedBy ? '#2563EB' : '#111827' }}>All users</Text>
+                  {!performedBy && <Ionicons name="checkmark" size={18} color="#2563EB" />}
+                </TouchableOpacity>
+                {profiles.map((p) => (
+                  <TouchableOpacity key={String(p?.id)} onPress={() => { setPerformedBy(String(p?.id)); setPerformerPickerOpen(false); }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: performedBy === String(p?.id) ? '800' : '500', color: performedBy === String(p?.id) ? '#2563EB' : '#111827' }}>{profileLabel(p)}</Text>
+                    {performedBy === String(p?.id) && <Ionicons name="checkmark" size={18} color="#2563EB" />}
+                  </TouchableOpacity>
+                ))}
+                {profiles.length === 0 && (
+                  <Text style={{ fontSize: 13, color: '#6B7280', padding: 16 }}>No users available</Text>
+                )}
               </ScrollView>
             </View>
           </TouchableOpacity>

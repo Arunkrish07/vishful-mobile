@@ -14,6 +14,46 @@ const statusColor = (s: string) => {
     case 'partial': return colors.warning; case 'overdue': return colors.danger; default: return colors.textSecondary; }
 };
 
+// ── period labels (web parity with Reports.tsx / ReportsScreen) ──
+const PERIODS: { key: string; label: string }[] = [
+  { key: 'current_fy',     label: 'Current FY' },
+  { key: 'last_fy',        label: 'Last FY' },
+  { key: 'last_2fy',       label: 'Last 2 FYs' },
+  { key: 'last_5y',        label: 'Last 5 Years' },
+  { key: 'from_beginning', label: 'Since Beginning' },
+];
+
+// compact money formatter for KPI/report tiles (screen uses "Rs" prefix)
+const fmtMoney = (v: number) => {
+  const n = Number(v) || 0;
+  if (Math.abs(n) >= 100000) return `Rs ${(n / 100000).toFixed(2)}L`;
+  if (Math.abs(n) >= 1000) return `Rs ${(n / 1000).toFixed(1)}K`;
+  return `Rs ${Math.round(n).toLocaleString('en-IN')}`;
+};
+
+const SECTIONS = [
+  { key: 'invoices', label: 'Invoices' },
+  { key: 'receipts', label: 'Receipts' },
+  { key: 'expenses', label: 'Expenses' },
+  { key: 'payments', label: 'Rental Payments' },
+  { key: 'reports',  label: 'Reports' },
+];
+
+// run a fetch, swallow errors → fallback value (keeps one bad action from
+// wiping the rest of the screen); data is org-scoped server-side.
+async function safeCall<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { const r = await fn(); return (r as any) ?? fallback; } catch { return fallback; }
+}
+
+function KpiTile({ label, value, color }: { label: string; value: string | number; color?: string }) {
+  return (
+    <View style={styles.kpiTile}>
+      <Text style={[styles.kpiValue, color ? { color } : null]}>{value}</Text>
+      <Text style={styles.kpiLabel}>{label}</Text>
+    </View>
+  );
+}
+
 export default function AccountingScreen() {
   const { token } = useAuth();
   const mounted = useMountedRef();
@@ -22,6 +62,23 @@ export default function AccountingScreen() {
   const [stays, setStays] = useState<any[]>([]);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // section switcher + period scoping (parity with web Accounting.tsx)
+  const [section, setSection] = useState('invoices');
+  const [period, setPeriod] = useState('current_fy');
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const [reportsTab, setReportsTab] = useState<'pnl' | 'beds' | 'eb'>('pnl');
+
+  // period-scoped summary + reports
+  const [summary, setSummary] = useState<any>(null);
+  const [pnl, setPnl] = useState<any[]>([]);
+  const [bedProfit, setBedProfit] = useState<any[]>([]);
+  const [ebRecon, setEbRecon] = useState<any[]>([]);
+
+  // read-only ledgers
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [ownerPayments, setOwnerPayments] = useState<any[]>([]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [showPay, setShowPay] = useState<any>(null);
@@ -56,6 +113,44 @@ export default function AccountingScreen() {
       setStays([]);
       setPendingTotal(0);
     });
+  }, [token, refreshKey]);
+
+  // Period-scoped Financial Overview + Reports. Reloads when period changes.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      const [s, p, bp, eb] = await Promise.all([
+        safeCall<any>(() => sb.getReportsSummary(period), null),
+        safeCall<any[]>(() => sb.getPropertyPnL(period), []),
+        safeCall<any[]>(() => sb.getBedProfitability(period), []),
+        safeCall<any[]>(() => sb.getEBReconciliation(period), []),
+      ]);
+      if (cancelled || !mounted.current) return;
+      setSummary(s || null);
+      setPnl(Array.isArray(p) ? p : []);
+      setBedProfit(Array.isArray(bp) ? bp : []);
+      setEbRecon(Array.isArray(eb) ? eb : []);
+    })();
+    return () => { cancelled = true; };
+  }, [token, period, refreshKey]);
+
+  // Read-only ledgers (org-scoped, not period-scoped by their wrappers).
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      const [rc, ex, op] = await Promise.all([
+        safeCall<any[]>(() => sb.listReceipts(), []),
+        safeCall<any[]>(() => sb.listExpenses(), []),
+        safeCall<any[]>(() => sb.listOwnerPayments(), []),
+      ]);
+      if (cancelled || !mounted.current) return;
+      setReceipts(Array.isArray(rc) ? rc : []);
+      setExpenses(Array.isArray(ex) ? ex : []);
+      setOwnerPayments(Array.isArray(op) ? op : []);
+    })();
+    return () => { cancelled = true; };
   }, [token, refreshKey]);
 
   const handleCreate = async () => {
@@ -133,6 +228,19 @@ export default function AccountingScreen() {
   // Canonical AR from v_tenant_current_dues (see getPendingDues) — not a client-side invoice sum.
   const totalPending = pendingTotal;
 
+  // getReportsSummary returns { accounting, tenants, propertyStatus, tickets };
+  // tolerate a flat shape too.
+  const acc = (summary?.accounting ?? summary ?? {}) as any;
+  const periodLabel = PERIODS.find(p => p.key === period)?.label || 'Current FY';
+
+  // Receipts carry only tenant_id / tenant_allotment_id — resolve a display
+  // name from the already-loaded billing tenants.
+  const tenantNameFor = (r: any) => {
+    const st = stays.find((s: any) => s.allotmentId && s.allotmentId === r.tenant_allotment_id)
+      || stays.find((s: any) => s.tenantId && s.tenantId === r.tenant_id);
+    return st?.tenantName || r.receipt_type || 'Payment';
+  };
+
   return (
     <GlassBackground>
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -143,6 +251,10 @@ export default function AccountingScreen() {
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Accounts</Text>
         </View>
+        <TouchableOpacity onPress={() => setPeriodOpen(true)} style={styles.periodBtn}>
+          <Text style={styles.periodBtnText} numberOfLines={1}>{periodLabel}</Text>
+          <Ionicons name="chevron-down" size={13} color={colors.primary} />
+        </TouchableOpacity>
         <IconBtnSolid onPress={() => setShowAdd(true)} />
       </View>
       {totalPending > 0 && (
@@ -151,40 +263,199 @@ export default function AccountingScreen() {
           <Text style={styles.pendingText}>Pending: Rs {totalPending.toLocaleString()}</Text>
         </View>
       )}
-      <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
-        <SearchField value={search} onChangeText={setSearch} placeholder="Search accounts..." />
-      </View>
+
+      {/* Section switcher */}
       <ScrollView horizontal style={styles.filters} showsHorizontalScrollIndicator={false}>
-        {['all', 'sent', 'partial', 'paid', 'overdue'].map(f => (
-          <TouchableOpacity key={f} style={[styles.filterChip, filter === f && styles.filterActive]} onPress={() => setFilter(f)}>
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f}</Text>
+        {SECTIONS.map(s => (
+          <TouchableOpacity key={s.key} style={[styles.filterChip, section === s.key && styles.filterActive]} onPress={() => setSection(s.key)}>
+            <Text style={[styles.filterText, { textTransform: 'none' }, section === s.key && styles.filterTextActive]}>{s.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
+
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}>
-        {filtered.length === 0 ? (
-          <EmptyState title="No Invoices" subtitle="Create invoices for tenant billing" icon="receipt-outline" />
-        ) : filtered.map((inv: any) => (
-          <TouchableOpacity key={inv._id} style={styles.card} onPress={() => setShowPay(inv)}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={styles.invNum}>{inv.invoiceNumber}</Text>
-              <Badge text={inv.status} color={statusColor(inv.status)} />
-            </View>
-            <Text style={styles.cardTitle}>{inv.tenantName}</Text>
-            <Text style={styles.cardSub}>{inv.billingMonth} | {inv.propertyName}</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-              <View>
-                <Text style={styles.cardSub}>Rent: Rs {inv.rentAmount}</Text>
-                {inv.electricityAmount > 0 && <Text style={styles.cardSub}>Elec: Rs {inv.electricityAmount}</Text>}
+        {/* Financial Overview (period-scoped) */}
+        <View style={{ marginBottom: spacing.lg }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Text style={styles.sectionHeading}>Financial Overview</Text>
+            <Text style={styles.sectionSub}>{periodLabel}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <KpiTile label="Total Invoiced" value={fmtMoney(acc.totalInvoiced || 0)} />
+            <KpiTile label="Collections" value={fmtMoney(acc.totalCollections || 0)} color={colors.success} />
+            <KpiTile label="Expenses" value={fmtMoney(acc.totalExpenses || 0)} color={colors.danger} />
+            <KpiTile label="Profit" value={fmtMoney(acc.totalProfit || 0)} color={(acc.totalProfit || 0) >= 0 ? colors.success : colors.danger} />
+            <KpiTile label="Deposits" value={fmtMoney(acc.depositCollections || 0)} color={colors.primary} />
+            <KpiTile label="Pending Dues" value={fmtMoney(acc.totalPendingCollection || 0)} color={colors.primary} />
+          </View>
+        </View>
+
+        {/* ── INVOICES ── */}
+        {section === 'invoices' && (<>
+          <View style={{ marginBottom: spacing.sm }}>
+            <SearchField value={search} onChangeText={setSearch} placeholder="Search invoices..." />
+          </View>
+          <ScrollView horizontal style={{ marginBottom: spacing.md, maxHeight: 44 }} showsHorizontalScrollIndicator={false}>
+            {['all', 'sent', 'partial', 'paid', 'overdue'].map(f => (
+              <TouchableOpacity key={f} style={[styles.filterChip, filter === f && styles.filterActive]} onPress={() => setFilter(f)}>
+                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>{f}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {filtered.length === 0 ? (
+            <EmptyState title="No Invoices" subtitle="Create invoices for tenant billing" icon="receipt-outline" />
+          ) : filtered.map((inv: any) => (
+            <TouchableOpacity key={inv._id} style={styles.card} onPress={() => setShowPay(inv)}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={styles.invNum}>{inv.invoiceNumber}</Text>
+                <Badge text={inv.status} color={statusColor(inv.status)} />
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Rs {inv.totalAmount}</Text>
-                {inv.paidAmount > 0 && <Text style={{ fontSize: fontSize.sm, color: colors.success }}>Paid: Rs {inv.paidAmount}</Text>}
+              <Text style={styles.cardTitle}>{inv.tenantName}</Text>
+              <Text style={styles.cardSub}>{inv.billingMonth} | {inv.propertyName}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                <View>
+                  <Text style={styles.cardSub}>Rent: Rs {inv.rentAmount}</Text>
+                  {inv.electricityAmount > 0 && <Text style={styles.cardSub}>Elec: Rs {inv.electricityAmount}</Text>}
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Rs {inv.totalAmount}</Text>
+                  {inv.paidAmount > 0 && <Text style={{ fontSize: fontSize.sm, color: colors.success }}>Paid: Rs {inv.paidAmount}</Text>}
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </>)}
+
+        {/* ── RECEIPTS (read-only) ── */}
+        {section === 'receipts' && (
+          receipts.length === 0 ? (
+            <EmptyState title="No Receipts" subtitle="Recorded payments will appear here" icon="cash-outline" />
+          ) : receipts.map((r: any) => (
+            <View key={r.id} style={styles.card}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.cardTitle} numberOfLines={1}>{tenantNameFor(r)}</Text>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.success }}>Rs {Number(r.amount_paid || 0).toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                <Text style={styles.cardSub}>{r.payment_date ? formatDate(r.payment_date) : '—'}{r.payment_mode ? ` · ${String(r.payment_mode).toUpperCase()}` : ''}</Text>
+                {!!r.reference_number && <Text style={styles.cardSub} numberOfLines={1}>Ref: {r.reference_number}</Text>}
               </View>
             </View>
-          </TouchableOpacity>
-        ))}
+          ))
+        )}
+
+        {/* ── EXPENSES (read-only) ── */}
+        {section === 'expenses' && (
+          expenses.length === 0 ? (
+            <EmptyState title="No Expenses" subtitle="Recorded expenses will appear here" icon="receipt-outline" />
+          ) : expenses.map((e: any) => (
+            <View key={e.id} style={styles.card}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.cardTitle} numberOfLines={1}>{e.category || 'Expense'}</Text>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.danger }}>Rs {Number(e.amount || 0).toLocaleString('en-IN')}</Text>
+              </View>
+              {!!e.description && <Text style={styles.cardSub} numberOfLines={2}>{e.description}</Text>}
+              <Text style={styles.cardSub}>{e.expense_date ? formatDate(e.expense_date) : '—'}</Text>
+            </View>
+          ))
+        )}
+
+        {/* ── RENTAL PAYMENTS / owner payouts (read-only) ── */}
+        {section === 'payments' && (
+          ownerPayments.length === 0 ? (
+            <EmptyState title="No Rental Payments" subtitle="Owner payouts will appear here" icon="wallet-outline" />
+          ) : ownerPayments.map((p: any) => (
+            <View key={p.id ?? p._id ?? p.created_at} style={styles.card}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.cardTitle} numberOfLines={1}>{p.owner_name || p.property_name || p.owner_id || 'Owner Payout'}</Text>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.primary }}>Rs {Number(p.amount || 0).toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                <Text style={styles.cardSub}>{p.payment_date ? formatDate(p.payment_date) : (p.created_at ? formatDate(p.created_at) : '—')}{p.payment_mode ? ` · ${String(p.payment_mode).toUpperCase()}` : ''}</Text>
+                {!!p.notes && <Text style={styles.cardSub} numberOfLines={1}>{p.notes}</Text>}
+              </View>
+            </View>
+          ))
+        )}
+
+        {/* ── REPORTS (period-scoped) ── */}
+        {section === 'reports' && (<>
+          <ScrollView horizontal style={{ marginBottom: spacing.md, maxHeight: 44 }} showsHorizontalScrollIndicator={false}>
+            {([['pnl', 'Property P&L'], ['beds', 'Bed Profitability'], ['eb', 'EB Reconciliation']] as const).map(([k, lbl]) => (
+              <TouchableOpacity key={k} style={[styles.filterChip, reportsTab === k && styles.filterActive]} onPress={() => setReportsTab(k as any)}>
+                <Text style={[styles.filterText, { textTransform: 'none' }, reportsTab === k && styles.filterTextActive]}>{lbl}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {reportsTab === 'pnl' && (
+            pnl.length === 0 ? <EmptyState title="No P&L Data" subtitle="No property P&L for this period" icon="stats-chart-outline" />
+            : pnl.map((p: any) => (
+              <View key={p.id} style={styles.card}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>{p.property_name}</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.primary }}>{p.occupancy}% occ</Text>
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  <KpiTile label="Revenue" value={fmtMoney(p.revenue)} color={colors.success} />
+                  <KpiTile label="Expenses" value={fmtMoney(p.totalExpense)} color={colors.danger} />
+                  <KpiTile label="Profit" value={fmtMoney(p.profit)} color={p.profit >= 0 ? colors.success : colors.danger} />
+                  <KpiTile label="Rev / Bed" value={fmtMoney(p.revPerBed)} color={colors.primary} />
+                </View>
+              </View>
+            ))
+          )}
+
+          {reportsTab === 'beds' && (
+            bedProfit.length === 0 ? <EmptyState title="No Bed Data" subtitle="No bed profitability for this period" icon="bed-outline" />
+            : bedProfit.map((b: any, i: number) => (
+              <View key={i} style={styles.card}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{b.apartment_code} · {b.bed_code}</Text>
+                    <Text style={styles.cardSub}>{b.property_name}</Text>
+                  </View>
+                  <Badge text={fmtMoney(b.profit)} color={b.isLoss ? colors.danger : colors.success} />
+                </View>
+                <View style={{ flexDirection: 'row', gap: 20, marginTop: 8 }}>
+                  <View><Text style={styles.cardSub}>Revenue</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.success }}>{fmtMoney(b.revenue)}</Text></View>
+                  <View><Text style={styles.cardSub}>Cost</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.danger }}>{fmtMoney(b.totalCost)}</Text></View>
+                </View>
+              </View>
+            ))
+          )}
+
+          {reportsTab === 'eb' && (
+            ebRecon.length === 0 ? <EmptyState title="No EB Data" subtitle="No EB reconciliation for this period" icon="flash-outline" />
+            : ebRecon.map((e: any, i: number) => (
+              <View key={i} style={styles.card}>
+                <Text style={[styles.cardTitle, { marginBottom: 8 }]} numberOfLines={1}>{e.property_name}</Text>
+                <View style={{ flexDirection: 'row', gap: 18 }}>
+                  <View><Text style={styles.cardSub}>Billed</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.success }}>{fmtMoney(e.ebBilled)}</Text></View>
+                  <View><Text style={styles.cardSub}>Actual</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.primary }}>{fmtMoney(e.ebActual)}</Text></View>
+                  <View><Text style={styles.cardSub}>Variance</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: e.variance >= 0 ? colors.success : colors.danger }}>{e.variance >= 0 ? '+' : ''}{fmtMoney(e.variance)} ({e.variancePct}%)</Text></View>
+                </View>
+              </View>
+            ))
+          )}
+        </>)}
       </ScrollView>
+
+      {/* Period selector modal */}
+      <Modal visible={periodOpen} transparent animationType="fade" onRequestClose={() => setPeriodOpen(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setPeriodOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 32 }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden' }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>Select Period</Text>
+            {PERIODS.map(p => (
+              <TouchableOpacity key={p.key} onPress={() => { setPeriod(p.key); setPeriodOpen(false); }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                <Text style={{ fontSize: 14, fontWeight: period === p.key ? '800' : '500', color: period === p.key ? colors.primary : colors.text }}>{p.label}</Text>
+                {period === p.key && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Create Invoice */}
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
@@ -289,4 +560,17 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 8 },
   summaryValue: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text },
+  periodBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8, maxWidth: 130,
+  },
+  periodBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary, flexShrink: 1 },
+  sectionHeading: { fontSize: fontSize.md, fontWeight: '800', color: colors.text },
+  sectionSub: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  kpiTile: {
+    flexGrow: 1, flexBasis: '30%', minWidth: '30%', backgroundColor: '#FFFFFF', borderRadius: 12,
+    padding: spacing.md, borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  kpiValue: { fontSize: fontSize.md, fontWeight: '900', color: colors.text },
+  kpiLabel: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
 });

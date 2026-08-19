@@ -32,7 +32,7 @@ export default function MarketScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const canManage = user?.role === 'admin' || user?.role === 'super_admin';
-  const [tab, setTab] = useState<'competitors' | 'benchmark' | 'expansion' | 'settings'>('competitors');
+  const [tab, setTab] = useState<'competitors' | 'benchmark' | 'expansion' | 'settings'>('benchmark');
   const [competitors, setCompetitors] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [localities, setLocalities] = useState<any[]>([]);
@@ -46,8 +46,10 @@ export default function MarketScreen() {
   const [locName, setLocName] = useState('');
   const [locCity, setLocCity] = useState('');
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true); else setLoading(true);
+  const load = useCallback(async (isRefresh = false, silent = false) => {
+    // silent=true is used by the 30s auto-refresh so the poll updates data
+    // without flashing the full-screen spinner or the pull-to-refresh control.
+    if (silent) { /* no loading flag */ } else if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const [comp, opps, locs, summ, bench] = await Promise.all([
         sb.getMarketCompetitors({}).catch(() => []),
@@ -68,7 +70,15 @@ export default function MarketScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Web parity: MarketIntelligence.tsx polls competitors + summary every 30s
+  // (refetchInterval: 30_000). Mirror that with a focused-only interval so we
+  // don't poll in the background. The initial load is triggered once on focus;
+  // subsequent ticks are silent (no spinner flash).
+  useFocusEffect(useCallback(() => {
+    load();
+    const id = setInterval(() => { load(false, true); }, 30000);
+    return () => clearInterval(id);
+  }, [load]));
 
   const doScan = useCallback(() => {
     Alert.alert('Start market scan', 'Enqueue discovery jobs to refresh competitor data?', [

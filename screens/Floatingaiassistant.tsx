@@ -121,7 +121,7 @@ export default function FloatingAIAssistant() {
     if (open && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `Hi! I'm your Vishful AI assistant. I have access to your live data — tenants, tickets, properties, EB payments and more.\n\nAsk me anything about your organization!`,
+        content: `Hi! I'm your Vishful AI assistant. I can help you understand how to use the app and answer general questions about property and tenant management.\n\nHeads up: I can't read your live records (tenants, tickets, properties or EB payments) — for exact numbers, please check the relevant screen. How can I help?`,
       }]);
     }
   }, [open]);
