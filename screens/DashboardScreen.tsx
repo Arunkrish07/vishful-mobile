@@ -2,7 +2,7 @@
 import {
   View, Text, ScrollView, RefreshControl, TouchableOpacity,
   Dimensions, Image, Animated, StyleSheet, Modal, TextInput,
-  TouchableWithoutFeedback, ActivityIndicator, StatusBar,
+  TouchableWithoutFeedback, ActivityIndicator, StatusBar, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -539,8 +539,19 @@ function PeriodModal({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function DashboardScreen() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const navigation = useNavigation();
+
+  const confirmSignOut = () => {
+    Alert.alert(
+      user?.userName ? `Sign out of ${user.userName}?` : 'Sign out?',
+      'You’ll need your mobile number to sign back in.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => logout() },
+      ],
+    );
+  };
 
   const [periodOpen, setPeriodOpen] = useState(false);
   const [period, setPeriod] = useState<string>('current_fy');
@@ -753,11 +764,17 @@ export default function DashboardScreen() {
                 {periodLabel(period, customFrom, customTo)}
               </Text>
             </TouchableOpacity>
-            <View style={styles.avatar}>
+            <TouchableOpacity
+              style={styles.avatar}
+              activeOpacity={0.75}
+              onPress={confirmSignOut}
+              accessibilityRole="button"
+              accessibilityLabel="Account — tap to sign out"
+            >
               <Text style={styles.avatarText}>
                 {(user?.userName || 'V')[0].toUpperCase()}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 

@@ -125,7 +125,18 @@ const SaveBtn = ({ onPress, loading, label = 'Save Changes' }: any) => (
 
 // ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
 export default function SettingsScreen() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  const confirmSignOut = () => {
+    Alert.alert(
+      user?.userName ? `Sign out of ${user.userName}?` : 'Sign out?',
+      'You’ll need your mobile number to sign back in.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => logout() },
+      ],
+    );
+  };
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState('organization');
   const [loading, setLoading] = useState(false);
@@ -964,6 +975,16 @@ export default function SettingsScreen() {
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Settings</Text>
             <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Profile, appearance, access, org defaults</Text>
           </View>
+          <TouchableOpacity
+            onPress={confirmSignOut}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(220,38,38,0.08)', borderWidth: 1, borderColor: 'rgba(220,38,38,0.22)' }}
+          >
+            <Ionicons name="log-out-outline" size={16} color="#DC2626" />
+            <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>Sign out</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Tab bar (horizontal scroll) */}

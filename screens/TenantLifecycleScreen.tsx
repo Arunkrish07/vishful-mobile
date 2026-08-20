@@ -26,7 +26,7 @@ import { LoadingScreen, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { client, api } from '../lib/convexApi';
-import { uploadKycPhoto, uploadPaymentProof } from '../services/ticketService';
+import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
 import * as sb from '../lib/supabaseService';
 // (registration PDF helpers are defined inline below — no separate module)
 
@@ -374,6 +374,20 @@ const PAY_MODES = [
   { label: 'Bank Transfer', value: 'bank_transfer'  },
   { label: 'Credit Card',   value: 'credit_card'   },
 ];
+
+// Map an OCR-detected bank/app name to one of our PAY_MODES values.
+// GPay / PhonePe / Paytm etc. are UPI apps → 'upi'.
+function mapOcrPaymentMode(bankName?: string | null): string | null {
+  if (!bankName) return null;
+  const b = String(bankName).toLowerCase();
+  if (/\b(g[\s-]?pay|google[\s-]?pay|phonepe|paytm|bhim|upi|cred|amazon[\s-]?pay|mobikwik|freecharge)\b/.test(b)) return 'upi';
+  if (/\brtgs\b/.test(b)) return 'rtgs';
+  if (/\b(card|visa|master|rupay|credit|debit)\b/.test(b)) return 'credit_card';
+  if (/\bcash\b/.test(b)) return 'cash';
+  // Any bank name (HDFC, SBI, ICICI, NEFT, IMPS, transfer…) → bank transfer.
+  if (/\b(neft|imps|bank|transfer|hdfc|sbi|icici|axis|kotak|yes|idfc|pnb|bob|canara|union|indus)\b/.test(b)) return 'bank_transfer';
+  return null;
+}
 
 // ─── Shared UI Components ─────────────────────────────────────────────────────
 
@@ -864,6 +878,67 @@ export default function TenantLifecycleScreen() {
   const [bookingProof,   setBookingProof]   = useState<{ uri: string; base64?: string; mimeType?: string } | null>(null);
   const [onboardProof,   setOnboardProof]   = useState<{ uri: string; base64?: string; mimeType?: string } | null>(null);
   const [proofUploading, setProofUploading] = useState(false);
+  // OCR scan-in-progress flags for the proof tiles (booking / onboarding).
+  const [proofScanning, setProofScanning] = useState<{ booking: boolean; onboarding: boolean }>({ booking: false, onboarding: false });
+  // Always-fresh bank-accounts snapshot so the OCR matcher (in a []-dep callback) isn't stale.
+  const bankAccountsRef = useRef<any[]>([]);
+  bankAccountsRef.current = bankAccounts;
+
+  // Scan an uploaded payment screenshot and auto-fill amount / mode / txn ref / bank.
+  // Mirrors the web TenantLifecycle handleProofSelectAndOcr + the technician flow.
+  const runProofOcr = useCallback(async (target: 'booking' | 'onboarding', base64?: string) => {
+    if (!base64) return;
+    setProofScanning(p => ({ ...p, [target]: true }));
+    try {
+      const ocr: any = await extractPaymentProof(base64);
+      if (ocr && (ocr.amount || ocr.payment_date || ocr.bank_name || ocr.transaction_reference)) {
+        const mode = mapOcrPaymentMode(ocr.bank_name);
+        // Match a saved org bank account by name (best-effort, same as technician flow).
+        let matchedBankId: string | undefined;
+        if (ocr.bank_name) {
+          const name = String(ocr.bank_name).toLowerCase();
+          const matched = bankAccountsRef.current.find((ba: any) => {
+            const bn = String(ba.bank_name || '').toLowerCase();
+            return bn && (bn.includes(name) || name.includes(bn));
+          });
+          if (matched) matchedBankId = matched.id;
+        }
+        if (target === 'booking') {
+          setBForm((p: any) => ({
+            ...p,
+            amount:        ocr.amount ? String(Math.round(Number(ocr.amount))) : p.amount,
+            refNo:         ocr.transaction_reference || p.refNo,
+            paymentMode:   mode || p.paymentMode,
+            bankAccountId: matchedBankId || p.bankAccountId,
+          }));
+        } else {
+          setOForm((p: any) => ({
+            ...p,
+            paidAmount:    ocr.amount ? String(Math.round(Number(ocr.amount))) : p.paidAmount,
+            refNo:         ocr.transaction_reference || p.refNo,
+            payMode:       mode || p.payMode,
+            bankAccountId: matchedBankId || p.bankAccountId,
+          }));
+        }
+        if (ocr.amount) {
+          Alert.alert(
+            'Payment scanned',
+            `Amount: ₹${Math.round(Number(ocr.amount))}` +
+            `${ocr.bank_name ? `\nMode: ${ocr.bank_name}` : ''}` +
+            `${ocr.transaction_reference ? `\nRef: ${ocr.transaction_reference}` : ''}` +
+            `${ocr.payment_date ? `\nDate: ${ocr.payment_date}` : ''}` +
+            `\n\nFields auto-filled — please verify.`,
+          );
+        }
+      } else if (ocr && ocr._requireManualAmount) {
+        Alert.alert('Scan unavailable', ocr._message || 'Could not read the screenshot. Please enter the payment details manually.');
+      }
+    } catch {
+      // Non-blocking — the user can still fill the fields by hand.
+    } finally {
+      setProofScanning(p => ({ ...p, [target]: false }));
+    }
+  }, []);
 
   // ── Proof picker — gallery OR camera (mirrors web UnifiedImagePicker) ──────
   const pickProof = useCallback(async (target: 'booking' | 'onboarding') => {
@@ -880,6 +955,7 @@ export default function TenantLifecycleScreen() {
             if (result.canceled || !result.assets?.[0]) return;
             const asset = result.assets[0];
             setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
+            runProofOcr(target, asset.base64 ?? undefined);
           } catch (e: any) { Alert.alert('Error', e.message || 'Could not open gallery.'); }
         },
       },
@@ -894,6 +970,7 @@ export default function TenantLifecycleScreen() {
             if (result.canceled || !result.assets?.[0]) return;
             const asset = result.assets[0];
             setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
+            runProofOcr(target, asset.base64 ?? undefined);
           } catch (e: any) { Alert.alert('Error', e.message || 'Could not open camera.'); }
         },
       },
@@ -2610,11 +2687,54 @@ export default function TenantLifecycleScreen() {
       ...returningTenants.map((t: any) => ({ label: `↩ ${t.full_name} · ${t.phone}`, value: t.id })),
     ];
     const filtered = filterBySearch(bookedAllotments, ['tenants.full_name', 'apartments.apartment_code'], ts('booking'));
+    const openBookingFor = (tenantId: string) => { setBForm({ ...bForm, tenantId }); setBookingOpen(true); };
+    const BookBtn = ({ onPress }: { onPress: () => void }) => (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85}
+        style={{ backgroundColor: VBRAND.purpleSoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 }}>
+        <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purpleDeep }}>Book</Text>
+      </TouchableOpacity>
+    );
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        {/* ── Section 1: New Tenants (KYC ✓) ──────────────────────────────── */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <SectionTitle title={`New Tenants (KYC ✓)`} />
           <ActionBtn title="New Booking" icon="add-circle-outline" small onPress={() => setBookingOpen(true)} />
+        </View>
+        {eligibleTenants.length === 0
+          ? <EmptyCard message="No new tenants with completed KYC" />
+          : eligibleTenants.map((t: any) => (
+              <LifeTenantCard
+                key={t.id}
+                name={t.full_name || '—'}
+                sub={t.phone}
+                pill="New"
+                right={<BookBtn onPress={() => openBookingFor(t.id)} />}
+              />
+            ))
+        }
+
+        {/* ── Section 2: Returning Tenants (Previously Exited) ─────────────── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 18, marginBottom: 8 }}>
+          <Ionicons name="refresh-outline" size={15} color={VBRAND.ink600} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: VBRAND.ink600 }}>Returning Tenants (Previously Exited)</Text>
+        </View>
+        {returningTenants.length === 0
+          ? <Text style={{ fontSize: 12, color: VBRAND.ink500, paddingVertical: 8, paddingLeft: 2 }}>No returning tenants</Text>
+          : returningTenants.map((t: any) => (
+              <LifeTenantCard
+                key={t.id}
+                name={t.full_name || '—'}
+                sub={t.phone}
+                pill={typeof t.tenant_rating === 'number' ? `★ ${t.tenant_rating.toFixed(1)}` : undefined}
+                right={<BookBtn onPress={() => openBookingFor(t.id)} />}
+              />
+            ))
+        }
+
+        {/* ── Section 3: Booked — Pending Onboarding ───────────────────────── */}
+        <View style={{ marginTop: 18, marginBottom: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: VBRAND.ink600 }}>Booked — Pending Onboarding</Text>
         </View>
         <SearchBar tab="booking" placeholder="Search tenant, bed…" />
         {filtered.length === 0 ? <EmptyCard message="No booked tenants" /> :
@@ -2679,7 +2799,10 @@ export default function TenantLifecycleScreen() {
                   <Text style={{ fontSize: 9, color: '#6B7280', fontWeight: '600' }}>Optional</Text>
                 </View>
               </View>
-              {bookingProof && (
+              {proofScanning.booking && (
+                <Text style={{ fontSize: 10, color: '#6366F1', fontWeight: '700' }}>Scanning receipt…</Text>
+              )}
+              {bookingProof && !proofScanning.booking && (
                 <TouchableOpacity onPress={() => setBookingProof(null)}>
                   <Text style={{ fontSize: fontSize.xs, color: '#C62828', fontWeight: '700' }}>Remove</Text>
                 </TouchableOpacity>
@@ -2889,7 +3012,10 @@ export default function TenantLifecycleScreen() {
                   <Text style={{ fontSize: 9, color: '#6B7280', fontWeight: '600' }}>Optional</Text>
                 </View>
               </View>
-              {onboardProof && (
+              {proofScanning.onboarding && (
+                <Text style={{ fontSize: 10, color: '#6366F1', fontWeight: '700' }}>Scanning receipt…</Text>
+              )}
+              {onboardProof && !proofScanning.onboarding && (
                 <TouchableOpacity onPress={() => setOnboardProof(null)}>
                   <Text style={{ fontSize: fontSize.xs, color: '#C62828', fontWeight: '700' }}>Remove</Text>
                 </TouchableOpacity>
@@ -4143,7 +4269,7 @@ export default function TenantLifecycleScreen() {
 
   // ─── TAB RENDERER ─────────────────────────────────────────────────────────
 
-  const tabContent: Record<string, () => JSX.Element> = {
+  const tabContent: Record<string, () => React.JSX.Element> = {
     map:       renderBedMap,
     booking:   renderBooking,
     onboard:   renderOnboarding,

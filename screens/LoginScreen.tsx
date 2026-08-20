@@ -10,8 +10,7 @@ import { useAuth } from '../lib/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-type Portal = 'tenant' | 'technician' | 'staff';
-type Step = 'role' | 'phone' | 'otp';
+type Step = 'phone' | 'otp';
 
 const C = {
   night: '#0F1224',
@@ -31,59 +30,18 @@ const C = {
   danger: '#DC2626',
 };
 
-const STAFF_ROLES = new Set([
-  'super_admin', 'org_admin', 'property_manager', 'admin', 'manager', 'pm', 'team_member',
-]);
-
-const PORTALS: {
-  id: Portal;
-  title: string;
-  subtitle: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}[] = [
-  { id: 'tenant', title: 'Tenant', subtitle: 'Tickets, stay and notices', icon: 'home-outline' },
-  { id: 'technician', title: 'Technician', subtitle: 'Assigned jobs and visits', icon: 'construct-outline' },
-  { id: 'staff', title: 'Staff', subtitle: 'Property OS for the team', icon: 'grid-outline' },
-];
-
-function portalCopy(portal: Portal) {
-  if (portal === 'tenant') {
-    return {
-      eyebrow: 'TENANT',
-      title: 'Sign in to your stay',
-      sub: 'We’ll text a one-time code to your registered mobile number.',
-    };
-  }
-  if (portal === 'technician') {
-    return {
-      eyebrow: 'TECHNICIAN',
-      title: 'Sign in to your jobs',
-      sub: 'We’ll text a one-time code to your work mobile number.',
-    };
-  }
-  return {
-    eyebrow: 'STAFF',
-    title: 'Welcome back',
-    sub: 'We’ll text a one-time code to confirm it’s you.',
-  };
-}
-
-function roleFitsPortal(role: string, portal: Portal): boolean {
-  if (portal === 'tenant') return role === 'tenant';
-  if (portal === 'technician') return role === 'technician';
-  return STAFF_ROLES.has(role);
-}
-
-function mismatchMessage(role: string, portal: Portal): string {
-  if (role === 'tenant') return 'This number is a tenant account. Choose Tenant to continue.';
-  if (role === 'technician') return 'This number is a technician account. Choose Technician to continue.';
-  return 'This number is a staff account. Choose Staff to continue.';
-}
+// The phone number alone determines the role — the backend resolves it from
+// team_members / tenants and returns the correct role on verify. No portal
+// picker: the user just enters their registered number and signs in.
+const COPY = {
+  eyebrow: 'SIGN IN',
+  title: 'Sign in to Vishful',
+  sub: 'We’ll text a one-time code to your registered mobile number.',
+};
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
-  const [step, setStep] = useState<Step>('role');
-  const [portal, setPortal] = useState<Portal | null>(null);
+  const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -94,7 +52,7 @@ export default function LoginScreen() {
   const resendTimer = useRef<any>(null);
   const { login } = useAuth();
 
-  const copy = portal ? portalCopy(portal) : portalCopy('staff');
+  const copy = COPY;
 
   const RESEND_SECONDS = 30;
   const startResendCountdown = () => {
@@ -117,22 +75,6 @@ export default function LoginScreen() {
       Animated.timing(slideUp, { toValue: 0, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
   }, []);
-
-  const pickPortal = (id: Portal) => {
-    setPortal(id);
-    setError('');
-    setShowSignupPrompt(false);
-    setStep('phone');
-  };
-
-  const backToRole = () => {
-    setStep('role');
-    setPortal(null);
-    setPhone('');
-    setOtp('');
-    setError('');
-    setShowSignupPrompt(false);
-  };
 
   const handleSendOTP = async () => {
     const trimmed = phone.trim().replace(/\D/g, '').slice(-10);
@@ -171,11 +113,7 @@ export default function LoginScreen() {
       const cleanPhone = phone.trim().replace(/\D/g, '').slice(-10);
       const result = await sb.verifyOtpAndLogin(cleanPhone, otp.trim());
       if (result.success && result.token) {
-        const role = String(result.user?.role || '');
-        if (portal && !roleFitsPortal(role, portal)) {
-          setError(mismatchMessage(role, portal));
-          return;
-        }
+        // Role comes straight from the backend (resolved from the phone number).
         await login(result.token, result.user as any, result.refreshToken);
       } else {
         setError(result.message || 'Could not verify. Please try again.');
@@ -269,33 +207,7 @@ export default function LoginScreen() {
             </Animated.View>
 
             <Animated.View style={[styles.card, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
-              {step === 'role' && (
-                <>
-                  <Text style={styles.cardEyebrow}>SIGN IN</Text>
-                  <Text style={styles.cardTitle}>Who’s signing in?</Text>
-                  <Text style={styles.cardSub}>Choose your portal. You’ll enter your mobile number next.</Text>
-
-                  {PORTALS.map((p) => (
-                    <TouchableOpacity
-                      key={p.id}
-                      activeOpacity={0.88}
-                      onPress={() => pickPortal(p.id)}
-                      style={styles.portalRow}
-                    >
-                      <View style={styles.portalIcon}>
-                        <Ionicons name={p.icon} size={20} color={C.brand} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.portalTitle}>{p.title}</Text>
-                        <Text style={styles.portalSub}>{p.subtitle}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
-
-              {step === 'phone' && portal && (
+              {step === 'phone' && (
                 <>
                   <Text style={styles.cardEyebrow}>{copy.eyebrow}</Text>
                   <Text style={styles.cardTitle}>{copy.title}</Text>
@@ -348,15 +260,10 @@ export default function LoginScreen() {
                       )}
                     </View>
                   </TouchableOpacity>
-
-                  <TouchableOpacity onPress={backToRole} style={styles.backBtn}>
-                    <Ionicons name="chevron-back" size={16} color={C.inkMuted} />
-                    <Text style={styles.backText}>Change portal</Text>
-                  </TouchableOpacity>
                 </>
               )}
 
-              {step === 'otp' && portal && (
+              {step === 'otp' && (
                 <>
                   <Text style={styles.cardEyebrow}>{copy.eyebrow}</Text>
                   <Text style={styles.cardTitle}>Check your phone</Text>
@@ -495,29 +402,6 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   cardSubStrong: { color: C.ink, fontWeight: '700' },
-
-  portalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: C.line,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-  },
-  portalIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  portalTitle: { fontSize: 16, fontWeight: '800', color: C.ink },
-  portalSub: { fontSize: 12, color: C.inkMuted, marginTop: 2, fontWeight: '600' },
 
   fieldLabel: {
     fontSize: 12,
