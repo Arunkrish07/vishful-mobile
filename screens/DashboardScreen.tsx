@@ -603,13 +603,14 @@ export default function DashboardScreen() {
         ? { period: 'custom', customFrom: apiPeriod.customFrom, customTo: apiPeriod.customTo }
         : { period: apiPeriod.period };
 
-      const [data, tickets, ext, hero, dues, punc] = await Promise.all([
+      const [data, tickets, ext, hero, dues, punc, disc] = await Promise.all([
         sb.getDashboardData(),
         fetchTickets('admin').catch(() => []),
         client.action(api.dashboard.getExtendedStats, extArgs).catch(() => EMPTY_EXTENDED),
         getHeroMonthly().catch(() => null),
         getDuesTotals().catch(() => null),
         getTenantPunctuality(token!, apiPeriod.period, apiPeriod.customFrom, apiPeriod.customTo).catch(() => null),
+        sb.getBedTenantDiscrepancies().catch(() => ({ bed: 0, tenant: 0 })),
       ]);
       return {
         stats: data ?? EMPTY_DASHBOARD,
@@ -618,6 +619,7 @@ export default function DashboardScreen() {
         heroMonthly: hero,
         duesTotals: dues,
         punctuality: punc,
+        discrepancies: disc ?? { bed: 0, tenant: 0 },
       };
     },
   });
@@ -628,6 +630,7 @@ export default function DashboardScreen() {
   const heroMonthly = dashboardQuery.data?.heroMonthly ?? null;
   const duesTotals = dashboardQuery.data?.duesTotals ?? null;
   const punctuality = dashboardQuery.data?.punctuality ?? null;
+  const discrepancies = (dashboardQuery.data as any)?.discrepancies ?? { bed: 0, tenant: 0 };
   const isRefreshing = dashboardQuery.isRefetching;
   const isBackgroundUpdating = dashboardQuery.isFetching && !!dashboardQuery.data;
 
@@ -693,8 +696,8 @@ export default function DashboardScreen() {
   const openTicketsN = tickets.filter(t => !['closed', 'completed', 'cancelled'].includes(t.status)).length;
   const actionChips = [
     { id: 'tenant', label: 'Tenant approval', count: tenantApprovalN || openTicketsN, icon: 'ticket-outline' as const, route: 'Tickets' },
-    { id: 'multi-bed', label: 'Beds with multiple active tenants', count: 0, icon: 'warning-outline' as const, route: 'Tenants' },
-    { id: 'multi-tenant', label: 'Tenants with multiple active beds', count: 0, icon: 'warning-outline' as const, route: 'Tenants' },
+    { id: 'multi-bed', label: 'Beds with multiple active tenants', count: discrepancies.bed || 0, icon: 'warning-outline' as const, route: 'Tenants' },
+    { id: 'multi-tenant', label: 'Tenants with multiple active beds', count: discrepancies.tenant || 0, icon: 'warning-outline' as const, route: 'Tenants' },
     { id: 'cost', label: 'Cost approval', count: costApprovalN, icon: 'cash-outline' as const, route: 'Tickets' },
     { id: 'admin', label: 'Admin approval', count: adminApprovalN, icon: 'shield-checkmark-outline' as const, route: 'Tickets' },
   ].filter(c => c.count > 0 || ['tenant', 'cost', 'admin'].includes(c.id));

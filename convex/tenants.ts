@@ -33,6 +33,56 @@ function nextWorkStart(from: Date): Date {
   return new Date(d.getTime() - IST_OFFSET_MS);
 }
 
+// ─── DASHBOARD DISCREPANCIES (web parity: NeedsAttentionTicker) ───────────────
+// Counts beds genuinely double-booked and tenants occupying 2+ beds — using the
+// same overlap rule as web findBed/findTenantDiscrepancies: an allotment window
+// is [onboarding_date, effective-exit], effective exit = actual→estimated→notice;
+// two windows overlap iff start<otherEnd && otherStart<end (same-day handover ok).
+export const getBedTenantDiscrepancies = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const allots: any[] = await safeList(
+      sb.from("tenant_allotments")
+        .select("id, bed_id, tenant_id, staying_status, onboarding_date, actual_exit_date, estimated_exit_date, notice_date")
+        .eq("organization_id", ORG_ID)
+        .in("staying_status", ["Staying", "On-Notice", "Booked"])
+    );
+    const effExit = (a: any): string | null => {
+      for (const v0 of [a.actual_exit_date, a.estimated_exit_date, a.notice_date]) {
+        if (v0 && String(v0).trim()) return v0;
+      }
+      return null;
+    };
+    const win = (a: any) => {
+      const s = a.onboarding_date && String(a.onboarding_date).trim() ? new Date(a.onboarding_date).getTime() : -Infinity;
+      const e0 = effExit(a);
+      const e = e0 && String(e0).trim() ? new Date(e0).getTime() : Infinity;
+      return { start: s, end: e };
+    };
+    const overlaps = (group: any[]): boolean => {
+      const w = group.map(win);
+      for (let i = 0; i < w.length; i++) {
+        for (let j = i + 1; j < w.length; j++) {
+          if (w[i].start < w[j].end && w[j].start < w[i].end) return true;
+        }
+      }
+      return false;
+    };
+    const byBed = new Map<string, any[]>();
+    const byTenant = new Map<string, any[]>();
+    for (const a of allots) {
+      if (a.bed_id) { if (!byBed.has(a.bed_id)) byBed.set(a.bed_id, []); byBed.get(a.bed_id)!.push(a); }
+      if (a.tenant_id) { if (!byTenant.has(a.tenant_id)) byTenant.set(a.tenant_id, []); byTenant.get(a.tenant_id)!.push(a); }
+    }
+    let bed = 0, tenant = 0;
+    for (const g of byBed.values()) if (g.length >= 2 && overlaps(g)) bed++;
+    for (const g of byTenant.values()) if (g.length >= 2 && overlaps(g)) tenant++;
+    return { bed, tenant };
+  },
+});
+
 // ─── BED RATES ────────────────────────────────────────────────────────────────
 
 export const listBedRates = action({

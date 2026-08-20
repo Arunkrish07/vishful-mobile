@@ -80,6 +80,9 @@ export async function getSession(token: string): Promise<{
 export async function getDashboardData() {
   return client.action(api.dashboard.getStats, {});
 }
+export async function getBedTenantDiscrepancies(): Promise<{ bed: number; tenant: number }> {
+  return client.action((api as any).tenants.getBedTenantDiscrepancies, {});
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROPERTIES
