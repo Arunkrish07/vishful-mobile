@@ -1888,18 +1888,47 @@ Example: {"amount": 855.00, "payment_date": "2026-05-02", "bank_name": "GPay", "
         }
       }
 
-      // ── Groq: describe image with a text prompt asking user to provide info ──
-      // Groq doesn't support vision, so we return a special flag telling the
-      // mobile app to ask the user to manually enter the amount for validation.
+      // ── Groq vision (Qwen-VL) — OpenAI-compatible chat completions ─────────
+      // Groq now serves vision models; the Qwen VL model reads payment
+      // screenshots well. Model id is overridable via GROQ_VISION_MODEL.
       if (groqKey) {
+        const model = process.env.GROQ_VISION_MODEL || "qwen/qwen3.6-27b";
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+              ],
+            }],
+            temperature: 0.1,
+            max_tokens: 600,
+          }),
+        });
+        if (res.ok) {
+          const j = await res.json();
+          let raw = String(j.choices?.[0]?.message?.content ?? "");
+          // Qwen may emit a <think>…</think> block and/or ```json fences —
+          // strip them and pull out the JSON object before parsing.
+          raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, "");
+          const m = raw.match(/\{[\s\S]*\}/);
+          if (m) {
+            try {
+              const parsed = JSON.parse(m[0]);
+              return { ...parsed, _source: "groq_qwen" };
+            } catch { /* fall through to manual entry */ }
+          }
+        }
+        // Groq reachable but no usable result — ask for manual entry.
         return {
-          amount: null,
-          payment_date: null,
-          bank_name: null,
-          transaction_reference: null,
-          _source: "groq_no_vision",
+          amount: null, payment_date: null, bank_name: null, transaction_reference: null,
+          _source: "groq_parse_fail",
           _requireManualAmount: true,
-          _message: "Please enter the amount shown in your payment screenshot to verify it matches the resolution cost.",
+          _message: "Couldn't read the screenshot automatically. Please enter the payment details manually.",
         };
       }
 
