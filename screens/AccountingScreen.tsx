@@ -8,6 +8,7 @@ import { Button, Input, Badge, EmptyState, LoadingScreen, PickerSelect, GlassBac
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
+import { fetchBankAccounts } from '../services/ticketService';
 
 const statusColor = (s: string) => {
   switch (s) { case 'paid': return colors.success; case 'sent': return colors.primary;
@@ -91,6 +92,17 @@ export default function AccountingScreen() {
   const [payAmount, setPayAmount] = useState('');
   const [payMode, setPayMode] = useState('cash');
   const [payRef, setPayRef] = useState('');
+  const [payBank, setPayBank] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  // Standalone collection (a payment not tied to one specific invoice — the
+  // ledger trigger FIFO-allocates it across the tenant's outstanding invoices).
+  const [showCollect, setShowCollect] = useState(false);
+  const [colTenant, setColTenant] = useState('');
+  const [colAmount, setColAmount] = useState('');
+  const [colDate, setColDate] = useState('');
+  const [colMode, setColMode] = useState('cash');
+  const [colRef, setColRef] = useState('');
+  const [colBank, setColBank] = useState('');
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -140,15 +152,17 @@ export default function AccountingScreen() {
     if (!token) return;
     let cancelled = false;
     (async () => {
-      const [rc, ex, op] = await Promise.all([
+      const [rc, ex, op, ba] = await Promise.all([
         safeCall<any[]>(() => sb.listReceipts(), []),
         safeCall<any[]>(() => sb.listExpenses(), []),
         safeCall<any[]>(() => sb.listOwnerPayments(), []),
+        safeCall<any[]>(() => fetchBankAccounts(), []),
       ]);
       if (cancelled || !mounted.current) return;
       setReceipts(Array.isArray(rc) ? rc : []);
       setExpenses(Array.isArray(ex) ? ex : []);
       setOwnerPayments(Array.isArray(op) ? op : []);
+      setBankAccounts(Array.isArray(ba) ? ba : []);
     })();
     return () => { cancelled = true; };
   }, [token, refreshKey]);
@@ -190,6 +204,9 @@ export default function AccountingScreen() {
     const amt = Number(payAmount);
     if (!(amt > 0)) { Alert.alert('Invalid amount', 'Enter a payment amount greater than 0.'); return; }
     if (amt > balance + 0.01) { Alert.alert('Amount too high', `Payment cannot exceed the outstanding balance of Rs ${balance.toLocaleString('en-IN')}.`); return; }
+    if (payMode !== 'cash' && bankAccounts.length > 0 && !payBank) {
+      Alert.alert('Bank required', 'Select the receiving bank account for a non-cash payment.'); return;
+    }
     setLoading(true);
     try {
       const res = await sb.recordPayment({
@@ -199,9 +216,41 @@ export default function AccountingScreen() {
         paymentMode: payMode,
         amountPaid: amt,
         referenceNumber: payRef.trim() || null,
+        bankAccountId: payBank || null,
       });
       if (res?.ok === false) { Alert.alert('Duplicate payment', res.reason || 'This payment looks like a duplicate and was not recorded.'); return; }
-      setShowPay(null); setPayAmount(''); setPayRef('');
+      setShowPay(null); setPayAmount(''); setPayRef(''); setPayBank('');
+      setRefreshKey((k: number) => k + 1);
+    } catch (e: any) { Alert.alert('Error', e.message); }
+    setLoading(false);
+  };
+
+  // Standalone collection — a payment recorded against a tenant (allotment)
+  // rather than one specific invoice. recordPayment inserts a receipt and the
+  // ledger trigger FIFO-allocates it across the tenant's outstanding invoices.
+  const handleAddCollection = async () => {
+    const stay = stays.find((s: any) => s.tenantId === colTenant && s.status === 'active');
+    if (!stay) { Alert.alert('Error', 'Select a tenant with an active stay.'); return; }
+    const amt = Number(colAmount);
+    if (!(amt > 0)) { Alert.alert('Invalid amount', 'Enter a collection amount greater than 0.'); return; }
+    if (colMode !== 'cash' && bankAccounts.length > 0 && !colBank) {
+      Alert.alert('Bank required', 'Select the receiving bank account for a non-cash payment.'); return;
+    }
+    setLoading(true);
+    try {
+      const res = await sb.recordPayment({
+        token: token!,
+        tenantId: colTenant,
+        allotmentId: stay.allotmentId,
+        propertyId: stay.propertyId,
+        paymentDate: colDate || new Date().toISOString().split('T')[0],
+        paymentMode: colMode,
+        amountPaid: amt,
+        referenceNumber: colRef.trim() || null,
+        bankAccountId: colBank || null,
+      });
+      if (res?.ok === false) { Alert.alert('Duplicate payment', res.reason || 'This payment looks like a duplicate and was not recorded.'); return; }
+      setShowCollect(false); setColTenant(''); setColAmount(''); setColRef(''); setColBank('');
       setRefreshKey((k: number) => k + 1);
     } catch (e: any) { Alert.alert('Error', e.message); }
     setLoading(false);
@@ -224,6 +273,10 @@ export default function AccountingScreen() {
     { label: 'Bank Transfer', value: 'bank' },
     { label: 'Card', value: 'card' },
   ];
+  const bankOpts = bankAccounts.map((b: any) => ({
+    label: `${b.bank_name || 'Bank'}${b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}`,
+    value: b.id,
+  }));
 
   // Canonical AR from v_tenant_current_dues (see getPendingDues) — not a client-side invoice sum.
   const totalPending = pendingTotal;
@@ -326,9 +379,16 @@ export default function AccountingScreen() {
           ))}
         </>)}
 
-        {/* ── RECEIPTS (read-only) ── */}
-        {section === 'receipts' && (
-          receipts.length === 0 ? (
+        {/* ── RECEIPTS + Add Collection ── */}
+        {section === 'receipts' && (<>
+          <View style={{ marginBottom: spacing.md }}>
+            <Button
+              title="Add Collection"
+              icon="add-circle-outline"
+              onPress={() => { setColDate(new Date().toISOString().split('T')[0]); setShowCollect(true); }}
+            />
+          </View>
+          {receipts.length === 0 ? (
             <EmptyState title="No Receipts" subtitle="Recorded payments will appear here" icon="cash-outline" />
           ) : receipts.map((r: any) => (
             <View key={r.id} style={styles.card}>
@@ -341,8 +401,8 @@ export default function AccountingScreen() {
                 {!!r.reference_number && <Text style={styles.cardSub} numberOfLines={1}>Ref: {r.reference_number}</Text>}
               </View>
             </View>
-          ))
-        )}
+          ))}
+        </>)}
 
         {/* ── EXPENSES (read-only) ── */}
         {section === 'expenses' && (
@@ -510,12 +570,53 @@ export default function AccountingScreen() {
                   <Input label="Amount" value={payAmount} onChangeText={setPayAmount}
                     placeholder={String(showPay.totalAmount - showPay.paidAmount)} keyboardType="numeric" />
                   <PickerSelect label="Payment Mode" value={payMode} options={payModes} onSelect={setPayMode} />
+                  {bankOpts.length > 0 && (
+                    <PickerSelect
+                      label={payMode !== 'cash' ? 'Bank Account *' : 'Bank Account'}
+                      value={payBank} options={bankOpts} onSelect={setPayBank}
+                    />
+                  )}
                   <Input label="Reference No. (UTR / txn ref)" value={payRef} onChangeText={setPayRef} placeholder="Optional — bank/UPI reference" />
                   <Button title="Record Payment" onPress={handlePayment} loading={loading} icon="cash-outline" />
                 </>
               )}
             </ScrollView>
           )}
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* Add Collection — standalone payment (FIFO-allocated across invoices) */}
+      <Modal visible={showCollect} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowCollect(false)}>
+              <Text style={{ color: colors.danger }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Add Collection</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>
+            <PickerSelect label="Tenant" value={colTenant} options={tenantOpts} onSelect={setColTenant} />
+            <Input label="Amount" value={colAmount} onChangeText={setColAmount} placeholder="Amount received" keyboardType="numeric" />
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Payment Date</Text>
+              <DateField value={colDate} onChange={setColDate} />
+            </View>
+            <PickerSelect label="Payment Mode" value={colMode} options={payModes} onSelect={setColMode} />
+            {bankOpts.length > 0 && (
+              <PickerSelect
+                label={colMode !== 'cash' ? 'Bank Account *' : 'Bank Account'}
+                value={colBank} options={bankOpts} onSelect={setColBank}
+              />
+            )}
+            <Input label="Reference No. (UTR / txn ref)" value={colRef} onChangeText={setColRef} placeholder="Optional — bank/UPI reference" />
+            <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 14 }}>
+              Allocated automatically across the tenant's outstanding invoices (oldest first).
+            </Text>
+            <Button title="Record Collection" onPress={handleAddCollection} loading={loading} icon="cash-outline" />
+          </ScrollView>
         </SafeAreaView>
         </GlassBackground>
       </Modal>
