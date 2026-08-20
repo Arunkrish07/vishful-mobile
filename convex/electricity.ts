@@ -4,6 +4,78 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { getSupabase, ORG_ID, safeList, insertRow } from "./lib/supabaseAdmin";
 
+// ─── CURRENT EB MONITORING (web parity: Electricity "Current EB" tab) ────────
+// Per Live apartment: the latest meter reading is the statement's start; the
+// current reading comes from the last saved monitoring snapshot (overwrite
+// model = one live record per apartment). The mobile computes the slab bill.
+export const loadCurrentEb = action({
+  args: { propertyId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { propertyId }) => {
+    const sb = getSupabase();
+    const [apts, readings, snaps] = await Promise.all([
+      safeList(sb.from("apartments").select("id, apartment_code, eb_meter_number").eq("organization_id", ORG_ID).eq("property_id", propertyId).eq("status", "Live").order("apartment_code")),
+      safeList(sb.from("electricity_readings").select("apartment_id, reading_end, billing_month, created_at").eq("organization_id", ORG_ID).eq("property_id", propertyId).order("created_at", { ascending: false })),
+      safeList(sb.from("eb_monitoring_readings").select("id, apartment_id, current_reading, meter_photo_url, created_at").eq("property_id", propertyId).order("created_at", { ascending: false })),
+    ]);
+    // Latest reading + latest snapshot per apartment (both lists are newest-first).
+    const lastReading: Record<string, any> = {};
+    for (const r of readings) { if (r.apartment_id && !(r.apartment_id in lastReading)) lastReading[r.apartment_id] = r; }
+    const lastSnap: Record<string, any> = {};
+    for (const s of snaps) { if (s.apartment_id && !(s.apartment_id in lastSnap)) lastSnap[s.apartment_id] = s; }
+    return apts.map((apt: any) => {
+      const rd = lastReading[apt.id];
+      const sv = lastSnap[apt.id];
+      return {
+        apartmentId: apt.id,
+        apartmentCode: apt.apartment_code,
+        ebMeterNumber: apt.eb_meter_number || "",
+        startReading: rd ? Number(rd.reading_end) || 0 : 0,
+        startMonth: rd ? rd.billing_month || null : null,
+        currentReading: sv?.current_reading != null ? String(sv.current_reading) : "",
+        photoUrl: sv?.meter_photo_url ?? null,
+        existingId: sv?.id ?? null,
+      };
+    });
+  },
+});
+
+// Overwrite-model upsert of today's monitoring snapshots (read-only vs billing).
+export const saveEbMonitoring = action({
+  args: { rows: v.any() },
+  returns: v.any(),
+  handler: async (_ctx, { rows }) => {
+    const sb = getSupabase();
+    const list: any[] = Array.isArray(rows) ? rows : [];
+    const today = new Date().toISOString().slice(0, 10);
+    let saved = 0;
+    for (const r of list) {
+      const payload: any = {
+        organization_id: ORG_ID,
+        property_id: r.propertyId,
+        apartment_id: r.apartmentId,
+        reading_date: today,
+        start_reading: Number(r.startReading) || 0,
+        start_month: r.startMonth ?? null,
+        current_reading: Number(r.currentReading) || 0,
+        units_consumed: Number(r.unitsConsumed) || 0,
+        eb_amount: Number(r.ebAmount) || 0,
+        is_danger: !!r.isDanger,
+        meter_photo_url: r.photoUrl ?? null,
+      };
+      if (r.existingId) {
+        const { error } = await sb.from("eb_monitoring_readings").update(payload).eq("id", r.existingId).eq("organization_id", ORG_ID);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await sb.from("eb_monitoring_readings").insert(payload);
+        if (error) throw new Error(error.message);
+      }
+      saved++;
+    }
+    return { success: true, saved };
+  },
+});
+
 // ─── LIST READINGS (grouped by billing_month + property_id) ──────────────────
 export const listReadings = action({
   args: { billingMonth: v.optional(v.string()) },

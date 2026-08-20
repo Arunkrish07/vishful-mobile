@@ -29,6 +29,7 @@ import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import * as sb from '../lib/supabaseService';
 import { fetchBankAccounts } from '../services/ticketService';
+import { computeEbSlabBill, EB_DANGER_THRESHOLD } from '../lib/ebSlab';
 import { fetchVisibleTabKeys, filterTabs } from '../lib/tabPermissions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -247,10 +248,11 @@ function DatePickerField({ label, value, onChange, required, placeholder }: {
 }
 
 const TABS = [
-  { key: 'readings',    label: 'Meter Readings', icon: 'flash-outline'     },
-  { key: 'rates',       label: 'EB Rates',       icon: 'pricetag-outline'  },
-  { key: 'eb-payments', label: 'EB Payments',    icon: 'card-outline'      },
-  { key: 'analytics',   label: 'Analytics',      icon: 'bar-chart-outline' },
+  { key: 'readings',    label: 'Meter Readings', icon: 'flash-outline'       },
+  { key: 'current-eb',  label: 'Current EB',     icon: 'speedometer-outline' },
+  { key: 'rates',       label: 'EB Rates',       icon: 'pricetag-outline'    },
+  { key: 'eb-payments', label: 'EB Payments',    icon: 'card-outline'        },
+  { key: 'analytics',   label: 'Analytics',      icon: 'bar-chart-outline'   },
 ];
 
 // ─── Period filter helpers (mirrors web AccountingPeriodSelector) ─────────────
@@ -491,6 +493,50 @@ export default function ElectricityScreen() {
     ]);
   };
   const [ebPayments,       setEbPayments]       = useState<any[]>([]);
+  // ── Current EB (live slab statement from last reading → today's reading) ──
+  const [currentEbProperty, setCurrentEbProperty] = useState('');
+  const [currentEbRows,     setCurrentEbRows]     = useState<any[]>([]);
+  const [currentEbLoading,  setCurrentEbLoading]  = useState(false);
+  const [currentEbSaving,   setCurrentEbSaving]   = useState(false);
+
+  const loadCurrentEb = useCallback(async (propertyId: string) => {
+    if (!propertyId) { setCurrentEbRows([]); return; }
+    setCurrentEbLoading(true);
+    try {
+      const rows = await sb.loadCurrentEb(propertyId);
+      if (mounted.current) setCurrentEbRows(Array.isArray(rows) ? rows : []);
+    } catch { if (mounted.current) setCurrentEbRows([]); }
+    finally { if (mounted.current) setCurrentEbLoading(false); }
+  }, [mounted]);
+
+  const handleSaveCurrentEb = useCallback(async () => {
+    const toSave = currentEbRows
+      .filter((r: any) => r.currentReading !== '' && r.currentReading != null && !isNaN(parseFloat(String(r.currentReading))))
+      .map((r: any) => {
+        const units = Math.max(0, (parseFloat(String(r.currentReading)) || 0) - (Number(r.startReading) || 0));
+        const bill = computeEbSlabBill(units);
+        return {
+          propertyId: currentEbProperty,
+          apartmentId: r.apartmentId,
+          startReading: Number(r.startReading) || 0,
+          startMonth: r.startMonth || null,
+          currentReading: parseFloat(String(r.currentReading)) || 0,
+          unitsConsumed: units,
+          ebAmount: bill.total,
+          isDanger: bill.isDanger,
+          existingId: r.existingId || null,
+          photoUrl: r.photoUrl || null,
+        };
+      });
+    if (!toSave.length) { Alert.alert('Nothing to save', 'Enter at least one current reading first.'); return; }
+    setCurrentEbSaving(true);
+    try {
+      await sb.saveEbMonitoring(toSave);
+      Alert.alert('Saved', `${toSave.length} monitoring reading(s) saved for today.`);
+      await loadCurrentEb(currentEbProperty);
+    } catch (e: any) { Alert.alert('Save failed', e?.message || 'Could not save readings.'); }
+    finally { setCurrentEbSaving(false); }
+  }, [currentEbRows, currentEbProperty, loadCurrentEb]);
   const [expandedEbGroup,  setExpandedEbGroup]  = useState<string | null>(null);
 
   // ── Period filter derived values (must be after all state declarations) ───
@@ -934,6 +980,96 @@ export default function ElectricityScreen() {
   };
 
   // ─── RENDER READINGS TAB ───────────────────────────────────────────────────
+  const renderCurrentEb = () => {
+    const rowsComputed = currentEbRows.map((r: any) => {
+      const cur = parseFloat(String(r.currentReading));
+      const hasCur = r.currentReading !== '' && r.currentReading != null && !isNaN(cur);
+      const units = hasCur ? Math.max(0, cur - (Number(r.startReading) || 0)) : 0;
+      const bill = computeEbSlabBill(units);
+      return { ...r, hasCur, units, bill };
+    });
+    const totalAmount = rowsComputed.reduce((s: number, r: any) => s + (r.hasCur ? r.bill.total : 0), 0);
+    const anyDanger = rowsComputed.some((r: any) => r.hasCur && r.bill.isDanger);
+    const enteredCount = rowsComputed.filter((r: any) => r.hasCur).length;
+    return (
+      <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 120 }}>
+        <SectionLabel text="Property" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.lg }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {properties.map((p: any) => {
+              const pid = p._id || p.id;
+              const active = currentEbProperty === pid;
+              return (
+                <TouchableOpacity key={pid} onPress={() => { setCurrentEbProperty(pid); loadCurrentEb(pid); }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>{p.property_name || p.name || ''}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        {!currentEbProperty ? (
+          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 30 }}>Select a property to load its meters.</Text>
+        ) : currentEbLoading ? (
+          <ActivityIndicator color="#0284C7" style={{ marginTop: 30 }} />
+        ) : rowsComputed.length === 0 ? (
+          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 30 }}>No live apartments with meters for this property.</Text>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+              <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <Text style={{ fontSize: 11, color: colors.textSecondary }}>Estimated total ({enteredCount}/{rowsComputed.length})</Text>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: anyDanger ? '#DC2626' : '#0284C7' }}>₹{Math.round(totalAmount).toLocaleString('en-IN')}</Text>
+              </View>
+              {anyDanger && (
+                <View style={{ justifyContent: 'center', backgroundColor: '#FEF2F2', borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: '#FECACA' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>⚠ Danger</Text>
+                  <Text style={{ fontSize: 9, color: '#DC2626' }}>{'>'} ₹{EB_DANGER_THRESHOLD.toLocaleString('en-IN')}</Text>
+                </View>
+              )}
+            </View>
+
+            {rowsComputed.map((r: any, idx: number) => (
+              <View key={r.apartmentId} style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: r.hasCur && r.bill.isDanger ? '#FECACA' : '#E5E7EB' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{r.apartmentCode}</Text>
+                    <Text style={{ fontSize: 10, color: colors.textTertiary }}>{r.ebMeterNumber ? `Meter ${r.ebMeterNumber} · ` : ''}Start {r.startReading}{r.startMonth ? ` (${r.startMonth})` : ''}</Text>
+                  </View>
+                  {r.hasCur && (
+                    <View style={{ alignItems: 'flex-end', backgroundColor: r.bill.isDanger ? '#FEF2F2' : '#ECFDF5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: r.bill.isDanger ? '#DC2626' : '#059669' }}>₹{Math.round(r.bill.total).toLocaleString('en-IN')}</Text>
+                      <Text style={{ fontSize: 9, color: r.bill.isDanger ? '#DC2626' : '#059669' }}>{r.units} units</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>Current reading</Text>
+                  <TextInput
+                    style={[S.input, { flex: 1, marginBottom: 0 }]}
+                    value={String(r.currentReading ?? '')}
+                    onChangeText={(v: string) => setCurrentEbRows((prev: any[]) => prev.map((x: any, i: number) => i === idx ? { ...x, currentReading: v.replace(/[^0-9.]/g, '') } : x))}
+                    placeholder={`≥ ${r.startReading}`}
+                    keyboardType="numeric"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+              </View>
+            ))}
+
+            <Text style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 10 }}>
+              Slab-rate estimate (TN telescopic). Saved snapshots are for monitoring only and don't affect billing.
+            </Text>
+            <TouchableOpacity style={[S.saveBtn, { backgroundColor: '#0284C7' }, currentEbSaving && { opacity: 0.5 }]} onPress={handleSaveCurrentEb} disabled={currentEbSaving}>
+              {currentEbSaving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>Save Today's Readings</Text>}
+            </TouchableOpacity>
+          </>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderReadings = () => (
     <ScrollView
       style={{ flex: 1 }}
@@ -1580,7 +1716,7 @@ export default function ElectricityScreen() {
         </View>
 
         {/* Tab content */}
-        {activeTab === 'readings' ? renderReadings() : activeTab === 'eb-payments' ? renderEbPayments() : activeTab === 'analytics' ? renderAnalytics() : renderRates()}
+        {activeTab === 'readings' ? renderReadings() : activeTab === 'current-eb' ? renderCurrentEb() : activeTab === 'eb-payments' ? renderEbPayments() : activeTab === 'analytics' ? renderAnalytics() : renderRates()}
 
       </SafeAreaView>
 

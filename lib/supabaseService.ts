@@ -767,6 +767,12 @@ export async function listEbPayments() {
 export async function saveEbPayment(data: any) {
   return client.action((api as any).electricity.saveEbPayment, { data });
 }
+export async function loadCurrentEb(propertyId: string) {
+  return client.action((api as any).electricity.loadCurrentEb, { propertyId });
+}
+export async function saveEbMonitoring(rows: any[]) {
+  return client.action((api as any).electricity.saveEbMonitoring, { rows });
+}
 export async function deleteEbPayment(id: string) {
   return client.action((api as any).electricity.deleteEbPayment, { id });
 }
