@@ -1906,9 +1906,21 @@ Example: {"amount": 855.00, "payment_date": "2026-05-02", "bank_name": "GPay", "
               ],
             }],
             temperature: 0.1,
-            max_tokens: 600,
+            max_tokens: 500,
+            // Qwen3 is a reasoning model; without this it emits a long <think>
+            // block that can exhaust max_tokens before the JSON and blows the
+            // 8k tokens/min limit. "none" → clean JSON in ~65 completion tokens.
+            reasoning_effort: "none",
           }),
         });
+        if (res.status === 429) {
+          return {
+            amount: null, payment_date: null, bank_name: null, transaction_reference: null,
+            _source: "groq_rate_limited",
+            _requireManualAmount: true,
+            _message: "Too many scans right now — wait a minute and try again, or enter the details manually.",
+          };
+        }
         if (res.ok) {
           const j = await res.json();
           let raw = String(j.choices?.[0]?.message?.content ?? "");

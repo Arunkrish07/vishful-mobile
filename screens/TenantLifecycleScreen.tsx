@@ -886,11 +886,24 @@ export default function TenantLifecycleScreen() {
 
   // Scan an uploaded payment screenshot and auto-fill amount / mode / txn ref / bank.
   // Mirrors the web TenantLifecycle handleProofSelectAndOcr + the technician flow.
-  const runProofOcr = useCallback(async (target: 'booking' | 'onboarding', base64?: string) => {
-    if (!base64) return;
+  const runProofOcr = useCallback(async (target: 'booking' | 'onboarding', base64?: string, uri?: string) => {
+    // The image picker (with allowsEditing) frequently returns NO base64 on
+    // Android, and full-res screenshots can be too large — so re-encode a
+    // resized JPEG from the uri to guarantee usable base64 for the OCR call.
+    let b64 = base64;
+    if (uri) {
+      try {
+        const IM: any = await import('expo-image-manipulator');
+        const FS: any = await import('expo-file-system');
+        const manip = await IM.manipulateAsync(uri, [{ resize: { width: 1400 } }], { compress: 0.7, format: IM.SaveFormat.JPEG });
+        const encoded = await FS.readAsStringAsync(manip.uri, { encoding: 'base64' });
+        if (encoded) b64 = encoded;
+      } catch { /* fall back to any picker-provided base64 */ }
+    }
+    if (!b64) { Alert.alert('Scan skipped', 'Could not read that image to scan. Please enter the payment details manually.'); return; }
     setProofScanning(p => ({ ...p, [target]: true }));
     try {
-      const ocr: any = await extractPaymentProof(base64);
+      const ocr: any = await extractPaymentProof(b64);
       if (ocr && (ocr.amount || ocr.payment_date || ocr.bank_name || ocr.transaction_reference)) {
         const mode = mapOcrPaymentMode(ocr.bank_name);
         // Match a saved org bank account by name (best-effort, same as technician flow).
@@ -955,7 +968,7 @@ export default function TenantLifecycleScreen() {
             if (result.canceled || !result.assets?.[0]) return;
             const asset = result.assets[0];
             setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
-            runProofOcr(target, asset.base64 ?? undefined);
+            runProofOcr(target, asset.base64 ?? undefined, asset.uri);
           } catch (e: any) { Alert.alert('Error', e.message || 'Could not open gallery.'); }
         },
       },
@@ -970,7 +983,7 @@ export default function TenantLifecycleScreen() {
             if (result.canceled || !result.assets?.[0]) return;
             const asset = result.assets[0];
             setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
-            runProofOcr(target, asset.base64 ?? undefined);
+            runProofOcr(target, asset.base64 ?? undefined, asset.uri);
           } catch (e: any) { Alert.alert('Error', e.message || 'Could not open camera.'); }
         },
       },
