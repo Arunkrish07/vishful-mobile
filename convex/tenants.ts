@@ -33,6 +33,35 @@ function nextWorkStart(from: Date): Date {
   return new Date(d.getTime() - IST_OFFSET_MS);
 }
 
+// ─── MERGE TENANTS (web parity: merge_tenants RPC) ───────────────────────────
+// Re-points every child record (allotments, remarks, documents, receipts,
+// tickets…) from secondary → primary, applies p_field_values (COALESCE, so an
+// empty object safely keeps the primary's values), then deletes the secondary.
+// The DB function blocks when both tenants have allotments.
+export const mergeTenants = action({
+  args: { primaryId: v.string(), secondaryId: v.string(), fieldValues: v.optional(v.any()) },
+  returns: v.any(),
+  handler: async (_ctx, { primaryId, secondaryId, fieldValues }) => {
+    const sb = getSupabase();
+    if (!primaryId || !secondaryId || primaryId === secondaryId) {
+      return { ok: false, error: "Pick two different tenant records to merge." };
+    }
+    try {
+      const { data, error } = await sb.rpc("merge_tenants", {
+        p_primary_id: primaryId,
+        p_secondary_id: secondaryId,
+        p_field_values: fieldValues || {},
+      });
+      if (error) return { ok: false, error: error.message };
+      const moved = (data as any)?.moved || {};
+      const totalMoved = Object.values(moved).reduce((s: number, n: any) => s + Number(n || 0), 0);
+      return { ok: true, moved, totalMoved };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || "Merge failed." };
+    }
+  },
+});
+
 // ─── ISSUE KYC QR TOKEN (web parity: kyc-token-issue) ────────────────────────
 // The QR payload is AES-GCM encrypted with KYC_QR_SECRET, which only the
 // deployed Supabase edge function holds — so we forward the caller's user token

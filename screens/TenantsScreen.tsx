@@ -524,6 +524,50 @@ export default function TenantsScreen() {
     setDupLoading(false);
   };
 
+  // ── NEW: Merge duplicate tenants (web parity: merge_tenants RPC) ───────────
+  // Picks the allotted record (or the first) as primary and merges the rest in.
+  const tenantHasAllotment = (t: any) => {
+    const match = (tenants || []).find((ten: any) => ten._id === t.id);
+    return !!(match?.allotmentId || t.allotmentId || t.tenant_allotment_id);
+  };
+  const handleMergeDuplicates = (members: any[]) => {
+    const list = (members || []).filter(Boolean);
+    if (list.length < 2) return;
+    const allotted = list.filter(tenantHasAllotment);
+    if (allotted.length > 1) {
+      Alert.alert('Cannot merge automatically', 'More than one of these records has an allotment. Merging two allotted tenants is blocked — cancel one allotment first, then merge.');
+      return;
+    }
+    const primary = allotted[0] || list[0];
+    const secondaries = list.filter((t: any) => t.id !== primary.id);
+    if (!secondaries.length) return;
+    Alert.alert(
+      'Merge duplicates',
+      `Merge ${secondaries.length} record${secondaries.length === 1 ? '' : 's'} into “${primary.full_name || 'primary'}”?\n\nAll allotments, remarks, documents, receipts and tickets move to the primary; the duplicate record${secondaries.length === 1 ? ' is' : 's are'} deleted. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Merge', style: 'destructive', onPress: async () => {
+          setDupLoading(true);
+          try {
+            let moved = 0;
+            for (const s of secondaries) {
+              const res: any = await convexClient.action((convexApi as any).tenants.mergeTenants, { primaryId: primary.id, secondaryId: s.id });
+              if (!res?.ok) throw new Error(res?.error || 'Merge failed');
+              moved += res.totalMoved || 0;
+            }
+            setRefreshKey((k: number) => k + 1);
+            await runDuplicateScanAll();
+            Alert.alert('Merged', `Merged into “${primary.full_name || 'primary'}”. ${moved} record${moved === 1 ? '' : 's'} moved.`);
+          } catch (e: any) {
+            Alert.alert('Merge failed', e?.message || 'Could not merge these records.');
+          } finally {
+            setDupLoading(false);
+          }
+        } },
+      ],
+    );
+  };
+
   // ── NEW: Delete tenant ────────────────────────────────────────────────────
   const handleDeleteTenant = (t: any) => {
     Alert.alert('Delete Tenant', `Delete "${t.name}"? This cannot be undone.\n\nOnly NEW tenants with no allotments can be deleted.`, [
@@ -1059,8 +1103,17 @@ export default function TenantsScreen() {
                 <View key={g.phone} style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{g.phone}</Text>
-                    <View style={{ backgroundColor: '#FEF3C7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#D97706' }}>{g.tenants.length} records</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ backgroundColor: '#FEF3C7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#D97706' }}>{g.tenants.length} records</Text>
+                      </View>
+                      {g.tenants.length >= 2 && (
+                        <TouchableOpacity onPress={() => handleMergeDuplicates(g.tenants)} disabled={dupLoading}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, opacity: dupLoading ? 0.5 : 1 }}>
+                          <Ionicons name="git-merge-outline" size={13} color="#fff" />
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>Merge</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                   {g.tenants.map((t: any) => {
