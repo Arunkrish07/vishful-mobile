@@ -27,6 +27,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import TenantLifecycleScreen from './screens/TenantLifecycleScreen';
 import TenantHomeScreen from './screens/TenantHomeScreen';
 import TenantProfileScreen from './screens/TenantProfileScreen';
+import TenantKycScreen from './screens/TenantKycScreen';
 import  TechnicianTicketsNavigatorScreen  from './screens/TechnicianTicketsNavigatorScreen';
 import TicketsScreen from './screens/TicketsScreen';
 import TenantTicketsScreen from './screens/TenantTicketsScreen';
@@ -535,6 +536,7 @@ function TenantNavigator() {
     <TenantStack.Navigator screenOptions={{ headerShown: false }}>
       <TenantStack.Screen name="TenantTabs" component={TenantTabNavigator} />
       <TenantStack.Screen name="CreateTicket" component={CreateTicketScreen} />
+      <TenantStack.Screen name="TenantKyc" component={TenantKycScreen} />
       <TenantStack.Screen name="RaiseTicket" component={RaiseTicketScreen} />
       <TenantStack.Screen name="TicketDetail" component={TicketDetailScreen} />
     </TenantStack.Navigator>

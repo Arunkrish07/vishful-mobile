@@ -94,6 +94,46 @@ export const issueKycToken = action({
   },
 });
 
+// ─── TENANT SELF-SERVICE KYC (web parity: KYCForm admin_edit write) ──────────
+// The tenant fills their own KYC details; we resolve their record by phone and
+// update a whitelisted set of KYC fields, optionally marking kyc_completed.
+export const updateTenantKyc = action({
+  args: { phone: v.string(), fields: v.any() },
+  returns: v.any(),
+  handler: async (_ctx, { phone, fields }) => {
+    const sb = getSupabase();
+    let clean = String(phone || "").replace(/[^0-9]/g, "");
+    if (clean.length === 12 && clean.startsWith("91")) clean = clean.slice(2);
+    else if (clean.length === 11 && clean.startsWith("0")) clean = clean.slice(1);
+    clean = clean.slice(-10);
+    if (clean.length !== 10) return { ok: false, error: "Invalid phone number." };
+    const variants = [clean, `+91${clean}`, `91${clean}`];
+    let tenant: any = null;
+    for (const vv of variants) {
+      const { data } = await sb.from("tenants").select("id").eq("organization_id", ORG_ID).eq("phone", vv).maybeSingle();
+      if (data) { tenant = data; break; }
+    }
+    if (!tenant) return { ok: false, error: "Your tenant record was not found." };
+    const ALLOWED = new Set([
+      "first_name", "last_name", "full_name", "gender", "date_of_birth", "food_preference", "profession",
+      "email", "address", "city", "state", "pincode", "permanent_address",
+      "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship", "emergency_contact_relation",
+      "aadhar_number", "pan_number",
+      "bank_name", "bank_branch", "bank_account_number", "bank_account_holder", "bank_ifsc",
+      "company_name", "designation", "date_of_joining", "photo_url",
+    ]);
+    const payload: any = {};
+    for (const k of Object.keys(fields || {})) {
+      if (ALLOWED.has(k)) payload[k] = fields[k] === "" ? null : fields[k];
+    }
+    if (fields?.markComplete === true) payload.kyc_completed = true;
+    if (Object.keys(payload).length === 0) return { ok: false, error: "Nothing to save." };
+    const { error } = await sb.from("tenants").update(payload).eq("id", tenant.id).eq("organization_id", ORG_ID);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, tenantId: tenant.id };
+  },
+});
+
 // ─── DASHBOARD DISCREPANCIES (web parity: NeedsAttentionTicker) ───────────────
 // Counts beds genuinely double-booked and tenants occupying 2+ beds — using the
 // same overlap rule as web findBed/findTenantDiscrepancies: an allotment window

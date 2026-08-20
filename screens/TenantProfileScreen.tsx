@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
 import { spacing, glass } from '../lib/theme';
 import { Button, GlassBackground } from '../components/shared';
+import { useNavigation } from '@react-navigation/native';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { getActiveSession } from '../services/getActiveSession';
@@ -58,6 +59,7 @@ function InfoRow({ icon, label, value }: { icon: string; label: string; value: s
 export default function TenantProfileScreen() {
   const { user, logout } = useAuth();
   const { colors } = useTheme();
+  const navigation = useNavigation<any>();
 
   const [profile,       setProfile]       = useState<any>(null);
   const [accommodation, setAccommodation] = useState<any>(null);
@@ -257,7 +259,13 @@ export default function TenantProfileScreen() {
                   { icon: 'home-outline',  label: 'Permanent Address', value: profile?.permanentAddress },
                   { icon: profile?.kycCompleted ? 'checkmark-circle-outline' : 'alert-circle-outline', label: 'KYC Status', value: profile?.kycCompleted ? 'Verified' : 'Pending' },
                 ].filter(d => d.value).map((d) => (
-                  <InfoRow key={d.label} icon={d.icon} label={d.label} value={d.value as string} />
+                  d.label === 'KYC Status' ? (
+                    <TouchableOpacity key={d.label} activeOpacity={0.7} onPress={() => navigation.navigate('TenantKyc')}>
+                      <InfoRow icon={d.icon} label={d.label} value={`${d.value}  ›`} />
+                    </TouchableOpacity>
+                  ) : (
+                    <InfoRow key={d.label} icon={d.icon} label={d.label} value={d.value as string} />
+                  )
                 ))}
               </View>
 

@@ -251,6 +251,9 @@ export async function getTenantDetails(phone: string): Promise<{
 } | null> {
   return client.action(api.tenants.getTenantDetails, { phone }) as any;
 }
+export async function updateTenantKyc(phone: string, fields: Record<string, any>): Promise<{ ok: boolean; tenantId?: string; error?: string }> {
+  return client.action((api as any).tenants.updateTenantKyc, { phone, fields });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ASSETS
