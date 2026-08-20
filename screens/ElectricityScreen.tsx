@@ -28,6 +28,7 @@ import { LoadingScreen, DateField, IconBtnSolid } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import * as sb from '../lib/supabaseService';
+import { fetchBankAccounts } from '../services/ticketService';
 import { fetchVisibleTabKeys, filterTabs } from '../lib/tabPermissions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -356,6 +357,7 @@ export default function ElectricityScreen() {
   const [groups, setGroups] = useState<any[] | null>(null);
   const [ebRates, setEbRates] = useState<any[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -541,7 +543,7 @@ export default function ElectricityScreen() {
     return Array.from(map.values()).sort((a, b) => String(b.sortDate || '').localeCompare(String(a.sortDate || '')));
   }, [ebPayments]);
   const [paymentOpen,      setPaymentOpen]      = useState(false);
-  const [paymentForm,      setPaymentForm]      = useState({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', billing_period_start: '', billing_period_end: '', notes: '' });
+  const [paymentForm,      setPaymentForm]      = useState({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', bank_account_id: '', billing_period_start: '', billing_period_end: '', notes: '' });
   const [paymentSaving,    setPaymentSaving]    = useState(false);
   // Bulk EB payment entry
   const [bulkPayOpen,      setBulkPayOpen]      = useState(false);
@@ -549,6 +551,7 @@ export default function ElectricityScreen() {
   const [bulkPayBillDate,  setBulkPayBillDate]  = useState('');
   const [bulkPayDate,      setBulkPayDate]      = useState('');
   const [bulkPayMode,      setBulkPayMode]      = useState('');
+  const [bulkPayBankId,    setBulkPayBankId]    = useState('');
   const [bulkPayRows,      setBulkPayRows]      = useState<any[]>([]);
   const [bulkPayLoading,   setBulkPayLoading]   = useState(false);
   const [bulkPaySaving,    setBulkPaySaving]    = useState(false);
@@ -589,17 +592,19 @@ export default function ElectricityScreen() {
     if (!token) return;
     try {
       // Each fetch is independent — failure in readings must not block properties
-      const [g, rates, props, payments] = await Promise.all([
+      const [g, rates, props, payments, banks] = await Promise.all([
         sb.listReadings().catch(() => []) as Promise<any[]>,
         sb.listEbRates().catch(() => []) as Promise<any[]>,
         sb.listPropertiesEnriched().catch(() => []) as Promise<any[]>,
         sb.listEbPayments().catch(() => []) as Promise<any[]>,
+        fetchBankAccounts().catch(() => []) as Promise<any[]>,
       ]);
       if (!mounted.current) return;
       setGroups(g ?? []);
       setEbRates(rates ?? []);
       setProperties(props ?? []);
       setEbPayments(payments ?? []);
+      setBankAccounts(banks ?? []);
     } catch (e: any) {
       if (!mounted.current || isAbortError(e)) return;
       // Still try to load properties even if overall fetch fails
@@ -814,12 +819,16 @@ export default function ElectricityScreen() {
       Alert.alert('Required', 'Property, bill date and bill amount are required');
       return;
     }
+    if (paymentForm.payment_mode && paymentForm.payment_mode !== 'Cash' && bankAccounts.length > 0 && !paymentForm.bank_account_id) {
+      Alert.alert('Bank required', 'Select the receiving bank account for a non-cash payment.');
+      return;
+    }
     setPaymentSaving(true);
     try {
       await sb.saveEbPayment(paymentForm);
       Alert.alert('Success', paymentForm.id ? 'Payment updated' : 'Payment added');
       setPaymentOpen(false);
-      setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', billing_period_start: '', billing_period_end: '', notes: '' });
+      setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', bank_account_id: '', billing_period_start: '', billing_period_end: '', notes: '' });
       fetchAll();
     } catch (e: any) { Alert.alert('Error', e.message); }
     setPaymentSaving(false);
@@ -852,6 +861,9 @@ export default function ElectricityScreen() {
     }
     const toSave = bulkPayRows.filter(r => r.bill_amount && parseFloat(r.bill_amount) > 0);
     if (!toSave.length) { Alert.alert('Error', 'Enter at least one bill amount'); return; }
+    if (bulkPayMode && bulkPayMode !== 'Cash' && bankAccounts.length > 0 && !bulkPayBankId) {
+      Alert.alert('Bank required', 'Select the receiving bank account for a non-cash payment.'); return;
+    }
     setBulkPaySaving(true);
     try {
       // Derive the billing period from the chosen bill date's calendar month so the
@@ -868,13 +880,14 @@ export default function ElectricityScreen() {
           payment_date: bulkPayDate || null,
           payment_mode: bulkPayMode || null,
           reference_number: row.reference_number || null,
+          bank_account_id: bulkPayBankId || null,
           billing_period_start: periodStart || null,
           billing_period_end: periodEnd || null,
         });
       }
       Alert.alert('Success', `${toSave.length} payment(s) saved`);
       setBulkPayOpen(false);
-      setBulkPayProperty(''); setBulkPayBillDate(''); setBulkPayDate(''); setBulkPayMode('');
+      setBulkPayProperty(''); setBulkPayBillDate(''); setBulkPayDate(''); setBulkPayMode(''); setBulkPayBankId('');
       setBulkPayRows([]);
       fetchAll();
     } catch (e: any) { Alert.alert('Error', e.message); }
@@ -988,7 +1001,7 @@ export default function ElectricityScreen() {
 
       {/* Add Payment shortcut */}
       <TouchableOpacity
-        onPress={() => { setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', billing_period_start: '', billing_period_end: '', notes: '' }); setPaymentOpen(true); }}
+        onPress={() => { setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', bank_account_id: '', billing_period_start: '', billing_period_end: '', notes: '' }); setPaymentOpen(true); }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', marginBottom: spacing.md, backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(2,132,199,0.25)' }}
       >
         <Ionicons name="add" size={15} color="#0284C7" />
@@ -1137,7 +1150,7 @@ export default function ElectricityScreen() {
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
         <TouchableOpacity
           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0284C7', borderRadius: 12, paddingVertical: 10 }}
-          onPress={() => { setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', billing_period_start: '', billing_period_end: '', notes: '' }); setPaymentOpen(true); }}
+          onPress={() => { setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', bank_account_id: '', billing_period_start: '', billing_period_end: '', notes: '' }); setPaymentOpen(true); }}
         >
           <Ionicons name="add" size={16} color="#fff" />
           <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Add Payment</Text>
@@ -1223,7 +1236,7 @@ export default function ElectricityScreen() {
                     </View>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       <TouchableOpacity style={S.iconBtn} onPress={() => {
-                        setPaymentForm({ id: p.id, property_id: p.property_id, bill_date: p.bill_date, bill_amount: String(p.bill_amount), payment_date: p.payment_date || '', payment_mode: p.payment_mode || '', reference_number: p.reference_number || '', billing_period_start: p.billing_period_start || '', billing_period_end: p.billing_period_end || '', notes: p.notes || '' });
+                        setPaymentForm({ id: p.id, property_id: p.property_id, bill_date: p.bill_date, bill_amount: String(p.bill_amount), payment_date: p.payment_date || '', payment_mode: p.payment_mode || '', reference_number: p.reference_number || '', bank_account_id: p.bank_account_id || '', billing_period_start: p.billing_period_start || '', billing_period_end: p.billing_period_end || '', notes: p.notes || '' });
                         setPaymentOpen(true);
                       }}>
                         <Ionicons name="pencil-outline" size={16} color={colors.textTertiary} />
@@ -1969,6 +1982,27 @@ export default function ElectricityScreen() {
                 </View>
               </View>
 
+              {bankAccounts.length > 0 && (
+                <>
+                  <SectionLabel text={paymentForm.payment_mode && paymentForm.payment_mode !== 'Cash' ? 'Bank Account *' : 'Bank Account'} />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.lg }}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {bankAccounts.map((b: any) => {
+                        const active = paymentForm.bank_account_id === b.id;
+                        return (
+                          <TouchableOpacity key={b.id} onPress={() => setPaymentForm(f => ({ ...f, bank_account_id: active ? '' : b.id }))}
+                            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>
+                              {b.bank_name}{b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </>
+              )}
+
               <SectionLabel text="Reference Number" />
               <TextInput style={[S.input, { marginBottom: spacing.lg }]} value={paymentForm.reference_number} onChangeText={v => setPaymentForm(f => ({ ...f, reference_number: v }))} placeholder="Transaction ref / UTR / Cheque no." placeholderTextColor={colors.textTertiary} />
 
@@ -2036,6 +2070,27 @@ export default function ElectricityScreen() {
                   })}
                 </View>
               </ScrollView>
+
+              {bankAccounts.length > 0 && (
+                <>
+                  <SectionLabel text={bulkPayMode && bulkPayMode !== 'Cash' ? 'Bank Account *' : 'Bank Account'} />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.lg }}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {bankAccounts.map((b: any) => {
+                        const active = bulkPayBankId === b.id;
+                        return (
+                          <TouchableOpacity key={b.id} onPress={() => setBulkPayBankId(active ? '' : b.id)}
+                            style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>
+                              {b.bank_name}{b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </>
+              )}
 
               {bulkPayLoading ? (
                 <ActivityIndicator color="#0284C7" style={{ marginTop: 24 }} />
