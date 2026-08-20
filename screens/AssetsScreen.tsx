@@ -876,6 +876,7 @@ function DSection({ title, right, children }: any) {
 }
 
 function AssetDetailModal({ visible, onClose, assetId, onQR, onChanged }: any) {
+  const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [d, setD] = useState<any>(null);
   const [tab, setTab] = useState<'overview' | 'payments' | 'flow'>('overview');
@@ -1049,7 +1050,12 @@ function AssetDetailModal({ visible, onClose, assetId, onQR, onChanged }: any) {
                   : d.tickets.map((t: any) => {
                     const open = !['closed', 'completed', 'cancelled'].includes(String(t.status || '').toLowerCase());
                     return (
-                      <View key={t.id} style={{ borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)', paddingVertical: 8 }}>
+                      <TouchableOpacity
+                        key={t.id}
+                        activeOpacity={0.7}
+                        onPress={() => { onClose(); navigation.navigate('Tickets', { screen: 'TicketDetail', params: { ticketId: t.id } }); }}
+                        style={{ borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)', paddingVertical: 8 }}
+                      >
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
                             <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{t.ticketNumber || '—'}</Text>
@@ -1058,10 +1064,11 @@ function AssetDetailModal({ visible, onClose, assetId, onQR, onChanged }: any) {
                             </View>
                           </View>
                           {t.cost > 0 && <Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>{fmtFull(t.cost)}</Text>}
+                          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                         </View>
                         {!!t.issueType && <Text style={{ fontSize: 12, color: '#556274', marginTop: 2 }}>{t.issueType}</Text>}
                         {!!t.createdAt && <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Raised {fmtDate(t.createdAt)}{t.resolvedAt ? ` · Resolved ${fmtDate(t.resolvedAt)}` : ''}</Text>}
-                      </View>
+                      </TouchableOpacity>
                     );
                   })}
               </DSection>
