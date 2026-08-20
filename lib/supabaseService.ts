@@ -589,6 +589,9 @@ export async function listWhatsappJobs(args: { jobType?: string; limit?: number 
 export async function listWhatsappJobDeliveries(jobId: string) {
   return client.action((api as any).whatsapplogs.listJobDeliveries, { jobId });
 }
+export async function searchWhatsappDeliveries(term: string) {
+  return client.action((api as any).whatsapplogs.searchWhatsappDeliveries, { term });
+}
 export async function resendWhatsappDelivery(deliveryId: string) {
   return client.action((api as any).whatsapplogs.resendDelivery, { deliveryId });
 }

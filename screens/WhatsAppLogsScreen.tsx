@@ -52,6 +52,9 @@ export default function WhatsAppLogsScreen() {
   const [dLoading, setDLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // id of the in-flight write
   const [jobType, setJobType] = useState('all');
+  const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [searching, setSearching] = useState(false);
   const didAutoExpand = useRef(false); // auto-expand the first failing/running job once per mount
   const [editPhone, setEditPhone] = useState<{ deliveryId: string; tenantId: string; jobId: string } | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
@@ -77,6 +80,22 @@ export default function WhatsAppLogsScreen() {
   // Mirror live state into refs so the auto-resume interval always sees fresh values
   // without re-arming the timer on every render.
   useEffect(() => { jobsRef.current = jobs; }, [jobs]);
+
+  // Debounced message-level search across all jobs (web parity: name / phone /
+  // invoice-receipt label). Empty/short term → back to the job list.
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 2) { setSearchResults(null); setSearching(false); return; }
+    setSearching(true);
+    const h = setTimeout(async () => {
+      try {
+        const r = await sb.searchWhatsappDeliveries(term);
+        setSearchResults(Array.isArray(r) ? r : []);
+      } catch { setSearchResults([]); }
+      finally { setSearching(false); }
+    }, 350);
+    return () => clearTimeout(h);
+  }, [search]);
   useEffect(() => { busyRef.current = busy; }, [busy]);
 
   // Silent refetch (no spinner / no pull-to-refresh flag) — used after an auto-resume so
@@ -235,6 +254,25 @@ export default function WhatsAppLogsScreen() {
           </View>
         </View>
 
+        {/* Search (name / phone / invoice-receipt no) */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12 }}>
+            <Ionicons name="search" size={16} color="#9CA3AF" />
+            <TextInput
+              style={{ flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827' }}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search name, phone, or invoice/receipt no…"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="none"
+            />
+            {searching ? <ActivityIndicator size="small" color="#2563EB" />
+              : search ? (
+                <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#9CA3AF" /></TouchableOpacity>
+              ) : null}
+          </View>
+        </View>
+
         {/* Job-type filter */}
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 }}>
           {JOB_TYPE_OPTIONS.map(o => (
@@ -255,7 +293,47 @@ export default function WhatsAppLogsScreen() {
             contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
           >
-            {jobs.length === 0 ? (
+            {searchResults !== null ? (
+              searchResults.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 60 }}>
+                  <Ionicons name="search" size={48} color="rgba(37,99,235,0.18)" />
+                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No messages match “{search.trim()}”</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>
+                    {searchResults.length} message{searchResults.length === 1 ? '' : 's'} found
+                  </Text>
+                  {searchResults.map((d) => {
+                    const lc = (s: any) => String(s || '').toLowerCase();
+                    const canResend = ['failed', 'pending', 'error', 'skipped'].includes(lc(d.status));
+                    return (
+                      <View key={d.id} style={{ backgroundColor: '#fff', borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB', padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexShrink: 1, paddingRight: 8 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{d.tenantName || d.label || 'Recipient'}</Text>
+                          <Text style={{ fontSize: 11, color: '#6B7280' }} numberOfLines={1}>
+                            {d.phoneMasked || d.deliveryKind || ''}{d.label && d.tenantName ? ` · ${d.label}` : ''}{d.sentAt ? ` · ${fmtTs(d.sentAt)}` : ''}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'capitalize', color: statusColor(d.status) }}>{d.status || '—'}</Text>
+                          {['failed', 'skipped', 'error'].includes(lc(d.status)) && d.tenantId && (
+                            <TouchableOpacity disabled={!!busy} onPress={() => { setEditPhone({ deliveryId: d.id, tenantId: d.tenantId, jobId: d.jobId }); setPhoneInput(''); }} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
+                              <Ionicons name="create-outline" size={16} color="#D97706" />
+                            </TouchableOpacity>
+                          )}
+                          {canResend && (
+                            <TouchableOpacity disabled={!!busy} onPress={() => doResendOne(d.id, d.jobId)} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
+                              {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="refresh" size={16} color="#2563EB" />}
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </>
+              )
+            ) : jobs.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
                 <Ionicons name="logo-whatsapp" size={56} color="rgba(37,99,235,0.18)" />
                 <Text style={{ marginTop: 12, color: '#6B7280' }}>No send jobs yet</Text>

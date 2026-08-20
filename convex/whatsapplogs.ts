@@ -71,6 +71,56 @@ export const listJobDeliveries = action({
   },
 });
 
+// ─── SEARCH DELIVERIES (message-level, across all jobs) ──────────────────────
+// Web parity (whatsapp-log-filters classifySearchTerm): search by tenant name,
+// label/caption, or phone (resolved to tenant ids). Returns matching deliveries
+// with their job id so the row keeps its resend/fix-number actions.
+export const searchWhatsappDeliveries = action({
+  args: { term: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { term }) => {
+    const sb = getSupabase();
+    // Strip LIKE wildcards / PostgREST or() grammar chars (sanitizeIlikeTerm).
+    const clean = String(term || "").trim().replace(/[%_,()\\"']/g, " ").replace(/\s+/g, " ").trim();
+    if (clean.length < 2) return [];
+
+    // Phone-looking term → resolve to tenant ids by phone, OR'd into the search.
+    const digits = clean.replace(/\D/g, "");
+    let tenantIds: string[] = [];
+    if (digits.length >= 6) {
+      const ts: any[] = await safeList(
+        sb.from("tenants").select("id").eq("organization_id", ORG_ID).ilike("phone", `%${digits.slice(-10)}%`).limit(200)
+      );
+      tenantIds = ts.map((t: any) => t.id).filter(Boolean);
+    }
+
+    const orParts = [`tenant_name.ilike.%${clean}%`, `label.ilike.%${clean}%`];
+    if (tenantIds.length) orParts.push(`tenant_id.in.(${tenantIds.join(",")})`);
+
+    const rows: any[] = await safeList(
+      sb.from("whatsapp_send_deliveries")
+        .select("id, job_id, tenant_id, delivery_kind, tenant_name, label, status, error_message, phone_masked, created_at, sent_at")
+        .eq("organization_id", ORG_ID)
+        .or(orParts.join(","))
+        .order("created_at", { ascending: false })
+        .limit(100)
+    );
+    return rows.map((r: any) => ({
+      id: r.id,
+      jobId: r.job_id,
+      tenantId: r.tenant_id || null,
+      deliveryKind: r.delivery_kind || null,
+      tenantName: r.tenant_name || null,
+      label: r.label || null,
+      status: r.status || "",
+      errorMessage: r.error_message || null,
+      phoneMasked: r.phone_masked || null,
+      createdAt: r.created_at || null,
+      sentAt: r.sent_at || null,
+    }));
+  },
+});
+
 // ─── WRITES (edge-function backed) ───────────────────────────────────────────
 // Mirror web whatsappSendJobService: resend a single delivery, resend all
 // failed/pending in a job, and resume a stalled job. The whatsapp-send-job edge
