@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, TextInput, Linking, Share, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, TextInput, Linking, Share, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadTicketPhoto } from '../services/ticketService';
@@ -424,6 +424,36 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
   // ── KYC QR ─────────────────────────────────────────────────────────────────
   const [kycQrOpen, setKycQrOpen] = useState(false);
+  const [issuedKycQr, setIssuedKycQr] = useState<string | null>(null);
+  const [kycIssuing, setKycIssuing] = useState(false);
+  const [kycIssueError, setKycIssueError] = useState('');
+
+  // Issue (or reuse) the property's KYC QR via the edge function (web parity).
+  const doIssueKyc = React.useCallback(async () => {
+    if (kycIssuing) return;
+    setKycIssuing(true); setKycIssueError('');
+    try {
+      const res = await sb.issueKycToken(propertyId, token || '');
+      if (res?.ok && res.qr) {
+        setIssuedKycQr(res.qr);
+        detailQuery.refetch();
+      } else {
+        setKycIssueError(res?.error || 'Could not issue the KYC QR. Please try again.');
+      }
+    } catch (e: any) {
+      setKycIssueError(e?.message || 'Could not issue the KYC QR. Please try again.');
+    } finally {
+      setKycIssuing(false);
+    }
+  }, [kycIssuing, propertyId, token]);
+
+  // Auto-issue when the modal opens and no QR exists yet (mirrors web ensureKycToken).
+  useEffect(() => {
+    if (kycQrOpen && !perfProperty?.kyc_qr_code && !issuedKycQr && !kycIssuing) {
+      doIssueKyc();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kycQrOpen]);
 
   // ── Bed History ─────────────────────────────────────────────────────────────
   const [bedHistoryBed,    setBedHistoryBed]    = useState<any>(null);
@@ -2259,7 +2289,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
 
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
             {(() => {
-              const kycQrCode = perfProperty?.kyc_qr_code;
+              const kycQrCode = issuedKycQr || perfProperty?.kyc_qr_code;
               const appBaseUrl = 'https://app.vishful.in';
               const kycUrl = kycQrCode ? `${appBaseUrl}/vista/kyc?qr=${encodeURIComponent(kycQrCode)}` : '';
 
@@ -2267,23 +2297,33 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                 return (
                   <View style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
                     <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
-                      <Ionicons name="qr-code-outline" size={36} color="#6366F1" />
+                      {kycIssuing
+                        ? <ActivityIndicator size="large" color="#6366F1" />
+                        : <Ionicons name="qr-code-outline" size={36} color="#6366F1" />}
                     </View>
                     <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', textAlign: 'center' }}>
-                      No KYC QR Issued Yet
+                      {kycIssuing ? 'Generating KYC QR…' : 'No KYC QR Issued Yet'}
                     </Text>
                     <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 }}>
-                      {"Generate a KYC QR code from the web app dashboard.\nGo to Properties > select this property > tap KYC QR."}
+                      The KYC QR links tenants to a secure registration form. It can be shared or printed once issued.
                     </Text>
-                    <View style={{ backgroundColor: '#EFF6FF', borderRadius: 14, padding: 14, width: '100%', borderWidth: 1, borderColor: '#E5E7EB' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Ionicons name="information-circle-outline" size={16} color="#6366F1" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>How it works</Text>
+                    {!!kycIssueError && (
+                      <View style={{ backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                        <Text style={{ flex: 1, fontSize: 12, color: '#DC2626', fontWeight: '600' }}>{kycIssueError}</Text>
                       </View>
-                      <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 6, lineHeight: 18 }}>
-                        The KYC QR links tenants to a secure registration form. Once issued via the web app, the QR appears here and can be shared or printed.
-                      </Text>
-                    </View>
+                    )}
+                    {!kycIssuing && (
+                      <TouchableOpacity
+                        onPress={doIssueKyc}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#6366F1', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24 }}
+                      >
+                        <Ionicons name="qr-code-outline" size={16} color="#fff" />
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>
+                          {kycIssueError ? 'Retry' : 'Generate KYC QR'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 );
               }

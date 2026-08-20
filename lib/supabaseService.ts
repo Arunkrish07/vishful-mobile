@@ -83,6 +83,9 @@ export async function getDashboardData() {
 export async function getBedTenantDiscrepancies(): Promise<{ bed: number; tenant: number }> {
   return client.action((api as any).tenants.getBedTenantDiscrepancies, {});
 }
+export async function issueKycToken(propertyId: string, token: string): Promise<{ ok: boolean; qr?: string | null; propertyName?: string | null; reused?: boolean; error?: string }> {
+  return client.action((api as any).tenants.issueKycToken, { propertyId, token });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROPERTIES

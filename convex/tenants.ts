@@ -33,6 +33,38 @@ function nextWorkStart(from: Date): Date {
   return new Date(d.getTime() - IST_OFFSET_MS);
 }
 
+// ─── ISSUE KYC QR TOKEN (web parity: kyc-token-issue) ────────────────────────
+// The QR payload is AES-GCM encrypted with KYC_QR_SECRET, which only the
+// deployed Supabase edge function holds — so we forward the caller's user token
+// to that edge function (it checks admin role, issues/reuses, and stores the QR
+// on properties.kyc_qr_code) rather than re-implementing the crypto here.
+export const issueKycToken = action({
+  args: { propertyId: v.string(), token: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { propertyId, token }) => {
+    const url = process.env.SUPABASE_URL;
+    const anon = process.env.SUPABASE_ANON_KEY;
+    if (!url || !anon) return { ok: false, error: "Server not configured." };
+    if (!token) return { ok: false, error: "Please sign in again." };
+    try {
+      const res = await fetch(`${url}/functions/v1/kyc-token-issue`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: anon,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ property_id: propertyId }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data?.error || `Could not issue KYC QR (${res.status}).` };
+      return { ok: true, qr: data.qr || null, propertyName: data.property_name || null, reused: !!data.reused };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || "Request failed." };
+    }
+  },
+});
+
 // ─── DASHBOARD DISCREPANCIES (web parity: NeedsAttentionTicker) ───────────────
 // Counts beds genuinely double-booked and tenants occupying 2+ beds — using the
 // same overlap rule as web findBed/findTenantDiscrepancies: an allotment window
