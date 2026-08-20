@@ -532,7 +532,7 @@ export const getAssetDetail = action({
   returns: v.any(),
   handler: async (_ctx, { assetId }) => {
     const sb = getSupabase();
-    const [assetRes, allocRes, maintRes, payRes, moveRes] = await Promise.all([
+    const [assetRes, allocRes, maintRes, payRes, moveRes, ticketRes] = await Promise.all([
       sb.from("assets")
         .select("*, asset_types(name, expected_life_months, asset_categories(name)), vendors(vendor_name, phone, email, gst_number)")
         .eq("id", assetId)
@@ -553,6 +553,11 @@ export const getAssetDetail = action({
         .select("*")
         .eq("asset_id", assetId)
         .order("move_date", { ascending: false }),
+      // Maintenance tickets raised against this asset (issue-type name embedded).
+      sb.from("maintenance_tickets")
+        .select("id, ticket_number, status, priority, created_at, resolved_at, closure_cost, description, issue_types(name)")
+        .eq("asset_id", assetId)
+        .order("created_at", { ascending: false }),
     ]);
 
     const a = assetRes.data;
@@ -667,6 +672,18 @@ export const getAssetDetail = action({
         apartment: al.apartments?.apartment_code || null,
         bed: al.beds?.bed_code || null,
         date: al.allocated_date || al.created_at || null,
+      })),
+      // Maintenance tickets raised against this asset.
+      tickets: (ticketRes.data || []).map((t: any) => ({
+        id: t.id,
+        ticketNumber: t.ticket_number || null,
+        status: t.status || "open",
+        priority: t.priority || null,
+        issueType: (t.issue_types as any)?.name || null,
+        cost: t.closure_cost != null ? Number(t.closure_cost) : 0,
+        description: t.description || null,
+        createdAt: t.created_at || null,
+        resolvedAt: t.resolved_at || null,
       })),
     };
   },

@@ -1043,6 +1043,28 @@ function AssetDetailModal({ visible, onClose, assetId, onQR, onChanged }: any) {
                     </View>
                   ))}
               </DSection>
+
+              <DSection title="Linked Tickets" right={d.tickets?.length ? <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>{d.tickets.length}</Text> : undefined}>
+                {(!d.tickets || d.tickets.length === 0) ? <Text style={{ fontSize: 12, color: '#6B7280' }}>No tickets raised for this asset</Text>
+                  : d.tickets.map((t: any) => {
+                    const open = !['closed', 'completed', 'cancelled'].includes(String(t.status || '').toLowerCase());
+                    return (
+                      <View key={t.id} style={{ borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)', paddingVertical: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{t.ticketNumber || '—'}</Text>
+                            <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: open ? '#FEF3C7' : '#ECFDF5' }}>
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: open ? '#D97706' : '#059669' }}>{t.status || 'open'}</Text>
+                            </View>
+                          </View>
+                          {t.cost > 0 && <Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>{fmtFull(t.cost)}</Text>}
+                        </View>
+                        {!!t.issueType && <Text style={{ fontSize: 12, color: '#556274', marginTop: 2 }}>{t.issueType}</Text>}
+                        {!!t.createdAt && <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Raised {fmtDate(t.createdAt)}{t.resolvedAt ? ` · Resolved ${fmtDate(t.resolvedAt)}` : ''}</Text>}
+                      </View>
+                    );
+                  })}
+              </DSection>
             </>)}
 
             {tab === 'payments' && (
