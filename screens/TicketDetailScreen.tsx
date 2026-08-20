@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
-  Linking,
+  Linking, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -759,6 +759,25 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
         <View style={glass.card}>
           <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 8 }}>DESCRIPTION</Text>
           <Text style={{ fontSize: fontSize.md, color: '#111827', lineHeight: 22 }}>{(ticket as any).description}</Text>
+        </View>
+      )}
+
+      {Array.isArray((ticket as any).photo_urls) && (ticket as any).photo_urls.length > 0 && (
+        <View style={glass.card}>
+          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 8 }}>
+            PHOTOS ({(ticket as any).photo_urls.length})
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {(ticket as any).photo_urls.map((url: string, i: number) => (
+              <TouchableOpacity key={`${url}-${i}`} activeOpacity={0.85} onPress={() => url && Linking.openURL(url)}>
+                <Image
+                  source={{ uri: url }}
+                  style={{ width: 104, height: 104, borderRadius: 10, backgroundColor: '#F3F4F6' }}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 

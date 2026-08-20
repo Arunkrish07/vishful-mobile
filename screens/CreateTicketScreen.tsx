@@ -761,8 +761,9 @@ export default function CreateTicketScreen({ navigation }: any) {
                   </>
                 )}
 
-                {/* Step 4 onwards — only shown after Bed is selected */}
-                {selectedBed && (
+                {/* Step 4 onwards — shown after Bed is selected, or (for admin/staff)
+                    once a Property is chosen so property-level tickets are allowed. */}
+                {(selectedBed || (!isTenant && selectedProperty)) && (
                   <>
                     {/* Description — AI fires after typing, auto-selects Issue Type + Details */}
                     <SectionLabel>Description *</SectionLabel>

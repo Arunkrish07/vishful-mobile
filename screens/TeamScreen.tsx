@@ -52,13 +52,13 @@ const EMPTY_ATTENDANCE = {
   date: '', status: 'present', check_in: '', check_out: '', notes: '',
 };
 
-const EMPTY_EXIT = { exit_date: '', exit_type: 'resignation', exit_reason: '' };
+const EMPTY_EXIT = { exit_date: '', exit_type: 'resigned', exit_reason: '' };
 
 const EXIT_TYPES = [
-  { label: 'Resignation', value: 'resignation' },
-  { label: 'Termination', value: 'termination' },
-  { label: 'Retirement', value: 'retirement' },
-  { label: 'Contract End', value: 'contract_end' },
+  { label: 'Resigned', value: 'resigned' },
+  { label: 'Terminated', value: 'terminated' },
+  { label: 'Retired', value: 'retired' },
+  { label: 'Contract Ended', value: 'contract_ended' },
   { label: 'Other', value: 'other' },
 ];
 

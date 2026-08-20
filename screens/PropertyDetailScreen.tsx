@@ -2261,7 +2261,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
             {(() => {
               const kycQrCode = perfProperty?.kyc_qr_code;
               const appBaseUrl = 'https://app.vishful.in';
-              const kycUrl = kycQrCode ? `${appBaseUrl}/kyc?qr=${encodeURIComponent(kycQrCode)}` : '';
+              const kycUrl = kycQrCode ? `${appBaseUrl}/vista/kyc?qr=${encodeURIComponent(kycQrCode)}` : '';
 
               if (!kycQrCode) {
                 return (
