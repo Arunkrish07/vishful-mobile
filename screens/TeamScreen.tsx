@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Alert, RefreshControl, TextInput, Image,
+  Modal, Alert, RefreshControl, TextInput, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
@@ -80,7 +80,10 @@ export default function TeamScreen() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [tickets, setTickets]       = useState<any[]>([]);
   const [search, setSearch]         = useState('');
-  const [activeTab, setActiveTab]   = useState<'members' | 'dashboard' | 'payments' | 'attendance' | 'performance'>('members');
+  const [activeTab, setActiveTab]   = useState<'members' | 'dashboard' | 'payments' | 'salary' | 'attendance' | 'performance'>('members');
+  const [salaryBills, setSalaryBills] = useState<any[]>([]);
+  const [salaryLoading, setSalaryLoading] = useState(false);
+  const [salaryBusy, setSalaryBusy] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -152,6 +155,26 @@ export default function TeamScreen() {
     } finally {
       if (mounted.current) setRefreshing(false);
     }
+  }, []);
+
+  // ── Salary bills (read + draft→approved→paid status flow) ──
+  const loadSalary = useCallback(async () => {
+    setSalaryLoading(true);
+    try {
+      const bills = await sb.listSalaryBills();
+      if (mounted.current) setSalaryBills(Array.isArray(bills) ? bills : []);
+    } catch { if (mounted.current) setSalaryBills([]); }
+    finally { if (mounted.current) setSalaryLoading(false); }
+  }, []);
+  useEffect(() => { if (activeTab === 'salary') loadSalary(); }, [activeTab, loadSalary]);
+
+  const handleSalaryStatus = useCallback(async (bill: any, status: string) => {
+    setSalaryBusy(bill.id);
+    try {
+      await sb.setSalaryBillStatus(bill.id, status);
+      if (mounted.current) setSalaryBills(prev => prev.map(b => b.id === bill.id ? { ...b, status } : b));
+    } catch (e: any) { Alert.alert('Error', e?.message || 'Could not update status'); }
+    finally { if (mounted.current) setSalaryBusy(null); }
   }, []);
 
   // ── Filtered ──
@@ -536,6 +559,7 @@ export default function TeamScreen() {
     { key: 'members',    label: 'Members',    icon: 'people-outline' },
     { key: 'dashboard',  label: 'Insights',   icon: 'stats-chart-outline' },
     { key: 'payments',   label: 'Payments',   icon: 'cash-outline' },
+    { key: 'salary',     label: 'Salary',     icon: 'receipt-outline' },
     { key: 'attendance', label: 'Attendance', icon: 'calendar-outline' },
     { key: 'performance', label: 'Performance', icon: 'trophy-outline' },
   ] as const;
@@ -641,6 +665,64 @@ export default function TeamScreen() {
                   onDelete={() => handleDeletePayment(p)}
                 />
               ))
+            )
+          )}
+
+          {activeTab === 'salary' && (
+            salaryLoading ? (
+              <ActivityIndicator color="#2563EB" style={{ marginTop: 30 }} />
+            ) : salaryBills.length === 0 ? (
+              <EmptyState icon="receipt-outline" title="No salary bills" subtitle="Pay slips are generated from attendance on the web app; they appear here to approve and mark paid." />
+            ) : (
+              salaryBills.map(b => {
+                const m = (members || []).find((x: any) => x.id === b.team_member_id);
+                const name = m ? (m.name || `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Member') : 'Member';
+                const st = String(b.status || 'draft').toLowerCase();
+                const stCfg = st === 'paid' ? { bg: '#ECFDF5', c: '#059669', label: 'Paid' }
+                  : st === 'approved' ? { bg: '#EFF6FF', c: '#2563EB', label: 'Approved' }
+                  : { bg: '#FEF3C7', c: '#D97706', label: 'Draft' };
+                const deductions = (Number(b.advance_deducted) || 0) + (Number(b.other_deductions) || 0);
+                const net = Number(b.net_payable ?? b.earned_salary ?? 0);
+                const busy = salaryBusy === b.id;
+                return (
+                  <View key={b.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{name}</Text>
+                        <Text style={{ fontSize: 12, color: '#6B7280' }}>{b.month} · {b.present_days ?? 0}/{b.working_days ?? 0} days</Text>
+                      </View>
+                      <View style={{ backgroundColor: stCfg.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: stCfg.c }}>{stCfg.label}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+                      <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Base</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>₹{Math.round(Number(b.base_salary) || 0).toLocaleString('en-IN')}</Text></View>
+                      <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Earned</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>₹{Math.round(Number(b.earned_salary) || 0).toLocaleString('en-IN')}</Text></View>
+                      {deductions > 0 && <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Deductions</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>−₹{Math.round(deductions).toLocaleString('en-IN')}</Text></View>}
+                      <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Net payable</Text><Text style={{ fontSize: 15, fontWeight: '900', color: '#059669' }}>₹{Math.round(net).toLocaleString('en-IN')}</Text></View>
+                    </View>
+                    {st !== 'paid' && (
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                        {st === 'draft' && (
+                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'approved')} style={{ flex: 1, backgroundColor: '#2563EB', borderRadius: 10, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
+                            {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Approve</Text>}
+                          </TouchableOpacity>
+                        )}
+                        {st === 'approved' && (
+                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'paid')} style={{ flex: 1, backgroundColor: '#059669', borderRadius: 10, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
+                            {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Mark Paid</Text>}
+                          </TouchableOpacity>
+                        )}
+                        {st === 'approved' && (
+                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'draft')} style={{ backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' }}>
+                            <Text style={{ color: '#6B7280', fontWeight: '700', fontSize: 13 }}>Revert</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })
             )
           )}
 

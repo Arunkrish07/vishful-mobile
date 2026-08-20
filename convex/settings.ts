@@ -130,6 +130,29 @@ export const deleteTeamPayment = action({
   },
 });
 
+// ─── SALARY BILLS (web parity: Team → Salary pay-slips) ──────────────────────
+// Read pre-computed monthly salary bills (earned/net are computed on the web/
+// payroll side) and drive the draft → approved → paid status flow. We do NOT
+// re-compute payroll here — mobile only reads bills and advances their status.
+export const listSalaryBills = action({
+  args: { memberId: v.optional(v.string()) },
+  returns: v.any(),
+  handler: async (_ctx, { memberId }) => {
+    const sb = getSupabase();
+    let q = sb.from("team_salary_bills").select("*").eq("organization_id", ORG_ID);
+    if (memberId) q = q.eq("team_member_id", memberId);
+    return safeList(q.order("month", { ascending: false }));
+  },
+});
+
+export const setSalaryBillStatus = action({
+  args: { id: v.string(), status: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { id, status }) => {
+    return updateRow("team_salary_bills", id, { status });
+  },
+});
+
 // ─── TEAM ATTENDANCE ─────────────────────────────────────────────────
 // NOTE: web also recomputes draft salary bills on attendance change
 // (onTeamAttendanceChanged) — not ported here yet.

@@ -448,6 +448,12 @@ export async function listOrgTickets() {
 export async function listTeamPayments() {
   return client.action(api.settings.listTeamPayments, {});
 }
+export async function listSalaryBills(memberId?: string) {
+  return client.action((api as any).settings.listSalaryBills, memberId ? { memberId } : {});
+}
+export async function setSalaryBillStatus(id: string, status: string) {
+  return client.action((api as any).settings.setSalaryBillStatus, { id, status });
+}
 
 export async function createTeamPayment(data: any) {
   return client.action(api.settings.createTeamPayment, { data });
