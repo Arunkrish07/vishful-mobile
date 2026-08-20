@@ -494,7 +494,9 @@ export default function TicketDetailScreen({ route, navigation }: any) {
               onPress={() => setShowStatusModal(true)}
               style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
             >
-              <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>Update Status</Text>
+              <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>
+                {nextStatuses.length === 1 && nextStatuses[0] === 'reopened' ? 'Reopen Ticket' : 'Update Status'}
+              </Text>
             </TouchableOpacity>
           )}
 
@@ -1363,6 +1365,24 @@ function TimelineTab({ logs }: { logs: TicketLog[] }) {
               <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 4 }}>
                 {new Date(log.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
               </Text>
+              {(() => {
+                const raw = (log as any).photo_urls;
+                const photos = Array.isArray(raw)
+                  ? raw
+                  : (typeof raw === 'string'
+                      ? (() => { try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; } })()
+                      : []);
+                if (!photos.length) return null;
+                return (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} style={{ marginTop: 6 }}>
+                    {photos.map((url: string, i: number) => (
+                      <TouchableOpacity key={`${url}-${i}`} activeOpacity={0.85} onPress={() => url && Linking.openURL(url)}>
+                        <Image source={{ uri: url }} style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: '#F3F4F6' }} resizeMode="cover" />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                );
+              })()}
             </View>
           </View>
         ))

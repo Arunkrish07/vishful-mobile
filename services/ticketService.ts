@@ -76,6 +76,7 @@ export interface TicketLog {
   cost_quantity?: number | null;
   cost_unit_price?: number | null;
   cost_total?: number | null;
+  photo_urls?: string[] | string | null;
 }
 
 export interface IssueType {
@@ -159,6 +160,7 @@ export function getNextStatuses(currentStatus: string, role: string): string[] {
       on_hold:                   ["in_progress", "cancelled"],
       pending_admin_approval:    ["closed", "in_progress"],
       closed:                    ["reopened"],
+      completed:                 ["reopened"],
     };
     return map[currentStatus] || [];
   }
