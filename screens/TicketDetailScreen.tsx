@@ -419,6 +419,17 @@ export default function TicketDetailScreen({ route, navigation }: any) {
   // Show resolution form for completed/closed tickets or when admin triggers it
   const showResolutionSection = ['completed', 'pending_tenant_approval', 'pending_admin_approval', 'closed'].includes(ticket.status);
 
+  // ── Bottom action bar: derive each button, and whether the bar has ANY button.
+  // Without this the absolute-positioned bar renders as an empty white strip
+  // whenever no action applies (common now that "Update Status" is gone).
+  const canReopen = canUpdateStatus && nextStatuses.length === 1 && nextStatuses[0] === 'reopened';
+  const canReassign = isAdmin && ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'waiting_for_cost_approval', 'on_hold', 'reopened', 'reassigned'].includes(ticket.status);
+  const canDiagnose = isAssignedTechnician && ticket.status === 'in_progress' && !diagSession;
+  const canSubmitCost = isAssignedTechnician && ticket.status === 'in_progress' && estimates.length === 0;
+  const canRecordPurchase = isAssignedTechnician && ticket.status === 'waiting_for_parts' && purchases.length === 0;
+  const canAddResolution = showResolutionSection && !resolution && (isAdmin || isAssignedTechnician);
+  const hasAnyAction = canReopen || canReassign || canDiagnose || canSubmitCost || canRecordPurchase || canAddResolution;
+
   return (
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -476,7 +487,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
         </View>
         )}
 
-        <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 160, gap: 12 }}>
+        <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: hasAnyAction ? 160 : 40, gap: 12 }}>
           {/* Admin completion-review banner — modal is dismissable now, so give the
               admin an explicit entry point after reviewing the tabs. */}
           {isAdmin && ticket.status === 'pending_admin_approval' && (
@@ -542,7 +553,9 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           )}
         </ScrollView>
 
-        {/* Action Buttons */}
+        {/* Action Buttons — only rendered when at least one action applies, so the
+            bar never shows as an empty floating strip. */}
+        {hasAnyAction && (
         <View style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
           padding: spacing.xl, paddingBottom: 32, gap: 10,
@@ -552,7 +565,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           {/* "Update Status" removed per product decision — status advances via the
               dedicated flows (assign/diagnose/cost/approve). Reopen is kept: it is the
               only status action surfaced on a closed ticket. */}
-          {canUpdateStatus && nextStatuses.length === 1 && nextStatuses[0] === 'reopened' && (
+          {canReopen && (
             <TouchableOpacity
               onPress={() => setShowStatusModal(true)}
               style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
@@ -563,7 +576,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
 
           {/* Admin can (re)assign at any active work stage — backend resets status→assigned + SLA.
               Excluded: terminal (closed/cancelled/completed) and approval-pending states. */}
-          {isAdmin && ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'waiting_for_cost_approval', 'on_hold', 'reopened', 'reassigned'].includes(ticket.status) && (
+          {canReassign && (
             <TouchableOpacity
               onPress={() => setShowReassignModal(true)}
               style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
@@ -574,7 +587,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           )}
 
-          {isAssignedTechnician && ticket.status === 'in_progress' && !diagSession && (
+          {canDiagnose && (
             <TouchableOpacity
               onPress={() => setShowDiagModal(true)}
               style={{ backgroundColor: '#0369A1', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
@@ -583,7 +596,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           )}
 
-          {isAssignedTechnician && ticket.status === 'in_progress' && estimates.length === 0 && (
+          {canSubmitCost && (
             <TouchableOpacity
               onPress={() => setShowCostModal(true)}
               style={{ backgroundColor: '#16A34A', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
@@ -592,7 +605,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           )}
 
-          {isAssignedTechnician && ticket.status === 'waiting_for_parts' && purchases.length === 0 && (
+          {canRecordPurchase && (
             <TouchableOpacity
               onPress={() => setShowPurchaseModal(true)}
               style={{ backgroundColor: '#16A34A', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
@@ -602,7 +615,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           )}
 
           {/* Resolution button — for completed/closed tickets */}
-          {showResolutionSection && !resolution && (isAdmin || isAssignedTechnician) && (
+          {canAddResolution && (
             <TouchableOpacity
               onPress={() => { setResolutionEditMode(true); setShowResolutionForm(true); }}
               style={{ backgroundColor: '#1D4ED8', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
@@ -611,6 +624,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           )}
         </View>
+        )}
 
         {/* ── MODALS ─────────────────────────────────────────────────────── */}
         <StatusModal
