@@ -609,7 +609,7 @@ export const listPropertiesForFilter = action({
   handler: async () => {
     const sb = getSupabase();
     const props = await safeList(
-      sb.from("properties").select("id, property_name, name, code").eq("organization_id", ORG_ID).order("property_name")
+      sb.from("properties").select("id, property_name, code").eq("organization_id", ORG_ID).order("property_name")
     );
     return props.map((p: any) => ({
       id:   p.id,

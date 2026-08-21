@@ -423,13 +423,15 @@ export const getOrgSettings = action({
   returns: v.any(),
   handler: async () => {
     const sb = getSupabase();
+    // Real schema: org settings live on the `organizations` row itself (PK id = ORG_ID);
+    // there is no `org_settings` table. Auto-approval threshold = ticket_auto_approve_threshold.
     const rows = await safeList(
-      sb.from("org_settings").select("*").eq("organization_id", ORG_ID).limit(1)
+      sb.from("organizations").select("*").eq("id", ORG_ID).limit(1)
     );
     if (rows.length > 0) {
       const r = rows[0];
       return {
-        costApprovalThreshold: r.cost_approval_threshold ?? 5000,
+        costApprovalThreshold: r.ticket_auto_approve_threshold ?? 5000,
         organizationName: r.organization_name || "Vishful Spaces LLP",
         // Org profile fields (web parity). Column names assumed to match the
         // Settings form; verify against org_settings if any comes back null.
@@ -469,12 +471,10 @@ export const updateOrgSettings = action({
   },
   returns: v.any(),
   handler: async (_ctx, args) => {
-    const sb = getSupabase();
-    const existing = await safeList(
-      sb.from("org_settings").select("id").eq("organization_id", ORG_ID).limit(1)
-    );
     const updates: Record<string, any> = {};
-    if (args.costApprovalThreshold !== undefined) updates.cost_approval_threshold = args.costApprovalThreshold;
+    // Real schema: write to the `organizations` row (id = ORG_ID). Auto-approval threshold
+    // maps to ticket_auto_approve_threshold; there is no cost_approval_threshold column.
+    if (args.costApprovalThreshold !== undefined) updates.ticket_auto_approve_threshold = args.costApprovalThreshold;
     if (args.organizationName !== undefined) updates.organization_name = args.organizationName;
     if (args.gstNumber !== undefined) updates.gst_number = args.gstNumber;
     if (args.addressLine1 !== undefined) updates.address_line1 = args.addressLine1;
@@ -487,11 +487,7 @@ export const updateOrgSettings = action({
     if (args.contactPhone !== undefined) updates.contact_phone = args.contactPhone;
     if (args.contactEmail !== undefined) updates.contact_email = args.contactEmail;
     if (args.website !== undefined) updates.website = args.website;
-    if (existing.length > 0) {
-      await updateRow("org_settings", existing[0].id, updates);
-    } else {
-      await insertRow("org_settings", { organization_name: "Vishful Spaces LLP", ...updates });
-    }
+    await updateRow("organizations", ORG_ID, updates);
     return { success: true };
   },
 });
@@ -761,16 +757,26 @@ export const saveOrgExitSettings = action({
 // Enforce a single primary account org-wide: setting one primary clears the rest.
 async function clearOtherPrimaries(exceptId?: string) {
   const sb = getSupabase();
-  let q = sb.from("bank_accounts").update({ is_primary: false } as any).eq("organization_id", ORG_ID).eq("is_primary", true);
+  let q = sb.from("organization_bank_accounts").update({ is_primary: false } as any).eq("organization_id", ORG_ID).eq("is_primary", true);
   if (exceptId) q = q.neq("id", exceptId);
   await q;
+}
+// Map the mobile bank-form shape onto the real `organization_bank_accounts` columns
+// (account_holder → account_name, ifsc → ifsc_code; there is no is_active column).
+function remapBankFields(d: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = { ...d };
+  delete out.id;
+  delete out.is_active; // no such column on organization_bank_accounts
+  if ("account_holder" in out) { out.account_name = out.account_holder; delete out.account_holder; }
+  if ("ifsc" in out) { out.ifsc_code = out.ifsc; delete out.ifsc; }
+  return out;
 }
 export const createBankAccount = action({
   args: { data: v.any() },
   returns: v.any(),
   handler: async (_ctx, { data }) => {
     if (data.is_primary) await clearOtherPrimaries();
-    return insertRow("bank_accounts", { bank_name: data.bank_name, account_number: data.account_number, account_holder: data.account_holder || null, ifsc: data.ifsc || null, branch: data.branch || null, is_primary: data.is_primary || false, is_active: true, organization_id: ORG_ID });
+    return insertRow("organization_bank_accounts", { bank_name: data.bank_name, account_number: data.account_number, account_name: data.account_holder || data.account_name || null, ifsc_code: data.ifsc || data.ifsc_code || null, branch: data.branch || null, is_primary: data.is_primary || false, status: "active", organization_id: ORG_ID });
   },
 });
 export const updateBankAccount = action({
@@ -779,14 +785,14 @@ export const updateBankAccount = action({
   handler: async (_ctx, { id, data }) => {
     const { id: _id, ...rest } = data;
     if (rest.is_primary) await clearOtherPrimaries(id);
-    return updateRow("bank_accounts", id, rest);
+    return updateRow("organization_bank_accounts", id, remapBankFields(rest));
   },
 });
 export const deleteBankAccount = action({
   args: { id: v.string() },
   returns: v.any(),
   handler: async (_ctx, { id }) => {
-    await deleteRow("bank_accounts", id);
+    await deleteRow("organization_bank_accounts", id);
     return { success: true };
   },
 });

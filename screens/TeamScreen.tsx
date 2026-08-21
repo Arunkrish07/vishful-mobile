@@ -142,8 +142,8 @@ export default function TeamScreen() {
     try {
       const [m, p, a, d, t]: any = await Promise.all([
         sb.getTeamMembers(),
-        sb.getAll('team_payments'),
-        sb.getAll('team_attendance'),
+        sb.listTeamPayments().catch(() => []),
+        sb.listTeamAttendance().catch(() => []),
         sb.listTeamDepartments().catch(() => []),
         sb.listOrgTickets().catch(() => []),
       ]);

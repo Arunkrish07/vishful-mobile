@@ -274,7 +274,7 @@ export const getPropertyPnL = action({
     const [properties, apartments, beds, invoices, expenses, allotments] = await Promise.all([
       safeList(sb.from("properties").select("*").eq("organization_id", ORG_ID)),
       safeList(sb.from("apartments").select("id,property_id,status").eq("organization_id", ORG_ID)),
-      safeList(sb.from("beds").select("id,apartment_id,status,is_occupied").eq("organization_id", ORG_ID)),
+      safeList(sb.from("beds").select("id,apartment_id,status,bed_lifecycle_status").eq("organization_id", ORG_ID)),
       safeList(sb.from("invoices").select("*").eq("organization_id", ORG_ID).eq("is_deleted", false)),
       safeList(sb.from("expenses").select("*").eq("organization_id", ORG_ID)),
       safeList(sb.from("tenant_allotments").select("bed_id,staying_status").eq("organization_id", ORG_ID)),

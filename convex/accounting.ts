@@ -717,15 +717,22 @@ export const listExpenses = action({
   returns: v.any(),
   handler: async () => {
     const sb = getSupabase();
+    // Real schema: expenses.category_id → expense_categories.label (there is no expenses.category column).
     const rows = await safeList(
       sb.from("expenses")
-        .select("id, category, description, amount, expense_date, created_at")
+        .select("id, category_id, description, amount, expense_date, created_at")
         .eq("organization_id", ORG_ID)
         .order("created_at", { ascending: false })
     );
+    const catIds = [...new Set(rows.map((r: any) => r.category_id).filter(Boolean))];
+    const cats = catIds.length
+      ? await safeList(sb.from("expense_categories").select("id, label").eq("organization_id", ORG_ID).in("id", catIds))
+      : [];
+    const catLabel = new Map<string, string>();
+    for (const c of cats) catLabel.set(c.id, c.label);
     return rows.map((row: any) => ({
       id: row.id,
-      category: row.category || null,
+      category: row.category_id ? (catLabel.get(row.category_id) || null) : null,
       description: row.description || null,
       amount: row.amount ?? 0,
       expense_date: row.expense_date || null,
@@ -768,15 +775,16 @@ export const listOwnerPayments = action({
     const sb = getSupabase();
     const rows = await safeList(
       sb.from("owner_payments")
-        .select("id, owner_id, amount, payment_date, payment_mode, notes, created_at")
+        // Real schema: base_amount/escalated_amount (no `amount`), paid_date (no `payment_date`).
+        .select("id, owner_id, base_amount, escalated_amount, paid_date, payment_mode, notes, created_at")
         .eq("organization_id", ORG_ID)
         .order("created_at", { ascending: false })
     );
     return rows.map((row: any) => ({
       id: row.id,
       owner_id: row.owner_id || null,
-      amount: row.amount ?? 0,
-      payment_date: row.payment_date || null,
+      amount: Number(row.escalated_amount ?? row.base_amount ?? 0),
+      payment_date: row.paid_date || null,
       payment_mode: row.payment_mode || null,
       notes: row.notes || null,
       created_at: row.created_at || null,
