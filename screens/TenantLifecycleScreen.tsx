@@ -1190,6 +1190,14 @@ export default function TenantLifecycleScreen() {
     return { monthlyRent: Math.ceil(monthlyRent), effectiveRent: Math.ceil(effectiveRent), discount, premium, advance, proratedRent, remainingDays, daysInMonth, onboardingCharges, totalDue, alreadyPaid, balance };
   }, [allotments, getBedRate, config]);
 
+  // Default "Amount Paying Now" at onboarding to just the deposit (advance = rent ×1.5).
+  // The field stays editable; this only sets a sensible starting value. Recomputed
+  // whenever the allotment / date / bed changes.
+  const depositDefault = useCallback((allotmentId: string, date: string, bedId?: string) => {
+    const c = calcOnboardingCosts(allotmentId, date, bedId);
+    return c ? String(c.advance) : '';
+  }, [calcOnboardingCosts]);
+
   // ─── MUTATIONS ─────────────────────────────────────────────────────────────
 
   const withSave = async (fn: () => Promise<void>) => {
@@ -2912,7 +2920,8 @@ export default function TenantLifecycleScreen() {
                     <Ionicons name="close-circle-outline" size={18} color="#C62828" />
                   </TouchableOpacity>
                   <ActionBtn title="Onboard" small onPress={() => {
-                    setOForm({ allotmentId: a.id, date: a.onboarding_date || today(), bedId: a.bed_id, payMode: '', refNo: '', paidAmount: '', bankAccountId: '', ccCharges: '' });
+                    const d = a.onboarding_date || today();
+                    setOForm({ allotmentId: a.id, date: d, bedId: a.bed_id, payMode: '', refNo: '', paidAmount: depositDefault(a.id, d, a.bed_id), bankAccountId: '', ccCharges: '' });
                     setOnboardOpen(true);
                   }} />
                 </View>
@@ -2969,12 +2978,13 @@ export default function TenantLifecycleScreen() {
           <Field label="Tenant *">
             <SelectF options={allotOpts} value={oForm.allotmentId} onChange={v => {
               const a = bookedAllotments.find((x: any) => x.id === v);
-              setOForm({ ...oForm, allotmentId: v, bedId: a?.bed_id || '', date: a?.onboarding_date || today() });
+              const d = a?.onboarding_date || today();
+              setOForm({ ...oForm, allotmentId: v, bedId: a?.bed_id || '', date: d, paidAmount: depositDefault(v, d, a?.bed_id || '') });
             }} />
           </Field>
-          <Field label="Onboarding Date *"><DateF value={oForm.date} onChange={v => setOForm({ ...oForm, date: v })} /></Field>
+          <Field label="Onboarding Date *"><DateF value={oForm.date} onChange={v => setOForm({ ...oForm, date: v, paidAmount: depositDefault(oForm.allotmentId, v, oForm.bedId) })} /></Field>
           <Field label="Bed (optional override)">
-            <SelectF options={[{ label: '— Keep current bed —', value: '' }, ...vacantBedOpts]} value={oForm.bedId} onChange={v => setOForm({ ...oForm, bedId: v, paidAmount: '' })} />
+            <SelectF options={[{ label: '— Keep current bed —', value: '' }, ...vacantBedOpts]} value={oForm.bedId} onChange={v => setOForm({ ...oForm, bedId: v, paidAmount: depositDefault(oForm.allotmentId, oForm.date, v) })} />
           </Field>
           {costs && (
             <Card style={{ marginBottom: 14 }}>
