@@ -166,17 +166,13 @@ function TicketsDashboardScreen({ navigation }: any) {
   useEffect(() => { load(); }, [load]);
 
   const stats = useMemo(() => {
-    const active  = tickets.filter(t => ['assigned', 'in_progress'].includes(t.status));
-    // Counts below must match the tab each stat card opens (see StatCard onPress),
-    // otherwise tapping a card lands on a tab showing a different number.
+    // Counts must match the tab each stat card opens (see StatCard onPress):
+    // "Active" → the 'open' tab (OPEN_STATUSES); "SLA Breached" → the 'sla' tab (isSlaBreached).
+    const active  = tickets.filter(t => OPEN_STATUSES.includes(t.status));
     const waiting = tickets.filter(t => ['waiting_for_cost_approval'].includes(t.status));
     const pending = tickets.filter(t => ['pending_admin_approval'].includes(t.status));
     const closed  = tickets.filter(t => ['closed', 'completed'].includes(t.status));
-    const breached = tickets.filter(t => {
-      if (!t.sla_deadline) return false;
-      if (['closed','completed','pending_admin_approval','pending_tenant_approval'].includes(t.status)) return false;
-      return new Date(t.sla_deadline) < new Date();
-    });
+    const breached = tickets.filter(isSlaBreached);
     return { active, waiting, pending, closed, breached, total: tickets.length };
   }, [tickets]);
 
@@ -240,7 +236,7 @@ function TicketsDashboardScreen({ navigation }: any) {
                 color={stats.breached.length > 0 ? '#DC2626' : '#556274'}
                 bg={stats.breached.length > 0 ? 'rgba(220,38,38,0.1)' : 'rgba(107,114,128,0.08)'}
                 icon="warning-outline"
-                onPress={() => navigation.navigate('MyTickets', { filterKey: 'open' })} />
+                onPress={() => navigation.navigate('MyTickets', { filterKey: 'sla' })} />
             </View>
           </Animated.View>
 
@@ -393,13 +389,23 @@ function TicketCardSkeleton() {
 // ════════════════════════════════════════════════════════════════
 //  2. MY TICKETS
 // ════════════════════════════════════════════════════════════════
+// Shared so the dashboard cards and the tab counts use the SAME definitions —
+// otherwise a stat card's number won't match the tab it opens.
+const OPEN_STATUSES = ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'reassigned', 'on_hold', 'reopened'];
+function isSlaBreached(t: any): boolean {
+  if (!t.sla_deadline) return false;
+  if (['closed', 'completed', 'cancelled', 'pending_admin_approval', 'pending_tenant_approval'].includes(t.status)) return false;
+  return new Date(t.sla_deadline) < new Date();
+}
+
 const FILTERS = [
-  { key: 'open',                        label: 'Open',           statuses: ['open', 'assigned', 'in_progress', 'waiting_for_parts', 'reassigned', 'on_hold', 'reopened'] },
+  { key: 'open',                        label: 'Open',           statuses: OPEN_STATUSES },
+  { key: 'sla',                         label: 'SLA Breach',     statuses: [] as string[] }, // special: matched via isSlaBreached, not status
   { key: 'waiting_for_cost_approval',   label: 'Cost Approval',  statuses: ['waiting_for_cost_approval'] },
   { key: 'pending_admin_approval',      label: 'Admin Approval', statuses: ['pending_admin_approval'] },
   { key: 'pending_tenant_approval',     label: 'Tenant Approval',statuses: ['pending_tenant_approval'] },
   { key: 'closed',                      label: 'Closed',         statuses: ['closed', 'completed', 'cancelled'] },
-] as const;
+];
 
 function MyTicketsScreen({ navigation, route }: any) {
   const { colors } = useTheme();
@@ -424,12 +430,14 @@ function MyTicketsScreen({ navigation, route }: any) {
   useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
+    if (filter === 'sla') return tickets.filter(isSlaBreached);
     const opt = FILTERS.find(f => f.key === filter);
     if (!opt) return tickets;
     return tickets.filter(t => (opt.statuses as readonly string[]).includes(t.status));
   }, [tickets, filter]);
 
   const getCount = (key: string) => {
+    if (key === 'sla') return tickets.filter(isSlaBreached).length;
     const opt = FILTERS.find(f => f.key === key);
     if (!opt) return 0;
     return tickets.filter(t => (opt.statuses as readonly string[]).includes(t.status)).length;
