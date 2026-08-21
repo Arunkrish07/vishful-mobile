@@ -487,7 +487,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
         </View>
         )}
 
-        <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: hasAnyAction ? 160 : 40, gap: 12 }}>
+        <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: hasAnyAction ? 180 : 40, gap: 12 }}>
           {/* Admin completion-review banner — modal is dismissable now, so give the
               admin an explicit entry point after reviewing the tabs. */}
           {isAdmin && ticket.status === 'pending_admin_approval' && (
@@ -880,7 +880,8 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
               disabled={savingAsset}
               style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6,
                 alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 14,
-                borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#2563EB' }}
+                borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#2563EB',
+                opacity: savingAsset ? 0.5 : 1 }}
             >
               <Ionicons name={(ticket as any).linked_asset ? 'swap-horizontal' : 'add'} size={16} color="#2563EB" />
               <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: fontSize.sm }}>
