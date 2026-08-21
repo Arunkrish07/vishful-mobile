@@ -33,14 +33,15 @@ export const askAssistant = action({
   },
   returns: v.any(),
   handler: async (_ctx, { question, history }) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return { answer: "The AI assistant isn't configured yet — set ANTHROPIC_API_KEY in the Convex environment (Settings → Environment Variables) and redeploy." };
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!anthropicKey && !groqKey) {
+      return { answer: "The AI assistant isn't configured yet — set ANTHROPIC_API_KEY (or GROQ_API_KEY) in the Convex environment (Settings → Environment Variables) and redeploy." };
     }
 
     // Build the message list from history (which ends with the user's question),
-    // dropping any leading non-user turns — Anthropic requires the first message
-    // to be a user turn. Fall back to just the question if history is unusable.
+    // dropping any leading non-user turns — the first message must be a user turn.
+    // Fall back to just the question if history is unusable.
     const msgs = (history || [])
       .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
       .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
@@ -50,30 +51,55 @@ export const askAssistant = action({
     }
 
     try {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      // Prefer Anthropic when configured; otherwise use Groq (OpenAI-compatible).
+      if (anthropicKey) {
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-5",
+            max_tokens: 1024,
+            thinking: { type: "disabled" },
+            system: SYSTEM_PROMPT,
+            messages: msgs,
+          }),
+        });
+        if (!resp.ok) {
+          const body = await resp.text().catch(() => "");
+          console.warn("[aiAssistant] Anthropic error", resp.status, body.slice(0, 300));
+          return { answer: `Sorry — the AI service returned an error (${resp.status}). Please try again in a moment.` };
+        }
+        const data: any = await resp.json();
+        const answer = Array.isArray(data?.content)
+          ? data.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("\n").trim()
+          : "";
+        return { answer: answer || "No response." };
+      }
+
+      // Groq (OpenAI-compatible chat completions).
+      const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+          authorization: `Bearer ${groqKey}`,
         },
         body: JSON.stringify({
-          model: "claude-sonnet-5",
+          model: "openai/gpt-oss-120b",
           max_tokens: 1024,
-          thinking: { type: "disabled" }, // snappy Q&A; no tools, so no leakage risk
-          system: SYSTEM_PROMPT,
-          messages: msgs,
+          messages: [{ role: "system", content: SYSTEM_PROMPT }, ...msgs],
         }),
       });
       if (!resp.ok) {
         const body = await resp.text().catch(() => "");
-        console.warn("[aiAssistant] Anthropic error", resp.status, body.slice(0, 300));
+        console.warn("[aiAssistant] Groq error", resp.status, body.slice(0, 300));
         return { answer: `Sorry — the AI service returned an error (${resp.status}). Please try again in a moment.` };
       }
       const data: any = await resp.json();
-      const answer = Array.isArray(data?.content)
-        ? data.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("\n").trim()
-        : "";
+      const answer = (data?.choices?.[0]?.message?.content || "").trim();
       return { answer: answer || "No response." };
     } catch (e: any) {
       console.warn("[aiAssistant] request failed:", e?.message);
