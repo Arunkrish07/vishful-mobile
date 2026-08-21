@@ -717,6 +717,42 @@ export const updateTicketStatus = action({
   },
 });
 
+// ─── UPDATE LINKED ASSET ──────────────────────────────────────────────────────
+// Assign / change / remove the asset linked to a ticket (web TicketDetail parity).
+// Pass assetId = null to unlink. Returns the rebuilt linked_asset for the UI.
+export const updateTicketAsset = action({
+  args: {
+    ticketId: v.string(),
+    assetId:  v.union(v.string(), v.null()),
+  },
+  returns: v.any(),
+  handler: async (_ctx, { ticketId, assetId }) => {
+    const sb = getSupabase();
+    const { error } = await sb
+      .from("maintenance_tickets")
+      .update({ asset_id: assetId, updated_at: new Date().toISOString() })
+      .eq("id", ticketId)
+      .eq("organization_id", ORG_ID);
+    if (error) throw new Error(error.message);
+
+    let linked_asset: any = null;
+    if (assetId) {
+      const { data: asset } = await sb
+        .from("assets").select("id, asset_code, brand, model, condition")
+        .eq("organization_id", ORG_ID).eq("id", assetId).single();
+      if (asset) {
+        linked_asset = {
+          id: asset.id,
+          asset_code: asset.asset_code,
+          label: [asset.brand, asset.model].filter(Boolean).join(" ") || asset.asset_code,
+          condition: asset.condition || null,
+        };
+      }
+    }
+    return { success: true, asset_id: assetId, linked_asset };
+  },
+});
+
 // ─── REASSIGN TICKET ──────────────────────────────────────────────────────────
 
 export const reassignTicket = action({
@@ -1966,7 +2002,7 @@ export const getBankAccounts = action({
   handler: async () => {
     const sb = getSupabase();
     return await safeList(
-      sb.from("bank_accounts").select("id, bank_name, account_number, account_name").eq("organization_id", ORG_ID).eq("is_active", true).order("bank_name")
+      sb.from("organization_bank_accounts").select("id, bank_name, account_number, account_name").eq("organization_id", ORG_ID).eq("status", "active").order("bank_name")
     );
   },
 });

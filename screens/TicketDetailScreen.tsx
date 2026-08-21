@@ -30,6 +30,7 @@ import {
   BankAccount, TicketResolutionForm, ResolutionItem,
 } from '../services/ticketResolutionService';
 import * as sb from '../lib/supabaseService';
+import { computeTicketAssetSuggestion, formatTicketAssetLabel } from '../lib/ticketAssetResolution';
 
 type ActiveTab = 'details' | 'diagnosis' | 'costs' | 'timeline';
 
@@ -69,6 +70,10 @@ export default function TicketDetailScreen({ route, navigation }: any) {
   // ── Modals ─────────────────────────────────────────────────────────────────
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
+  // ── Linked-asset picker (staff assign/change/remove — web TicketDetail parity) ──
+  const [showAssetModal, setShowAssetModal] = useState(false);
+  const [assetOptions, setAssetOptions] = useState<any[]>([]);
+  const [savingAsset, setSavingAsset] = useState(false);
   const [showDiagModal, setShowDiagModal] = useState(false);
   const [showCostModal, setShowCostModal] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -122,6 +127,59 @@ export default function TicketDetailScreen({ route, navigation }: any) {
   }, [ticketId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ── Linked-asset options ─────────────────────────────────────────────────────
+  // Staff only: build the pickable asset list — location-scoped candidates (same
+  // resolver the Create-Ticket flow uses); falls back to all org assets so the
+  // picker is never empty. Mirrors the web TicketDetail "Linked Asset" dropdown.
+  useEffect(() => {
+    if (role === 'tenant' || !ticket) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [allocs, assets] = await Promise.all([sb.listAllocations(), sb.listAssets()]);
+        const assetById: Record<string, any> = {};
+        for (const a of (assets as any[]) || []) {
+          assetById[a._id] = {
+            id: a._id, asset_code: a.assetCode ?? null, brand: a.brand ?? null,
+            model: a.model ?? null, condition: a.condition ?? null, status: a.status ?? null,
+            asset_type_id: a.assetTypeId ?? null, asset_types: { name: a.typeName ?? null },
+          };
+        }
+        const joined = ((allocs as any[]) || [])
+          .filter((al: any) => al.asset_id && assetById[al.asset_id])
+          .map((al: any) => ({
+            allocation_type: al.allocation_type, apartment_id: al.apartment_id,
+            bed_id: al.bed_id, property_id: al.property_id, asset_id: al.asset_id,
+            assets: assetById[al.asset_id],
+          }));
+        const { candidates } = computeTicketAssetSuggestion({
+          apartmentId: (ticket as any).apartment_id || '', bedId: (ticket as any).bed_id || '',
+          propertyId: (ticket as any).property_id || '', issueTypeId: (ticket as any).issue_type_id || '',
+          description: (ticket as any).description || '', issueTypes: [],
+          assetAllocations: joined, apartmentBedIds: [],
+        });
+        // Location candidates if any, else all assets so the picker still works.
+        const opts = candidates.length ? candidates : Object.values(assetById);
+        if (!cancelled) setAssetOptions(opts);
+      } catch { if (!cancelled) setAssetOptions([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [ticket?.id, role]);
+
+  async function handleAssetChange(assetId: string | null) {
+    if (!ticket) return;
+    setSavingAsset(true);
+    try {
+      await sb.updateTicketAsset(ticket.id, assetId);
+      setShowAssetModal(false);
+      await load();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update linked asset');
+    } finally {
+      setSavingAsset(false);
+    }
+  }
 
   // ── Status change ──────────────────────────────────────────────────────────
   async function handleStatusChange(newStatus: string) {
@@ -452,6 +510,8 @@ export default function TicketDetailScreen({ route, navigation }: any) {
               onAdd={() => { setResolutionEditMode(true); setShowResolutionForm(true); }}
               onOpenApproval={() => setShowApprovalModal(true)}
               showResolutionSection={showResolutionSection}
+              onEditAsset={() => setShowAssetModal(true)}
+              savingAsset={savingAsset}
             />
           )}
           {!isTenant && activeTab === 'diagnosis' && (
@@ -489,14 +549,15 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           backgroundColor: 'rgba(255,255,255,0.9)',
           borderTopWidth: 1, borderTopColor: colors.border,
         }}>
-          {canUpdateStatus && nextStatuses.length > 0 && (
+          {/* "Update Status" removed per product decision — status advances via the
+              dedicated flows (assign/diagnose/cost/approve). Reopen is kept: it is the
+              only status action surfaced on a closed ticket. */}
+          {canUpdateStatus && nextStatuses.length === 1 && nextStatuses[0] === 'reopened' && (
             <TouchableOpacity
               onPress={() => setShowStatusModal(true)}
               style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
             >
-              <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>
-                {nextStatuses.length === 1 && nextStatuses[0] === 'reopened' ? 'Reopen Ticket' : 'Update Status'}
-              </Text>
+              <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>Reopen Ticket</Text>
             </TouchableOpacity>
           )}
 
@@ -564,6 +625,52 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           submitting={submitting}
           currentStatus={ticket.status}
         />
+
+        {/* Linked-asset picker */}
+        <Modal visible={showAssetModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAssetModal(false)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <TouchableOpacity onPress={() => setShowAssetModal(false)} style={{ marginRight: 12 }}>
+                <Ionicons name="close" size={26} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.text }}>Linked Asset</Text>
+              {savingAsset && <ActivityIndicator style={{ marginLeft: 'auto' }} color="#2563EB" />}
+            </View>
+            <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+              {/* No specific asset */}
+              <TouchableOpacity
+                onPress={() => handleAssetChange(null)}
+                disabled={savingAsset}
+                style={{ paddingVertical: 14, paddingHorizontal: 12, borderRadius: borderRadius.md, marginBottom: 8,
+                  backgroundColor: !(ticket as any).linked_asset ? '#EFF6FF' : 'transparent',
+                  borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <Ionicons name="remove-circle-outline" size={20} color="#6B7280" />
+                <Text style={{ fontSize: fontSize.md, color: colors.text }}>No specific asset</Text>
+              </TouchableOpacity>
+              {assetOptions.map((a: any) => {
+                const selected = (ticket as any).linked_asset?.id === a.id;
+                const label = formatTicketAssetLabel(a) || a.asset_code || a.brand || 'Asset';
+                return (
+                  <TouchableOpacity
+                    key={a.id}
+                    onPress={() => handleAssetChange(a.id)}
+                    disabled={savingAsset}
+                    style={{ paddingVertical: 14, paddingHorizontal: 12, borderRadius: borderRadius.md, marginBottom: 8,
+                      backgroundColor: selected ? '#EFF6FF' : 'transparent',
+                      borderWidth: 1, borderColor: selected ? '#2563EB' : colors.border }}
+                  >
+                    <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>{label}</Text>
+                    {a.asset_code && <Text style={{ fontSize: fontSize.sm, color: '#6B7280', marginTop: 2 }}>{a.asset_code}</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+              {assetOptions.length === 0 && (
+                <Text style={{ color: '#6B7280', textAlign: 'center', marginTop: 24 }}>No assets available to link.</Text>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
 
         <ReassignModal
           visible={showReassignModal}
@@ -706,7 +813,8 @@ export default function TicketDetailScreen({ route, navigation }: any) {
 // ─── DETAILS TAB ──────────────────────────────────────────────────────────────
 
 function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTenant, isResolutionReadOnly,
-  resolutionEditUnlocked, bankAccounts, onEdit, onUnlock, onAdd, onOpenApproval, showResolutionSection }: any) {
+  resolutionEditUnlocked, bankAccounts, onEdit, onUnlock, onAdd, onOpenApproval, showResolutionSection,
+  onEditAsset, savingAsset }: any) {
   const { colors } = useTheme();
   return (
     <>
@@ -740,12 +848,32 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
         {(ticket as any).bed_code && <Row label="Bed" value={(ticket as any).bed_code} />}
       </View>
 
-      {(ticket as any).linked_asset && (
+      {(!isTenant || (ticket as any).linked_asset) && (
         <View style={glass.card}>
           <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6B7280', marginBottom: 8 }}>LINKED ASSET</Text>
-          <Row label="Asset" value={(ticket as any).linked_asset.label || (ticket as any).linked_asset.asset_code || '—'} />
-          {(ticket as any).linked_asset.asset_code && <Row label="Code" value={(ticket as any).linked_asset.asset_code} />}
-          {(ticket as any).linked_asset.condition && <Row label="Condition" value={(ticket as any).linked_asset.condition} />}
+          {(ticket as any).linked_asset ? (
+            <>
+              <Row label="Asset" value={(ticket as any).linked_asset.label || (ticket as any).linked_asset.asset_code || '—'} />
+              {(ticket as any).linked_asset.asset_code && <Row label="Code" value={(ticket as any).linked_asset.asset_code} />}
+              {(ticket as any).linked_asset.condition && <Row label="Condition" value={(ticket as any).linked_asset.condition} />}
+            </>
+          ) : (
+            <Text style={{ fontSize: fontSize.md, color: '#6B7280' }}>No asset linked</Text>
+          )}
+          {!isTenant && (
+            <TouchableOpacity
+              onPress={onEditAsset}
+              disabled={savingAsset}
+              style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6,
+                alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 14,
+                borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#2563EB' }}
+            >
+              <Ionicons name={(ticket as any).linked_asset ? 'swap-horizontal' : 'add'} size={16} color="#2563EB" />
+              <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: fontSize.sm }}>
+                {(ticket as any).linked_asset ? 'Change asset' : 'Assign asset'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
