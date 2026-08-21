@@ -14,7 +14,8 @@ import { client as convexClient, api as convexApi } from '../lib/convexApi';
 import { INDIAN_STATES, INDIAN_CITIES } from '../lib/indianCitiesStates';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+// SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
+import * as FileSystem from 'expo-file-system/legacy';
 
 const owners = (convexApi as any).owners;
 

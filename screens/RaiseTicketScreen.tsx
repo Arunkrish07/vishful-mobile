@@ -10,7 +10,8 @@ import { useAction } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+// SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { GlassBackground } from '../components/shared';

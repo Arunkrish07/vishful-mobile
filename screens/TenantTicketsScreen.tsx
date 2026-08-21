@@ -21,7 +21,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+// SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
+import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { GlassBackground } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
