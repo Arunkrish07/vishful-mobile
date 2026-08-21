@@ -1408,6 +1408,37 @@ export const getIssueTypes = action({
   },
 });
 
+// Regular (recurring) maintenance rules — powers the admin Tickets → "Regular" tab.
+// Reads the real `regular_maintenance_rules` table and resolves the issue-type name
+// for display. (Previously this tab wrongly loaded issue types as stand-in "rules".)
+export const listRegularMaintenanceRules = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rules = await safeList(
+      sb.from("regular_maintenance_rules")
+        .select("id, maintenance_type, frequency, issue_type_id, is_active, next_run_at, created_at")
+        .eq("organization_id", ORG_ID)
+        .order("created_at", { ascending: false })
+    );
+    const typeIds = [...new Set(rules.map((r: any) => r.issue_type_id).filter(Boolean))];
+    const types = typeIds.length
+      ? await safeList(sb.from("issue_types").select("id, name").eq("organization_id", ORG_ID).in("id", typeIds))
+      : [];
+    const typeName = new Map<string, string>();
+    for (const t of types) typeName.set(t.id, t.name);
+    return rules.map((r: any) => ({
+      id: r.id,
+      name: r.maintenance_type || typeName.get(r.issue_type_id) || "Maintenance Rule",
+      frequency: r.frequency || null,
+      issue_type: r.issue_type_id ? (typeName.get(r.issue_type_id) || null) : null,
+      is_active: r.is_active,
+      next_run_at: r.next_run_at || null,
+    }));
+  },
+});
+
 export const getIssueSubTypes = action({
   args: { issueTypeId: v.string() },
   returns: v.any(),

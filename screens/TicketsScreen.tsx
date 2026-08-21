@@ -1003,7 +1003,7 @@ export default function TicketsScreen({ navigation }: any) {
     setRegularLoading(true);
     try {
       const { client, api } = await import('../lib/convexApi') as any;
-      const rules = await client.action(api.tickets.getIssueTypes, {});
+      const rules = await client.action(api.tickets.listRegularMaintenanceRules, {});
       setRegularRules(Array.isArray(rules) ? rules : []);
     } catch {
       setRegularRules([]);
@@ -1730,6 +1730,17 @@ export default function TicketsScreen({ navigation }: any) {
                         ? <ActivityIndicator color="#fff" />
                         : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>Confirm Rejection</Text>
                       }
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Back to the approve/reject choice (only shown in reject mode) */}
+                  {showRejectInput && (
+                    <TouchableOpacity
+                      disabled={approvalSubmitting}
+                      onPress={() => { setShowRejectInput(false); setRejectReason(''); }}
+                      style={{ paddingVertical: 12, alignItems: 'center' }}
+                    >
+                      <Text style={{ color: '#6B7280', fontWeight: '700', fontSize: fontSize.sm }}>← Back</Text>
                     </TouchableOpacity>
                   )}
                 </>
