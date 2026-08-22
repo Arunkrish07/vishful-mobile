@@ -1056,7 +1056,7 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-const convexClient = new ConvexReactClient('https://wonderful-kiwi-122.convex.cloud');
+const convexClient = new ConvexReactClient('https://polished-sockeye-740.convex.cloud');
 
 export default function App() {
   return (

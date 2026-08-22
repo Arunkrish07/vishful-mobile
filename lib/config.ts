@@ -19,6 +19,6 @@ export const ORG_ID = '00000000-0000-0000-0000-000000000001';
 // (e.g. "rapid-lion-123"). CONVEX_CLOUD_URL is the action-client URL;
 // CONVEX_SITE_URL is the direct HTTP host (/api/transcribe, etc.).
 // ============================================================
-export const CONVEX_DEPLOYMENT = 'wonderful-kiwi-122'; // ← CHANGE to your new deployment name
+export const CONVEX_DEPLOYMENT = 'polished-sockeye-740'; // ← CHANGE to your new deployment name
 export const CONVEX_CLOUD_URL = `https://${CONVEX_DEPLOYMENT}.convex.cloud`;
 export const CONVEX_SITE_URL = `https://${CONVEX_DEPLOYMENT}.convex.site`;
