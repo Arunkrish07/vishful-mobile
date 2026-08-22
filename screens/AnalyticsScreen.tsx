@@ -181,6 +181,24 @@ export default function AnalyticsScreen() {
   const isLiveBed = (bed: any) =>
     String(bed.status || '').toLowerCase() === 'live' && liveAptIds.has(bedAptId(bed));
 
+  // Invoices carry allotment_id but NOT bed_id, so resolve invoice → bed via the
+  // allotment. Without this, per-bed revenue is always ₹0 (bed_id never matches).
+  const allotBedMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of allotments) {
+      const aId = a.id ?? a._id;
+      const bId = a.bed_id ?? a.bedId;
+      if (aId && bId) m.set(String(aId), String(bId));
+    }
+    return m;
+  }, [allotments]);
+  const invoiceBedId = (i: any) => {
+    const direct = i.bed_id ?? i.bedId;
+    if (direct) return String(direct);
+    const aId = i.allotment_id ?? i.allotmentId;
+    return aId ? allotBedMap.get(String(aId)) : undefined;
+  };
+
   // ── BED PERFORMANCE ──
   const bedData = useMemo(() => {
     return beds
@@ -195,7 +213,7 @@ export default function AnalyticsScreen() {
         const apt = apartments.find((a: any) => (a.id || a._id) === bedAptId(bed));
         const prop = apt ? properties.find((p: any) => (p.id || p._id) === aptPropId(apt)) : null;
         const bedId = bed.id || bed._id;
-        const bedInvoices = invoices.filter((i: any) => i.bed_id === bedId || i.bedId === bedId);
+        const bedInvoices = invoices.filter((i: any) => invoiceBedId(i) === String(bedId));
         const totalRevenue = bedInvoices.reduce((s: number, i: any) => s + Number(i.total_amount ?? i.totalAmount ?? 0), 0);
         const rentRevenue  = bedInvoices.reduce((s: number, i: any) => s + Number(i.rent_amount ?? i.rentAmount ?? 0), 0);
         const ebRevenue    = bedInvoices.reduce((s: number, i: any) => s + Number(i.electricity_amount ?? i.electricityAmount ?? 0), 0);
@@ -234,7 +252,7 @@ export default function AnalyticsScreen() {
         return b.bedCode.toLowerCase().includes(q) || b.aptCode.toLowerCase().includes(q) || b.propName.toLowerCase().includes(q);
       })
       .sort((a: any, b: any) => sortBy === 'revenue' ? b.totalRevenue - a.totalRevenue : sortBy === 'occupancy' ? b.occupancyPct - a.occupancyPct : b.avgMonthly - a.avgMonthly);
-  }, [beds, apartments, properties, allotments, invoices, propertyFilter, search, sortBy, months12]);
+  }, [beds, apartments, properties, allotments, invoices, allotBedMap, propertyFilter, search, sortBy, months12]);
 
   const bedSummary = useMemo(() => ({
     totalRevenue: bedData.reduce((s: number, b: any) => s + b.totalRevenue, 0),

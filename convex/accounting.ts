@@ -505,6 +505,8 @@ export const listInvoices = action({
         tenantId: row.tenant_id,
         allotmentId: row.allotment_id,
         propertyId: row.property_id,
+        apartmentId: row.apartment_id,
+        bedId: row.bed_id,
         tenantName: tenantName.get(row.tenant_id) || "Unknown",
         propertyName: propName.get(row.property_id) || "",
         billingMonth: row.billing_month || "",
