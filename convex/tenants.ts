@@ -1681,7 +1681,7 @@ export const getTenantDetails = action({
 
       // Get allotment details
       const { data: allotments } = await sb
-        .from('allotments')
+        .from('tenant_allotments')
         .select('*, properties!inner(*), apartments!inner(*), beds!inner(*)')
         .eq('tenant_id', tenants.id)
         .eq('organization_id', ORG_ID)

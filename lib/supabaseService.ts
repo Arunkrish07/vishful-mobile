@@ -405,10 +405,6 @@ export async function updateTicketAsset(ticketId: string, assetId: string | null
   return client.action((api as any).tickets.updateTicketAsset, { ticketId, assetId });
 }
 
-export async function updateTicket(ticketId: string, data: any) {
-  return client.action(api.tickets.updateTicket, { ticketId, data });
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // SETTINGS — TEAM MEMBERS
 // ═══════════════════════════════════════════════════════════════════════════════

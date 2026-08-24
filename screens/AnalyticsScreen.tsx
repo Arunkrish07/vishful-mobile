@@ -531,7 +531,7 @@ export default function AnalyticsScreen() {
           {tab === 'bed_performance' && (<>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <SummaryCard value={fmtAmt(bedSummary.totalRevenue)} label="Total Revenue" color="#16a34a" icon="cash-outline" />
-              <SummaryCard value={`${bedSummary.avgOccupancy}%`} label="Avg Occupancy" color="#2563EB" icon="bed-outline" />
+              <SummaryCard value={`${bedSummary.avgOccupancy}%`} label="Avg Occ (12mo)" color="#2563EB" icon="bed-outline" />
               <SummaryCard value={bedSummary.vacantBeds} label="Vacant Beds" color="#2563EB" icon="alert-circle-outline" />
               <SummaryCard value={bedData.length} label="Total Beds Analysed" color="#7C3AED" icon="grid-outline" />
             </View>

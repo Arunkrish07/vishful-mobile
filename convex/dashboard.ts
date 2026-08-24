@@ -525,9 +525,12 @@ export const getExtendedStats = action({
           starCustomers,
         },
         announcements: announcements as any[],
-        // Ledger-RPC snapshots (web parity) — occupancy & active counts.
-        // Fall back to canonical client-side occupancy when the RPC has no propertyStatus.
-        propertyStatus: rpcPropertyStatus ?? computePropertyStatus(liveBedsList, allotments),
+        // Headline occupancy is canonical point-in-time: (Staying + On-Notice) / live beds,
+        // matching Reports/getStats/metrics.ts so every screen shows the same number.
+        propertyStatus: computePropertyStatus(liveBedsList, allotments),
+        // Month bed-days occupancy (ledger RPC) kept available but NOT the headline —
+        // it answers "how filled was this month" and reads higher than point-in-time.
+        monthOccupancy: rpcPropertyStatus ?? null,
         rpcTenants,
         rpcTickets,
       };

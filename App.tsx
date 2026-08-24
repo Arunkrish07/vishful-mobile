@@ -221,21 +221,6 @@ const TenantTab = createBottomTabNavigator();
 const TenantStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 
-// ── Placeholder for ticket screens (removed — new system TBD) ───────────
-function TicketPlaceholder() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
-      <Ionicons name="construct-outline" size={48} color="#2563EB" />
-      <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginTop: 16 }}>
-        Tickets
-      </Text>
-      <Text style={{ fontSize: 14, color: '#6B7280', marginTop: 4, textAlign: 'center', paddingHorizontal: 32 }}>
-        New ticket system coming soon
-      </Text>
-    </View>
-  );
-}
-
 function PropertiesStack() {
   return (
     <PropStack.Navigator screenOptions={{ headerShown: false }}>

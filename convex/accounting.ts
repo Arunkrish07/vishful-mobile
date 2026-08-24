@@ -572,8 +572,8 @@ export const createInvoice = action({
       const fyStart = mm >= 4 ? yy : yy - 1;
       const fy = `${String(fyStart).slice(-2)}-${String(fyStart + 1).slice(-2)}`;
       const mmStr = numMonth.split("-")[1];
-      const props: any[] = await safeList(sb.from("properties").select("name").eq("id", propertyId).limit(1));
-      const abbr = String(props[0]?.name || "UNKNO").replace(/\s+/g, "").slice(0, 5).toUpperCase().padEnd(5, "X");
+      const props: any[] = await safeList(sb.from("properties").select("property_name").eq("id", propertyId).limit(1));
+      const abbr = String(props[0]?.property_name || "UNKNO").replace(/\s+/g, "").slice(0, 5).toUpperCase().padEnd(5, "X");
       const existingInv: any[] = await safeList(
         sb.from("invoices").select("id").eq("organization_id", ORG_ID).eq("property_id", propertyId)
       );
