@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { useAction } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import * as ImagePicker from 'expo-image-picker';
@@ -233,7 +233,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
   const createTicket = useAction(api.tickets.createTicket);
 
   // ── Recording refs ───────────────────────────────────────────────────────
-  const recordingRef      = useRef<Audio.Recording | null>(null);
+  const audioRecorder     = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const silenceTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meteringInterval  = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -275,7 +275,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
 
   useEffect(() => () => {
     clearTimers();
-    recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+    if (audioRecorder.isRecording) audioRecorder.stop().catch(() => {});
   }, []);
 
   // ── Stop & transcribe ────────────────────────────────────────────────────
@@ -283,13 +283,11 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
     clearTimers();
     try {
       setScreenState('transcribing');
-      const rec = recordingRef.current;
-      if (!rec) { setScreenState('idle'); return; }
+      if (!audioRecorder.isRecording && !audioRecorder.uri) { setScreenState('idle'); return; }
 
-      await rec.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = rec.getURI();
-      recordingRef.current = null;
+      await audioRecorder.stop();
+      await setAudioModeAsync({ allowsRecording: false });
+      const uri = audioRecorder.uri;
 
       if (!uri) {
         setErrorMsg('No audio recorded. Please try again.');
@@ -338,25 +336,22 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
       setPhoto(null);
       setScreenState('recording');
 
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) {
         setErrorMsg('Microphone permission denied. Please allow in Settings.');
         setScreenState('error');
         return;
       }
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
 
-      const { recording } = await Audio.Recording.createAsync({
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        isMeteringEnabled: true,
-      });
-      recordingRef.current = recording;
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
 
       // ── Auto-stop after 2s of silence (metering < -40 dB)
       meteringInterval.current = setInterval(async () => {
         try {
-          const status = await recording.getStatusAsync();
+          const status = audioRecorder.getStatus();
           if (!status.isRecording) return;
           const level = (status as any).metering ?? -160;
           if (level < -40) {
@@ -395,8 +390,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
   // ── Reset ────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     clearTimers();
-    recordingRef.current?.stopAndUnloadAsync().catch(() => {});
-    recordingRef.current = null;
+    if (audioRecorder.isRecording) audioRecorder.stop().catch(() => {});
     setTranscript('');
     setClassification(null);
     setErrorMsg('');

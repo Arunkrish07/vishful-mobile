@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 // SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
@@ -85,8 +85,8 @@ export default function TenantTicketsScreen({ navigation }: any) {
   const [selTypeName, setSelTypeName] = useState('');
   const [ticketNum,   setTicketNum]   = useState('');
 
-  // expo-av recording refs
-  const recordingRef     = useRef<Audio.Recording | null>(null);
+  // expo-audio recorder + timers
+  const audioRecorder    = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const silenceTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meteringIntRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -142,17 +142,15 @@ export default function TenantTicketsScreen({ navigation }: any) {
   // If transcription fails, we fall back to an empty transcript for manual entry.
   const stopRecording = useCallback(async () => {
     clearTimers();
-    const rec = recordingRef.current;
-    if (!rec) { setVoiceStep('idle'); return; }
+    if (!audioRecorder.isRecording && !audioRecorder.uri) { setVoiceStep('idle'); return; }
 
     setVoiceStep('processing');
     setSelTypeId('');
     setSelTypeName('');
     try {
-      await rec.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = rec.getURI();
-      recordingRef.current = null;
+      await audioRecorder.stop();
+      await setAudioModeAsync({ allowsRecording: false });
+      const uri = audioRecorder.uri;
 
       let text = '';
       if (uri) {
@@ -189,7 +187,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
       setSelTypeName('');
 
       // Request mic permission
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) {
         Alert.alert(
           'Microphone Required',
@@ -199,19 +197,16 @@ export default function TenantTicketsScreen({ navigation }: any) {
         return;
       }
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
 
-      const { recording } = await Audio.Recording.createAsync({
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        isMeteringEnabled: true,
-      });
-      recordingRef.current = recording;
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
       setVoiceStep('recording');
 
       // Auto-stop after 2s of silence (metering < -40 dB) — max 60s
       meteringIntRef.current = setInterval(async () => {
         try {
-          const status = await recording.getStatusAsync();
+          const status = audioRecorder.getStatus();
           if (!status.isRecording) return;
           const level = (status as any).metering ?? -160;
           if (level < -40) {
@@ -240,10 +235,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
   // ── Reset voice state ─────────────────────────────────────────────────────
   const resetVoice = useCallback(() => {
     clearTimers();
-    if (recordingRef.current) {
-      recordingRef.current.stopAndUnloadAsync().catch(() => {});
-      recordingRef.current = null;
-    }
+    if (audioRecorder.isRecording) audioRecorder.stop().catch(() => {});
     setVoiceStep('idle');
     setVoiceError('');
     setSeconds(0);

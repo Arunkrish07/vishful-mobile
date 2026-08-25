@@ -15,7 +15,7 @@ import {
   Dimensions, KeyboardAvoidingView, Platform, Image, Animated,
 } from 'react-native';
 import { CONVEX_SITE_URL } from '../lib/config';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -775,7 +775,7 @@ export default function TenantLifecycleScreen() {
   const [noticeTranscript,  setNoticeTranscript]  = useState('');
   const [noticeVoiceErr,    setNoticeVoiceErr]    = useState('');
   const [noticeSubmitting,  setNoticeSubmitting]  = useState(false);
-  const noticeRecordingRef  = useRef<Audio.Recording | null>(null);
+  const noticeRecorder      = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const noticeSilenceTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noticeMeteringInt   = useRef<ReturnType<typeof setInterval> | null>(null);
   const noticePulseScale1   = useRef(new Animated.Value(1)).current;
@@ -1589,12 +1589,10 @@ export default function TenantLifecycleScreen() {
     clearNoticeTimers();
     try {
       setNoticeRecState('transcribing');
-      const rec = noticeRecordingRef.current;
-      if (!rec) { setNoticeRecState('idle'); return; }
-      await rec.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = rec.getURI();
-      noticeRecordingRef.current = null;
+      if (!noticeRecorder.isRecording && !noticeRecorder.uri) { setNoticeRecState('idle'); return; }
+      await noticeRecorder.stop();
+      await setAudioModeAsync({ allowsRecording: false });
+      const uri = noticeRecorder.uri;
       if (!uri) { setNoticeVoiceErr('No audio captured. Please try again.'); setNoticeRecState('error'); return; }
 
       const FileSystem = await import('expo-file-system') as any;
@@ -1621,17 +1619,14 @@ export default function TenantLifecycleScreen() {
       setNoticeTranscript('');
       setNoticeVoiceErr('');
       setNoticeRecState('recording');
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) { setNoticeVoiceErr('Microphone permission denied.'); setNoticeRecState('error'); return; }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync({
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        isMeteringEnabled: true,
-      });
-      noticeRecordingRef.current = recording;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await noticeRecorder.prepareToRecordAsync();
+      noticeRecorder.record();
       noticeMeteringInt.current = setInterval(async () => {
         try {
-          const status = await recording.getStatusAsync();
+          const status = noticeRecorder.getStatus();
           if (!status.isRecording) return;
           const level = (status as any).metering ?? -160;
           if (level < -40) {
@@ -1671,7 +1666,7 @@ export default function TenantLifecycleScreen() {
 
   useEffect(() => () => {
     clearNoticeTimers();
-    noticeRecordingRef.current?.stopAndUnloadAsync().catch(() => {});
+    if (noticeRecorder.isRecording) noticeRecorder.stop().catch(() => {});
   }, []);
 
   async function submitVoiceNotice() {
@@ -3628,7 +3623,7 @@ export default function TenantLifecycleScreen() {
               {/* Header */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1A1A2E' }}>🎙️ Voice Notice</Text>
-                <TouchableOpacity onPress={() => { clearNoticeTimers(); noticeRecordingRef.current?.stopAndUnloadAsync().catch(() => {}); noticeRecordingRef.current = null; setVoiceNoticeOpen(false); setNoticeRecState('idle'); }}>
+                <TouchableOpacity onPress={() => { clearNoticeTimers(); if (noticeRecorder.isRecording) noticeRecorder.stop().catch(() => {}); setVoiceNoticeOpen(false); setNoticeRecState('idle'); }}>
                   <Ionicons name="close-circle" size={28} color="#6B7280" />
                 </TouchableOpacity>
               </View>
