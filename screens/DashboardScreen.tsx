@@ -6,6 +6,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, {
+  Path, Circle, Line as SvgLine, Defs,
+  LinearGradient as SvgGradient, Stop,
+} from 'react-native-svg';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { spacing, fontSize, mobile, colors as themeColors, shadows } from '../lib/theme';
@@ -25,7 +29,7 @@ const DASH = {
   ink: '#0F172A',
   ink2: '#64748B',
   ink3: '#94A3B8',
-  indigo: '#4F46E5',
+  indigo: '#6A2C90',
   brandSub: '#556274',
   blue: '#1856FF',
   blueInk: '#1240C7',
@@ -131,7 +135,7 @@ function Panel({
     <View style={[styles.panel, darkHead && styles.panelAttention]}>
       {darkHead ? (
         <LinearGradient
-          colors={['#6D28D9', '#2449BD'] as const}
+          colors={['#6A2C90', '#4E2069'] as const}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.panelHeadDark}
@@ -190,7 +194,7 @@ function OccupancyRing({ pct, size = 88 }: { pct: number; size?: number }) {
   );
 }
 
-function MiniSpark({ values }: { values: number[] }) {
+function MiniSpark({ values, light }: { values: number[]; light?: boolean }) {
   if (!values.length) return null;
   const max = Math.max(...values, 1);
   return (
@@ -202,7 +206,9 @@ function MiniSpark({ values }: { values: number[] }) {
             width: 6,
             height: Math.max(4, (v / max) * 36),
             borderRadius: 3,
-            backgroundColor: i === values.length - 1 ? DASH.blue : '#A5B4FC',
+            backgroundColor: light
+              ? (i === values.length - 1 ? '#FFFFFF' : 'rgba(255,255,255,0.45)')
+              : (i === values.length - 1 ? DASH.blue : '#A5B4FC'),
           }}
         />
       ))}
@@ -444,6 +450,110 @@ function MiniLineChart({
   );
 }
 
+// ─── Smooth SVG helpers (reference-parity charts) ────────────────────────────
+/** Catmull-Rom → cubic-bezier so the revenue line reads as a smooth curve. */
+function smoothLinePath(pts: { x: number; y: number }[]): string {
+  if (pts.length < 2) return pts.length === 1 ? `M ${pts[0].x} ${pts[0].y}` : '';
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
+/** Reference "Revenue trend" card chart: gradient area + smooth line + endpoint dot. */
+function RevenueTrendChart({
+  values, labels, width, height = 132,
+}: { values: number[]; labels: string[]; width: number; height?: number }) {
+  if (values.length < 2 || width <= 0) return null;
+  const padTop = 16, padBottom = 4, padLeft = 2, padRight = 6;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = Math.max(max - min, 1);
+  const stepX = chartW / (values.length - 1);
+  const pts = values.map((v, i) => ({
+    x: padLeft + i * stepX,
+    y: padTop + chartH - ((v - min) / range) * chartH,
+  }));
+  const linePath = smoothLinePath(pts);
+  const last = pts[pts.length - 1];
+  const baseY = padTop + chartH;
+  const areaPath = `${linePath} L ${last.x} ${baseY} L ${pts[0].x} ${baseY} Z`;
+  return (
+    <View>
+      <Svg width={width} height={height}>
+        <Defs>
+          <SvgGradient id="revArea" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#6A2C90" stopOpacity={0.22} />
+            <Stop offset="1" stopColor="#6A2C90" stopOpacity={0} />
+          </SvgGradient>
+        </Defs>
+        <Path d={areaPath} fill="url(#revArea)" />
+        <SvgLine
+          x1={last.x} y1={padTop - 8} x2={last.x} y2={baseY}
+          stroke="#C7D2FE" strokeWidth={1} strokeDasharray="3 3"
+        />
+        <Path
+          d={linePath} fill="none" stroke="#6A2C90" strokeWidth={2.5}
+          strokeLinecap="round" strokeLinejoin="round"
+        />
+        <Circle cx={last.x} cy={last.y} r={8} fill="#6A2C90" fillOpacity={0.16} />
+        <Circle cx={last.x} cy={last.y} r={4.5} fill="#fff" stroke="#6A2C90" strokeWidth={2.5} />
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+        {labels.map((l, i) => (
+          <Text key={i} style={[styles.trendAxis, i === labels.length - 1 && { color: DASH.ink }]}>{l}</Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** Reference occupancy widget: concentric multi-ring donut with a centred headline. */
+function MultiRingDonut({
+  rings, size = 116, center, sub,
+}: { rings: { pct: number; color: string }[]; size?: number; center: string; sub?: string }) {
+  const stroke = 8;
+  const gap = 3;
+  const cx = size / 2, cy = size / 2;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size}>
+        {rings.map((ring, i) => {
+          const r = size / 2 - stroke / 2 - i * (stroke + gap);
+          if (r <= 4) return null;
+          const c = 2 * Math.PI * r;
+          const dash = (Math.max(0, Math.min(100, ring.pct)) / 100) * c;
+          return (
+            <React.Fragment key={i}>
+              <Circle cx={cx} cy={cy} r={r} stroke="#EEF2F8" strokeWidth={stroke} fill="none" />
+              <Circle
+                cx={cx} cy={cy} r={r} stroke={ring.color} strokeWidth={stroke} fill="none"
+                strokeDasharray={`${dash} ${c - dash}`} strokeLinecap="round"
+                transform={`rotate(-90 ${cx} ${cy})`}
+              />
+            </React.Fragment>
+          );
+        })}
+      </Svg>
+      <View style={{ position: 'absolute', alignItems: 'center' }}>
+        <Text style={styles.donutCenter}>{center}</Text>
+        {sub ? <Text style={styles.donutSub}>{sub}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
 // ─── Period Selector Modal ────────────────────────────────────────────────────
 function PeriodModal({
   visible, onClose, period, customFrom, customTo, onSelectPreset, onApplyCustom,
@@ -477,7 +587,7 @@ function PeriodModal({
         <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 28 }}>
           <TouchableWithoutFeedback>
             <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', maxWidth: 320, alignSelf: 'center', width: '100%' }}>
-              <View style={{ backgroundColor: '#1D4ED8', paddingHorizontal: 16, paddingVertical: 12 }}>
+              <View style={{ backgroundColor: '#6A2C90', paddingHorizontal: 16, paddingVertical: 12 }}>
                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Period</Text>
               </View>
 
@@ -495,7 +605,7 @@ function PeriodModal({
                         borderWidth: period === p.key ? 1 : 0, borderColor: '#C7D2FE',
                       }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: period === p.key ? '700' : '500', color: period === p.key ? '#1E1B4B' : DASH.ink }}>
+                      <Text style={{ fontSize: 13, fontWeight: period === p.key ? '700' : '500', color: period === p.key ? DASH.blueInk : DASH.ink }}>
                         {p.label}
                       </Text>
                       {period === p.key && <Ionicons name="checkmark" size={18} color={DASH.indigo} />}
@@ -557,6 +667,7 @@ export default function DashboardScreen() {
   const [period, setPeriod] = useState<string>('current_fy');
   const [customFrom, setCustomFrom] = useState<string>('');
   const [customTo, setCustomTo] = useState<string>('');
+  const [trendRange, setTrendRange] = useState<3 | 6 | 12>(6);
 
   // Ask AI modal state
   const [aiOpen, setAiOpen] = useState(false);
@@ -662,6 +773,12 @@ export default function DashboardScreen() {
   const occupancyPct = ps?.occupancyPct != null
     ? Math.round(Number(ps.occupancyPct))
     : Math.round(((occupiedBedsV + noticeBedsV) / Math.max(1, totalBedsLive)) * 100);
+  // "Month" bed-days occupancy (reads higher than point-in-time) — distinct from the headline.
+  const monthOcc = (extended as any)?.monthOccupancy ?? null;
+  const monthOccRaw = monthOcc?.occupancyPct ?? monthOcc?.occupancy_rate ?? null;
+  const monthOccPct = monthOccRaw != null ? Math.round(Number(monthOccRaw) * 10) / 10 : occupancyPct;
+  // Pure occupied fill (excludes on-notice) — the innermost donut ring.
+  const occupiedFillPct = Math.round((occupiedBedsV / Math.max(1, totalBedsLive)) * 100);
 
   const depositsHeldV = fin.depositCollections ?? heroMonthly?.depositsHeld ?? 0;
   const pendingDuesV = (fin.pendingAmount ?? 0) > 0
@@ -681,6 +798,22 @@ export default function DashboardScreen() {
   const revenueHeadline = heroMonthly?.revenueThisMonth ?? fin.operationalCollections ?? fin.totalRevenue ?? stats.monthlyRevenue ?? 0;
   const momPct = heroMonthly?.momPct;
   const sparkVals = finSeries.slice(-6).map((d: any) => Number(d.revenue || 0));
+
+  // Revenue-trend card (reference): one smooth line, 3M/6M/12M window on the revenue series.
+  const trendSeries = finSeries.slice(-trendRange);
+  const trendValues = trendSeries.map((d: any) => Number(d.revenue || 0));
+  const trendLabels = trendSeries.length
+    ? [
+        trendSeries[0]?.label ?? '',
+        trendSeries[Math.floor((trendSeries.length - 1) / 2)]?.label ?? '',
+        trendSeries[trendSeries.length - 1]?.label ?? '',
+      ]
+    : [];
+  const trendEndLabel = trendSeries[trendSeries.length - 1]?.label ?? '';
+  const TREND_W = SCREEN_WIDTH - DASH.padX * 2 - 24 - 28; // scroll padX·2 · panel body pad·2 · card pad·2
+  // Per-card mini sparklines — only where a real monthly series exists (no fabrication).
+  const revenueSpark = finSeries.slice(-8).map((d: any) => Number(d.revenue || 0));
+  const expensesSpark = finSeries.slice(-8).map((d: any) => Number(d.expenses || 0));
 
   const profitMargin = fin.totalRevenue > 0
     ? Math.round((fin.totalProfit / fin.totalRevenue) * 100)
@@ -753,20 +886,11 @@ export default function DashboardScreen() {
               source={require('../assets/vishful-logo-DPK24n8p.webp')}
               style={styles.markImg}
             />
-            <View>
-              <Text style={styles.brandName}>Vishful</Text>
-              <Text style={styles.brandTag}>Stay · Belong · Succeed</Text>
-            </View>
+            <Text style={styles.brandName}>Vishful</Text>
           </View>
 
           <View style={styles.dashActions}>
             {isBackgroundUpdating && <ActivityIndicator size="small" color={DASH.blue} />}
-            <TouchableOpacity style={styles.periodPill} activeOpacity={0.75} onPress={() => setPeriodOpen(true)}>
-              <Ionicons name="calendar-outline" size={14} color={DASH.blue} />
-              <Text style={styles.periodPillText} numberOfLines={1}>
-                {periodLabel(period, customFrom, customTo)}
-              </Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.avatar}
               activeOpacity={0.75}
@@ -794,14 +918,22 @@ export default function DashboardScreen() {
                 <Text style={styles.deckGreeting}>{timeGreeting()}</Text>
                 <Text style={styles.deckSub}>Here is what needs your attention today.</Text>
               </View>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={styles.askAiBtn}
-                onPress={() => { setAiError(''); setAiOpen(true); }}
-              >
-                <Ionicons name="sparkles" size={12} color="#fff" />
-                <Text style={styles.askAiText}>Ask AI</Text>
-              </TouchableOpacity>
+              <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                <TouchableOpacity style={styles.periodPill} activeOpacity={0.75} onPress={() => setPeriodOpen(true)}>
+                  <Ionicons name="calendar-outline" size={14} color={DASH.blue} />
+                  <Text style={styles.periodPillText} numberOfLines={1}>
+                    {periodLabel(period, customFrom, customTo)}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.askAiBtn}
+                  onPress={() => { setAiError(''); setAiOpen(true); }}
+                >
+                  <Ionicons name="sparkles" size={12} color="#fff" />
+                  <Text style={styles.askAiText}>Ask AI</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Action queue */}
@@ -815,67 +947,84 @@ export default function DashboardScreen() {
                   <Text style={styles.warnBadgeText}>{actionOpenSum} open</Text>
                 </View>
               </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
-              >
+              <View style={{ gap: 8 }}>
                 {actionChips.map((chip) => (
                   <TouchableOpacity
                     key={chip.id}
-                    style={styles.attnChip}
+                    style={styles.attnRow}
                     activeOpacity={0.8}
                     onPress={() => go(chip.route)}
                   >
-                    <View style={styles.attnChipIco}>
+                    <View style={styles.attnRowIco}>
                       <Ionicons name={chip.icon} size={16} color={DASH.blue} />
                     </View>
-                    <Text style={styles.attnChipLabel} numberOfLines={2}>{chip.label}</Text>
-                    <View style={styles.attnChipCount}>
-                      <Text style={styles.attnChipCountText}>{chip.count}</Text>
+                    <Text style={styles.attnRowLabel} numberOfLines={2}>{chip.label}</Text>
+                    <View style={styles.attnRowCount}>
+                      <Text style={styles.attnRowCountText}>{chip.count}</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={14} color={DASH.ink3} />
+                    <Ionicons name="chevron-forward" size={16} color={DASH.ink3} />
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </View>
             </View>
           </View>
 
           {/* ── Financials ── */}
           <Panel title="Financials">
-            <View style={styles.finHero}>
+            <LinearGradient
+              colors={['#6A2C90', '#4E2069'] as const}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.finHero}
+            >
               <View style={{ flex: 1 }}>
-                <Text style={styles.mutedSm}>Revenue this month</Text>
-                <Text style={styles.finBig}>{fmtINR(revenueHeadline)}</Text>
+                <Text style={styles.finHeroLabel}>Revenue this month</Text>
+                <Text style={styles.finHeroBig}>{fmtINR(revenueHeadline)}</Text>
                 {momPct != null && (
-                  <Text style={[styles.delta, momPct >= 0 ? styles.deltaUp : styles.deltaDown]}>
+                  <Text style={styles.finHeroDelta}>
                     {momPct >= 0 ? '+' : ''}{momPct}% vs last month
                   </Text>
                 )}
               </View>
-              <MiniSpark values={sparkVals.length ? sparkVals : [1, 2, 1.5, 2.2, 1.8, 2.5]} />
-            </View>
+              <MiniSpark values={sparkVals.length ? sparkVals : [1, 2, 1.5, 2.2, 1.8, 2.5]} light />
+            </LinearGradient>
 
             <View style={styles.finGrid}>
               {[
-                { label: 'Revenue', value: fmtINR(fin.totalRevenue), tone: 'indigo' as const, icon: 'trending-up-outline' as const },
-                { label: 'Expenses', value: fmtINR(fin.totalExpenses), tone: 'rose' as const, icon: 'card-outline' as const },
-                { label: 'Pending dues', value: fmtINR(pendingDuesV), tone: 'amber' as const, icon: 'time-outline' as const },
-                { label: 'Deposits held', value: fmtINR(depositsHeldV), tone: 'green' as const, icon: 'wallet-outline' as const },
+                { label: 'Revenue', value: fmtINR(fin.totalRevenue), tone: 'indigo' as const, icon: 'wallet-outline' as const, spark: revenueSpark, delta: momPct },
+                { label: 'Expenses', value: fmtINR(fin.totalExpenses), tone: 'rose' as const, icon: 'trending-up-outline' as const, spark: expensesSpark, delta: undefined },
+                { label: 'Pending dues', value: fmtINR(pendingDuesV), tone: 'amber' as const, icon: 'calendar-outline' as const, spark: [] as number[], delta: undefined },
+                { label: 'Deposits held', value: fmtINR(depositsHeldV), tone: 'green' as const, icon: 'arrow-down-circle-outline' as const, spark: [] as number[], delta: undefined },
               ].map((c) => {
                 const tone = {
-                  indigo: { bg: '#E0E7FFE6', fg: '#4338CA' },
+                  indigo: { bg: '#F3ECF9', fg: '#6A2C90' },
                   rose: { bg: '#FFF1F2', fg: '#BE123C' },
                   amber: { bg: '#FFFBEB', fg: '#B45309' },
                   green: { bg: '#F0FDF4', fg: '#15803D' },
                 }[c.tone];
+                const hasSpark = c.spark.length >= 2;
+                const hasDelta = c.delta != null;
                 return (
                   <View key={c.label} style={styles.finCard}>
-                    <View style={[styles.finCardIco, { backgroundColor: tone.bg }]}>
-                      <Ionicons name={c.icon} size={18} color={tone.fg} />
+                    <View style={styles.finCardTop}>
+                      <View style={[styles.finCardIco, { backgroundColor: tone.bg }]}>
+                        <Ionicons name={c.icon} size={18} color={tone.fg} />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.mutedSm} numberOfLines={1}>{c.label}</Text>
+                        <Text style={styles.finVal} numberOfLines={1}>{c.value}</Text>
+                      </View>
                     </View>
-                    <Text style={styles.mutedSm}>{c.label}</Text>
-                    <Text style={styles.finVal}>{c.value}</Text>
+                    {(hasSpark || hasDelta) && (
+                      <View style={styles.finCardBottom}>
+                        {hasDelta ? (
+                          <Text style={[styles.finDelta, { color: (c.delta as number) >= 0 ? DASH.good : DASH.bad }]}>
+                            {(c.delta as number) >= 0 ? '+' : ''}{c.delta}%
+                          </Text>
+                        ) : <View />}
+                        {hasSpark ? <MiniSpark values={c.spark.slice(-8)} /> : null}
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -896,16 +1045,42 @@ export default function DashboardScreen() {
               ))}
             </View>
 
-            {finSeries.length > 0 && (
-              <View style={{ marginTop: 14, gap: 16 }}>
-                <View>
-                  <Text style={styles.chartHead}>Monthly profitability</Text>
-                  <MiniLineChart data={finSeries} valueKey="profit" color={DASH.indigo} height={60} />
+            {trendValues.length >= 2 && (
+              <View style={styles.trendCard}>
+                <View style={styles.trendTop}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.trendLabel}>Revenue trend</Text>
+                    <Text style={styles.trendBig}>{fmtINR(revenueHeadline)}</Text>
+                  </View>
+                  <View style={styles.trendToggle}>
+                    {([3, 6, 12] as const).map((r) => (
+                      <TouchableOpacity
+                        key={r}
+                        onPress={() => setTrendRange(r)}
+                        activeOpacity={0.8}
+                        style={[styles.trendSeg, trendRange === r && styles.trendSegOn]}
+                      >
+                        <Text style={[styles.trendSegText, trendRange === r && styles.trendSegTextOn]}>{r}M</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.chartHead}>Revenue trend</Text>
-                  <MiniBarChart data={finSeries} valueKey="revenue" color={DASH.blue} height={72} />
-                </View>
+                {momPct != null && (
+                  <View style={styles.trendDeltaRow}>
+                    <View style={[styles.trendDeltaPill, momPct < 0 && { backgroundColor: DASH.badBg }]}>
+                      <Ionicons
+                        name={momPct >= 0 ? 'trending-up' : 'trending-down'}
+                        size={12}
+                        color={momPct >= 0 ? DASH.good : DASH.bad}
+                      />
+                      <Text style={[styles.trendDeltaText, momPct < 0 && { color: DASH.bad }]}>
+                        {momPct >= 0 ? '+' : ''}{momPct}%
+                      </Text>
+                    </View>
+                    {!!trendEndLabel && <Text style={styles.mutedSm}>{trendEndLabel}</Text>}
+                  </View>
+                )}
+                <RevenueTrendChart values={trendValues} labels={trendLabels} width={TREND_W} />
               </View>
             )}
           </Panel>
@@ -913,22 +1088,34 @@ export default function DashboardScreen() {
           {/* ── Occupancy ── */}
           <Panel title="Occupancy">
             <View style={styles.occTop}>
-              <OccupancyRing pct={occupancyPct} />
-              <View style={styles.occStats}>
-                <View style={styles.occPill}>
-                  <Text style={styles.occPillStrong}>{occupancyPct}%</Text>
-                  <Text style={styles.occPillSpan}>Current</Text>
+              <MultiRingDonut
+                rings={[
+                  { pct: occupancyPct, color: DASH.blue },
+                  { pct: monthOccPct, color: DASH.good },
+                  { pct: occupiedFillPct, color: '#F59E0B' },
+                ]}
+                center={`${occupancyPct}%`}
+                sub="Current"
+              />
+              <View style={styles.occList}>
+                <View style={styles.occNumRow}>
+                  <Text style={styles.occNumVal}>{occupancyPct}%</Text>
+                  <Text style={styles.occNumLbl}>Current</Text>
                 </View>
-                <View style={styles.occPill}>
-                  <Text style={styles.occPillStrong}>{occupancyPct}%</Text>
-                  <Text style={styles.occPillSpan}>Month</Text>
+                <View style={styles.occNumRow}>
+                  <Text style={styles.occNumVal}>{monthOccPct}%</Text>
+                  <Text style={styles.occNumLbl}>Month</Text>
                 </View>
-                {bedTypes.slice(0, 4).map((b: any) => (
-                  <View key={b.type} style={styles.typeHit}>
-                    <Text style={styles.typeName} numberOfLines={1}>{b.type}</Text>
-                    <Text style={styles.typePct}>{b.pct}%</Text>
-                  </View>
-                ))}
+                {bedTypes.slice(0, 4).map((b: any) => {
+                  const p = Number(b.pct) || 0;
+                  const col = p >= 95 ? DASH.good : p >= 80 ? DASH.warn : DASH.bad;
+                  return (
+                    <View key={b.type} style={styles.occTypeRow}>
+                      <Text style={styles.occTypeName} numberOfLines={1}>{b.type}</Text>
+                      <Text style={[styles.occTypePct, { color: col }]}>{p}%</Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
 
@@ -1154,9 +1341,9 @@ const styles = StyleSheet.create({
     borderBottomColor: DASH.line,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
-  markImg: { width: 36, height: 36, resizeMode: 'contain' },
+  markImg: { width: 42, height: 42, resizeMode: 'contain' },
   brandName: {
-    fontSize: 15, fontWeight: '700', letterSpacing: -0.2, color: DASH.indigo,
+    fontSize: 20, fontWeight: '800', letterSpacing: -0.3, color: '#7C3AED',
   },
   brandTag: {
     fontSize: 10, color: DASH.brandSub, letterSpacing: 0.8, fontWeight: '700',
@@ -1215,28 +1402,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
   },
   warnBadgeText: { fontSize: 11, fontWeight: '700', color: '#92400E' },
-  attnChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 9,
-    minHeight: 44, maxWidth: 280,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 12, backgroundColor: DASH.soft,
+  attnRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    borderRadius: 12, backgroundColor: '#F6F8FC',
     borderWidth: 1, borderColor: '#EEF2F7',
   },
-  attnChipIco: {
-    width: 28, height: 28, borderRadius: 14,
+  attnRowIco: {
+    width: 30, height: 30, borderRadius: 8,
     backgroundColor: DASH.blueSoft, alignItems: 'center', justifyContent: 'center',
   },
-  attnChipLabel: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: DASH.ink, maxWidth: 140 },
-  attnChipCount: {
+  attnRowLabel: { flex: 1, fontSize: 13, fontWeight: '700', color: DASH.ink },
+  attnRowCount: {
     minWidth: 24, height: 22, paddingHorizontal: 7, borderRadius: 999,
     backgroundColor: DASH.blueSoft, alignItems: 'center', justifyContent: 'center',
   },
-  attnChipCountText: { fontSize: 11, fontWeight: '800', color: DASH.blueInk },
+  attnRowCountText: { fontSize: 12, fontWeight: '800', color: DASH.blueInk },
 
   panel: {
     backgroundColor: '#fff',
-    borderRadius: 14, borderWidth: 1, borderColor: DASH.panelBorder,
-    marginBottom: 10, overflow: 'hidden',
+    borderRadius: 18, borderWidth: 1, borderColor: '#EEF1F6',
+    marginBottom: 12, overflow: 'hidden',
     ...shadows.card,
   },
   panelAttention: { borderColor: '#C7D2FE' },
@@ -1247,7 +1433,7 @@ const styles = StyleSheet.create({
   panelHeadDark: {
     paddingHorizontal: 14, paddingVertical: 12,
   },
-  panelTitle: { fontSize: 20, fontWeight: '600', color: DASH.ink },
+  panelTitle: { fontSize: 17, fontWeight: '800', color: DASH.ink },
   panelTitleDark: { fontSize: 16, fontWeight: '700', color: '#fff' },
   panelRight: { fontSize: 12, fontWeight: '600', color: DASH.ink2 },
   panelBody: { padding: 12, paddingTop: 8 },
@@ -1255,8 +1441,11 @@ const styles = StyleSheet.create({
   mutedSm: { fontSize: 12, color: DASH.ink2, fontWeight: '500' },
   finHero: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: DASH.finHero, borderRadius: 12, padding: 14, marginBottom: 10,
+    borderRadius: 18, padding: 18, marginBottom: 12, overflow: 'hidden',
   },
+  finHeroLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.82)' },
+  finHeroBig: { fontSize: 32, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.6, marginTop: 4 },
+  finHeroDelta: { fontSize: 12, fontWeight: '700', color: '#86EFAC', marginTop: 6 },
   finBig: { fontSize: 30, fontWeight: '800', color: DASH.ink, letterSpacing: -0.6, marginTop: 2 },
   delta: { fontSize: 12, fontWeight: '700', marginTop: 4 },
   deltaUp: { color: '#15803D' },
@@ -1265,14 +1454,22 @@ const styles = StyleSheet.create({
   finGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   finCard: {
     width: '47%', flexGrow: 1,
-    borderRadius: 13, padding: 12, minHeight: 100,
-    backgroundColor: DASH.soft, borderWidth: 1, borderColor: DASH.line,
+    borderRadius: 16, padding: 14, minHeight: 104,
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6',
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
   },
+  finCardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   finCardIco: {
     width: 38, height: 38, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+    alignItems: 'center', justifyContent: 'center',
   },
-  finVal: { fontSize: 18, fontWeight: '800', color: DASH.ink, marginTop: 4, letterSpacing: -0.3 },
+  finVal: { fontSize: 18, fontWeight: '800', color: DASH.ink, marginTop: 2, letterSpacing: -0.3 },
+  finCardBottom: {
+    flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
+    marginTop: 12, minHeight: 20,
+  },
+  finDelta: { fontSize: 12, fontWeight: '800' },
 
   ringRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   ringStat: {
@@ -1352,4 +1549,52 @@ const styles = StyleSheet.create({
   annBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
   annBadgeText: { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
   annBody: { fontSize: 12, color: DASH.ink2, lineHeight: 17 },
+
+  // ── Revenue trend card ──
+  trendCard: {
+    marginTop: 14, borderRadius: 16, padding: 14,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6',
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+  },
+  trendTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  trendLabel: { fontSize: 12, fontWeight: '600', color: DASH.ink2 },
+  trendBig: { fontSize: 24, fontWeight: '800', color: DASH.ink, letterSpacing: -0.5, marginTop: 2 },
+  trendToggle: {
+    flexDirection: 'row', backgroundColor: '#F1F3F9', borderRadius: 999, padding: 3, gap: 2,
+  },
+  trendSeg: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
+  trendSegOn: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  trendSegText: { fontSize: 12, fontWeight: '700', color: DASH.ink3 },
+  trendSegTextOn: { color: '#6A2C90' },
+  trendDeltaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  trendDeltaPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: DASH.goodBg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3,
+  },
+  trendDeltaText: { fontSize: 12, fontWeight: '800', color: DASH.good },
+  trendAxis: { fontSize: 10, color: DASH.ink3, fontWeight: '600' },
+
+  // ── Occupancy multi-ring + list ──
+  donutCenter: { fontSize: 20, fontWeight: '800', color: DASH.ink, letterSpacing: -0.5 },
+  donutSub: { fontSize: 10, color: DASH.ink2, fontWeight: '600', marginTop: 1 },
+  occList: { flex: 1, gap: 6 },
+  occNumRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6',
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9,
+    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+  },
+  occNumVal: { fontSize: 17, fontWeight: '800', color: DASH.ink, letterSpacing: -0.3 },
+  occNumLbl: { fontSize: 12, color: DASH.ink2, fontWeight: '600' },
+  occTypeRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6',
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  occTypeName: { fontSize: 13, color: DASH.ink, fontWeight: '600', flex: 1 },
+  occTypePct: { fontSize: 13, fontWeight: '800' },
 });
