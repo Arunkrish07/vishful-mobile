@@ -24,28 +24,28 @@ import { client as convexClient, api as convexApi } from '../lib/convexApi';
 interface StatusDef { label: string; color: string; bg: string; icon: string; }
 
 const STATUS: Record<string, StatusDef> = {
-  staying:    { label: 'Staying',    color: '#22C55E', bg: '#ECFDF5', icon: 'home'         },
-  onboarding: { label: 'Onboarding', color: '#2563EB', bg: '#EFF6FF', icon: 'person-add'   },
-  'on-notice':{ label: 'On Notice',  color: '#F59E0B', bg: '#FFFBEB', icon: 'warning'      },
-  new:        { label: 'New',        color: '#2563EB', bg: '#EFF6FF', icon: 'star-outline'  },
-  booked:     { label: 'Booked',     color: '#2563EB', bg: '#EFF6FF', icon: 'calendar'     },
-  kyc_pending:{ label: 'KYC Pending',color: '#F59E0B', bg: '#FFFBEB', icon: 'hourglass-outline' },
-  exited:     { label: 'Exited',     color: '#6B7280', bg: '#F1F5F9', icon: 'exit'         },
+  staying:    { label: 'Staying',    color: '#16A34A', bg: '#DCFCE7', icon: 'home'         },
+  onboarding: { label: 'Onboarding', color: '#1D4ED8', bg: '#EEF3FF', icon: 'person-add'   },
+  'on-notice':{ label: 'On Notice',  color: '#EA580C', bg: '#FFEDD5', icon: 'warning'      },
+  new:        { label: 'New',        color: '#1D4ED8', bg: '#EEF3FF', icon: 'star-outline'  },
+  booked:     { label: 'Booked',     color: '#1D4ED8', bg: '#EEF3FF', icon: 'calendar'     },
+  kyc_pending:{ label: 'KYC Pending',color: '#EA580C', bg: '#FFEDD5', icon: 'hourglass-outline' },
+  exited:     { label: 'Exited',     color: '#64748B', bg: '#F1F5F9', icon: 'exit'         },
 };
 
 const getStatus = (s?: string): StatusDef =>
-  STATUS[s || 'new'] || { label: s || 'New', color: '#2563EB', bg: '#EFF6FF', icon: 'star-outline' };
+  STATUS[s || 'new'] || { label: s || 'New', color: '#1D4ED8', bg: '#EEF3FF', icon: 'star-outline' };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STAT CHIPS — web order: All Status | New | Booked | Staying | On Notice | Exited
 // ─────────────────────────────────────────────────────────────────────────────
 const STAT_CHIPS = [
-  { key: 'all',        label: 'All Status', color: '#2563EB' },
-  { key: 'new',        label: 'New',        color: '#2563EB' },
-  { key: 'booked',     label: 'Booked',     color: '#2563EB' },
-  { key: 'staying',    label: 'Staying',    color: '#22C55E' },
-  { key: 'on-notice',  label: 'On Notice',  color: '#F59E0B' },
-  { key: 'exited',     label: 'Exited',     color: '#6B7280' },
+  { key: 'all',        label: 'All Status', color: '#6A2C90' },
+  { key: 'new',        label: 'New',        color: '#6A2C90' },
+  { key: 'booked',     label: 'Booked',     color: '#6A2C90' },
+  { key: 'staying',    label: 'Staying',    color: '#16A34A' },
+  { key: 'on-notice',  label: 'On Notice',  color: '#EA580C' },
+  { key: 'exited',     label: 'Exited',     color: '#64748B' },
 ];
 
 type TabKey = 'tenants' | 'allotments';
@@ -609,7 +609,7 @@ export default function TenantsScreen() {
                 style={tenantStyles.ghostIconBtn}
                 onPress={() => { setDupPhone(''); setDupResults([]); setDupGroups([]); setShowDuplicates(true); runDuplicateScanAll(); }}
               >
-                <Ionicons name="copy-outline" size={17} color="#2563EB" />
+                <Ionicons name="copy-outline" size={17} color="#6A2C90" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={tenantStyles.ghostIconBtn}
@@ -652,7 +652,7 @@ export default function TenantsScreen() {
               <Ionicons
                 name={tab.icon}
                 size={15}
-                color={activeTab === tab.key ? colors.primary : colors.textTertiary}
+                color={activeTab === tab.key ? '#6A2C90' : colors.textTertiary}
               />
               <Text style={[tenantStyles.tabText, activeTab === tab.key && tenantStyles.tabTextActive]}>
                 {tab.label}
@@ -740,7 +740,7 @@ export default function TenantsScreen() {
                   style={{
                     flexDirection: 'row', alignItems: 'center', gap: 4,
                     backgroundColor: colors.primary,
-                    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
                   }}
                   onPress={() => nav.dispatch(DrawerActions.jumpTo('Tenant Lifecycle'))}
                 >
@@ -946,7 +946,7 @@ export default function TenantsScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                     <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>Remarks &amp; Disputes</Text>
                     <TouchableOpacity onPress={() => setShowAddRemark(true)}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 }}>
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12 }}>
                       <Ionicons name="add" size={14} color="#fff" />
                       <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>Add Remark</Text>
                     </TouchableOpacity>
@@ -962,10 +962,10 @@ export default function TenantsScreen() {
                       dispute:  { bg: '#FFF7ED', text: '#EA580C' },
                       neutral:  { bg: '#F8FAFC', text: '#64748B' },
                     };
-                    const severityColors: Record<string, string> = { low: '#2563EB', medium: '#D97706', high: '#EA580C', critical: '#DC2626' };
+                    const severityColors: Record<string, string> = { low: '#1D4ED8', medium: '#D97706', high: '#EA580C', critical: '#DC2626' };
                     const tc = typeColors[r.remark_type] || typeColors.neutral;
                     return (
-                      <View key={r.id} style={{ backgroundColor: tc.bg, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: tc.text + '30', marginBottom: 10 }}>
+                      <View key={r.id} style={{ backgroundColor: tc.bg, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: tc.text + '30', marginBottom: 10 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                           <View style={{ backgroundColor: tc.text + '20', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
                             <Text style={{ fontSize: 10, fontWeight: '700', color: tc.text, textTransform: 'uppercase' }}>{r.remark_type}</Text>
@@ -1004,14 +1004,14 @@ export default function TenantsScreen() {
                     </View>
                     <TouchableOpacity onPress={() => handleComputeRating(detailTenant._id)}
                       disabled={computingRatingId === detailTenant._id}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10 }}>
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 }}>
                       {computingRatingId === detailTenant._id
                         ? <ActivityIndicator size="small" color="#fff" />
                         : <Ionicons name="refresh-outline" size={15} color="#fff" />}
                       <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Compute Rating</Text>
                     </TouchableOpacity>
                   </View>
-                  <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.border }}>
+                  <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 10 }}>Rating Breakdown</Text>
                     {[
                       ['Payment Timeliness', 'max 4 pts', '7 days = 4, 15 days = 3, 30 days = 2, late = 1'],
@@ -1056,7 +1056,7 @@ export default function TenantsScreen() {
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
                 {(['low', 'medium', 'high', 'critical'] as const).map(s => {
                   const active = remarkForm.severity === s;
-                  const sColors: Record<string, string> = { low: '#2563EB', medium: '#D97706', high: '#EA580C', critical: '#DC2626' };
+                  const sColors: Record<string, string> = { low: '#1D4ED8', medium: '#D97706', high: '#EA580C', critical: '#DC2626' };
                   return (
                     <TouchableOpacity key={s} onPress={() => setRemarkForm(p => ({ ...p, severity: s }))}
                       style={{ flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', borderWidth: 1.5, borderColor: active ? sColors[s] : colors.border, backgroundColor: active ? sColors[s] + '15' : colors.surface }}>
@@ -1095,12 +1095,12 @@ export default function TenantsScreen() {
                 </TouchableOpacity>
               </View>
               <TouchableOpacity onPress={runDuplicateScanAll} disabled={dupLoading}
-                style={{ backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, alignItems: 'center', marginBottom: 16, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+                style={{ backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', padding: 12, alignItems: 'center', marginBottom: 16, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
                 {dupLoading ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="scan-outline" size={16} color={colors.primary} />}
                 <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{dupLoading ? 'Scanning…' : 'List all duplicate / triplicate phone records'}</Text>
               </TouchableOpacity>
               {dupGroups.length > 0 ? dupGroups.map(g => (
-                <View key={g.phone} style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border }}>
+                <View key={g.phone} style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{g.phone}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1126,7 +1126,7 @@ export default function TenantsScreen() {
                         <Text style={{ fontSize: 11, color: colors.textSecondary }}>{t.email || '—'} · {(t.staying_status || 'new').toUpperCase()}</Text>
                         <View style={{ flexDirection: 'row', marginTop: 3 }}>
                           <View style={{ backgroundColor: hasAllotment ? '#ECFDF5' : '#F1F5F9', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: hasAllotment ? '#059669' : '#6B7280' }}>{hasAllotment ? 'Allocated' : 'No allotment'}</Text>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: hasAllotment ? '#059669' : '#64748B' }}>{hasAllotment ? 'Allocated' : 'No allotment'}</Text>
                           </View>
                         </View>
                       </View>
@@ -1148,13 +1148,13 @@ export default function TenantsScreen() {
                 const match = (tenants || []).find((ten: any) => ten._id === t.id);
                 const hasAllotment = !!(match?.allotmentId || t.allotmentId || t.tenant_allotment_id);
                 return (
-                <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: colors.surface, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border }}>
+                <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: colors.surface, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{t.full_name || '—'}</Text>
                     <Text style={{ fontSize: 11, color: colors.textSecondary }}>{t.phone} · {t.email || '—'} · {(t.staying_status || 'new').toUpperCase()}</Text>
                     <View style={{ flexDirection: 'row', marginTop: 3 }}>
                       <View style={{ backgroundColor: hasAllotment ? '#ECFDF5' : '#F1F5F9', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: hasAllotment ? '#059669' : '#6B7280' }}>{hasAllotment ? 'Allocated' : 'No allotment'}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: hasAllotment ? '#059669' : '#64748B' }}>{hasAllotment ? 'Allocated' : 'No allotment'}</Text>
                       </View>
                     </View>
                   </View>
@@ -1514,7 +1514,7 @@ function TenantFormModal({
           <Input label="Mobile *" value={form.phone} onChangeText={v => setF('phone')(v.replace(/\D/g,'').slice(0,10))} placeholder="10 digit mobile" keyboardType="phone-pad" maxLength={10} />
           <Input label="Email *" value={form.email} onChangeText={setF('email')} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" />
           <Input label="S/W/D of (Relationship)" value={form.relation_name} onChangeText={setF('relation_name')} placeholder="e.g. S/o Ramesh Kumar" />
-          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Date of Birth *</Text><DateField value={form.date_of_birth} onChange={setF('date_of_birth')} /></View>
+          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 }}>Date of Birth *</Text><DateField value={form.date_of_birth} onChange={setF('date_of_birth')} /></View>
           <PillSelect label="Gender *" value={form.gender} options={GENDER_OPTS} onSelect={setF('gender')} required />
           <PillSelect label="Food Preference" value={form.food_preference} options={FOOD_OPTS} onSelect={setF('food_preference')} />
           <Input label="Profession *" value={form.profession} onChangeText={setF('profession')} placeholder="e.g. Software Engineer, Student" />
@@ -1534,7 +1534,7 @@ function TenantFormModal({
           {/* ══ SECTION 3: Professional Information ══ */}
           <FormSection icon="briefcase-outline" title="Professional Information" />
           <Input label="Company / College" value={form.company_name} onChangeText={setF('company_name')} placeholder="Employer or institution" />
-          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 }}>Date of Joining</Text><DateField value={form.date_of_joining} onChange={setF('date_of_joining')} /></View>
+          <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 }}>Date of Joining</Text><DateField value={form.date_of_joining} onChange={setF('date_of_joining')} /></View>
           <Input label="Designation / Course" value={form.designation} onChangeText={setF('designation')} placeholder="Job title or course" />
           <Input label="Company Address" value={form.company_address} onChangeText={setF('company_address')} placeholder="Office address" multiline />
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1627,13 +1627,13 @@ const tenantStyles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
   iconBtn: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#1D4ED8',
+    backgroundColor: '#6A2C90',
     alignItems: 'center', justifyContent: 'center',
   },
   ghostIconBtn: {
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: '#E5E7EB',
+    borderWidth: 1, borderColor: '#EEF1F6',
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -1646,9 +1646,9 @@ const tenantStyles = StyleSheet.create({
     justifyContent: 'center', gap: 6, paddingVertical: 11,
     borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
-  tabItemActive:  { borderBottomColor: colors.primary },
+  tabItemActive:  { borderBottomColor: '#6A2C90' },
   tabText:        { fontSize: 13, color: colors.textTertiary, fontWeight: '500' },
-  tabTextActive:  { color: colors.primary, fontWeight: '700' },
+  tabTextActive:  { color: '#6A2C90', fontWeight: '700' },
 
   chip: {
     alignItems: 'center', minWidth: 68,
@@ -1668,14 +1668,14 @@ const tenantStyles = StyleSheet.create({
   resultLabel: { fontSize: 11, color: colors.textTertiary, marginBottom: 10, marginLeft: 2 },
 
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 14,
+    backgroundColor: '#FFFFFF', borderRadius: 16,
     padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: '#E5E7EB',
-    shadowColor: '#0F172A', shadowOpacity: 0.04,
-    shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1,
+    borderWidth: 1, borderColor: '#EEF1F6',
+    shadowColor: '#0F172A', shadowOpacity: 0.05,
+    shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1,
   },
   avatar: {
-    width: 44, height: 44, borderRadius: 14,
+    width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
   },
   avatarText: { fontSize: 18, fontWeight: '800' },
@@ -1691,7 +1691,7 @@ const tenantStyles = StyleSheet.create({
   },
   noticeBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    marginTop: 8, backgroundColor: '#FFFBEB',
+    marginTop: 8, backgroundColor: '#FFEDD5',
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
   },
 
