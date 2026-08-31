@@ -10,9 +10,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { fetchBankAccounts } from '../services/ticketService';
 
+// ── design tokens (web dashboard parity — see DASH in DashboardScreen.tsx) ──
+const ACC = {
+  ink: '#0F172A',
+  ink2: '#64748B',
+  ink3: '#94A3B8',
+  line: '#EEF1F6',
+  soft: '#F8FAFC',
+  purple: '#6A2C90',
+  pillInactiveBg: '#F1F3F9',
+  good: '#16A34A',
+  goodBg: '#DCFCE7',
+  warn: '#EA580C',
+  warnBg: '#FFEDD5',
+  bad: '#DC2626',
+  badBg: '#FEE2E2',
+  info: '#1D4ED8',
+  infoBg: '#EEF3FF',
+};
+
 const statusColor = (s: string) => {
-  switch (s) { case 'paid': return colors.success; case 'sent': return colors.primary;
-    case 'partial': return colors.warning; case 'overdue': return colors.danger; default: return colors.textSecondary; }
+  switch (s) { case 'paid': return ACC.good; case 'sent': return ACC.info;
+    case 'partial': return ACC.warn; case 'overdue': return ACC.bad; default: return ACC.ink2; }
 };
 
 // ── period labels (web parity with Reports.tsx / ReportsScreen) ──
@@ -295,9 +314,9 @@ export default function AccountingScreen() {
   };
 
   return (
-    <GlassBackground>
+    <GlassBackground style={{ backgroundColor: '#FFFFFF' }}>
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-      <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+      <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, backgroundColor: '#FFFFFF', borderBottomColor: ACC.line }]}>
         <View style={{ width: 38, height: 28, overflow: 'hidden', alignItems: 'center', marginRight: 10 }}>
           <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
         </View>
@@ -312,7 +331,7 @@ export default function AccountingScreen() {
       </View>
       {totalPending > 0 && (
         <View style={styles.pendingBanner}>
-          <Ionicons name="alert-circle" size={18} color={colors.danger} />
+          <Ionicons name="alert-circle" size={18} color={ACC.bad} />
           <Text style={styles.pendingText}>Pending: Rs {totalPending.toLocaleString()}</Text>
         </View>
       )}
@@ -335,9 +354,9 @@ export default function AccountingScreen() {
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <KpiTile label="Total Invoiced" value={fmtMoney(acc.totalInvoiced || 0)} />
-            <KpiTile label="Collections" value={fmtMoney(acc.totalCollections || 0)} color={colors.success} />
-            <KpiTile label="Expenses" value={fmtMoney(acc.totalExpenses || 0)} color={colors.danger} />
-            <KpiTile label="Profit" value={fmtMoney(acc.totalProfit || 0)} color={(acc.totalProfit || 0) >= 0 ? colors.success : colors.danger} />
+            <KpiTile label="Collections" value={fmtMoney(acc.totalCollections || 0)} color={ACC.good} />
+            <KpiTile label="Expenses" value={fmtMoney(acc.totalExpenses || 0)} color={ACC.bad} />
+            <KpiTile label="Profit" value={fmtMoney(acc.totalProfit || 0)} color={(acc.totalProfit || 0) >= 0 ? ACC.good : ACC.bad} />
             <KpiTile label="Deposits" value={fmtMoney(acc.depositCollections || 0)} color={colors.primary} />
             <KpiTile label="Pending Dues" value={fmtMoney(acc.totalPendingCollection || 0)} color={colors.primary} />
           </View>
@@ -371,8 +390,8 @@ export default function AccountingScreen() {
                   {inv.electricityAmount > 0 && <Text style={styles.cardSub}>Elec: Rs {inv.electricityAmount}</Text>}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Rs {inv.totalAmount}</Text>
-                  {inv.paidAmount > 0 && <Text style={{ fontSize: fontSize.sm, color: colors.success }}>Paid: Rs {inv.paidAmount}</Text>}
+                  <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.ink }}>Rs {inv.totalAmount}</Text>
+                  {inv.paidAmount > 0 && <Text style={{ fontSize: fontSize.sm, color: ACC.good, fontWeight: '600' }}>Paid: Rs {inv.paidAmount}</Text>}
                 </View>
               </View>
             </TouchableOpacity>
@@ -394,7 +413,7 @@ export default function AccountingScreen() {
             <View key={r.id} style={styles.card}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{tenantNameFor(r)}</Text>
-                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.success }}>Rs {Number(r.amount_paid || 0).toLocaleString('en-IN')}</Text>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.good }}>Rs {Number(r.amount_paid || 0).toLocaleString('en-IN')}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                 <Text style={styles.cardSub}>{r.payment_date ? formatDate(r.payment_date) : '—'}{r.payment_mode ? ` · ${String(r.payment_mode).toUpperCase()}` : ''}</Text>
@@ -412,7 +431,7 @@ export default function AccountingScreen() {
             <View key={e.id} style={styles.card}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{e.category || 'Expense'}</Text>
-                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.danger }}>Rs {Number(e.amount || 0).toLocaleString('en-IN')}</Text>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.bad }}>Rs {Number(e.amount || 0).toLocaleString('en-IN')}</Text>
               </View>
               {!!e.description && <Text style={styles.cardSub} numberOfLines={2}>{e.description}</Text>}
               <Text style={styles.cardSub}>{e.expense_date ? formatDate(e.expense_date) : '—'}</Text>
@@ -428,7 +447,7 @@ export default function AccountingScreen() {
             <View key={p.id ?? p._id ?? p.created_at} style={styles.card}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{p.owner_name || p.property_name || p.owner_id || 'Owner Payout'}</Text>
-                <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.primary }}>Rs {Number(p.amount || 0).toLocaleString('en-IN')}</Text>
+                <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.primary }}>Rs {Number(p.amount || 0).toLocaleString('en-IN')}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                 <Text style={styles.cardSub}>{p.payment_date ? formatDate(p.payment_date) : (p.created_at ? formatDate(p.created_at) : '—')}{p.payment_mode ? ` · ${String(p.payment_mode).toUpperCase()}` : ''}</Text>
@@ -457,9 +476,9 @@ export default function AccountingScreen() {
                   <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.primary }}>{p.occupancy}% occ</Text>
                 </View>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  <KpiTile label="Revenue" value={fmtMoney(p.revenue)} color={colors.success} />
-                  <KpiTile label="Expenses" value={fmtMoney(p.totalExpense)} color={colors.danger} />
-                  <KpiTile label="Profit" value={fmtMoney(p.profit)} color={p.profit >= 0 ? colors.success : colors.danger} />
+                  <KpiTile label="Revenue" value={fmtMoney(p.revenue)} color={ACC.good} />
+                  <KpiTile label="Expenses" value={fmtMoney(p.totalExpense)} color={ACC.bad} />
+                  <KpiTile label="Profit" value={fmtMoney(p.profit)} color={p.profit >= 0 ? ACC.good : ACC.bad} />
                   <KpiTile label="Rev / Bed" value={fmtMoney(p.revPerBed)} color={colors.primary} />
                 </View>
               </View>
@@ -475,11 +494,11 @@ export default function AccountingScreen() {
                     <Text style={styles.cardTitle}>{b.apartment_code} · {b.bed_code}</Text>
                     <Text style={styles.cardSub}>{b.property_name}</Text>
                   </View>
-                  <Badge text={fmtMoney(b.profit)} color={b.isLoss ? colors.danger : colors.success} />
+                  <Badge text={fmtMoney(b.profit)} color={b.isLoss ? ACC.bad : ACC.good} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 20, marginTop: 8 }}>
-                  <View><Text style={styles.cardSub}>Revenue</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.success }}>{fmtMoney(b.revenue)}</Text></View>
-                  <View><Text style={styles.cardSub}>Cost</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.danger }}>{fmtMoney(b.totalCost)}</Text></View>
+                  <View><Text style={styles.cardSub}>Revenue</Text><Text style={{ fontSize: fontSize.md, fontWeight: '800', color: ACC.good }}>{fmtMoney(b.revenue)}</Text></View>
+                  <View><Text style={styles.cardSub}>Cost</Text><Text style={{ fontSize: fontSize.md, fontWeight: '800', color: ACC.bad }}>{fmtMoney(b.totalCost)}</Text></View>
                 </View>
               </View>
             ))
@@ -491,9 +510,9 @@ export default function AccountingScreen() {
               <View key={i} style={styles.card}>
                 <Text style={[styles.cardTitle, { marginBottom: 8 }]} numberOfLines={1}>{e.property_name}</Text>
                 <View style={{ flexDirection: 'row', gap: 18 }}>
-                  <View><Text style={styles.cardSub}>Billed</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.success }}>{fmtMoney(e.ebBilled)}</Text></View>
-                  <View><Text style={styles.cardSub}>Actual</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.primary }}>{fmtMoney(e.ebActual)}</Text></View>
-                  <View><Text style={styles.cardSub}>Variance</Text><Text style={{ fontSize: fontSize.md, fontWeight: '700', color: e.variance >= 0 ? colors.success : colors.danger }}>{e.variance >= 0 ? '+' : ''}{fmtMoney(e.variance)} ({e.variancePct}%)</Text></View>
+                  <View><Text style={styles.cardSub}>Billed</Text><Text style={{ fontSize: fontSize.md, fontWeight: '800', color: ACC.good }}>{fmtMoney(e.ebBilled)}</Text></View>
+                  <View><Text style={styles.cardSub}>Actual</Text><Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.primary }}>{fmtMoney(e.ebActual)}</Text></View>
+                  <View><Text style={styles.cardSub}>Variance</Text><Text style={{ fontSize: fontSize.md, fontWeight: '800', color: e.variance >= 0 ? ACC.good : ACC.bad }}>{e.variance >= 0 ? '+' : ''}{fmtMoney(e.variance)} ({e.variancePct}%)</Text></View>
                 </View>
               </View>
             ))
@@ -504,12 +523,12 @@ export default function AccountingScreen() {
       {/* Period selector modal */}
       <Modal visible={periodOpen} transparent animationType="fade" onRequestClose={() => setPeriodOpen(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setPeriodOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 32 }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden' }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>Select Period</Text>
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, overflow: 'hidden' }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: ACC.ink, padding: 16, borderBottomWidth: 1, borderBottomColor: ACC.line }}>Select Period</Text>
             {PERIODS.map(p => (
               <TouchableOpacity key={p.key} onPress={() => { setPeriod(p.key); setPeriodOpen(false); }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
-                <Text style={{ fontSize: 14, fontWeight: period === p.key ? '800' : '500', color: period === p.key ? colors.primary : colors.text }}>{p.label}</Text>
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: ACC.line }}>
+                <Text style={{ fontSize: 14, fontWeight: period === p.key ? '800' : '500', color: period === p.key ? colors.primary : ACC.ink }}>{p.label}</Text>
                 {period === p.key && <Ionicons name="checkmark" size={18} color={colors.primary} />}
               </TouchableOpacity>
             ))}
@@ -535,7 +554,7 @@ export default function AccountingScreen() {
             <Input label="Electricity Amount" value={elec} onChangeText={setElec} placeholder="0" keyboardType="numeric" />
             <Input label="Other Charges" value={other} onChangeText={setOther} placeholder="0" keyboardType="numeric" />
             <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Due Date</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Due Date</Text>
               <DateField value={dueDate} onChange={setDueDate} />
             </View>
             <Button title="Create Invoice" onPress={handleCreate} loading={loading} icon="receipt-outline" />
@@ -561,9 +580,9 @@ export default function AccountingScreen() {
                 <Text style={styles.summaryLabel}>Total Amount</Text>
                 <Text style={styles.summaryValue}>Rs {showPay.totalAmount}</Text>
                 <Text style={styles.summaryLabel}>Paid</Text>
-                <Text style={[styles.summaryValue, { color: colors.success }]}>Rs {showPay.paidAmount}</Text>
+                <Text style={[styles.summaryValue, { color: ACC.good }]}>Rs {showPay.paidAmount}</Text>
                 <Text style={styles.summaryLabel}>Balance</Text>
-                <Text style={[styles.summaryValue, { color: colors.danger }]}>Rs {showPay.totalAmount - showPay.paidAmount}</Text>
+                <Text style={[styles.summaryValue, { color: ACC.bad }]}>Rs {showPay.totalAmount - showPay.paidAmount}</Text>
               </View>
               {showPay.status !== 'paid' && (
                 <>
@@ -601,7 +620,7 @@ export default function AccountingScreen() {
             <PickerSelect label="Tenant" value={colTenant} options={tenantOpts} onSelect={setColTenant} />
             <Input label="Amount" value={colAmount} onChangeText={setColAmount} placeholder="Amount received" keyboardType="numeric" />
             <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Payment Date</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Payment Date</Text>
               <DateField value={colDate} onChange={setColDate} />
             </View>
             <PickerSelect label="Payment Mode" value={colMode} options={payModes} onSelect={setColMode} />
@@ -634,44 +653,50 @@ const styles = StyleSheet.create({
   title: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text },
   addBtn: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
     shadowColor: colors.primary, shadowOpacity: 0.4, shadowRadius: 10, elevation: 5 },
-  pendingBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.dangerLight, padding: spacing.md, paddingHorizontal: spacing.xl },
-  pendingText: { fontSize: fontSize.sm, color: colors.danger, fontWeight: '600' },
-  filters: { backgroundColor: 'rgba(255,255,255,0.5)', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, maxHeight: 50,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)' },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.6)', marginRight: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
-  filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { fontSize: fontSize.sm, color: colors.textSecondary, textTransform: 'capitalize', fontWeight: '600' },
+  pendingBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: ACC.badBg, borderWidth: 1, borderColor: '#FECACA',
+    borderRadius: 14, padding: spacing.md, marginHorizontal: spacing.xl, marginTop: spacing.sm,
+  },
+  pendingText: { fontSize: fontSize.sm, color: ACC.bad, fontWeight: '700' },
+  filters: { backgroundColor: '#FFFFFF', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, maxHeight: 50,
+    borderBottomWidth: 1, borderBottomColor: ACC.line },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: ACC.pillInactiveBg, marginRight: 8,
+    borderWidth: 1, borderColor: ACC.pillInactiveBg },
+  filterActive: { backgroundColor: ACC.purple, borderColor: ACC.purple },
+  filterText: { fontSize: fontSize.sm, color: ACC.ink2, textTransform: 'capitalize', fontWeight: '600' },
   filterTextActive: { color: colors.white, fontWeight: '700' },
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: spacing.lg,
-    marginBottom: spacing.md, borderWidth: 1, borderColor: '#E5E7EB',
-    shadowColor: '#1D4ED8', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg,
+    marginBottom: spacing.md, borderWidth: 1, borderColor: ACC.line,
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
   },
   invNum: { fontSize: fontSize.xs, fontWeight: '700', color: colors.primary },
-  cardTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
-  cardSub: { fontSize: fontSize.sm, color: colors.textSecondary },
+  cardTitle: { fontSize: fontSize.md, fontWeight: '800', color: ACC.ink },
+  cardSub: { fontSize: fontSize.sm, color: ACC.ink2 },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
+    padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: ACC.line,
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: spacing.xl, marginBottom: spacing.xl,
-    borderWidth: 1, borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.xl, marginBottom: spacing.xl,
+    borderWidth: 1, borderColor: ACC.line,
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
   },
-  summaryLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 8 },
-  summaryValue: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text },
+  summaryLabel: { fontSize: fontSize.sm, color: ACC.ink2, marginTop: 8 },
+  summaryValue: { fontSize: fontSize.xl, fontWeight: '800', color: ACC.ink },
   periodBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8,
-    borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8, maxWidth: 130,
+    flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 8,
+    borderRadius: 999, backgroundColor: '#fff', borderWidth: 1, borderColor: ACC.line, marginRight: 8, maxWidth: 130,
   },
   periodBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary, flexShrink: 1 },
-  sectionHeading: { fontSize: fontSize.md, fontWeight: '800', color: colors.text },
+  sectionHeading: { fontSize: 17, fontWeight: '800', color: ACC.ink },
   sectionSub: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
   kpiTile: {
-    flexGrow: 1, flexBasis: '30%', minWidth: '30%', backgroundColor: '#FFFFFF', borderRadius: 12,
-    padding: spacing.md, borderWidth: 1, borderColor: '#E5E7EB',
+    flexGrow: 1, flexBasis: '30%', minWidth: '30%', backgroundColor: '#FFFFFF', borderRadius: 16,
+    padding: spacing.md, borderWidth: 1, borderColor: ACC.line,
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
   },
-  kpiValue: { fontSize: fontSize.md, fontWeight: '900', color: colors.text },
-  kpiLabel: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  kpiValue: { fontSize: fontSize.md, fontWeight: '800', color: ACC.ink, letterSpacing: -0.3 },
+  kpiLabel: { fontSize: fontSize.xs, color: ACC.ink2, marginTop: 2 },
 });

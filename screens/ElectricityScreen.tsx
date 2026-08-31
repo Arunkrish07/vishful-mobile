@@ -82,7 +82,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: any }) {
 
 function SectionLabel({ text }: { text: string }) {
   return (
-    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB',
+    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6A2C90',
       letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 }}>
       {text}
     </Text>
@@ -153,7 +153,7 @@ function DatePickerField({ label, value, onChange, required, placeholder }: {
     <>
       <View style={{ marginBottom: 12 }}>
         {label ? (
-          <Text style={{ fontSize: 10, fontWeight: '700', color: '#6B7280', letterSpacing: 0.5, marginBottom: 5 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B', letterSpacing: 0.5, marginBottom: 5 }}>
             {label.toUpperCase()}{required ? ' *' : ''}
           </Text>
         ) : null}
@@ -165,17 +165,17 @@ function DatePickerField({ label, value, onChange, required, placeholder }: {
             }
             setOpen(true);
           }}
-          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: value ? '#2563EB' : 'rgba(37,99,235,0.2)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, gap: 8 }}
+          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: value ? '#6A2C90' : 'rgba(106,44,144,0.2)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, gap: 8 }}
         >
-          <Ionicons name="calendar-outline" size={16} color={value ? '#2563EB' : '#9CA3AF'} />
-          <Text style={{ flex: 1, fontSize: 14, color: value ? '#111827' : '#9CA3AF', fontWeight: value ? '600' : '400' }}>
+          <Ionicons name="calendar-outline" size={16} color={value ? '#6A2C90' : '#94A3B8'} />
+          <Text style={{ flex: 1, fontSize: 14, color: value ? '#0F172A' : '#94A3B8', fontWeight: value ? '600' : '400' }}>
             {value ? fmtDisplay(value) : (placeholder || 'Select date')}
           </Text>
           {value ? (
             <TouchableOpacity onPress={() => onChange('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="#94A3B8" />
             </TouchableOpacity>
-          ) : <Ionicons name="chevron-down" size={14} color="#9CA3AF" />}
+          ) : <Ionicons name="chevron-down" size={14} color="#94A3B8" />}
         </TouchableOpacity>
       </View>
 
@@ -186,30 +186,30 @@ function DatePickerField({ label, value, onChange, required, placeholder }: {
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <TouchableOpacity onPress={prevMonth} style={{ padding: 6 }}>
-                <Ionicons name="chevron-back" size={20} color="#2563EB" />
+                <Ionicons name="chevron-back" size={20} color="#6A2C90" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
                   {MONTHS[viewMonth]} {viewYear}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={nextMonth} style={{ padding: 6 }}>
-                <Ionicons name="chevron-forward" size={20} color="#2563EB" />
+                <Ionicons name="chevron-forward" size={20} color="#6A2C90" />
               </TouchableOpacity>
             </View>
             {/* Year quick-jump */}
             <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
               {[viewYear - 1, viewYear, viewYear + 1].map(y => (
                 <TouchableOpacity key={y} onPress={() => setViewYear(y)}
-                  style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, backgroundColor: y === viewYear ? '#2563EB' : '#EFF6FF' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: y === viewYear ? '#fff' : '#2563EB' }}>{y}</Text>
+                  style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, backgroundColor: y === viewYear ? '#6A2C90' : '#F3ECF9' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: y === viewYear ? '#fff' : '#6A2C90' }}>{y}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             {/* Day headers */}
             <View style={{ flexDirection: 'row', marginBottom: 6 }}>
               {DAYS.map(d => (
-                <Text key={d} style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#9CA3AF' }}>{d}</Text>
+                <Text key={d} style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#94A3B8' }}>{d}</Text>
               ))}
             </View>
             {/* Day grid */}
@@ -225,11 +225,11 @@ function DatePickerField({ label, value, onChange, required, placeholder }: {
                     style={{ width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' }}>
                     <View style={{
                       width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: isSelected ? '#2563EB' : isToday ? '#EFF6FF' : 'transparent',
+                      backgroundColor: isSelected ? '#6A2C90' : isToday ? '#F3ECF9' : 'transparent',
                       borderWidth: isToday && !isSelected ? 1.5 : 0,
-                      borderColor: '#2563EB',
+                      borderColor: '#6A2C90',
                     }}>
-                      <Text style={{ fontSize: 13, fontWeight: isSelected || isToday ? '800' : '400', color: isSelected ? '#fff' : isToday ? '#2563EB' : '#111827' }}>{day}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: isSelected || isToday ? '800' : '400', color: isSelected ? '#fff' : isToday ? '#6A2C90' : '#0F172A' }}>{day}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -237,8 +237,8 @@ function DatePickerField({ label, value, onChange, required, placeholder }: {
             </View>
             {/* Today button */}
             <TouchableOpacity onPress={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); handleSelect(today.getDate()); }}
-              style={{ marginTop: 14, backgroundColor: '#EFF6FF', borderRadius: 10, padding: 10, alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Today</Text>
+              style={{ marginTop: 14, backgroundColor: '#F3ECF9', borderRadius: 10, padding: 10, alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#6A2C90' }}>Today</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -1001,8 +1001,8 @@ export default function ElectricityScreen() {
               const active = currentEbProperty === pid;
               return (
                 <TouchableOpacity key={pid} onPress={() => { setCurrentEbProperty(pid); loadCurrentEb(pid); }}
-                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>{p.property_name || p.name || ''}</Text>
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{p.property_name || p.name || ''}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1012,15 +1012,15 @@ export default function ElectricityScreen() {
         {!currentEbProperty ? (
           <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 30 }}>Select a property to load its meters.</Text>
         ) : currentEbLoading ? (
-          <ActivityIndicator color="#0284C7" style={{ marginTop: 30 }} />
+          <ActivityIndicator color="#6A2C90" style={{ marginTop: 30 }} />
         ) : rowsComputed.length === 0 ? (
           <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 30 }}>No live apartments with meters for this property.</Text>
         ) : (
           <>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-              <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#EEF1F6' }}>
                 <Text style={{ fontSize: 11, color: colors.textSecondary }}>Estimated total ({enteredCount}/{rowsComputed.length})</Text>
-                <Text style={{ fontSize: 18, fontWeight: '900', color: anyDanger ? '#DC2626' : '#0284C7' }}>₹{Math.round(totalAmount).toLocaleString('en-IN')}</Text>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: anyDanger ? '#DC2626' : '#6A2C90' }}>₹{Math.round(totalAmount).toLocaleString('en-IN')}</Text>
               </View>
               {anyDanger && (
                 <View style={{ justifyContent: 'center', backgroundColor: '#FEF2F2', borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: '#FECACA' }}>
@@ -1031,10 +1031,10 @@ export default function ElectricityScreen() {
             </View>
 
             {rowsComputed.map((r: any, idx: number) => (
-              <View key={r.apartmentId} style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: r.hasCur && r.bill.isDanger ? '#FECACA' : '#E5E7EB' }}>
+              <View key={r.apartmentId} style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: r.hasCur && r.bill.isDanger ? '#FECACA' : '#EEF1F6' }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{r.apartmentCode}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>{r.apartmentCode}</Text>
                     <Text style={{ fontSize: 10, color: colors.textTertiary }}>{r.ebMeterNumber ? `Meter ${r.ebMeterNumber} · ` : ''}Start {r.startReading}{r.startMonth ? ` (${r.startMonth})` : ''}</Text>
                   </View>
                   {r.hasCur && (
@@ -1061,7 +1061,7 @@ export default function ElectricityScreen() {
             <Text style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 10 }}>
               Slab-rate estimate (TN telescopic). Saved snapshots are for monitoring only and don't affect billing.
             </Text>
-            <TouchableOpacity style={[S.saveBtn, { backgroundColor: '#0284C7' }, currentEbSaving && { opacity: 0.5 }]} onPress={handleSaveCurrentEb} disabled={currentEbSaving}>
+            <TouchableOpacity style={[S.saveBtn, { backgroundColor: '#6A2C90' }, currentEbSaving && { opacity: 0.5 }]} onPress={handleSaveCurrentEb} disabled={currentEbSaving}>
               {currentEbSaving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>Save Today's Readings</Text>}
             </TouchableOpacity>
           </>
@@ -1075,7 +1075,7 @@ export default function ElectricityScreen() {
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563EB" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6A2C90" />}
     >
       {/* Period filter (mirrors web AccountingPeriodSelector) */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
@@ -1088,11 +1088,10 @@ export default function ElectricityScreen() {
                 onPress={() => setPeriodFilter(opt.key)}
                 style={{
                   paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99,
-                  backgroundColor: active ? '#2563EB' : 'rgba(37,99,235,0.08)',
-                  borderWidth: 1.5, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.2)',
+                  backgroundColor: active ? '#6A2C90' : '#F1F3F9',
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>
                   {opt.label}
                 </Text>
               </TouchableOpacity>
@@ -1113,7 +1112,7 @@ export default function ElectricityScreen() {
           </View>
           <View style={{ width: 120 }}>
             <Card>
-              <Ionicons name="cash-outline" size={16} color="#2563EB" />
+              <Ionicons name="cash-outline" size={16} color="#6A2C90" />
               <Text style={S.kpiVal} numberOfLines={1} adjustsFontSizeToFit>{fmtAmt(totalCostFiltered)}</Text>
               <Text style={S.kpiLabel}>Total Billed</Text>
             </Card>
@@ -1138,10 +1137,10 @@ export default function ElectricityScreen() {
       {/* Add Payment shortcut */}
       <TouchableOpacity
         onPress={() => { setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', bank_account_id: '', billing_period_start: '', billing_period_end: '', notes: '' }); setPaymentOpen(true); }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', marginBottom: spacing.md, backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(2,132,199,0.25)' }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end', marginBottom: spacing.md, backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#EEF1F6' }}
       >
-        <Ionicons name="add" size={15} color="#0284C7" />
-        <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284C7' }}>Add Payment</Text>
+        <Ionicons name="add" size={15} color="#6A2C90" />
+        <Text style={{ fontSize: 12, fontWeight: '700', color: '#6A2C90' }}>Add Payment</Text>
       </TouchableOpacity>
 
       {groupsInPeriod.length === 0 ? (
@@ -1167,7 +1166,7 @@ export default function ElectricityScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.text }}>{group.billing_month}</Text>
                       {group.is_locked && (
-                        <Pill label="Locked" color="#E65100" bg="#FFF3E0" />
+                        <Pill label="Locked" color="#EA580C" bg="#FFEDD5" />
                       )}
                     </View>
                     <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{group.property_name}</Text>
@@ -1177,7 +1176,7 @@ export default function ElectricityScreen() {
                         <TrendArrow current={group.total_units} previous={prev?.total_units ?? null} />
                       </Text>
                       <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
-                        <Text style={{ fontWeight: '700', color: '#2563EB' }}>{fmtAmt(group.total_amount)}</Text>
+                        <Text style={{ fontWeight: '700', color: '#6A2C90' }}>{fmtAmt(group.total_amount)}</Text>
                       </Text>
                       <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>₹{group.unit_cost.toFixed(2)}/unit</Text>
                     </View>
@@ -1191,11 +1190,11 @@ export default function ElectricityScreen() {
                       disabled={locking === group.key}
                     >
                       {locking === group.key
-                        ? <ActivityIndicator size="small" color="#2563EB" />
+                        ? <ActivityIndicator size="small" color="#6A2C90" />
                         : <Ionicons
                             name={group.is_locked ? 'lock-closed' : 'lock-open-outline'}
                             size={16}
-                            color={group.is_locked ? '#E65100' : colors.textTertiary}
+                            color={group.is_locked ? '#EA580C' : colors.textTertiary}
                           />
                       }
                     </TouchableOpacity>
@@ -1214,7 +1213,7 @@ export default function ElectricityScreen() {
 
               {/* Expanded apartment details */}
               {expanded && (
-                <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 10 }}>
+                <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#EEF1F6', paddingTop: 10 }}>
                   <View style={{ flexDirection: 'row', marginBottom: 6 }}>
                     <Text style={[S.th, { flex: 1.2 }]}>Apt</Text>
                     <Text style={[S.th, { flex: 1, textAlign: 'right' }]}>Prev</Text>
@@ -1231,7 +1230,7 @@ export default function ElectricityScreen() {
                     .map((r: any) => {
                       const prevApt = prev?.readings?.find((pr: any) => pr.apartment_id === r.apartment_id);
                       return (
-                        <View key={r.id} style={{ flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
+                        <View key={r.id} style={{ flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: 'rgba(106,44,144,0.05)' }}>
                           <View style={{ flex: 1.2 }}>
                             <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.text }}>{r.apartment_code}</Text>
                             {r.eb_meter_number ? (
@@ -1246,7 +1245,7 @@ export default function ElectricityScreen() {
                             </Text>
                             <TrendArrow current={r.units_consumed} previous={prevApt?.units_consumed ?? null} />
                           </View>
-                          <Text style={[S.td, { flex: 1, textAlign: 'right', color: '#2563EB', fontWeight: '700' }]}>
+                          <Text style={[S.td, { flex: 1, textAlign: 'right', color: '#6A2C90', fontWeight: '700' }]}>
                             {fmtAmt(r.amount)}
                           </Text>
                           {/* Meter photo */}
@@ -1254,9 +1253,9 @@ export default function ElectricityScreen() {
                             {r.meter_photo_url ? (
                               <TouchableOpacity
                                 onPress={() => setLightboxUrl(r.meter_photo_url)}
-                                style={{ backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 }}
+                                style={{ backgroundColor: 'rgba(106,44,144,0.1)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 }}
                               >
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: '#0284C7' }}>View</Text>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: '#6A2C90' }}>View</Text>
                               </TouchableOpacity>
                             ) : (
                               <Text style={{ fontSize: 9, color: colors.textTertiary }}>—</Text>
@@ -1280,23 +1279,23 @@ export default function ElectricityScreen() {
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563EB" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6A2C90" />}
     >
       {/* Action buttons */}
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
         <TouchableOpacity
-          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0284C7', borderRadius: 12, paddingVertical: 10 }}
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#6A2C90', borderRadius: 12, paddingVertical: 10 }}
           onPress={() => { setPaymentForm({ id: '', property_id: '', bill_date: '', bill_amount: '', payment_date: '', payment_mode: '', reference_number: '', bank_account_id: '', billing_period_start: '', billing_period_end: '', notes: '' }); setPaymentOpen(true); }}
         >
           <Ionicons name="add" size={16} color="#fff" />
           <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Add Payment</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(2,132,199,0.25)' }}
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFFFFF', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#EEF1F6' }}
           onPress={() => { setBulkPayProperty(''); setBulkPayBillDate(''); setBulkPayDate(''); setBulkPayMode(''); setBulkPayRows([]); setBulkPayOpen(true); }}
         >
-          <Ionicons name="list-outline" size={16} color="#0284C7" />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0284C7' }}>Bulk Entry</Text>
+          <Ionicons name="list-outline" size={16} color="#6A2C90" />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#6A2C90' }}>Bulk Entry</Text>
         </TouchableOpacity>
       </View>
 
@@ -1333,7 +1332,7 @@ export default function ElectricityScreen() {
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0284C7' }}>{fmtAmt(g.total)}</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#6A2C90' }}>{fmtAmt(g.total)}</Text>
                   <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />
                 </View>
               </View>
@@ -1341,17 +1340,17 @@ export default function ElectricityScreen() {
 
             {/* Expanded — individual payments in this cycle (edit / delete intact) */}
             {expanded && (
-              <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 10, gap: 10 }}>
+              <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#EEF1F6', paddingTop: 10, gap: 10 }}>
                 {g.payments.map((p: any) => (
-                  <View key={p.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)', paddingBottom: 8 }}>
+                  <View key={p.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: 'rgba(106,44,144,0.05)', paddingBottom: 8 }}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0284C7' }}>
+                        <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#6A2C90' }}>
                           {fmtAmt(p.bill_amount)}
                         </Text>
                         {p.payment_mode && (
-                          <View style={{ backgroundColor: 'rgba(2,132,199,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#0284C7' }}>{p.payment_mode}</Text>
+                          <View style={{ backgroundColor: 'rgba(106,44,144,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#6A2C90' }}>{p.payment_mode}</Text>
                           </View>
                         )}
                       </View>
@@ -1396,8 +1395,8 @@ export default function ElectricityScreen() {
     if (analyticsLoading || !analytics) {
       return (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 60 }}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={{ color: '#6B7280', marginTop: 12, fontSize: fontSize.sm }}>Loading analytics…</Text>
+          <ActivityIndicator size="large" color="#6A2C90" />
+          <Text style={{ color: '#64748B', marginTop: 12, fontSize: fontSize.sm }}>Loading analytics…</Text>
         </View>
       );
     }
@@ -1410,13 +1409,13 @@ export default function ElectricityScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await fetchAnalytics(); setRefreshing(false); }} tintColor="#2563EB" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await fetchAnalytics(); setRefreshing(false); }} tintColor="#6A2C90" />}
       >
         {/* KPI Cards */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
           <View style={{ flex: 1, minWidth: 140 }}>
             <Card>
-              <Ionicons name="arrow-down-circle-outline" size={16} color="#2563EB" />
+              <Ionicons name="arrow-down-circle-outline" size={16} color="#6A2C90" />
               <Text style={S.kpiVal}>{fmtAmt(totalCollected)}</Text>
               <Text style={S.kpiLabel}>EB Collected (12m)</Text>
             </Card>
@@ -1430,20 +1429,20 @@ export default function ElectricityScreen() {
           </View>
           <View style={{ flex: 1, minWidth: 140 }}>
             <Card>
-              <Ionicons name={totalVariance >= 0 ? 'trending-up-outline' : 'trending-down-outline'} size={16} color={totalVariance >= 0 ? colors.success : colors.danger} />
-              <Text style={[S.kpiVal, { color: totalVariance >= 0 ? colors.success : colors.danger }]}>
+              <Ionicons name={totalVariance >= 0 ? 'trending-up-outline' : 'trending-down-outline'} size={16} color={totalVariance >= 0 ? '#16A34A' : '#DC2626'} />
+              <Text style={[S.kpiVal, { color: totalVariance >= 0 ? '#16A34A' : '#DC2626' }]}>
                 {totalVariance >= 0 ? '+' : ''}{fmtAmt(totalVariance)}
               </Text>
               <Text style={S.kpiLabel}>Net EB Variance</Text>
               <View style={{ marginTop: 4 }}>
-                <Pill label={totalVariance >= 0 ? 'Profitable' : 'At a Loss'} color={totalVariance >= 0 ? colors.success : colors.danger} bg={totalVariance >= 0 ? '#E8F5E9' : '#FFEBEE'} />
+                <Pill label={totalVariance >= 0 ? 'Profitable' : 'At a Loss'} color={totalVariance >= 0 ? '#16A34A' : '#DC2626'} bg={totalVariance >= 0 ? '#DCFCE7' : '#FEE2E2'} />
               </View>
             </Card>
           </View>
           <View style={{ flex: 1, minWidth: 140 }}>
             <Card>
-              <Ionicons name="calendar-outline" size={16} color="#2563EB" />
-              <Text style={S.kpiVal}>{profitableMonths}<Text style={{ fontSize: fontSize.sm, color: '#6B7280' }}> / 12</Text></Text>
+              <Ionicons name="calendar-outline" size={16} color="#6A2C90" />
+              <Text style={S.kpiVal}>{profitableMonths}<Text style={{ fontSize: fontSize.sm, color: '#64748B' }}> / 12</Text></Text>
               <Text style={S.kpiLabel}>Profitable Months</Text>
             </Card>
           </View>
@@ -1462,9 +1461,8 @@ export default function ElectricityScreen() {
                     fetchAnalytics(p.id);
                   }}
                   style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99,
-                    backgroundColor: active ? '#2563EB' : 'rgba(255,255,255,0.7)',
-                    borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>{p.property_name || p.name || ""}</Text>
+                    backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{p.property_name || p.name || ""}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1473,8 +1471,8 @@ export default function ElectricityScreen() {
 
         {/* Monthly bar visual */}
         <Card style={{ marginBottom: spacing.lg }}>
-          <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#111827', marginBottom: 4 }}>Monthly EB: Collected vs Actual Cost</Text>
-          <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginBottom: 12 }}>🟣 Collected  ⬜ Actual Cost</Text>
+          <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>Monthly EB: Collected vs Actual Cost</Text>
+          <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginBottom: 12 }}>🟣 Collected  ⬜ Actual Cost</Text>
           {monthlyData.map((m: any) => {
             const maxVal = Math.max(...monthlyData.map((x: any) => Math.max(x.ebCollected, x.ebPaid)), 1);
             const collectedW = (m.ebCollected / maxVal) * 100;
@@ -1483,7 +1481,7 @@ export default function ElectricityScreen() {
             return (
               <View key={m.month} style={{ marginBottom: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#111827' }}>{m.month}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#0F172A' }}>{m.month}</Text>
                   {hasData && (
                     <Text style={{ fontSize: 10, fontWeight: '700', color: m.variance >= 0 ? colors.success : colors.danger }}>
                       {m.variance >= 0 ? '+' : ''}{fmtAmt(m.variance)}
@@ -1493,16 +1491,16 @@ export default function ElectricityScreen() {
                 {hasData ? (
                   <>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                      <View style={{ width: `${collectedW}%` as any, height: 8, borderRadius: 99, backgroundColor: '#2563EB' }} />
-                      <Text style={{ fontSize: 9, color: '#6B7280' }}>{fmtAmt(m.ebCollected)}</Text>
+                      <View style={{ width: `${collectedW}%` as any, height: 8, borderRadius: 99, backgroundColor: '#6A2C90' }} />
+                      <Text style={{ fontSize: 9, color: '#64748B' }}>{fmtAmt(m.ebCollected)}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: `${paidW}%` as any, height: 8, borderRadius: 99, backgroundColor: '#C4B5A0' }} />
-                      <Text style={{ fontSize: 9, color: '#6B7280' }}>{fmtAmt(m.ebPaid)}</Text>
+                      <View style={{ width: `${paidW}%` as any, height: 8, borderRadius: 99, backgroundColor: '#94A3B8' }} />
+                      <Text style={{ fontSize: 9, color: '#64748B' }}>{fmtAmt(m.ebPaid)}</Text>
                     </View>
                   </>
                 ) : (
-                  <Text style={{ fontSize: 10, color: '#C4B5A0' }}>No data</Text>
+                  <Text style={{ fontSize: 10, color: '#94A3B8' }}>No data</Text>
                 )}
               </View>
             );
@@ -1511,7 +1509,7 @@ export default function ElectricityScreen() {
 
         {/* Monthly P&L table */}
         <Card style={{ marginBottom: spacing.lg }}>
-          <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Monthly EB P&L</Text>
+          <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>Monthly EB P&L</Text>
           {/* Header */}
           <View style={{ flexDirection: 'row', marginBottom: 6 }}>
             <Text style={[S.th, { flex: 1 }]}>Month</Text>
@@ -1527,16 +1525,16 @@ export default function ElectricityScreen() {
             return (
               <View key={m.month}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
-                  borderBottomWidth: 1, borderBottomColor: 'rgba(37,99,235,0.05)' }}>
-                  <Text style={{ flex: 1, fontSize: fontSize.xs, fontWeight: '700', color: '#111827' }}>{m.month}</Text>
-                  <Text style={{ flex: 1.2, fontSize: fontSize.xs, textAlign: 'right', color: '#111827' }}>
+                  borderBottomWidth: 1, borderBottomColor: 'rgba(106,44,144,0.05)' }}>
+                  <Text style={{ flex: 1, fontSize: fontSize.xs, fontWeight: '700', color: '#0F172A' }}>{m.month}</Text>
+                  <Text style={{ flex: 1.2, fontSize: fontSize.xs, textAlign: 'right', color: '#0F172A' }}>
                     {hasData ? fmtAmt(m.ebCollected) : '—'}
                   </Text>
-                  <Text style={{ flex: 1.2, fontSize: fontSize.xs, textAlign: 'right', color: '#111827' }}>
+                  <Text style={{ flex: 1.2, fontSize: fontSize.xs, textAlign: 'right', color: '#0F172A' }}>
                     {hasData ? fmtAmt(m.ebPaid) : '—'}
                   </Text>
                   <Text style={{ flex: 1, fontSize: fontSize.xs, textAlign: 'right', fontWeight: '700',
-                    color: hasData ? (m.variance >= 0 ? colors.success : colors.danger) : '#6B7280' }}>
+                    color: hasData ? (m.variance >= 0 ? colors.success : colors.danger) : '#64748B' }}>
                     {hasData ? `${m.variance >= 0 ? '+' : ''}${fmtAmt(m.variance)}` : '—'}
                   </Text>
                   <TouchableOpacity
@@ -1545,17 +1543,17 @@ export default function ElectricityScreen() {
                     disabled={!hasData}
                   >
                     {hasData ? (
-                      <Ionicons name={isDrilled ? 'chevron-up' : 'chevron-down'} size={14} color="#2563EB" />
+                      <Ionicons name={isDrilled ? 'chevron-up' : 'chevron-down'} size={14} color="#6A2C90" />
                     ) : (
-                      <Text style={{ fontSize: 10, color: '#C4B5A0' }}>—</Text>
+                      <Text style={{ fontSize: 10, color: '#94A3B8' }}>—</Text>
                     )}
                   </TouchableOpacity>
                 </View>
 
                 {/* Apartment drill-down */}
                 {isDrilled && drillRows.length > 0 && (
-                  <View style={{ backgroundColor: 'rgba(37,99,235,0.03)', borderRadius: 10, padding: 10, marginVertical: 6 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+                  <View style={{ backgroundColor: 'rgba(106,44,144,0.03)', borderRadius: 10, padding: 10, marginVertical: 6 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#6A2C90', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
                       Apartment Breakdown — {m.month}
                     </Text>
                     {/* Sub-header */}
@@ -1568,18 +1566,18 @@ export default function ElectricityScreen() {
                     </View>
                     {drillRows.map((apt: any) => (
                       <View key={apt.aptCode} style={{ flexDirection: 'row', paddingVertical: 5,
-                        borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                        borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#111827' }}>{apt.aptCode}</Text>
-                          <Text style={{ fontSize: 9, color: '#6B7280' }}>{apt.propName}</Text>
+                          <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#0F172A' }}>{apt.aptCode}</Text>
+                          <Text style={{ fontSize: 9, color: '#64748B' }}>{apt.propName}</Text>
                         </View>
-                        <Text style={{ flex: 0.8, fontSize: fontSize.xs, textAlign: 'right', color: '#111827' }}>
+                        <Text style={{ flex: 0.8, fontSize: fontSize.xs, textAlign: 'right', color: '#0F172A' }}>
                           {apt.unitsConsumed}
                         </Text>
-                        <Text style={{ flex: 1.1, fontSize: fontSize.xs, textAlign: 'right', color: '#111827' }}>
+                        <Text style={{ flex: 1.1, fontSize: fontSize.xs, textAlign: 'right', color: '#0F172A' }}>
                           {fmtAmt(apt.ebActualCost)}
                         </Text>
-                        <Text style={{ flex: 1.1, fontSize: fontSize.xs, textAlign: 'right', color: '#111827' }}>
+                        <Text style={{ flex: 1.1, fontSize: fontSize.xs, textAlign: 'right', color: '#0F172A' }}>
                           {fmtAmt(apt.ebCollected)}
                         </Text>
                         <Text style={{ flex: 1, fontSize: fontSize.xs, textAlign: 'right', fontWeight: '700',
@@ -1604,7 +1602,7 @@ export default function ElectricityScreen() {
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563EB" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6A2C90" />}
     >
       <TouchableOpacity
         style={S.addRateBtn}
@@ -1626,7 +1624,7 @@ export default function ElectricityScreen() {
         <Card key={rate.id} style={{ marginBottom: spacing.sm }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#2563EB' }}>
+              <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#6A2C90' }}>
                 ₹{parseFloat(rate.unit_cost).toFixed(2)}/unit
               </Text>
               <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 }}>
@@ -1665,7 +1663,7 @@ export default function ElectricityScreen() {
 
   // ─── MAIN RENDER ──────────────────────────────────────────────────────────
   return (
-    <View style={{ flex: 1 , backgroundColor: '#F8FAFC'}}>
+    <View style={{ flex: 1 , backgroundColor: '#FFFFFF'}}>
       <SafeAreaView style={{ flex: 1 }}>
 
         {/* Header */}
@@ -1676,7 +1674,7 @@ export default function ElectricityScreen() {
             </View>
             <View>
               <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Electricity</Text>
-              <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Meter readings, rates and cost sharing</Text>
+              <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 2 }}>Meter readings, rates and cost sharing</Text>
             </View>
           </View>
           {activeTab === 'readings' && (
@@ -1704,11 +1702,10 @@ export default function ElectricityScreen() {
                   onPress={() => setActiveTab(tab.key)}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99,
-                    backgroundColor: active ? '#2563EB' : 'rgba(255,255,255,0.5)',
-                    borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.15)' }}
+                    backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}
                 >
-                  <Ionicons name={tab.icon as any} size={13} color={active ? '#fff' : '#2563EB'} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>{tab.label}</Text>
+                  <Ionicons name={tab.icon as any} size={13} color={active ? '#fff' : '#64748B'} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{tab.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1722,16 +1719,16 @@ export default function ElectricityScreen() {
 
       {/* ── Bulk Add/Edit Modal ─────────────────────────────────────────────── */}
       <Modal visible={addOpen} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1 , backgroundColor: '#F8FAFC'}}>
+        <View style={{ flex: 1 , backgroundColor: '#FFFFFF'}}>
           <SafeAreaView style={{ flex: 1 }}>
             {/* Modal header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
               paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-              borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+              borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
               <TouchableOpacity onPress={() => { setAddOpen(false); resetBulkForm(); }}>
                 <Text style={{ color: colors.danger, fontSize: fontSize.md }}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A' }}>
                 {isEditMode ? 'Edit Readings' : 'Add Readings'}
               </Text>
               <View style={{ width: 60 }} />
@@ -1750,9 +1747,8 @@ export default function ElectricityScreen() {
                       <TouchableOpacity key={pid}
                         onPress={() => handlePropertySelect(pid)}
                         style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
-                          backgroundColor: active ? '#2563EB' : 'rgba(255,255,255,0.7)',
-                          borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>
+                          backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>
                           {p.property_name || p.name || ""}
                         </Text>
                       </TouchableOpacity>
@@ -1771,9 +1767,8 @@ export default function ElectricityScreen() {
                       <TouchableOpacity key={m}
                         onPress={() => handleMonthSelect(m)}
                         style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
-                          backgroundColor: active ? '#2563EB' : 'rgba(255,255,255,0.7)',
-                          borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>{m}</Text>
+                          backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{m}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -1801,7 +1796,7 @@ export default function ElectricityScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
                   backgroundColor: 'rgba(230,81,0,0.08)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
                   <Ionicons name="lock-closed" size={16} color="#E65100" />
-                  <Text style={{ fontSize: fontSize.sm, color: '#E65100', flex: 1 }}>
+                  <Text style={{ fontSize: fontSize.sm, color: '#EA580C', flex: 1 }}>
                     This month's readings are locked and cannot be modified.
                   </Text>
                 </View>
@@ -1809,7 +1804,7 @@ export default function ElectricityScreen() {
 
               {/* Bulk rows */}
               {bulkLoading ? (
-                <ActivityIndicator color="#2563EB" style={{ marginTop: 24 }} />
+                <ActivityIndicator color="#6A2C90" style={{ marginTop: 24 }} />
               ) : bulkRows.length === 0 && selProperty && selMonth ? (
                 <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                   <Ionicons name="home-outline" size={36} color="#C4B5A0" />
@@ -1826,14 +1821,14 @@ export default function ElectricityScreen() {
                       disabled={bulkScanBusy}
                       style={{
                         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        backgroundColor: 'rgba(2,132,199,0.1)', borderWidth: 1, borderColor: 'rgba(2,132,199,0.35)',
+                        backgroundColor: 'rgba(106,44,144,0.1)', borderWidth: 1, borderColor: 'rgba(106,44,144,0.35)',
                         borderRadius: 12, paddingVertical: 12, marginBottom: 12,
                       }}
                     >
                       {bulkScanBusy
-                        ? <ActivityIndicator size="small" color="#0284C7" />
-                        : <Ionicons name="scan-outline" size={18} color="#0284C7" />}
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#0284C7' }}>
+                        ? <ActivityIndicator size="small" color="#6A2C90" />
+                        : <Ionicons name="scan-outline" size={18} color="#6A2C90" />}
+                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6A2C90' }}>
                         {bulkScanBusy ? 'Scanning photos…' : 'Bulk Scan Meter Photos'}
                       </Text>
                     </TouchableOpacity>
@@ -1846,7 +1841,7 @@ export default function ElectricityScreen() {
                       <View key={row.apartment_id} style={[S.bulkRow, consumption !== null && consumption < 0 && { borderColor: colors.danger }]}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                           <View>
-                            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#111827' }}>{row.apartment_code}</Text>
+                            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0F172A' }}>{row.apartment_code}</Text>
                             {row.eb_meter_number ? (
                               <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>{row.eb_meter_number}</Text>
                             ) : null}
@@ -1858,7 +1853,7 @@ export default function ElectricityScreen() {
                                 {consumption < 0 ? '⚠' : '✓'} {Math.round(consumption)} units
                               </Text>
                               {unitCost ? (
-                                <Text style={{ fontSize: fontSize.xs, color: '#2563EB', fontWeight: '700' }}>
+                                <Text style={{ fontSize: fontSize.xs, color: '#6A2C90', fontWeight: '700' }}>
                                   {fmtAmt(consumption * parseFloat(unitCost))}
                                 </Text>
                               ) : null}
@@ -1902,14 +1897,14 @@ export default function ElectricityScreen() {
                               }}
                               style={{
                                 width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-                                backgroundColor: row.meter_photo_url ? 'rgba(34,197,94,0.15)' : 'rgba(2,132,199,0.1)',
-                                borderWidth: 1, borderColor: row.meter_photo_url ? '#22C55E' : 'rgba(2,132,199,0.3)',
+                                backgroundColor: row.meter_photo_url ? 'rgba(34,197,94,0.15)' : 'rgba(106,44,144,0.1)',
+                                borderWidth: 1, borderColor: row.meter_photo_url ? '#22C55E' : 'rgba(106,44,144,0.3)',
                               }}
                             >
                               <Ionicons
                                 name={row.meter_photo_url ? 'eye-outline' : 'camera-outline'}
                                 size={17}
-                                color={row.meter_photo_url ? '#22C55E' : '#0284C7'}
+                                color={row.meter_photo_url ? '#22C55E' : '#6A2C90'}
                               />
                             </TouchableOpacity>
                             <Text style={{ fontSize: 8, color: row.meter_photo_url ? '#22C55E' : colors.textTertiary, marginTop: 2, textAlign: 'center' }}>
@@ -1985,15 +1980,15 @@ export default function ElectricityScreen() {
 
       {/* ── EB Rate Modal ───────────────────────────────────────────────────── */}
       <Modal visible={rateOpen} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1 , backgroundColor: '#F8FAFC'}}>
+        <View style={{ flex: 1 , backgroundColor: '#FFFFFF'}}>
           <SafeAreaView style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
               paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-              borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+              borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
               <TouchableOpacity onPress={() => setRateOpen(false)}>
                 <Text style={{ color: colors.danger, fontSize: fontSize.md }}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A' }}>
                 {rateForm.id ? 'Edit EB Rate' : 'Add EB Rate'}
               </Text>
               <View style={{ width: 60 }} />
@@ -2010,9 +2005,8 @@ export default function ElectricityScreen() {
                       <TouchableOpacity key={pid || 'all'}
                         onPress={() => setRateForm(f => ({ ...f, property_id: pid }))}
                         style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
-                          backgroundColor: active ? '#2563EB' : 'rgba(255,255,255,0.7)',
-                          borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>
+                          backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>
                           {p.property_name || p.name || ""}
                         </Text>
                       </TouchableOpacity>
@@ -2059,13 +2053,13 @@ export default function ElectricityScreen() {
       </Modal>
       {/* ── Add / Edit Payment Modal ─────────────────────────────────────── */}
       <Modal visible={paymentOpen} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
           <SafeAreaView style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
               <TouchableOpacity onPress={() => setPaymentOpen(false)}>
                 <Text style={{ color: colors.danger, fontSize: fontSize.md }}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A' }}>
                 {paymentForm.id ? 'Edit Payment' : 'Add EB Payment'}
               </Text>
               <View style={{ width: 60 }} />
@@ -2079,8 +2073,8 @@ export default function ElectricityScreen() {
                     const active = paymentForm.property_id === pid;
                     return (
                       <TouchableOpacity key={pid} onPress={() => setPaymentForm(f => ({ ...f, property_id: pid }))}
-                        style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>{p.property_name || p.name || ""}</Text>
+                        style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{p.property_name || p.name || ""}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -2109,8 +2103,8 @@ export default function ElectricityScreen() {
                       const active = paymentForm.payment_mode === m;
                       return (
                         <TouchableOpacity key={m} onPress={() => setPaymentForm(f => ({ ...f, payment_mode: active ? '' : m }))}
-                          style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>{m}</Text>
+                          style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 99, backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{m}</Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -2127,8 +2121,8 @@ export default function ElectricityScreen() {
                         const active = paymentForm.bank_account_id === b.id;
                         return (
                           <TouchableOpacity key={b.id} onPress={() => setPaymentForm(f => ({ ...f, bank_account_id: active ? '' : b.id }))}
-                            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>
+                            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>
                               {b.bank_name}{b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}
                             </Text>
                           </TouchableOpacity>
@@ -2154,7 +2148,7 @@ export default function ElectricityScreen() {
 
               <SectionLabel text="Notes" />
               <TextInput style={[S.input, { marginBottom: spacing.xl, minHeight: 70, textAlignVertical: 'top' }]} value={paymentForm.notes} onChangeText={v => setPaymentForm(f => ({ ...f, notes: v }))} placeholder="Any notes…" placeholderTextColor={colors.textTertiary} multiline />
-              <TouchableOpacity style={[S.saveBtn, { backgroundColor: '#0284C7' }, paymentSaving && { opacity: 0.5 }]} onPress={handleSavePayment} disabled={paymentSaving}>
+              <TouchableOpacity style={[S.saveBtn, { backgroundColor: '#6A2C90' }, paymentSaving && { opacity: 0.5 }]} onPress={handleSavePayment} disabled={paymentSaving}>
                 {paymentSaving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>{paymentForm.id ? 'Update Payment' : 'Save Payment'}</Text>}
               </TouchableOpacity>
             </ScrollView>
@@ -2164,13 +2158,13 @@ export default function ElectricityScreen() {
 
       {/* ── Bulk EB Payment Entry Modal ───────────────────────────────────── */}
       <Modal visible={bulkPayOpen} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
           <SafeAreaView style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
               <TouchableOpacity onPress={() => setBulkPayOpen(false)}>
                 <Text style={{ color: colors.danger, fontSize: fontSize.md }}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827' }}>Bulk EB Payments</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A' }}>Bulk EB Payments</Text>
               <View style={{ width: 60 }} />
             </View>
             <ScrollView style={{ padding: spacing.xl }} contentContainerStyle={{ paddingBottom: 60 }}>
@@ -2182,8 +2176,8 @@ export default function ElectricityScreen() {
                     const active = bulkPayProperty === pid;
                     return (
                       <TouchableOpacity key={pid} onPress={() => { setBulkPayProperty(pid); loadBulkPayRows(pid, bulkPayBillDate); }}
-                        style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>{p.property_name || p.name || ""}</Text>
+                        style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{p.property_name || p.name || ""}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -2199,8 +2193,8 @@ export default function ElectricityScreen() {
                     const active = bulkPayMode === m;
                     return (
                       <TouchableOpacity key={m} onPress={() => setBulkPayMode(active ? '' : m)}
-                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>{m}</Text>
+                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{m}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -2216,8 +2210,8 @@ export default function ElectricityScreen() {
                         const active = bulkPayBankId === b.id;
                         return (
                           <TouchableOpacity key={b.id} onPress={() => setBulkPayBankId(active ? '' : b.id)}
-                            style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#0284C7' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: active ? '#0284C7' : 'rgba(2,132,199,0.2)' }}>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#0284C7' }}>
+                            style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>
                               {b.bank_name}{b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}
                             </Text>
                           </TouchableOpacity>
@@ -2229,14 +2223,14 @@ export default function ElectricityScreen() {
               )}
 
               {bulkPayLoading ? (
-                <ActivityIndicator color="#0284C7" style={{ marginTop: 24 }} />
+                <ActivityIndicator color="#6A2C90" style={{ marginTop: 24 }} />
               ) : bulkPayRows.length > 0 ? (
                 <>
                   <SectionLabel text="Bill Amounts per Apartment" />
                   {bulkPayRows.map((row, idx) => (
                     <View key={row.apartment_id} style={[S.bulkRow, { marginBottom: 8 }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#111827' }}>{row.apartment_code}</Text>
+                        <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#0F172A' }}>{row.apartment_code}</Text>
                         {row.existing_id && <Pill label="Existing" color="#16A34A" bg="#DCFCE7" />}
                       </View>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -2264,7 +2258,7 @@ export default function ElectricityScreen() {
                       </View>
                     </View>
                   ))}
-                  <TouchableOpacity style={[S.saveBtn, { backgroundColor: '#0284C7', marginTop: 8 }, bulkPaySaving && { opacity: 0.5 }]} onPress={handleSaveBulkPayments} disabled={bulkPaySaving}>
+                  <TouchableOpacity style={[S.saveBtn, { backgroundColor: '#6A2C90', marginTop: 8 }, bulkPaySaving && { opacity: 0.5 }]} onPress={handleSaveBulkPayments} disabled={bulkPaySaving}>
                     {bulkPaySaving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>Save All Payments</Text>}
                   </TouchableOpacity>
                 </>
@@ -2284,54 +2278,54 @@ export default function ElectricityScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: '#FFFFFF', borderRadius: 16,
+    borderWidth: 1, borderColor: '#EEF1F6',
     padding: 14, marginBottom: 10,
-    shadowColor: '#2563EB', shadowOpacity: 0.06, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 }, elevation: 2,
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }, elevation: 2,
   },
-  kpiVal: { fontSize: fontSize.lg, fontWeight: '800', color: '#111827', marginTop: 4 },
-  kpiLabel: { fontSize: fontSize.xs, color: '#6B7280', marginTop: 2 },
-  th: { fontSize: 10, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 },
-  td: { fontSize: fontSize.xs, color: '#111827' },
+  kpiVal: { fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A', marginTop: 4, letterSpacing: -0.3 },
+  kpiLabel: { fontSize: fontSize.xs, color: '#64748B', marginTop: 2 },
+  th: { fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
+  td: { fontSize: fontSize.xs, color: '#0F172A' },
   iconBtn: {
     width: 32, height: 32, borderRadius: 10,
-    backgroundColor: 'rgba(37,99,235,0.07)',
+    backgroundColor: '#F3ECF9',
     alignItems: 'center', justifyContent: 'center',
   },
   menuBtn: {
     width: 38, height: 38, borderRadius: 99,
-    backgroundColor: 'rgba(37,99,235,0.10)',
+    backgroundColor: '#F3ECF9',
     alignItems: 'center', justifyContent: 'center',
   },
   fab: {
-    width: 40, height: 40, borderRadius: 14,
-    backgroundColor: '#2563EB',
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#6A2C90',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#2563EB', shadowOpacity: 0.4, shadowRadius: 10, elevation: 5,
+    shadowColor: '#0F172A', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5,
   },
   addRateBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#2563EB', borderRadius: 12,
+    backgroundColor: '#6A2C90', borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 10,
     alignSelf: 'flex-end', marginBottom: 12,
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 12,
-    borderWidth: 1.5, borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF', borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#EEF1F6',
     paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: fontSize.md, color: '#111827',
+    fontSize: fontSize.md, color: '#0F172A',
     marginBottom: 0,
   },
   bulkRow: {
-    backgroundColor: '#FFFFFF', borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: '#FFFFFF', borderRadius: 16,
+    borderWidth: 1, borderColor: '#EEF1F6',
     padding: 14, marginBottom: 10,
   },
   saveBtn: {
-    backgroundColor: '#2563EB', borderRadius: 14,
+    backgroundColor: '#6A2C90', borderRadius: 12,
     paddingVertical: 14, alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#2563EB', shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
+    shadowColor: '#0F172A', shadowOpacity: 0.12, shadowRadius: 10, elevation: 4,
   },
 });
