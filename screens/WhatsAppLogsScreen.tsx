@@ -23,12 +23,26 @@ const JOB_TYPE_OPTIONS: { key: string; label: string }[] = [
 ];
 
 const STATUS_COLOR: Record<string, string> = {
-  completed: '#16a34a', success: '#16a34a', sent: '#16a34a', delivered: '#16a34a',
-  running: '#2563EB', pending: '#2563EB', queued: '#2563EB',
+  completed: '#16A34A', success: '#16A34A', sent: '#16A34A', delivered: '#16A34A',
+  running: '#1D4ED8',
+  pending: '#EA580C', queued: '#EA580C', skipped: '#EA580C',
   failed: '#DC2626', error: '#DC2626',
-  skipped: '#D97706',
 };
-const statusColor = (s: string) => STATUS_COLOR[(s || '').toLowerCase()] || '#2563EB';
+const STATUS_BG: Record<string, string> = {
+  completed: '#DCFCE7', success: '#DCFCE7', sent: '#DCFCE7', delivered: '#DCFCE7',
+  running: '#EEF3FF',
+  pending: '#FFEDD5', queued: '#FFEDD5', skipped: '#FFEDD5',
+  failed: '#FEE2E2', error: '#FEE2E2',
+};
+const statusColor = (s: string) => STATUS_COLOR[(s || '').toLowerCase()] || '#1D4ED8';
+const statusBg = (s: string) => STATUS_BG[(s || '').toLowerCase()] || '#EEF3FF';
+const statusIcon = (s: string): keyof typeof Ionicons.glyphMap => {
+  const k = (s || '').toLowerCase();
+  if (['completed', 'success', 'sent', 'delivered'].includes(k)) return 'checkmark-circle';
+  if (['failed', 'error'].includes(k)) return 'alert-circle';
+  if (k === 'running') return 'sync';
+  return 'time'; // pending / queued / skipped / unknown
+};
 
 // Web parity (WhatsAppDeliveryHistoryCard.tsx:82-100): auto-resume stalled send jobs.
 const STALL_MS = 90_000;              // no progress (updatedAt) for >90s ⇒ treat as stalled
@@ -250,25 +264,25 @@ export default function WhatsAppLogsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>WhatsApp Logs</Text>
-            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Outbound messages</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 2 }}>Outbound messages</Text>
           </View>
         </View>
 
         {/* Search (name / phone / invoice-receipt no) */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12 }}>
-            <Ionicons name="search" size={16} color="#9CA3AF" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12 }}>
+            <Ionicons name="search" size={16} color="#94A3B8" />
             <TextInput
-              style={{ flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827' }}
+              style={{ flex: 1, paddingVertical: 10, fontSize: 14, color: '#0F172A' }}
               value={search}
               onChangeText={setSearch}
               placeholder="Search name, phone, or invoice/receipt no…"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#94A3B8"
               autoCapitalize="none"
             />
-            {searching ? <ActivityIndicator size="small" color="#2563EB" />
+            {searching ? <ActivityIndicator size="small" color="#6A2C90" />
               : search ? (
-                <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#9CA3AF" /></TouchableOpacity>
+                <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#94A3B8" /></TouchableOpacity>
               ) : null}
           </View>
         </View>
@@ -277,54 +291,56 @@ export default function WhatsAppLogsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 }}>
           {JOB_TYPE_OPTIONS.map(o => (
             <TouchableOpacity key={o.key} onPress={() => setJobType(o.key)}
-              style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: jobType === o.key ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: jobType === o.key ? '#fff' : '#2563EB' }}>{o.label}</Text>
+              style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: jobType === o.key ? '#6A2C90' : '#F1F3F9' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: jobType === o.key ? '#fff' : '#64748B' }}>{o.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {loading && !refreshing ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text style={{ marginTop: 12, color: '#556274' }}>Loading WhatsApp logs…</Text>
+            <ActivityIndicator size="large" color="#6A2C90" />
+            <Text style={{ marginTop: 12, color: '#64748B' }}>Loading WhatsApp logs…</Text>
           </View>
         ) : (
           <ScrollView
             contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#6A2C90" />}
           >
             {searchResults !== null ? (
               searchResults.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                  <Ionicons name="search" size={48} color="rgba(37,99,235,0.18)" />
-                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No messages match “{search.trim()}”</Text>
+                  <Ionicons name="search" size={48} color="#EEF1F6" />
+                  <Text style={{ marginTop: 12, color: '#94A3B8' }}>No messages match “{search.trim()}”</Text>
                 </View>
               ) : (
                 <>
-                  <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>
                     {searchResults.length} message{searchResults.length === 1 ? '' : 's'} found
                   </Text>
                   {searchResults.map((d) => {
                     const lc = (s: any) => String(s || '').toLowerCase();
                     const canResend = ['failed', 'pending', 'error', 'skipped'].includes(lc(d.status));
                     return (
-                      <View key={d.id} style={{ backgroundColor: '#fff', borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB', padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View key={d.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#EEF1F6', padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                         <View style={{ flexShrink: 1, paddingRight: 8 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{d.tenantName || d.label || 'Recipient'}</Text>
-                          <Text style={{ fontSize: 11, color: '#6B7280' }} numberOfLines={1}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{d.tenantName || d.label || 'Recipient'}</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B' }} numberOfLines={1}>
                             {d.phoneMasked || d.deliveryKind || ''}{d.label && d.tenantName ? ` · ${d.label}` : ''}{d.sentAt ? ` · ${fmtTs(d.sentAt)}` : ''}
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'capitalize', color: statusColor(d.status) }}>{d.status || '—'}</Text>
+                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: statusBg(d.status) }}>
+                            <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'capitalize', color: statusColor(d.status) }}>{d.status || '—'}</Text>
+                          </View>
                           {['failed', 'skipped', 'error'].includes(lc(d.status)) && d.tenantId && (
                             <TouchableOpacity disabled={!!busy} onPress={() => { setEditPhone({ deliveryId: d.id, tenantId: d.tenantId, jobId: d.jobId }); setPhoneInput(''); }} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
-                              <Ionicons name="create-outline" size={16} color="#D97706" />
+                              <Ionicons name="create-outline" size={16} color="#EA580C" />
                             </TouchableOpacity>
                           )}
                           {canResend && (
                             <TouchableOpacity disabled={!!busy} onPress={() => doResendOne(d.id, d.jobId)} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
-                              {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="refresh" size={16} color="#2563EB" />}
+                              {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#6A2C90" /> : <Ionicons name="refresh" size={16} color="#6A2C90" />}
                             </TouchableOpacity>
                           )}
                         </View>
@@ -335,8 +351,8 @@ export default function WhatsAppLogsScreen() {
               )
             ) : jobs.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                <Ionicons name="logo-whatsapp" size={56} color="rgba(37,99,235,0.18)" />
-                <Text style={{ marginTop: 12, color: '#6B7280' }}>No send jobs yet</Text>
+                <Ionicons name="logo-whatsapp" size={56} color="#EEF1F6" />
+                <Text style={{ marginTop: 12, color: '#94A3B8' }}>No send jobs yet</Text>
               </View>
             ) : jobs.map((job) => {
               const expanded = expandedId === job.id;
@@ -344,21 +360,23 @@ export default function WhatsAppLogsScreen() {
               const renderRow = (d: any) => {
                 const canResend = ['failed', 'pending', 'error', 'skipped'].includes(lc(d.status));
                 return (
-                  <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                  <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
                     <View style={{ flexShrink: 1, paddingRight: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{d.tenantName || d.label || 'Recipient'}</Text>
-                      <Text style={{ fontSize: 10, color: '#6B7280' }}>{d.phoneMasked || d.deliveryKind || ''}{d.errorMessage ? ` · ${String(d.errorMessage).slice(0, 40)}` : d.sentAt ? ` · ${fmtTs(d.sentAt)}` : ''}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F172A' }} numberOfLines={1}>{d.tenantName || d.label || 'Recipient'}</Text>
+                      <Text style={{ fontSize: 10, color: '#64748B' }}>{d.phoneMasked || d.deliveryKind || ''}{d.errorMessage ? ` · ${String(d.errorMessage).slice(0, 40)}` : d.sentAt ? ` · ${fmtTs(d.sentAt)}` : ''}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'capitalize', color: statusColor(d.status) }}>{d.status || '—'}</Text>
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: statusBg(d.status) }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', textTransform: 'capitalize', color: statusColor(d.status) }}>{d.status || '—'}</Text>
+                      </View>
                       {['failed', 'skipped', 'error'].includes(lc(d.status)) && d.tenantId && (
                         <TouchableOpacity disabled={!!busy} onPress={() => { setEditPhone({ deliveryId: d.id, tenantId: d.tenantId, jobId: job.id }); setPhoneInput(''); }} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
-                          <Ionicons name="create-outline" size={16} color="#D97706" />
+                          <Ionicons name="create-outline" size={16} color="#EA580C" />
                         </TouchableOpacity>
                       )}
                       {canResend && (
                         <TouchableOpacity disabled={!!busy} onPress={() => doResendOne(d.id, job.id)} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
-                          {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="refresh" size={16} color="#2563EB" />}
+                          {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#6A2C90" /> : <Ionicons name="refresh" size={16} color="#6A2C90" />}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -366,22 +384,23 @@ export default function WhatsAppLogsScreen() {
                 );
               };
               return (
-                <View key={job.id} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' }}>
+                <View key={job.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#EEF1F6', overflow: 'hidden', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                   <TouchableOpacity onPress={() => toggleExpand(job.id)} style={{ padding: 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-                        <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: statusColor(job.status) + '22' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: statusBg(job.status) }}>
+                          <Ionicons name={statusIcon(job.status)} size={11} color={statusColor(job.status)} />
                           <Text style={{ fontSize: 10, fontWeight: '800', textTransform: 'capitalize', color: statusColor(job.status) }}>{job.status || '—'}</Text>
                         </View>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{job.label || (job.jobType || '').replace(/_/g, ' ') || 'Campaign'}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{job.label || (job.jobType || '').replace(/_/g, ' ') || 'Campaign'}</Text>
                       </View>
-                      <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#2563EB" />
+                      <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#6A2C90" />
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                      <Text style={{ fontSize: 12, color: '#556274' }}>Total <Text style={{ fontWeight: '800' }}>{job.totalCount}</Text></Text>
-                      <Text style={{ fontSize: 12, color: '#16a34a' }}>Sent <Text style={{ fontWeight: '800' }}>{job.sentCount}</Text></Text>
-                      <Text style={{ fontSize: 12, color: job.failedCount > 0 ? '#DC2626' : '#6B7280' }}>Failed <Text style={{ fontWeight: '800' }}>{job.failedCount}</Text></Text>
-                      <Text style={{ fontSize: 10, color: '#6B7280', marginLeft: 'auto' }}>{fmtTs(job.createdAt)}</Text>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>Total <Text style={{ fontWeight: '800' }}>{job.totalCount}</Text></Text>
+                      <Text style={{ fontSize: 12, color: '#16A34A' }}>Sent <Text style={{ fontWeight: '800' }}>{job.sentCount}</Text></Text>
+                      <Text style={{ fontSize: 12, color: job.failedCount > 0 ? '#DC2626' : '#64748B' }}>Failed <Text style={{ fontWeight: '800' }}>{job.failedCount}</Text></Text>
+                      <Text style={{ fontSize: 10, color: '#94A3B8', marginLeft: 'auto' }}>{fmtTs(job.createdAt)}</Text>
                     </View>
                     {/* Per-job progress: share of recipients already sent (green) with failed share (red). */}
                     {Number(job.totalCount) > 0 && (() => {
@@ -393,45 +412,45 @@ export default function WhatsAppLogsScreen() {
                       const done = sent >= total;
                       return (
                         <View style={{ marginTop: 8 }}>
-                          <View style={{ height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden', flexDirection: 'row' }}>
-                            {sentPct > 0 && <View style={{ width: `${sentPct}%`, backgroundColor: done ? '#16a34a' : '#2563EB' }} />}
+                          <View style={{ height: 6, borderRadius: 3, backgroundColor: '#EEF1F6', overflow: 'hidden', flexDirection: 'row' }}>
+                            {sentPct > 0 && <View style={{ width: `${sentPct}%`, backgroundColor: done ? '#16A34A' : '#6A2C90' }} />}
                             {failedPct > 0 && <View style={{ width: `${failedPct}%`, backgroundColor: '#DC2626' }} />}
                           </View>
-                          <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 3 }}>{sentPct}% sent{failed > 0 ? ` · ${failedPct}% failed` : ''}</Text>
+                          <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 3 }}>{sentPct}% sent{failed > 0 ? ` · ${failedPct}% failed` : ''}</Text>
                         </View>
                       );
                     })()}
                   </TouchableOpacity>
 
                   {expanded && (
-                    <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 12, backgroundColor: 'rgba(37,99,235,0.03)' }}>
+                    <View style={{ borderTopWidth: 1, borderTopColor: '#EEF1F6', padding: 12, backgroundColor: '#F8FAFC' }}>
                       {/* Job-level actions */}
                       {(job.failedCount > 0 || job.status === 'running' || job.status === 'pending') && (
                         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                           {job.failedCount > 0 && (
                             <TouchableOpacity disabled={!!busy} onPress={() => doResendAll(job.id)}
-                              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#2563EB', opacity: busy ? 0.5 : 1 }}>
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#6A2C90', opacity: busy ? 0.5 : 1 }}>
                               {busy === 'resendAll:' + job.id ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="refresh" size={13} color="#fff" />}
                               <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>Resend failed ({job.failedCount})</Text>
                             </TouchableOpacity>
                           )}
                           <TouchableOpacity disabled={!!busy} onPress={() => doResume(job.id)}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: 'rgba(37,99,235,0.12)', opacity: busy ? 0.5 : 1 }}>
-                            {busy === 'resume:' + job.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="play" size={13} color="#2563EB" />}
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Resume</Text>
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', opacity: busy ? 0.5 : 1 }}>
+                            {busy === 'resume:' + job.id ? <ActivityIndicator size="small" color="#6A2C90" /> : <Ionicons name="play" size={13} color="#6A2C90" />}
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#6A2C90' }}>Resume</Text>
                           </TouchableOpacity>
                         </View>
                       )}
                       {dLoading ? (
-                        <ActivityIndicator color="#2563EB" style={{ paddingVertical: 12 }} />
+                        <ActivityIndicator color="#6A2C90" style={{ paddingVertical: 12 }} />
                       ) : deliveries.length === 0 ? (
-                        <Text style={{ fontSize: 12, color: '#6B7280', textAlign: 'center', paddingVertical: 10 }}>No delivery rows</Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', paddingVertical: 10 }}>No delivery rows</Text>
                       ) : (
                         // Web parity: group by outcome, failures/skips first, so "who didn't get it" is up top.
                         [
                           { title: 'NOT RECEIVED', color: '#DC2626', rows: deliveries.filter(d => ['failed', 'skipped', 'error'].includes(lc(d.status))) },
-                          { title: 'PENDING',      color: '#2563EB', rows: deliveries.filter(d => ['pending', 'queued', 'running'].includes(lc(d.status))) },
-                          { title: 'DELIVERED',    color: '#16a34a', rows: deliveries.filter(d => !['failed', 'skipped', 'error', 'pending', 'queued', 'running'].includes(lc(d.status))) },
+                          { title: 'PENDING',      color: '#EA580C', rows: deliveries.filter(d => ['pending', 'queued', 'running'].includes(lc(d.status))) },
+                          { title: 'DELIVERED',    color: '#16A34A', rows: deliveries.filter(d => !['failed', 'skipped', 'error', 'pending', 'queued', 'running'].includes(lc(d.status))) },
                         ].filter(sec => sec.rows.length > 0).map(sec => (
                           <View key={sec.title}>
                             <Text style={{ fontSize: 10, fontWeight: '800', color: sec.color, letterSpacing: 0.5, marginTop: 8, marginBottom: 2 }}>{sec.title} ({sec.rows.length})</Text>
@@ -452,20 +471,20 @@ export default function WhatsAppLogsScreen() {
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', paddingHorizontal: 24 }]}>
             <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20 }}>
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>Update number & resend</Text>
-              <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 14 }}>Save a corrected phone number for this tenant and re-queue the failed message.</Text>
+              <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>Save a corrected phone number for this tenant and re-queue the failed message.</Text>
               <TextInput
                 value={phoneInput}
                 onChangeText={setPhoneInput}
                 placeholder="Phone number"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#94A3B8"
                 keyboardType="phone-pad"
-                style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: '#111827', marginBottom: 16 }}
+                style={{ borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: '#0F172A', marginBottom: 16 }}
               />
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
                 <TouchableOpacity onPress={() => { setEditPhone(null); setPhoneInput(''); }} style={{ paddingHorizontal: 14, paddingVertical: 9 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280' }}>Cancel</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B' }}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity disabled={!!busy} onPress={doEditPhoneSave} style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, backgroundColor: '#2563EB', opacity: busy ? 0.6 : 1 }}>
+                <TouchableOpacity disabled={!!busy} onPress={doEditPhoneSave} style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, backgroundColor: '#6A2C90', opacity: busy ? 0.6 : 1 }}>
                   {busy && String(busy).startsWith('phone:') ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Save & Resend</Text>}
                 </TouchableOpacity>
               </View>

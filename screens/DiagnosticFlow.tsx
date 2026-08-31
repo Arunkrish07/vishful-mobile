@@ -24,8 +24,8 @@ import { client, api } from '../lib/convexApi';
 import { saveTicketResolution, submitDiagnosis } from '../services/ticketService';
 import * as sb from '../lib/supabaseService';
 
-const BRAND = '#312E81';
-const BRAND_LIGHT = 'rgba(49,46,129,0.12)';
+const BRAND = '#1D4ED8';
+const BRAND_LIGHT = 'rgba(106,44,144,0.12)';
 
 // ─── Diagnostic questions (UNCHANGED) ────────────────────────────────────────
 interface DiagOption   { value: string; label: string }
@@ -118,7 +118,7 @@ interface CostTier {
 const COST_TIERS: CostTier[] = [
   { id:'basic',    label:'Basic',    tagline:'Essential repair only',       accentColor:'#16A34A', accentBg:'rgba(22,163,74,0.08)',   accentBorder:'rgba(22,163,74,0.25)',   icon:'build-outline',            multiplier:0.7 },
   { id:'standard', label:'Standard', tagline:'Recommended solution',        accentColor:BRAND,     accentBg:BRAND_LIGHT,              accentBorder:'rgba(49,46,129,0.35)', icon:'star-outline',             badge:'RECOMMENDED', multiplier:1.0 },
-  { id:'premium',  label:'Premium',  tagline:'Full fix + preventive care',  accentColor:'#6366F1', accentBg:'rgba(99,102,241,0.08)',  accentBorder:'rgba(99,102,241,0.25)', icon:'shield-checkmark-outline', multiplier:1.4 },
+  { id:'premium',  label:'Premium',  tagline:'Full fix + preventive care',  accentColor:'#2563EB', accentBg:'rgba(99,102,241,0.08)',  accentBorder:'rgba(99,102,241,0.25)', icon:'shield-checkmark-outline', multiplier:1.4 },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -329,7 +329,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
       {answers.length>0 && !['parts_approval','cost_options'].includes(stage) && (
         <View style={{ gap:8 }}>
           {answers.map((a,i) => (
-            <View key={i} style={{ backgroundColor:colors.surface, borderRadius:12, padding:12, borderWidth:1, borderColor:colors.border }}>
+            <View key={i} style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:12, borderWidth:1, borderColor:'#EEF1F6', shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
               <Text style={{ fontSize:11, color:colors.textTertiary }}>{a.question}</Text>
               <View style={{ flexDirection:'row', alignItems:'center', gap:6, marginTop:4 }}>
                 <Ionicons name="checkmark-circle" size={13} color={BRAND} />
@@ -342,7 +342,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
       {/* ── Stage: questioning ─────────────────────────────────────────── */}
       {stage==='questioning' && currentQuestion && (
-        <View style={{ backgroundColor:colors.surface, borderRadius:16, padding:16, borderWidth:1.5, borderColor:`${BRAND}40` }}>
+        <View style={{ backgroundColor:'#FFFFFF', borderRadius:18, padding:16, borderWidth:1.5, borderColor:`${BRAND}40`, shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
           <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
             <Text style={{ fontSize:14, fontWeight:'700', color:colors.text, flex:1, marginRight:10 }}>{currentQuestion.question}</Text>
             <View style={{ backgroundColor:BRAND_LIGHT, borderRadius:999, paddingHorizontal:8, paddingVertical:3 }}>
@@ -355,8 +355,8 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
               return (
                 <TouchableOpacity key={opt.value} onPress={() => handleAnswerSelect(opt.value)} activeOpacity={0.75}
                   style={{ flexDirection:'row', alignItems:'center', gap:12, padding:13, borderRadius:12,
-                    backgroundColor:isSel ? BRAND_LIGHT:(colors.background||colors.surface),
-                    borderWidth:1.5, borderColor:isSel ? BRAND:colors.border }}>
+                    backgroundColor:isSel ? BRAND_LIGHT:'#F8FAFC',
+                    borderWidth:1.5, borderColor:isSel ? BRAND:'#EEF1F6' }}>
                   <View style={{ width:20,height:20,borderRadius:10,borderWidth:2,
                     borderColor:isSel?BRAND:colors.border, backgroundColor:isSel?BRAND:'transparent',
                     alignItems:'center',justifyContent:'center' }}>
@@ -372,7 +372,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
       {/* ── Stage: ready_to_diagnose ───────────────────────────────────── */}
       {stage==='ready_to_diagnose' && (
-        <View style={{ backgroundColor:colors.surface, borderRadius:16, padding:20, borderWidth:1.5, borderColor:`${BRAND}40`, alignItems:'center' }}>
+        <View style={{ backgroundColor:'#FFFFFF', borderRadius:18, padding:20, borderWidth:1.5, borderColor:`${BRAND}40`, alignItems:'center', shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
           <View style={{ width:56,height:56,borderRadius:18,backgroundColor:BRAND_LIGHT,alignItems:'center',justifyContent:'center',marginBottom:12 }}>
             <Ionicons name="hardware-chip-outline" size={28} color={BRAND} />
           </View>
@@ -382,12 +382,12 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
           </Text>
           <View style={{ flexDirection:'row', gap:10 }}>
             <TouchableOpacity onPress={runDiagnosis}
-              style={{ flexDirection:'row',alignItems:'center',gap:8,backgroundColor:BRAND,borderRadius:14,paddingHorizontal:20,paddingVertical:12 }}>
+              style={{ flexDirection:'row',alignItems:'center',gap:8,backgroundColor:BRAND,borderRadius:12,paddingHorizontal:20,paddingVertical:12 }}>
               <Ionicons name="medical-outline" size={18} color="#fff" />
               <Text style={{ fontSize:14, fontWeight:'800', color:'#fff' }}>Run Diagnosis</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleReset}
-              style={{ flexDirection:'row',alignItems:'center',gap:6,borderWidth:1.5,borderColor:colors.border,borderRadius:14,paddingHorizontal:14,paddingVertical:12 }}>
+              style={{ flexDirection:'row',alignItems:'center',gap:6,backgroundColor:'#FFFFFF',borderWidth:1.5,borderColor:'#EEF1F6',borderRadius:12,paddingHorizontal:14,paddingVertical:12 }}>
               <Ionicons name="refresh-outline" size={16} color={colors.textSecondary} />
               <Text style={{ fontSize:13, fontWeight:'700', color:colors.textSecondary }}>Restart</Text>
             </TouchableOpacity>
@@ -397,7 +397,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
       {/* ── Stage: diagnosing ──────────────────────────────────────────── */}
       {stage==='diagnosing' && (
-        <View style={{ backgroundColor:colors.surface, borderRadius:16, padding:32, borderWidth:1, borderColor:`${BRAND}30`, alignItems:'center' }}>
+        <View style={{ backgroundColor:'#FFFFFF', borderRadius:18, padding:32, borderWidth:1, borderColor:`${BRAND}30`, alignItems:'center', shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
           <View style={{ position:'relative', marginBottom:16 }}>
             <Ionicons name="hardware-chip-outline" size={40} color={`${BRAND}50`} />
             <ActivityIndicator size="small" color={BRAND} style={{ position:'absolute', top:-4, right:-8 }} />
@@ -413,7 +413,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
           {(() => {
             const uc = URGENCY_COLOR[diagnosis.urgency]||URGENCY_COLOR.medium;
             return (
-              <View style={{ backgroundColor:uc.bg, borderRadius:16, padding:16, borderWidth:1.5, borderColor:uc.border }}>
+              <View style={{ backgroundColor:uc.bg, borderRadius:18, padding:16, borderWidth:1.5, borderColor:uc.border }}>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:10 }}>
                   <Ionicons name="hardware-chip-outline" size={16} color={BRAND} />
                   <Text style={{ fontSize:13, fontWeight:'800', color:colors.text }}>AI Diagnosis Summary</Text>
@@ -429,12 +429,12 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
             );
           })()}
 
-          <View style={{ backgroundColor:colors.surface, borderRadius:16, padding:16, borderWidth:1, borderColor:colors.border }}>
-            <Text style={{ fontSize:13, fontWeight:'800', color:colors.text, marginBottom:14 }}>Select Diagnosis Type</Text>
+          <View style={{ backgroundColor:'#FFFFFF', borderRadius:18, padding:16, borderWidth:1, borderColor:'#EEF1F6', shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
+            <Text style={{ fontSize:17, fontWeight:'800', color:'#0F172A', marginBottom:14 }}>Select Diagnosis Type</Text>
 
             {/* AI Option */}
             <TouchableOpacity onPress={() => setDiagChoice('ai')}
-              style={{ borderRadius:14, borderWidth:1.5, borderColor:diagChoice==='ai'?BRAND:colors.border, backgroundColor:diagChoice==='ai'?BRAND_LIGHT:colors.surface, padding:14, marginBottom:10 }}>
+              style={{ borderRadius:16, borderWidth:1.5, borderColor:diagChoice==='ai'?BRAND:'#EEF1F6', backgroundColor:diagChoice==='ai'?BRAND_LIGHT:'#FFFFFF', padding:14, marginBottom:10 }}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10, marginBottom:diagChoice==='ai'?14:0 }}>
                 <View style={{ width:20,height:20,borderRadius:10,borderWidth:2, borderColor:diagChoice==='ai'?BRAND:colors.border, backgroundColor:diagChoice==='ai'?BRAND:'transparent', alignItems:'center',justifyContent:'center' }}>
                   {diagChoice==='ai' && <View style={{ width:8,height:8,borderRadius:4,backgroundColor:'#fff' }} />}
@@ -449,7 +449,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
                     const isSel = selectedCause?.cause===cause.cause;
                     return (
                       <TouchableOpacity key={i} onPress={() => setSelectedCause(cause)}
-                        style={{ borderRadius:12, padding:12, borderWidth:1.5, borderColor:isSel?BRAND:colors.border, backgroundColor:isSel?`${BRAND}10`:(colors.background||colors.surface) }}>
+                        style={{ borderRadius:12, padding:12, borderWidth:1.5, borderColor:isSel?BRAND:'#EEF1F6', backgroundColor:isSel?`${BRAND}10`:'#F8FAFC' }}>
                         <View style={{ flexDirection:'row', alignItems:'flex-start', justifyContent:'space-between' }}>
                           <View style={{ flex:1, marginRight:8 }}>
                             <View style={{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:4 }}>
@@ -474,7 +474,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
                             <Text style={{ fontSize:10, color:colors.textTertiary, marginBottom:4 }}>Suggested Parts:</Text>
                             <View style={{ flexDirection:'row', flexWrap:'wrap', gap:6 }}>
                               {cause.requiredParts.map((p,pi) => (
-                                <View key={pi} style={{ borderWidth:1, borderColor:colors.border, borderRadius:999, paddingHorizontal:8, paddingVertical:2 }}>
+                                <View key={pi} style={{ borderWidth:1, borderColor:'#EEF1F6', backgroundColor:'#F8FAFC', borderRadius:999, paddingHorizontal:8, paddingVertical:2 }}>
                                   <Text style={{ fontSize:9, color:colors.textSecondary }}>{p.name} — {p.estimatedPrice}</Text>
                                 </View>
                               ))}
@@ -490,7 +490,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
             {/* Custom Option */}
             <TouchableOpacity onPress={() => setDiagChoice('custom')}
-              style={{ borderRadius:14, borderWidth:1.5, borderColor:diagChoice==='custom'?BRAND:colors.border, backgroundColor:diagChoice==='custom'?BRAND_LIGHT:colors.surface, padding:14 }}>
+              style={{ borderRadius:16, borderWidth:1.5, borderColor:diagChoice==='custom'?BRAND:'#EEF1F6', backgroundColor:diagChoice==='custom'?BRAND_LIGHT:'#FFFFFF', padding:14 }}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10, marginBottom:diagChoice==='custom'?14:0 }}>
                 <View style={{ width:20,height:20,borderRadius:10,borderWidth:2, borderColor:diagChoice==='custom'?BRAND:colors.border, backgroundColor:diagChoice==='custom'?BRAND:'transparent', alignItems:'center',justifyContent:'center' }}>
                   {diagChoice==='custom' && <View style={{ width:8,height:8,borderRadius:4,backgroundColor:'#fff' }} />}
@@ -521,13 +521,13 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
             <TouchableOpacity onPress={handleConfirmAndContinue}
               disabled={(diagChoice==='ai'&&!selectedCause)||(diagChoice==='custom'&&(!customProblem.trim()||!customSolution.trim()))}
-              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:BRAND, borderRadius:14, padding:14, marginTop:14,
+              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:BRAND, borderRadius:12, padding:14, marginTop:14,
                 opacity:(diagChoice==='ai'&&!selectedCause)||(diagChoice==='custom'&&(!customProblem.trim()||!customSolution.trim()))?0.45:1 }}>
               <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
               <Text style={{ fontSize:15, fontWeight:'800', color:'#fff' }}>Confirm Problem & Continue</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleReset}
-              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6, borderWidth:1.5, borderColor:colors.border, borderRadius:14, padding:12, marginTop:8 }}>
+              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6, backgroundColor:'#FFFFFF', borderWidth:1.5, borderColor:'#EEF1F6', borderRadius:12, padding:12, marginTop:8 }}>
               <Ionicons name="refresh-outline" size={15} color={colors.textSecondary} />
               <Text style={{ fontSize:13, fontWeight:'700', color:colors.textSecondary }}>Redo Diagnosis</Text>
             </TouchableOpacity>
@@ -546,18 +546,18 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
             <View style={{ width:48,height:48,borderRadius:14,backgroundColor:BRAND_LIGHT,alignItems:'center',justifyContent:'center',marginBottom:8 }}>
               <Ionicons name="receipt-outline" size={24} color={BRAND} />
             </View>
-            <Text style={{ fontSize:17, fontWeight:'800', color:colors.text }}>Cost Estimate Options</Text>
+            <Text style={{ fontSize:17, fontWeight:'800', color:'#0F172A' }}>Cost Estimate Options</Text>
             <Text style={{ fontSize:12, color:colors.textSecondary, marginTop:4, textAlign:'center' }}>
               Choose a repair tier — then review and customise the parts list
             </Text>
           </View>
 
           {/* Confirmed diagnosis pill */}
-          <View style={{ flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'rgba(34,197,94,0.08)', borderRadius:12, padding:12, borderWidth:1, borderColor:'rgba(34,197,94,0.25)' }}>
-            <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
+          <View style={{ flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'#DCFCE7', borderRadius:14, padding:12, borderWidth:1, borderColor:'rgba(22,163,74,0.25)' }}>
+            <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
             <View style={{ flex:1 }}>
               <Text style={{ fontSize:11, color:'#16A34A', fontWeight:'700' }}>CONFIRMED ISSUE</Text>
-              <Text style={{ fontSize:13, fontWeight:'700', color:colors.text }}>{confirmedDiag.cause}</Text>
+              <Text style={{ fontSize:13, fontWeight:'700', color:'#0F172A' }}>{confirmedDiag.cause}</Text>
             </View>
           </View>
 
@@ -568,16 +568,16 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
             const isSel = !noCostSelected && selectedTier?.id===tier.id;
             return (
               <TouchableOpacity key={tier.id} onPress={() => handleSelectTier(tier)} activeOpacity={0.8}
-                style={{ borderRadius:14, borderWidth:isSel?2:1, borderColor:isSel?tier.accentColor:colors.border, backgroundColor:isSel?tier.accentBg:colors.surface, overflow:'hidden' }}>
+                style={{ borderRadius:16, borderWidth:isSel?2:1, borderColor:isSel?tier.accentColor:'#EEF1F6', backgroundColor:isSel?tier.accentBg:'#FFFFFF', overflow:'hidden', shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
                 {/* Card header */}
-                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:isSel?tier.accentBorder:colors.border }}>
+                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:isSel?tier.accentBorder:'#EEF1F6' }}>
                   <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                    <View style={{ width:36,height:36,borderRadius:10, backgroundColor:isSel?tier.accentColor:(colors.background||colors.surface), alignItems:'center',justifyContent:'center', borderWidth:1, borderColor:isSel?'transparent':colors.border }}>
+                    <View style={{ width:36,height:36,borderRadius:10, backgroundColor:isSel?tier.accentColor:'#F8FAFC', alignItems:'center',justifyContent:'center', borderWidth:1, borderColor:isSel?'transparent':'#EEF1F6' }}>
                       <Ionicons name={tier.icon as any} size={18} color={isSel?'#fff':tier.accentColor} />
                     </View>
                     <View>
                       <View style={{ flexDirection:'row', alignItems:'center', gap:6 }}>
-                        <Text style={{ fontSize:15, fontWeight:'800', color:isSel?tier.accentColor:colors.text }}>{tier.label}</Text>
+                        <Text style={{ fontSize:15, fontWeight:'800', color:isSel?tier.accentColor:'#0F172A' }}>{tier.label}</Text>
                         {tier.badge && (
                           <View style={{ backgroundColor:tier.accentColor, borderRadius:999, paddingHorizontal:7, paddingVertical:2 }}>
                             <Text style={{ fontSize:8, fontWeight:'800', color:'#fff', letterSpacing:0.5 }}>{tier.badge}</Text>
@@ -588,7 +588,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
                     </View>
                   </View>
                   <View style={{ alignItems:'flex-end' }}>
-                    <Text style={{ fontSize:20, fontWeight:'800', color:isSel?tier.accentColor:colors.text }}>
+                    <Text style={{ fontSize:20, fontWeight:'800', color:isSel?tier.accentColor:'#0F172A' }}>
                       ₹{tierTotal.toLocaleString('en-IN')}
                     </Text>
                     <Text style={{ fontSize:9, color:colors.textTertiary }}>EST. TOTAL</Text>
@@ -599,8 +599,8 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
                   {tierParts.slice(0,3).map((p,pi) => (
                     <View key={pi} style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
                       <View style={{ flexDirection:'row', alignItems:'center', gap:6, flex:1 }}>
-                        <View style={{ width:6,height:6,borderRadius:3, backgroundColor:p.cost_type==='labor'?'#6366F1':tier.accentColor }} />
-                        <Text style={{ fontSize:12, color:colors.text, flex:1 }} numberOfLines={1}>{p.item_name}</Text>
+                        <View style={{ width:6,height:6,borderRadius:3, backgroundColor:p.cost_type==='labor'?'#2563EB':tier.accentColor }} />
+                        <Text style={{ fontSize:12, color:'#0F172A', flex:1 }} numberOfLines={1}>{p.item_name}</Text>
                       </View>
                       <Text style={{ fontSize:12, fontWeight:'700', color:colors.textSecondary }}>₹{(p.quantity*p.unit_price).toLocaleString('en-IN')}</Text>
                     </View>
@@ -620,24 +620,24 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
           {/* No Cost card */}
           <TouchableOpacity onPress={() => { setNoCostSelected(true); setSelectedTier(null); setParts([]); }} activeOpacity={0.8}
-            style={{ borderRadius:14, borderWidth:noCostSelected?2:1, borderColor:noCostSelected?'#22C55E':colors.border, backgroundColor:noCostSelected?'rgba(34,197,94,0.07)':colors.surface, overflow:'hidden' }}>
+            style={{ borderRadius:16, borderWidth:noCostSelected?2:1, borderColor:noCostSelected?'#16A34A':'#EEF1F6', backgroundColor:noCostSelected?'#DCFCE7':'#FFFFFF', overflow:'hidden', shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
             <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:14 }}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-                <View style={{ width:36,height:36,borderRadius:10, backgroundColor:noCostSelected?'#22C55E':(colors.background||colors.surface), alignItems:'center',justifyContent:'center', borderWidth:1, borderColor:noCostSelected?'transparent':colors.border }}>
-                  <Ionicons name="checkmark-done-circle-outline" size={18} color={noCostSelected?'#fff':'#22C55E'} />
+                <View style={{ width:36,height:36,borderRadius:10, backgroundColor:noCostSelected?'#16A34A':'#F8FAFC', alignItems:'center',justifyContent:'center', borderWidth:1, borderColor:noCostSelected?'transparent':'#EEF1F6' }}>
+                  <Ionicons name="checkmark-done-circle-outline" size={18} color={noCostSelected?'#fff':'#16A34A'} />
                 </View>
                 <View>
-                  <Text style={{ fontSize:15, fontWeight:'800', color:noCostSelected?'#22C55E':colors.text }}>No Cost</Text>
+                  <Text style={{ fontSize:15, fontWeight:'800', color:noCostSelected?'#16A34A':'#0F172A' }}>No Cost</Text>
                   <Text style={{ fontSize:11, color:colors.textSecondary }}>No parts or materials needed</Text>
                 </View>
               </View>
               <View style={{ alignItems:'flex-end' }}>
-                <Text style={{ fontSize:20, fontWeight:'800', color:noCostSelected?'#22C55E':colors.text }}>₹0</Text>
+                <Text style={{ fontSize:20, fontWeight:'800', color:noCostSelected?'#16A34A':'#0F172A' }}>₹0</Text>
                 <Text style={{ fontSize:9, color:colors.textTertiary }}>NO CHARGE</Text>
               </View>
             </View>
             {noCostSelected && (
-              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6, backgroundColor:'#22C55E', paddingVertical:8 }}>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6, backgroundColor:'#16A34A', paddingVertical:8 }}>
                 <Ionicons name="checkmark-circle" size={14} color="#fff" />
                 <Text style={{ fontSize:12, fontWeight:'800', color:'#fff' }}>Selected — will mark complete directly</Text>
               </View>
@@ -647,14 +647,14 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
           {/* CTA */}
           {noCostSelected ? (
             <TouchableOpacity onPress={handleNoCostSubmit} disabled={submitting}
-              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#22C55E', borderRadius:14, padding:14, opacity:submitting?0.6:1 }}>
+              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#16A34A', borderRadius:12, padding:14, opacity:submitting?0.6:1 }}>
               {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />}
               <Text style={{ fontSize:15, fontWeight:'800', color:'#fff' }}>Mark Complete — No Cost</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               onPress={() => { if (!selectedTier) { Alert.alert('Select a tier first'); return; } setStage('parts_approval'); }}
-              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:selectedTier?.accentColor||BRAND, borderRadius:14, padding:14 }}>
+              style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:selectedTier?.accentColor||BRAND, borderRadius:12, padding:14 }}>
               <Ionicons name="cube-outline" size={18} color="#fff" />
               <Text style={{ fontSize:15, fontWeight:'800', color:'#fff' }} >
                 Review Parts & Submit — ₹{parts.reduce((s,p) => s+p.quantity*p.unit_price,0).toLocaleString('en-IN')}
@@ -662,7 +662,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => setStage('result')}
-            style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6, borderWidth:1.5, borderColor:colors.border, borderRadius:14, padding:12 }}>
+            style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6, backgroundColor:'#FFFFFF', borderWidth:1.5, borderColor:'#EEF1F6', borderRadius:12, padding:12 }}>
             <Ionicons name="chevron-back-outline" size={15} color={colors.textSecondary} />
             <Text style={{ fontSize:13, fontWeight:'700', color:colors.textSecondary }}>Back to Diagnosis</Text>
           </TouchableOpacity>
@@ -676,7 +676,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
         <View style={{ gap:14 }}>
 
           {/* Tier + diagnosis summary */}
-          <View style={{ backgroundColor:selectedTier.accentBg, borderRadius:16, padding:14, borderWidth:1.5, borderColor:selectedTier.accentBorder }}>
+          <View style={{ backgroundColor:selectedTier.accentBg, borderRadius:18, padding:14, borderWidth:1.5, borderColor:selectedTier.accentBorder }}>
             <View style={{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:10 }}>
               <Ionicons name={selectedTier.icon as any} size={16} color={selectedTier.accentColor} />
               <Text style={{ fontSize:13, fontWeight:'800', color:selectedTier.accentColor }}>{selectedTier.label} Plan Selected</Text>
@@ -687,26 +687,26 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
               )}
             </View>
             <Text style={{ fontSize:10, color:colors.textTertiary, marginBottom:2 }}>PROBLEM</Text>
-            <Text style={{ fontSize:13, fontWeight:'700', color:colors.text, marginBottom:8 }}>{confirmedDiag.cause}</Text>
+            <Text style={{ fontSize:13, fontWeight:'700', color:'#0F172A', marginBottom:8 }}>{confirmedDiag.cause}</Text>
             <Text style={{ fontSize:10, color:colors.textTertiary, marginBottom:2 }}>SOLUTION</Text>
-            <Text style={{ fontSize:12, color:colors.text, lineHeight:18 }}>{confirmedDiag.recommendation}</Text>
+            <Text style={{ fontSize:12, color:'#0F172A', lineHeight:18 }}>{confirmedDiag.recommendation}</Text>
           </View>
 
           {/* Editable parts list */}
-          <View style={{ backgroundColor:colors.surface, borderRadius:16, padding:16, borderWidth:1, borderColor:colors.border }}>
+          <View style={{ backgroundColor:'#FFFFFF', borderRadius:18, padding:16, borderWidth:1, borderColor:'#EEF1F6', shadowColor:'#0F172A', shadowOpacity:0.05, shadowRadius:10, shadowOffset:{width:0,height:4} }}>
             <View style={{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:4 }}>
               <Ionicons name="cube-outline" size={18} color={BRAND} />
-              <Text style={{ fontSize:13, fontWeight:'800', color:colors.text }}>Parts & Cost Details</Text>
+              <Text style={{ fontSize:17, fontWeight:'800', color:'#0F172A' }}>Parts & Cost Details</Text>
             </View>
             <Text style={{ fontSize:12, color:colors.textTertiary, marginBottom:12 }}>
               Review, edit amounts, or add custom parts below.
             </Text>
 
             {parts.map((part,i) => (
-              <View key={i} style={{ backgroundColor:colors.background||colors.surface, borderRadius:12, padding:12, borderWidth:1, borderColor:colors.border, marginBottom:10 }}>
+              <View key={i} style={{ backgroundColor:'#F8FAFC', borderRadius:14, padding:12, borderWidth:1, borderColor:'#EEF1F6', marginBottom:10 }}>
                 <View style={{ flexDirection:'row', justifyContent:'space-between', marginBottom:8 }}>
                   <View style={{ flexDirection:'row', alignItems:'center', gap:6 }}>
-                    <View style={{ width:7,height:7,borderRadius:3.5, backgroundColor:part.cost_type==='labor'?'#6366F1':BRAND }} />
+                    <View style={{ width:7,height:7,borderRadius:3.5, backgroundColor:part.cost_type==='labor'?'#2563EB':BRAND }} />
                     <Text style={{ fontSize:11, fontWeight:'700', color:colors.textSecondary }}>ITEM {i+1}</Text>
                   </View>
                   <TouchableOpacity onPress={() => removePart(i)}>
@@ -735,8 +735,8 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
                   <View style={{ flexDirection:'row', gap:8 }}>
                     {(['parts','labor'] as const).map(ct => (
                       <TouchableOpacity key={ct} onPress={() => updatePart(i,'cost_type',ct)}
-                        style={{ paddingHorizontal:12, paddingVertical:6, borderRadius:999, backgroundColor:part.cost_type===ct?BRAND_LIGHT:colors.surface, borderWidth:1.5, borderColor:part.cost_type===ct?BRAND:colors.border }}>
-                        <Text style={{ fontSize:11, fontWeight:'700', color:part.cost_type===ct?BRAND:colors.textSecondary }}>
+                        style={{ paddingHorizontal:12, paddingVertical:6, borderRadius:999, backgroundColor:part.cost_type===ct?BRAND:'#F1F3F9', borderWidth:0 }}>
+                        <Text style={{ fontSize:11, fontWeight:'700', color:part.cost_type===ct?'#FFFFFF':'#64748B' }}>
                           {ct.charAt(0).toUpperCase()+ct.slice(1)}
                         </Text>
                       </TouchableOpacity>
@@ -758,33 +758,33 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
             {/* Total row */}
             {validParts.length>0 && (
-              <View style={{ flexDirection:'row', justifyContent:'space-between', backgroundColor:BRAND_LIGHT, borderRadius:12, padding:14, marginTop:12 }}>
+              <View style={{ flexDirection:'row', justifyContent:'space-between', backgroundColor:BRAND_LIGHT, borderRadius:14, padding:14, marginTop:12 }}>
                 <View>
                   <Text style={{ fontSize:12, color:colors.textTertiary }}>TOTAL ESTIMATE</Text>
-                  <Text style={{ fontSize:13, fontWeight:'700', color:colors.text }}>{validParts.length} item{validParts.length!==1?'s':''}</Text>
+                  <Text style={{ fontSize:13, fontWeight:'700', color:'#0F172A' }}>{validParts.length} item{validParts.length!==1?'s':''}</Text>
                 </View>
                 <Text style={{ fontSize:22, fontWeight:'800', color:BRAND }}>₹{totalCost.toLocaleString('en-IN')}</Text>
               </View>
             )}
 
             {/* Approver notice */}
-            <View style={{ flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'rgba(99,102,241,0.06)', borderRadius:10, padding:10, marginTop:12, borderWidth:1, borderColor:'rgba(99,102,241,0.2)' }}>
-              <Ionicons name="person-circle-outline" size={16} color="#6366F1" />
-              <Text style={{ fontSize:11, color:'#6366F1', flex:1 }}>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:8, backgroundColor:'#EEF3FF', borderRadius:12, padding:10, marginTop:12, borderWidth:1, borderColor:'rgba(29,78,216,0.2)' }}>
+              <Ionicons name="person-circle-outline" size={16} color="#1D4ED8" />
+              <Text style={{ fontSize:11, color:'#1D4ED8', flex:1 }}>
                 Request will be sent to <Text style={{ fontWeight:'800' }}>{approverName || 'the approver'}</Text> for approval
               </Text>
             </View>
 
-            <View style={{ height:1, backgroundColor:colors.border, marginVertical:14 }} />
+            <View style={{ height:1, backgroundColor:'#EEF1F6', marginVertical:14 }} />
 
             <View style={{ gap:10 }}>
               <TouchableOpacity onPress={handleFinalSubmit} disabled={submitting||validParts.length===0}
-                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#6366F1', borderRadius:14, padding:14, opacity:(submitting||validParts.length===0)?0.55:1 }}>
+                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#6A2C90', borderRadius:12, padding:14, opacity:(submitting||validParts.length===0)?0.55:1 }}>
                 {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send-outline" size={18} color="#fff" />}
                 <Text style={{ fontSize:15, fontWeight:'800', color:'#fff' }}>{submitting?'Submitting…':'Submit Cost Estimate'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setStage('cost_options')}
-                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6, borderWidth:1.5, borderColor:colors.border, borderRadius:14, padding:12 }}>
+                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6, backgroundColor:'#FFFFFF', borderWidth:1.5, borderColor:'#EEF1F6', borderRadius:12, padding:12 }}>
                 <Ionicons name="chevron-back-outline" size={15} color={colors.textSecondary} />
                 <Text style={{ fontSize:13, fontWeight:'700', color:colors.textSecondary }}>Back to Cost Options</Text>
               </TouchableOpacity>

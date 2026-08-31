@@ -527,8 +527,8 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
     return (
       <GlassBackground>
         <SafeAreaView style={[styles.flex, { alignItems: 'center', justifyContent: 'center' }]}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={{ marginTop: 12, color: '#6B7280' }}>Loading your profile…</Text>
+          <ActivityIndicator size="large" color="#6A2C90" />
+          <Text style={{ marginTop: 12, color: '#64748B' }}>Loading your profile…</Text>
         </SafeAreaView>
       </GlassBackground>
     );
@@ -541,7 +541,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
         {/* ── Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#111827" />
+            <Ionicons name="arrow-back" size={24} color="#0F172A" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Raise a Complaint</Text>
@@ -573,7 +573,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
         >
           {activeTab === 'manual' ? (
             <View style={styles.placeholderCard}>
-              <Ionicons name="create-outline" size={48} color="#9CA3AF" />
+              <Ionicons name="create-outline" size={48} color="#94A3B8" />
               <Text style={styles.placeholderTitle}>Manual Entry</Text>
               <Text style={styles.placeholderSubtext}>Prefer typing? Fill in the details yourself.</Text>
               <TouchableOpacity
@@ -630,7 +630,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
               {/* ── TRANSCRIBING */}
               {screenState === 'transcribing' && (
                 <View style={styles.centerSection}>
-                  <ActivityIndicator size="large" color="#6366F1" />
+                  <ActivityIndicator size="large" color="#6A2C90" />
                   <Text style={styles.processingTitle}>Transcribing your voice…</Text>
                   <Text style={styles.processingSubtext}>Analysing and classifying issue</Text>
                 </View>
@@ -659,8 +659,8 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                               {classification.priority.toUpperCase()}
                             </Text>
                           </View>
-                          <View style={[styles.badge, { backgroundColor: '#6366F118' }]}>
-                            <Text style={[styles.badgeText, { color: '#6366F1' }]}>
+                          <View style={[styles.badge, { backgroundColor: '#6A2C9018' }]}>
+                            <Text style={[styles.badgeText, { color: '#6A2C90' }]}>
                               {issueTypes.find((t: { id: string; name: string }) => t.id === selectedIssueTypeId)?.name?.toUpperCase() || classification.title.toUpperCase()}
                             </Text>
                           </View>
@@ -697,7 +697,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                   {/* Tenant location confirmation */}
                   {tenant.locationLabel ? (
                     <View style={styles.locationCard}>
-                      <Ionicons name="location" size={16} color="#6366F1" />
+                      <Ionicons name="location" size={16} color="#1D4ED8" />
                       <Text style={styles.locationText}>
                         Ticket will be raised for: <Text style={{ fontWeight: '700' }}>{tenant.locationLabel}</Text>
                       </Text>
@@ -718,11 +718,11 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                     ) : (
                       <View style={styles.photoButtonRow}>
                         <TouchableOpacity style={styles.photoBtn} onPress={handleTakePhoto}>
-                          <Ionicons name="camera" size={22} color="#6366F1" />
+                          <Ionicons name="camera" size={22} color="#6A2C90" />
                           <Text style={styles.photoBtnText}>Camera</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.photoBtn} onPress={handlePickPhoto}>
-                          <Ionicons name="image" size={22} color="#6366F1" />
+                          <Ionicons name="image" size={22} color="#6A2C90" />
                           <Text style={styles.photoBtnText}>Gallery</Text>
                         </TouchableOpacity>
                       </View>
@@ -736,7 +736,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                       onPress={handleReset}
                       disabled={screenState === 'submitting'}
                     >
-                      <Ionicons name="refresh" size={18} color="#6366F1" />
+                      <Ionicons name="refresh" size={18} color="#6A2C90" />
                       <Text style={styles.redoBtnLabel}>Redo</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -789,7 +789,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                       style={[styles.redoBtn, { marginTop: 24, flex: 0, paddingHorizontal: 32 }]}
                       onPress={handleReset}
                     >
-                      <Ionicons name="refresh" size={18} color="#6366F1" />
+                      <Ionicons name="refresh" size={18} color="#6A2C90" />
                       <Text style={styles.redoBtnLabel}>Try Again</Text>
                     </TouchableOpacity>
                   </View>
@@ -805,8 +805,13 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 
-const INDIGO = '#6366F1';
-const RED    = '#EF4444';
+const INDIGO = '#6A2C90';
+const RED    = '#DC2626';
+
+/** Soft elevation used across cards/panels (design-language shadow token). */
+const CARD_SHADOW = {
+  shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+} as const;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -816,35 +821,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF1F6',
   },
   backBtn:        { marginRight: 12, padding: 4 },
-  headerTitle:    { fontSize: 20, fontWeight: '800', color: '#111827' },
-  headerLocation: { fontSize: 12, color: '#6366F1', marginTop: 1, fontWeight: '600' },
+  headerTitle:    { fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
+  headerLocation: { fontSize: 12, color: '#6A2C90', marginTop: 1, fontWeight: '600' },
 
   tabRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4, gap: 10 },
   tab: {
-    flex: 1, paddingVertical: 12, borderRadius: 12,
-    backgroundColor: '#FFFFFF', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#E5E7EB',
+    flex: 1, paddingVertical: 12, borderRadius: 999,
+    backgroundColor: '#F1F3F9', alignItems: 'center',
   },
-  tabActive:      { backgroundColor: INDIGO, borderColor: INDIGO },
-  tabLabel:       { fontSize: 15, fontWeight: '700', color: '#6B7280' },
+  tabActive:      { backgroundColor: INDIGO },
+  tabLabel:       { fontSize: 15, fontWeight: '700', color: '#64748B' },
   tabLabelActive: { color: '#FFFFFF' },
 
   scrollContent: { padding: 20, paddingBottom: 40 },
 
   placeholderCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 48, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 }, elevation: 2,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 48, alignItems: 'center',
+    borderWidth: 1, borderColor: '#EEF1F6',
+    ...CARD_SHADOW,
   },
-  placeholderTitle:   { fontSize: 18, fontWeight: '700', color: '#6B7280', marginTop: 14 },
-  placeholderSubtext: { fontSize: 14, color: '#9CA3AF', marginTop: 4, textAlign: 'center' },
+  placeholderTitle:   { fontSize: 18, fontWeight: '800', color: '#0F172A', marginTop: 14 },
+  placeholderSubtext: { fontSize: 14, color: '#94A3B8', marginTop: 4, textAlign: 'center' },
   manualEntryBtn: {
-    marginTop: 20, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 14,
+    marginTop: 20, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12,
     backgroundColor: INDIGO,
     shadowColor: INDIGO, shadowOpacity: 0.3, shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 }, elevation: 5,
@@ -865,75 +869,75 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
   micBtnRecording: { backgroundColor: RED, shadowColor: RED },
-  micStatusText:   { fontSize: 16, fontWeight: '600', color: '#4B5563', marginTop: 24 },
+  micStatusText:   { fontSize: 16, fontWeight: '600', color: '#64748B', marginTop: 24 },
   livePill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12,
-    backgroundColor: '#FEE2E2', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+    backgroundColor: '#FEE2E2', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999,
   },
   liveDot:      { width: 8, height: 8, borderRadius: 4, backgroundColor: RED },
   liveLabel:    { fontSize: 11, fontWeight: '800', color: '#DC2626', letterSpacing: 1.5 },
-  autoStopHint: { fontSize: 12, color: '#9CA3AF', marginTop: 8 },
+  autoStopHint: { fontSize: 12, color: '#94A3B8', marginTop: 8 },
   hintText: {
-    fontSize: 14, color: '#9CA3AF', marginTop: 24,
+    fontSize: 14, color: '#94A3B8', marginTop: 24,
     textAlign: 'center', paddingHorizontal: 32, lineHeight: 20,
   },
 
   centerSection:    { alignItems: 'center', paddingVertical: 72 },
-  processingTitle:  { fontSize: 18, fontWeight: '700', color: '#111827', marginTop: 16 },
-  processingSubtext:{ fontSize: 14, color: '#6B7280', marginTop: 4 },
+  processingTitle:  { fontSize: 18, fontWeight: '800', color: '#0F172A', marginTop: 16 },
+  processingSubtext:{ fontSize: 14, color: '#64748B', marginTop: 4 },
 
   card: {
     backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 }, elevation: 3,
+    borderWidth: 1, borderColor: '#EEF1F6',
+    ...CARD_SHADOW,
   },
-  cardLabel:      { fontSize: 11, fontWeight: '800', color: '#9CA3AF', letterSpacing: 1, marginBottom: 12 },
+  cardLabel:      { fontSize: 11, fontWeight: '800', color: '#94A3B8', letterSpacing: 1, marginBottom: 12 },
   transcriptText: { fontSize: 16, color: '#374151', fontStyle: 'italic', lineHeight: 24 },
 
   classRow:  { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   classEmoji:{ fontSize: 36, marginTop: 2 },
-  classTitle:{ fontSize: 18, fontWeight: '800', color: '#111827' },
-  classDesc: { fontSize: 14, color: '#6B7280', marginTop: 4, lineHeight: 20 },
+  classTitle:{ fontSize: 18, fontWeight: '800', color: '#0F172A' },
+  classDesc: { fontSize: 14, color: '#64748B', marginTop: 4, lineHeight: 20 },
   badgeRow:  { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
-  badge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  badge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   badgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
   locationCard: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#EEF2FF', borderRadius: 10, padding: 12, marginBottom: 16,
+    backgroundColor: '#EEF3FF', borderRadius: 12, padding: 12, marginBottom: 16,
   },
-  locationText: { fontSize: 13, color: '#4B5563' },
+  locationText: { fontSize: 13, color: '#475569' },
 
   photoButtonRow: { flexDirection: 'row', gap: 12 },
   photoBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 14, borderRadius: 12,
-    borderWidth: 1.5, borderColor: INDIGO, backgroundColor: '#EEF2FF',
+    borderWidth: 1, borderColor: '#E4D3EF', backgroundColor: '#F3ECF9',
   },
   photoBtnText:   { fontSize: 14, fontWeight: '700', color: INDIGO },
-  photoPreview:   { width: '100%', height: 180, borderRadius: 10, marginBottom: 10 },
+  photoPreview:   { width: '100%', height: 180, borderRadius: 12, marginBottom: 10 },
   removePhotoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  removePhotoText:{ fontSize: 13, color: '#EF4444', fontWeight: '600' },
+  removePhotoText:{ fontSize: 13, color: '#DC2626', fontWeight: '600' },
 
   chipRow:       { flexDirection: 'row', gap: 8, paddingVertical: 4 },
   chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
+    borderWidth: 1, borderColor: '#EEF1F6', backgroundColor: '#F1F3F9',
   },
-  chipActive:     { borderColor: INDIGO, backgroundColor: '#EEF2FF' },
-  chipText:       { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-  chipActiveText: { fontSize: 13, fontWeight: '700', color: INDIGO },
+  chipActive:     { borderColor: INDIGO, backgroundColor: INDIGO },
+  chipText:       { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  chipActiveText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
 
   actionRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
   redoBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 16, borderRadius: 14, backgroundColor: '#FFFFFF',
-    borderWidth: 1.5, borderColor: INDIGO,
+    gap: 8, paddingVertical: 16, borderRadius: 12, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: '#EEF1F6',
   },
   redoBtnLabel: { fontSize: 16, fontWeight: '700', color: INDIGO },
   submitBtn: {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 16, borderRadius: 14, backgroundColor: INDIGO,
+    gap: 8, paddingVertical: 16, borderRadius: 12, backgroundColor: INDIGO,
     shadowColor: INDIGO, shadowOpacity: 0.3, shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 }, elevation: 5,
   },

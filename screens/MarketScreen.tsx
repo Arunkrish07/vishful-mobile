@@ -18,6 +18,21 @@ import { GlassBackground } from '../components/shared';
 
 const fmtInr = (v: number) => `₹${(Number(v) || 0).toLocaleString('en-IN')}`;
 
+// Design tokens (matches DashboardScreen/PropertiesScreen visual language).
+const MKT = {
+  accent: '#6A2C90', accentDeep: '#1D4ED8', purple: '#6A2C90',
+  ink900: '#0F172A', ink700: '#374151', ink600: '#64748B', ink500: '#64748B', ink400: '#94A3B8',
+  surface: '#FFFFFF', soft: '#F8FAFC', accentSoft: '#F3ECF9',
+  cardBorder: '#EEF1F6',
+  good: '#16A34A', goodBg: '#DCFCE7',
+  warn: '#EA580C', warnBg: '#FFEDD5',
+  bad: '#DC2626', badBg: '#FEE2E2',
+  info: '#1D4ED8', infoBg: '#EEF3FF',
+};
+const CARD_SHADOW = {
+  shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+} as const;
+
 // Web parity: competitor segment filter chips.
 const SEGMENTS = ['all', 'budget', 'mid-range', 'premium', 'luxury'];
 
@@ -160,19 +175,19 @@ export default function MarketScreen() {
             <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Market AI</Text>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: MKT.ink900, letterSpacing: -0.4 }}>Market AI</Text>
             {summary && (summary.competitorCount > 0 || summary.trackedLocalities > 0) ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, alignSelf: 'flex-start', backgroundColor: 'rgba(22,163,74,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
-                <Ionicons name="checkmark-circle" size={12} color="#16a34a" />
-                <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>{summary.competitorCount} competitors · {summary.trackedLocalities} localities</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, alignSelf: 'flex-start', backgroundColor: MKT.goodBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                <Ionicons name="checkmark-circle" size={12} color={MKT.good} />
+                <Text style={{ fontSize: 10, fontWeight: '700', color: MKT.good }}>{summary.competitorCount} competitors · {summary.trackedLocalities} localities</Text>
               </View>
             ) : (
-              <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Competitor pricing & locality trends</Text>
+              <Text style={{ fontSize: 13, color: MKT.ink500, fontWeight: '500', marginTop: 2 }}>Competitor pricing & locality trends</Text>
             )}
           </View>
           {canManage && (
             <TouchableOpacity disabled={!!busy} onPress={doScan}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#2563EB', opacity: busy ? 0.5 : 1 }}>
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: MKT.accent, opacity: busy ? 0.5 : 1 }}>
               {busy === 'scan' ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sync" size={14} color="#fff" />}
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Scan</Text>
             </TouchableOpacity>
@@ -188,96 +203,96 @@ export default function MarketScreen() {
             ...(canManage ? [{ k: 'settings', label: 'Settings' }] : []),
           ] as { k: string; label: string }[]).map(x => (
             <TouchableOpacity key={x.k} onPress={() => setTab(x.k as any)}
-              style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: tab === x.k ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: tab === x.k ? '#fff' : '#2563EB' }}>{x.label}</Text>
+              style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: tab === x.k ? MKT.purple : '#F1F3F9' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: tab === x.k ? '#fff' : MKT.ink600 }}>{x.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {loading && !refreshing ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text style={{ marginTop: 12, color: '#556274' }}>Loading market data…</Text>
+            <ActivityIndicator size="large" color={MKT.accent} />
+            <Text style={{ marginTop: 12, color: MKT.ink500 }}>Loading market data…</Text>
           </View>
         ) : (
           <ScrollView
             contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={MKT.accent} />}
           >
             {tab === 'competitors' && (
               competitors.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                  <Ionicons name="radio-outline" size={56} color="rgba(37,99,235,0.18)" />
-                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No competitors tracked yet</Text>
-                  <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Discovery jobs populate this from the web app.</Text>
+                  <Ionicons name="radio-outline" size={56} color={MKT.accentSoft} />
+                  <Text style={{ marginTop: 12, color: MKT.ink500 }}>No competitors tracked yet</Text>
+                  <Text style={{ marginTop: 4, color: MKT.ink500, fontSize: 12, textAlign: 'center' }}>Discovery jobs populate this from the web app.</Text>
                 </View>
               ) : (
                 <>
                   {canManage && competitors.some((c) => c.crawlStatus === 'failed') && (
                     <TouchableOpacity disabled={!!busy} onPress={doRetry}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, marginBottom: 10, backgroundColor: 'rgba(220,38,38,0.08)' }}>
-                      {busy === 'retry' ? <ActivityIndicator size="small" color="#DC2626" /> : <Ionicons name="refresh" size={14} color="#DC2626" />}
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Retry {competitors.filter((c) => c.crawlStatus === 'failed').length} failed analysis(es)</Text>
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, marginBottom: 10, backgroundColor: MKT.badBg }}>
+                      {busy === 'retry' ? <ActivityIndicator size="small" color={MKT.bad} /> : <Ionicons name="refresh" size={14} color={MKT.bad} />}
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: MKT.bad }}>Retry {competitors.filter((c) => c.crawlStatus === 'failed').length} failed analysis(es)</Text>
                     </TouchableOpacity>
                   )}
                   {/* Deep-intel coverage badge (web parity) */}
                   {deepIntelCount > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(22,163,74,0.1)', marginBottom: 10 }}>
-                      <Ionicons name="sparkles-outline" size={12} color="#16a34a" />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#16a34a' }}>{deepIntelCount} with deep intel</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: MKT.goodBg, marginBottom: 10 }}>
+                      <Ionicons name="sparkles-outline" size={12} color={MKT.good} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: MKT.good }}>{deepIntelCount} with deep intel</Text>
                     </View>
                   )}
                   {/* Segment filter chips (web parity) */}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
                     {SEGMENTS.map((s) => (
                       <TouchableOpacity key={s} onPress={() => setSeg(s)}
-                        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: seg === s ? '#2563EB' : 'rgba(37,99,235,0.1)' }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'capitalize', color: seg === s ? '#fff' : '#2563EB' }}>{s === 'all' ? 'All' : s}</Text>
+                        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: seg === s ? MKT.accent : '#F1F3F9' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'capitalize', color: seg === s ? '#fff' : MKT.ink600 }}>{s === 'all' ? 'All' : s}</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
                   {shownCompetitors.length === 0 ? (
-                    <Text style={{ fontSize: 12, color: '#6B7280', textAlign: 'center', paddingVertical: 20 }}>No competitors in this segment.</Text>
+                    <Text style={{ fontSize: 12, color: MKT.ink500, textAlign: 'center', paddingVertical: 20 }}>No competitors in this segment.</Text>
                   ) : shownCompetitors.map((c) => {
                     const intel = c.intelligence || {};
                     const isOpen = expandedCompetitor === c.id;
                     const hasIntel = intel.pricingMin != null || intel.pricingMax != null || (intel.roomTypes && intel.roomTypes.length) || intel.amenityScore != null || (intel.amenities && intel.amenities.length) || intel.phone || intel.email || (intel.uspTags && intel.uspTags.length);
-                    const chip = (label: string, tone = '#2563EB') => (
+                    const chip = (label: string, tone = MKT.accent) => (
                       <View key={label} style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: tone + '14', marginRight: 6, marginBottom: 6 }}>
                         <Text style={{ fontSize: 10, fontWeight: '700', color: tone }}>{label}</Text>
                       </View>
                     );
                     return (
                       <TouchableOpacity key={c.id} activeOpacity={hasIntel ? 0.7 : 1} onPress={() => hasIntel && setExpandedCompetitor(isOpen ? null : c.id)}
-                        style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                        style={{ backgroundColor: MKT.surface, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: MKT.cardBorder, ...CARD_SHADOW }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', flexShrink: 1 }} numberOfLines={1}>{c.name}</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: MKT.ink900, flexShrink: 1 }} numberOfLines={1}>{c.name}</Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                             {c.rating != null && (
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <Ionicons name="star" size={12} color="#2563EB" />
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{c.rating}{c.reviewCount != null ? ` (${c.reviewCount})` : ''}</Text>
+                                <Ionicons name="star" size={12} color={MKT.accent} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: MKT.accent }}>{c.rating}{c.reviewCount != null ? ` (${c.reviewCount})` : ''}</Text>
                               </View>
                             )}
-                            {hasIntel && <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#9CA3AF" />}
+                            {hasIntel && <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MKT.ink400} />}
                           </View>
                         </View>
-                        <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>
+                        <Text style={{ fontSize: 12, color: MKT.ink500, marginTop: 3 }}>
                           {[c.localityName, c.city].filter(Boolean).join(', ') || '—'}
                           {c.marketSegment ? `  ·  ${c.marketSegment}` : ''}
                         </Text>
                         {(intel.pricingMin != null || intel.pricingMax != null) && (
-                          <Text style={{ fontSize: 12, color: '#111827', fontWeight: '700', marginTop: 6 }}>
+                          <Text style={{ fontSize: 12, color: MKT.ink900, fontWeight: '700', marginTop: 6 }}>
                             {intel.pricingMin != null && intel.pricingMax != null ? `${fmtInr(intel.pricingMin)}–${fmtInr(intel.pricingMax)}/mo` : `${fmtInr(intel.pricingMin ?? intel.pricingMax)}/mo`}
                           </Text>
                         )}
                         {isOpen && (
-                          <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10, gap: 8 }}>
+                          <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: MKT.cardBorder, paddingTop: 10, gap: 8 }}>
                             {Array.isArray(intel.roomTypes) && intel.roomTypes.length > 0 && (
                               <View>
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#9CA3AF', letterSpacing: 0.4, marginBottom: 2 }}>ROOM TYPES</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: MKT.ink400, letterSpacing: 0.4, marginBottom: 2 }}>ROOM TYPES</Text>
                                 {intel.roomTypes.map((rt: any, i: number) => (
-                                  <Text key={i} style={{ fontSize: 12, color: '#374151' }}>
+                                  <Text key={i} style={{ fontSize: 12, color: MKT.ink700 }}>
                                     {(rt.label || rt.type || 'Room')}{rt.price != null ? ` · ${fmtInr(rt.price)}` : ''}{rt.occupancy != null ? ` · ${rt.occupancy}` : ''}
                                   </Text>
                                 ))}
@@ -285,33 +300,33 @@ export default function MarketScreen() {
                             )}
                             {(intel.amenityScore != null || intel.digitalMaturityScore != null) && (
                               <View style={{ flexDirection: 'row', gap: 16 }}>
-                                {intel.amenityScore != null && <Text style={{ fontSize: 12, color: '#374151' }}>Amenity <Text style={{ fontWeight: '800' }}>{intel.amenityScore}</Text></Text>}
-                                {intel.digitalMaturityScore != null && <Text style={{ fontSize: 12, color: '#374151' }}>Digital <Text style={{ fontWeight: '800' }}>{intel.digitalMaturityScore}</Text></Text>}
+                                {intel.amenityScore != null && <Text style={{ fontSize: 12, color: MKT.ink700 }}>Amenity <Text style={{ fontWeight: '800' }}>{intel.amenityScore}</Text></Text>}
+                                {intel.digitalMaturityScore != null && <Text style={{ fontSize: 12, color: MKT.ink700 }}>Digital <Text style={{ fontWeight: '800' }}>{intel.digitalMaturityScore}</Text></Text>}
                               </View>
                             )}
-                            {intel.targetDemographic ? <Text style={{ fontSize: 12, color: '#374151' }}>Target: {intel.targetDemographic}</Text> : null}
+                            {intel.targetDemographic ? <Text style={{ fontSize: 12, color: MKT.ink700 }}>Target: {intel.targetDemographic}</Text> : null}
                             {(intel.hasOnlineBooking || intel.hasVirtualTour || intel.hasPhotos) && (
                               <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                                {intel.hasOnlineBooking ? chip('Online booking', '#16a34a') : null}
-                                {intel.hasVirtualTour ? chip('Virtual tour', '#16a34a') : null}
-                                {intel.hasPhotos ? chip('Photos', '#16a34a') : null}
+                                {intel.hasOnlineBooking ? chip('Online booking', MKT.good) : null}
+                                {intel.hasVirtualTour ? chip('Virtual tour', MKT.good) : null}
+                                {intel.hasPhotos ? chip('Photos', MKT.good) : null}
                               </View>
                             )}
                             {Array.isArray(intel.uspTags) && intel.uspTags.length > 0 && (
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{intel.uspTags.map((t: any) => chip(String(t), '#7C3AED'))}</View>
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{intel.uspTags.map((t: any) => chip(String(t), MKT.accent))}</View>
                             )}
                             {Array.isArray(intel.amenities) && intel.amenities.length > 0 && (
-                              <Text style={{ fontSize: 11, color: '#6B7280' }}>Amenities: {intel.amenities.join(', ')}</Text>
+                              <Text style={{ fontSize: 11, color: MKT.ink500 }}>Amenities: {intel.amenities.join(', ')}</Text>
                             )}
                             {(intel.phone || intel.email || c.website) && (
                               <View style={{ gap: 2 }}>
-                                {intel.phone ? <Text style={{ fontSize: 12, color: '#2563EB' }}>{intel.phone}</Text> : null}
-                                {intel.email ? <Text style={{ fontSize: 12, color: '#2563EB' }}>{intel.email}</Text> : null}
-                                {c.website ? <Text style={{ fontSize: 11, color: '#2563EB' }} numberOfLines={1}>{c.website}</Text> : null}
+                                {intel.phone ? <Text style={{ fontSize: 12, color: MKT.accent }}>{intel.phone}</Text> : null}
+                                {intel.email ? <Text style={{ fontSize: 12, color: MKT.accent }}>{intel.email}</Text> : null}
+                                {c.website ? <Text style={{ fontSize: 11, color: MKT.accent }} numberOfLines={1}>{c.website}</Text> : null}
                               </View>
                             )}
                             {intel.crawlStatus === 'failed' && intel.errorMessage ? (
-                              <Text style={{ fontSize: 11, color: '#DC2626' }}>Analysis failed: {String(intel.errorMessage).slice(0, 80)}</Text>
+                              <Text style={{ fontSize: 11, color: MKT.bad }}>Analysis failed: {String(intel.errorMessage).slice(0, 80)}</Text>
                             ) : null}
                           </View>
                         )}
@@ -325,18 +340,18 @@ export default function MarketScreen() {
             {tab === 'expansion' && (
               opportunities.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                  <Ionicons name="trending-up-outline" size={56} color="rgba(37,99,235,0.18)" />
-                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No expansion opportunities</Text>
-                  <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Add tracked localities in the web app to see scores.</Text>
+                  <Ionicons name="trending-up-outline" size={56} color={MKT.accentSoft} />
+                  <Text style={{ marginTop: 12, color: MKT.ink500 }}>No expansion opportunities</Text>
+                  <Text style={{ marginTop: 4, color: MKT.ink500, fontSize: 12, textAlign: 'center' }}>Add tracked localities in the web app to see scores.</Text>
                 </View>
               ) : opportunities.map((op, i) => (
-                <View key={`${op.localityName}-${op.city}-${i}`} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <View key={`${op.localityName}-${op.city}-${i}`} style={{ backgroundColor: MKT.surface, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: MKT.cardBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, ...CARD_SHADOW }}>
                   <View style={{ flexShrink: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }} numberOfLines={1}>{op.localityName}{op.city ? `, ${op.city}` : ''}</Text>
-                    <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>{op.competitorCount} competitors · avg {fmtInr(op.avgMarketPrice)}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: MKT.ink900 }} numberOfLines={1}>{op.localityName}{op.city ? `, ${op.city}` : ''}</Text>
+                    <Text style={{ fontSize: 12, color: MKT.ink500, marginTop: 3 }}>{op.competitorCount} competitors · avg {fmtInr(op.avgMarketPrice)}</Text>
                   </View>
-                  <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: op.opportunityScore >= 70 ? '#2563EB' : 'rgba(37,99,235,0.12)' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '900', color: op.opportunityScore >= 70 ? '#fff' : '#2563EB' }}>Score {op.opportunityScore}</Text>
+                  <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: op.opportunityScore >= 70 ? MKT.accent : MKT.infoBg }}>
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: op.opportunityScore >= 70 ? '#fff' : MKT.info }}>Score {op.opportunityScore}</Text>
                   </View>
                 </View>
               ))
@@ -345,22 +360,22 @@ export default function MarketScreen() {
             {tab === 'benchmark' && (
               benchmark.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                  <Ionicons name="stats-chart-outline" size={56} color="rgba(37,99,235,0.18)" />
-                  <Text style={{ marginTop: 12, color: '#6B7280' }}>No pricing benchmark yet</Text>
-                  <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Pricing data populates after room-type extraction completes.</Text>
+                  <Ionicons name="stats-chart-outline" size={56} color={MKT.accentSoft} />
+                  <Text style={{ marginTop: 12, color: MKT.ink500 }}>No pricing benchmark yet</Text>
+                  <Text style={{ marginTop: 4, color: MKT.ink500, fontSize: 12, textAlign: 'center' }}>Pricing data populates after room-type extraction completes.</Text>
                 </View>
               ) : benchmark.map((row, i) => (
-                <View key={`${row.localityName}-${row.roomTypeLabel}-${i}`} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 10 }}>{row.localityName || '—'}{row.roomTypeLabel ? ` — ${row.roomTypeLabel}` : ''}</Text>
+                <View key={`${row.localityName}-${row.roomTypeLabel}-${i}`} style={{ backgroundColor: MKT.surface, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: MKT.cardBorder, ...CARD_SHADOW }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: MKT.ink900, marginBottom: 10 }}>{row.localityName || '—'}{row.roomTypeLabel ? ` — ${row.roomTypeLabel}` : ''}</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     {[
-                      { l: 'P25', v: row.priceP25 != null ? fmtInr(row.priceP25) : '—', tone: '#374151' },
-                      { l: 'Median', v: row.priceMedian != null ? fmtInr(row.priceMedian) : '—', tone: '#2563EB' },
-                      { l: 'P75', v: row.priceP75 != null ? fmtInr(row.priceP75) : '—', tone: '#374151' },
-                      { l: 'Properties', v: String(row.propertyCount ?? 0), tone: '#374151' },
+                      { l: 'P25', v: row.priceP25 != null ? fmtInr(row.priceP25) : '—', tone: MKT.ink700 },
+                      { l: 'Median', v: row.priceMedian != null ? fmtInr(row.priceMedian) : '—', tone: MKT.accent },
+                      { l: 'P75', v: row.priceP75 != null ? fmtInr(row.priceP75) : '—', tone: MKT.ink700 },
+                      { l: 'Properties', v: String(row.propertyCount ?? 0), tone: MKT.ink700 },
                     ].map((c) => (
                       <View key={c.l} style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 2 }}>{c.l}</Text>
+                        <Text style={{ fontSize: 10, color: MKT.ink400, marginBottom: 2 }}>{c.l}</Text>
                         <Text style={{ fontSize: 14, fontWeight: '800', color: c.tone }}>{c.v}</Text>
                       </View>
                     ))}
@@ -372,45 +387,45 @@ export default function MarketScreen() {
             {tab === 'settings' && (
               <>
                 {/* Add a tracked locality */}
-                <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', marginBottom: 8 }}>Track a locality</Text>
-                  <TextInput value={locName} onChangeText={setLocName} placeholder="Locality name (e.g. Koramangala)" placeholderTextColor="#9CA3AF"
-                    style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827', marginBottom: 8 }} />
-                  <TextInput value={locCity} onChangeText={setLocCity} placeholder="City (e.g. Bengaluru)" placeholderTextColor="#9CA3AF"
-                    style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827', marginBottom: 10 }} />
+                <View style={{ backgroundColor: MKT.surface, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: MKT.cardBorder, ...CARD_SHADOW }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: MKT.ink900, marginBottom: 8 }}>Track a locality</Text>
+                  <TextInput value={locName} onChangeText={setLocName} placeholder="Locality name (e.g. Koramangala)" placeholderTextColor={MKT.ink400}
+                    style={{ borderWidth: 1, borderColor: MKT.cardBorder, backgroundColor: MKT.soft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: MKT.ink900, marginBottom: 8 }} />
+                  <TextInput value={locCity} onChangeText={setLocCity} placeholder="City (e.g. Bengaluru)" placeholderTextColor={MKT.ink400}
+                    style={{ borderWidth: 1, borderColor: MKT.cardBorder, backgroundColor: MKT.soft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: MKT.ink900, marginBottom: 10 }} />
                   <TouchableOpacity disabled={!!busy} onPress={doAddLocality}
-                    style={{ backgroundColor: '#2563EB', borderRadius: 10, paddingVertical: 11, alignItems: 'center', opacity: busy ? 0.6 : 1 }}>
+                    style={{ backgroundColor: MKT.accent, borderRadius: 12, paddingVertical: 11, alignItems: 'center', opacity: busy ? 0.6 : 1 }}>
                     {busy === 'addLoc' ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Add locality</Text>}
                   </TouchableOpacity>
                 </View>
 
                 {localities.length === 0 ? (
                   <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                    <Ionicons name="location-outline" size={48} color="rgba(37,99,235,0.18)" />
-                    <Text style={{ marginTop: 10, color: '#6B7280' }}>No tracked localities yet</Text>
-                    <Text style={{ marginTop: 4, color: '#6B7280', fontSize: 12, textAlign: 'center' }}>Add one above to start tracking competitors there.</Text>
+                    <Ionicons name="location-outline" size={48} color={MKT.accentSoft} />
+                    <Text style={{ marginTop: 10, color: MKT.ink500 }}>No tracked localities yet</Text>
+                    <Text style={{ marginTop: 4, color: MKT.ink500, fontSize: 12, textAlign: 'center' }}>Add one above to start tracking competitors there.</Text>
                   </View>
                 ) : groupByCity(localities).map(([city, items]) => (
-                  <View key={city} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: 'rgba(37,99,235,0.05)' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{city} <Text style={{ color: '#6B7280', fontWeight: '600' }}>({items.filter((i: any) => i.isActive).length}/{items.length})</Text></Text>
+                  <View key={city} style={{ backgroundColor: MKT.surface, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: MKT.cardBorder, overflow: 'hidden', ...CARD_SHADOW }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: MKT.soft }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: MKT.ink900 }}>{city} <Text style={{ color: MKT.ink500, fontWeight: '600' }}>({items.filter((i: any) => i.isActive).length}/{items.length})</Text></Text>
                       <TouchableOpacity disabled={!!busy} onPress={() => doToggleCityWide(city)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: busy ? 0.5 : 1 }}>
-                        <Ionicons name={items.some((i: any) => i.cityWideScan) ? 'checkbox' : 'square-outline'} size={16} color="#2563EB" />
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>City-wide scan</Text>
+                        <Ionicons name={items.some((i: any) => i.cityWideScan) ? 'checkbox' : 'square-outline'} size={16} color={MKT.accent} />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: MKT.accent }}>City-wide scan</Text>
                       </TouchableOpacity>
                     </View>
                     {items.map((t: any) => (
-                      <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                      <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: MKT.cardBorder }}>
                         <View style={{ flexShrink: 1 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{t.locality?.name || '—'}</Text>
-                          <Text style={{ fontSize: 11, color: t.isActive ? '#16a34a' : '#9CA3AF', fontWeight: '700' }}>{t.isActive ? 'Active' : 'Paused'}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: MKT.ink900 }} numberOfLines={1}>{t.locality?.name || '—'}</Text>
+                          <Text style={{ fontSize: 11, color: t.isActive ? MKT.good : MKT.ink400, fontWeight: '700' }}>{t.isActive ? 'Active' : 'Paused'}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <TouchableOpacity disabled={!!busy} onPress={() => doToggleLocality(t.id)} style={{ padding: 6, opacity: busy ? 0.5 : 1 }}>
-                            <Ionicons name={t.isActive ? 'pause' : 'play'} size={16} color="#D97706" />
+                            <Ionicons name={t.isActive ? 'pause' : 'play'} size={16} color={MKT.warn} />
                           </TouchableOpacity>
                           <TouchableOpacity disabled={!!busy} onPress={() => doRemoveLocality(t.id, t.locality?.name)} style={{ padding: 6, opacity: busy ? 0.5 : 1 }}>
-                            <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                            <Ionicons name="trash-outline" size={16} color={MKT.bad} />
                           </TouchableOpacity>
                         </View>
                       </View>

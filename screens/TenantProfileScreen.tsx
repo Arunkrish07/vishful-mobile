@@ -3,32 +3,51 @@ import { View, Text, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Ima
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
-import { useTheme } from '../lib/ThemeContext';
-import { spacing, glass } from '../lib/theme';
+import { spacing } from '../lib/theme';
 import { Button, GlassBackground } from '../components/shared';
 import { useNavigation } from '@react-navigation/native';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { getActiveSession } from '../services/getActiveSession';
 
+// ─── Blue / slate design tokens (web chrome) ──────────────────────────────────
+const TP = {
+  ink: '#0F172A', sub: '#64748B', ter: '#94A3B8',
+  blue: '#6A2C90', blueDeep: '#1D4ED8',
+  surface: '#FFFFFF', bg: '#F8FAFC', border: '#EEF1F6', soft: '#F3ECF9',
+  good: '#16A34A', goodBg: '#DCFCE7',
+  warn: '#EA580C', warnBg: '#FFEDD5',
+  bad: '#DC2626', badBg: '#FEE2E2',
+  info: '#1D4ED8', infoBg: '#EEF3FF',
+};
+
+/** Soft elevation used across cards/panels (design-language shadow token). */
+const CARD_SHADOW = {
+  shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+} as const;
+
+const CARD: any = {
+  backgroundColor: TP.surface, borderRadius: 16, borderWidth: 1, borderColor: TP.border,
+  ...CARD_SHADOW,
+};
+
 // ── Status colour helper ──────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  staying:    { bg: '#dcfce7', text: '#16a34a' },
-  onboarding: { bg: '#dbeafe', text: '#2563eb' },
-  'on-notice':{ bg: '#ffedd5', text: '#ea580c' },
-  new:        { bg: '#EEF2FF', text: '#6366F1' },
-  exited:     { bg: '#f1f5f9', text: '#64748b' },
+  staying:    { bg: TP.goodBg, text: TP.good },
+  onboarding: { bg: TP.infoBg, text: TP.info },
+  'on-notice':{ bg: TP.warnBg, text: TP.warn },
+  new:        { bg: TP.infoBg, text: TP.info },
+  exited:     { bg: '#F1F5F9', text: TP.sub },
 };
 const statusStyle = (s?: string) =>
-  STATUS_COLORS[(s || '').toLowerCase()] ?? { bg: '#EEF2FF', text: '#6366F1' };
+  STATUS_COLORS[(s || '').toLowerCase()] ?? { bg: TP.infoBg, text: TP.info };
 
 // ── Section label ─────────────────────────────────────────────────────────────
 function SectionLabel({ title }: { title: string }) {
-  const { colors } = useTheme();
   return (
     <Text style={{
-      fontSize: 11, fontWeight: '700', color: colors.textTertiary,
-      letterSpacing: 1, marginBottom: 10, marginTop: 20, textTransform: 'uppercase',
+      fontSize: 17, fontWeight: '800', color: TP.ink, letterSpacing: -0.3,
+      marginBottom: 10, marginTop: 20,
     }}>
       {title}
     </Text>
@@ -37,19 +56,18 @@ function SectionLabel({ title }: { title: string }) {
 
 // ── Info row ──────────────────────────────────────────────────────────────────
 function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  const { colors } = useTheme();
   return (
-    <View style={[glass.card, { flexDirection: 'row', alignItems: 'center', marginBottom: 0 }]}>
+    <View style={[CARD, { flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 0 }]}>
       <View style={{
         width: 36, height: 36, borderRadius: 10,
-        backgroundColor: colors.primaryLight,
+        backgroundColor: TP.soft,
         alignItems: 'center', justifyContent: 'center', marginRight: spacing.md,
       }}>
-        <Ionicons name={icon as any} size={16} color={colors.primary} />
+        <Ionicons name={icon as any} size={16} color={TP.blue} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>{label}</Text>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>{value}</Text>
+        <Text style={{ fontSize: 11, color: TP.sub, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: TP.ink }}>{value}</Text>
       </View>
     </View>
   );
@@ -58,7 +76,6 @@ function InfoRow({ icon, label, value }: { icon: string; label: string; value: s
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function TenantProfileScreen() {
   const { user, logout } = useAuth();
-  const { colors } = useTheme();
   const navigation = useNavigation<any>();
 
   const [profile,       setProfile]       = useState<any>(null);
@@ -150,11 +167,11 @@ export default function TenantProfileScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* ── Header ── */}
-        <View style={[glass.header, { paddingHorizontal: spacing.lg, paddingVertical: spacing.lg }]}>
-          <Text style={{ fontSize: 11, color: colors.textTertiary, fontWeight: '700', letterSpacing: 0.5 }}>
+        <View style={{ backgroundColor: TP.surface, borderBottomWidth: 1, borderBottomColor: TP.border, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg }}>
+          <Text style={{ fontSize: 11, color: TP.ter, fontWeight: '700', letterSpacing: 0.5 }}>
             VISHFUL SPACES
           </Text>
-          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>My Profile</Text>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: TP.ink, letterSpacing: -0.3 }}>My Profile</Text>
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 60 }}>
@@ -162,20 +179,20 @@ export default function TenantProfileScreen() {
           {/* ── Loading ── */}
           {loading ? (
             <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ marginTop: 12, fontSize: 13, color: colors.textSecondary }}>Loading profile…</Text>
+              <ActivityIndicator size="large" color={TP.blue} />
+              <Text style={{ marginTop: 12, fontSize: 13, color: TP.sub }}>Loading profile…</Text>
             </View>
 
           ) : error ? (
             /* ── Error state ── */
-            <View style={[glass.card, { alignItems: 'center', paddingVertical: 32 }]}>
-              <Ionicons name="warning-outline" size={40} color="#ea580c" />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 12, textAlign: 'center' }}>
+            <View style={[CARD, { alignItems: 'center', paddingVertical: 32, padding: 16 }]}>
+              <Ionicons name="warning-outline" size={40} color={TP.warn} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: TP.ink, marginTop: 12, textAlign: 'center' }}>
                 {error}
               </Text>
               <TouchableOpacity
                 onPress={loadProfileData}
-                style={{ marginTop: 16, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 }}
+                style={{ marginTop: 16, backgroundColor: TP.blue, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 }}
               >
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
               </TouchableOpacity>
@@ -184,11 +201,11 @@ export default function TenantProfileScreen() {
           ) : (
             <>
               {/* ── Avatar + name ── */}
-              <View style={[glass.card, { marginBottom: spacing.md }]}>
+              <View style={[CARD, { padding: 16, marginBottom: spacing.md }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{
                     width: 60, height: 60, borderRadius: 16,
-                    backgroundColor: colors.primary,
+                    backgroundColor: TP.blue,
                     alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg,
                     overflow: 'hidden',
                   }}>
@@ -201,10 +218,10 @@ export default function TenantProfileScreen() {
                     )}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>
+                    <Text style={{ fontSize: 17, fontWeight: '800', color: TP.ink, letterSpacing: -0.3 }}>
                       {profile?.name || user?.userName || 'Tenant'}
                     </Text>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    <Text style={{ fontSize: 12, color: TP.sub, marginTop: 2 }}>
                       {profile?.phone || user?.phone}
                     </Text>
                     {stayStatus && (

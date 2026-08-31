@@ -53,53 +53,66 @@ export default function TechnicianProfileScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
           {/* Profile Card */}
-          <View style={[glass.card, { alignItems: 'center', paddingVertical: spacing.xxl }]}>
+          <View style={[glass.card, {
+            alignItems: 'center', paddingVertical: spacing.xxl,
+            borderRadius: 18, borderColor: '#EEF1F6',
+            shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+          }]}>
             <View style={{
-              width: 80, height: 80, borderRadius: 24,
-              backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#312E81', shadowOpacity: 0.35, shadowRadius: 16, elevation: 8,
+              width: 80, height: 80, borderRadius: 40,
+              backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#6A2C90', shadowOpacity: 0.25, shadowRadius: 14, elevation: 6,
               marginBottom: spacing.lg,
             }}>
-              <Text style={{ fontSize: 36, fontWeight: '900', color: '#fff' }}>{initials}</Text>
+              <Text style={{ fontSize: 32, fontWeight: '800', color: '#fff' }}>{initials}</Text>
             </View>
-            <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: colors.text }}>
+            <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>
               {user?.userName || 'Technician'}
             </Text>
-            <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 4 }}>
+            <Text style={{ fontSize: fontSize.sm, color: '#64748B', marginTop: 4 }}>
               {user?.phone || ''}
             </Text>
             <View style={{ marginTop: spacing.md }}>
-              <Badge text="Technician" color="#312E81" />
+              <Badge text="Technician" color="#1D4ED8" />
             </View>
-            <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: spacing.sm }}>
+            <Text style={{ fontSize: fontSize.xs, color: '#94A3B8', marginTop: spacing.sm }}>
               {user?.organizationName || 'Vishful Spaces LLP'}
             </Text>
           </View>
 
           {/* Performance Stats */}
-          <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.md, marginTop: spacing.md }}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', marginBottom: spacing.md, marginTop: spacing.md }}>
             Performance
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
             {[
-              { label: 'Total', value: stats.total, color: '#312E81', icon: 'layers-outline' },
-              { label: 'Active', value: stats.active, color: colors.primary, icon: 'construct-outline' },
-              { label: 'Done', value: stats.completed, color: '#10B981', icon: 'checkmark-circle-outline' },
-              { label: 'Avg Time', value: stats.avgResolution, color: '#F59E0B', icon: 'time-outline' },
+              { label: 'Total', value: stats.total, color: '#1D4ED8', bg: '#EEF3FF', icon: 'layers-outline' },
+              { label: 'Active', value: stats.active, color: '#6A2C90', bg: '#F3ECF9', icon: 'construct-outline' },
+              { label: 'Done', value: stats.completed, color: '#16A34A', bg: '#DCFCE7', icon: 'checkmark-circle-outline' },
+              { label: 'Avg Time', value: stats.avgResolution, color: '#EA580C', bg: '#FFEDD5', icon: 'time-outline' },
             ].map(s => (
-              <View key={s.label} style={[glass.card, { flex: 1, alignItems: 'center', padding: spacing.md, marginBottom: 0 }]}>
-                <Ionicons name={s.icon as any} size={20} color={s.color} />
-                <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: s.color, marginTop: 4 }}>
+              <View key={s.label} style={[glass.card, {
+                flex: 1, alignItems: 'center', padding: spacing.md, marginBottom: 0,
+                borderRadius: 16, borderColor: '#EEF1F6',
+                shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+              }]}>
+                <View style={{
+                  width: 32, height: 32, borderRadius: 10, backgroundColor: s.bg,
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Ionicons name={s.icon as any} size={16} color={s.color} />
+                </View>
+                <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: '#0F172A', marginTop: 6, letterSpacing: -0.3 }}>
                   {s.value}
                 </Text>
-                <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }}>{s.label}</Text>
+                <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>{s.label}</Text>
               </View>
             ))}
           </View>
 
           {/* Status Breakdown */}
-          <View style={glass.card}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 1.5, marginBottom: spacing.md }}>
+          <View style={[glass.card, { borderRadius: 18, borderColor: '#EEF1F6', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }]}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#94A3B8', letterSpacing: 1.5, marginBottom: spacing.md }}>
               STATUS BREAKDOWN
             </Text>
             {[
@@ -116,11 +129,11 @@ export default function TechnicianProfileScreen() {
               return (
                 <View key={status} style={{
                   flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                  paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(229,231,235,0.2)',
+                  paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#EEF1F6',
                 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cfg.color }} />
-                    <Text style={{ fontSize: fontSize.sm, color: colors.text }}>{cfg.label}</Text>
+                    <Text style={{ fontSize: fontSize.sm, color: '#0F172A' }}>{cfg.label}</Text>
                   </View>
                   <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: cfg.color }}>{count}</Text>
                 </View>
@@ -133,12 +146,13 @@ export default function TechnicianProfileScreen() {
             style={[glass.card, {
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
               gap: 8, paddingVertical: 16, marginTop: spacing.md,
-              borderWidth: 1.5, borderColor: colors.danger + '30',
+              borderRadius: 12, borderWidth: 1, borderColor: '#FEE2E2', backgroundColor: '#FFFFFF',
+              shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
             }]}
             onPress={handleLogout}
           >
-            <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: colors.danger }}>Logout</Text>
+            <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+            <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#DC2626' }}>Logout</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
