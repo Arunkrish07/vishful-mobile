@@ -6,7 +6,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
-import { spacing, fontSize, glass } from '../lib/theme';
 import { Button, Input, EmptyState, LoadingScreen, GlassBackground, DateField, IconBtnSolid, SearchField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
@@ -581,19 +580,24 @@ export default function TeamScreen() {
           />
         </View>
 
-        {/* Tabs */}
-        <View style={styles.tabRow}>
+        {/* Tabs — horizontal scroll so all 6 fit without cramming/clipping the labels */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabRowScroll}
+          contentContainerStyle={styles.tabRow}
+        >
           {tabs.map(t => (
             <TouchableOpacity
               key={t.key}
               onPress={() => setActiveTab(t.key)}
               style={[styles.tab, activeTab === t.key && styles.tabActive]}
             >
-              <Ionicons name={t.icon as any} size={14} color={activeTab === t.key ? '#2563EB' : '#6B7280'} />
-              <Text style={[styles.tabLabel, activeTab === t.key && styles.tabLabelActive]}>{t.label}</Text>
+              <Ionicons name={t.icon as any} size={14} color={activeTab === t.key ? '#fff' : '#64748B'} />
+              <Text style={[styles.tabLabel, activeTab === t.key && styles.tabLabelActive]} numberOfLines={1}>{t.label}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
         {/* Search (members only) */}
         {activeTab === 'members' && (
@@ -614,10 +618,10 @@ export default function TeamScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10 }}>
                 <TouchableOpacity
                   onPress={() => { setNewDeptName(''); setEditingDeptId(null); setEditingDeptName(''); setShowDepartments(true); }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#2563EB14', borderWidth: 1, borderColor: '#2563EB30' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#6A2C9014', borderWidth: 1, borderColor: '#6A2C9030' }}
                 >
-                  <Ionicons name="business-outline" size={14} color="#2563EB" />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Departments{departments.length ? ` (${departments.length})` : ''}</Text>
+                  <Ionicons name="business-outline" size={14} color="#6A2C90" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#6A2C90' }}>Departments{departments.length ? ` (${departments.length})` : ''}</Text>
                 </TouchableOpacity>
               </View>
               <KpiHeader
@@ -670,7 +674,7 @@ export default function TeamScreen() {
 
           {activeTab === 'salary' && (
             salaryLoading ? (
-              <ActivityIndicator color="#2563EB" style={{ marginTop: 30 }} />
+              <ActivityIndicator color="#6A2C90" style={{ marginTop: 30 }} />
             ) : salaryBills.length === 0 ? (
               <EmptyState icon="receipt-outline" title="No salary bills" subtitle="Pay slips are generated from attendance on the web app; they appear here to approve and mark paid." />
             ) : (
@@ -678,44 +682,44 @@ export default function TeamScreen() {
                 const m = (members || []).find((x: any) => x.id === b.team_member_id);
                 const name = m ? (m.name || `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Member') : 'Member';
                 const st = String(b.status || 'draft').toLowerCase();
-                const stCfg = st === 'paid' ? { bg: '#ECFDF5', c: '#059669', label: 'Paid' }
-                  : st === 'approved' ? { bg: '#EFF6FF', c: '#2563EB', label: 'Approved' }
-                  : { bg: '#FEF3C7', c: '#D97706', label: 'Draft' };
+                const stCfg = st === 'paid' ? { bg: '#DCFCE7', c: '#16A34A', label: 'Paid' }
+                  : st === 'approved' ? { bg: '#EEF3FF', c: '#1D4ED8', label: 'Approved' }
+                  : { bg: '#FFEDD5', c: '#EA580C', label: 'Draft' };
                 const deductions = (Number(b.advance_deducted) || 0) + (Number(b.other_deductions) || 0);
                 const net = Number(b.net_payable ?? b.earned_salary ?? 0);
                 const busy = salaryBusy === b.id;
                 return (
-                  <View key={b.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                  <View key={b.id} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{name}</Text>
-                        <Text style={{ fontSize: 12, color: '#6B7280' }}>{b.month} · {b.present_days ?? 0}/{b.working_days ?? 0} days</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>{name}</Text>
+                        <Text style={{ fontSize: 12, color: '#64748B' }}>{b.month} · {b.present_days ?? 0}/{b.working_days ?? 0} days</Text>
                       </View>
                       <View style={{ backgroundColor: stCfg.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
                         <Text style={{ fontSize: 11, fontWeight: '800', color: stCfg.c }}>{stCfg.label}</Text>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
-                      <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Base</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>₹{Math.round(Number(b.base_salary) || 0).toLocaleString('en-IN')}</Text></View>
-                      <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Earned</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>₹{Math.round(Number(b.earned_salary) || 0).toLocaleString('en-IN')}</Text></View>
-                      {deductions > 0 && <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Deductions</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>−₹{Math.round(deductions).toLocaleString('en-IN')}</Text></View>}
-                      <View><Text style={{ fontSize: 10, color: '#9CA3AF' }}>Net payable</Text><Text style={{ fontSize: 15, fontWeight: '900', color: '#059669' }}>₹{Math.round(net).toLocaleString('en-IN')}</Text></View>
+                      <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Base</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>₹{Math.round(Number(b.base_salary) || 0).toLocaleString('en-IN')}</Text></View>
+                      <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Earned</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>₹{Math.round(Number(b.earned_salary) || 0).toLocaleString('en-IN')}</Text></View>
+                      {deductions > 0 && <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Deductions</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>−₹{Math.round(deductions).toLocaleString('en-IN')}</Text></View>}
+                      <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Net payable</Text><Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>₹{Math.round(net).toLocaleString('en-IN')}</Text></View>
                     </View>
                     {st !== 'paid' && (
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                         {st === 'draft' && (
-                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'approved')} style={{ flex: 1, backgroundColor: '#2563EB', borderRadius: 10, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
+                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'approved')} style={{ flex: 1, backgroundColor: '#6A2C90', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
                             {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Approve</Text>}
                           </TouchableOpacity>
                         )}
                         {st === 'approved' && (
-                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'paid')} style={{ flex: 1, backgroundColor: '#059669', borderRadius: 10, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
+                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'paid')} style={{ flex: 1, backgroundColor: '#16A34A', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
                             {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Mark Paid</Text>}
                           </TouchableOpacity>
                         )}
                         {st === 'approved' && (
-                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'draft')} style={{ backgroundColor: '#F3F4F6', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' }}>
-                            <Text style={{ color: '#6B7280', fontWeight: '700', fontSize: 13 }}>Revert</Text>
+                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'draft')} style={{ backgroundColor: '#fff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', borderWidth: 1, borderColor: '#EEF1F6' }}>
+                            <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 13 }}>Revert</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -763,7 +767,7 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setShowPayment(false)}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color="#0F172A" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Record Payment</Text>
               <View style={{ width: 24 }} />
@@ -771,8 +775,8 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={[styles.selectedBanner]}>
-                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 8 }}>
+                  <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
                 </View>
@@ -781,7 +785,7 @@ export default function TeamScreen() {
                 options={[{ label: 'Salary', value: 'salary' }, { label: 'Advance', value: 'advance' }, { label: 'Bonus', value: 'bonus' }, { label: 'Deduction', value: 'deduction' }]}
                 onSelect={setPF('payment_type')} />
               <Input label="Amount (₹) *" value={paymentForm.amount} onChangeText={setPF('amount')} placeholder="0" keyboardType="numeric" icon="cash-outline" />
-              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Payment Date *</Text><DateField value={paymentForm.payment_date} onChange={setPF('payment_date')} /></View>
+              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 }}>Payment Date *</Text><DateField value={paymentForm.payment_date} onChange={setPF('payment_date')} /></View>
               <Input label="Month (optional)" value={paymentForm.payment_month} onChangeText={setPF('payment_month')} placeholder="YYYY-MM" icon="calendar-number-outline" />
               <PickerRow label="Payment Mode" value={paymentForm.payment_mode}
                 options={[{ label: 'Bank Transfer', value: 'bank_transfer' }, { label: 'Cash', value: 'cash' }, { label: 'UPI', value: 'upi' }, { label: 'Cheque', value: 'cheque' }]}
@@ -801,7 +805,7 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setShowAttendance(false)}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color="#0F172A" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Mark Attendance</Text>
               <View style={{ width: 24 }} />
@@ -809,13 +813,13 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={styles.selectedBanner}>
-                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 8 }}>
+                  <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
                 </View>
               )}
-              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Date *</Text><DateField value={attForm.date} onChange={setAF('date')} /></View>
+              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 }}>Date *</Text><DateField value={attForm.date} onChange={setAF('date')} /></View>
               <PickerRow label="Status" value={attForm.status}
                 options={[
                   { label: 'Present', value: 'present' }, { label: 'Absent', value: 'absent' },
@@ -839,7 +843,7 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => { setShowPaymentEdit(false); setEditingPayment(null); }}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color="#0F172A" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Edit Payment</Text>
               <TouchableOpacity onPress={() => editingPayment && handleDeletePayment(editingPayment)}>
@@ -851,7 +855,7 @@ export default function TeamScreen() {
                 options={[{ label: 'Salary', value: 'salary' }, { label: 'Advance', value: 'advance' }, { label: 'Bonus', value: 'bonus' }, { label: 'Deduction', value: 'deduction' }]}
                 onSelect={setPF('payment_type')} />
               <Input label="Amount (₹) *" value={paymentForm.amount} onChangeText={setPF('amount')} placeholder="0" keyboardType="numeric" icon="cash-outline" />
-              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Payment Date *</Text><DateField value={paymentForm.payment_date} onChange={setPF('payment_date')} /></View>
+              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 }}>Payment Date *</Text><DateField value={paymentForm.payment_date} onChange={setPF('payment_date')} /></View>
               <Input label="Month (optional)" value={paymentForm.payment_month} onChangeText={setPF('payment_month')} placeholder="YYYY-MM" icon="calendar-number-outline" />
               <PickerRow label="Payment Mode" value={paymentForm.payment_mode}
                 options={[{ label: 'Bank Transfer', value: 'bank_transfer' }, { label: 'Cash', value: 'cash' }, { label: 'UPI', value: 'upi' }, { label: 'Cheque', value: 'cheque' }]}
@@ -871,7 +875,7 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => { setShowExit(false); setSelected(null); }}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color="#0F172A" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Exit Employee</Text>
               <View style={{ width: 24 }} />
@@ -879,8 +883,8 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={styles.selectedBanner}>
-                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 8 }}>
+                  <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
                 </View>
@@ -890,7 +894,7 @@ export default function TeamScreen() {
                   This marks the member inactive and records their exit. You can reactivate them later.
                 </Text>
               </View>
-              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Exit Date *</Text><DateField value={exitForm.exit_date} onChange={setXF('exit_date')} /></View>
+              <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 }}>Exit Date *</Text><DateField value={exitForm.exit_date} onChange={setXF('exit_date')} /></View>
               <PickerRow label="Exit Type" value={exitForm.exit_type} options={EXIT_TYPES} onSelect={setXF('exit_type')} />
               <Input label="Reason" value={exitForm.exit_reason} onChangeText={setXF('exit_reason')} placeholder="Optional reason…" multiline icon="create-outline" />
               <View style={{ marginTop: 16 }}>
@@ -907,11 +911,11 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => setShowMemberAtt(false)}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color="#0F172A" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Attendance</Text>
               <TouchableOpacity onPress={() => { if (selected) openAttendance(selected); }}>
-                <Ionicons name="add-circle-outline" size={24} color="#2563EB" />
+                <Ionicons name="add-circle-outline" size={24} color="#6A2C90" />
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
@@ -929,7 +933,7 @@ export default function TeamScreen() {
           <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={() => { setShowDepartments(false); setEditingDeptId(null); setEditingDeptName(''); }}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color="#0F172A" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Departments</Text>
               <View style={{ width: 24 }} />
@@ -943,7 +947,7 @@ export default function TeamScreen() {
                 <TouchableOpacity
                   onPress={handleAddDept}
                   disabled={deptBusy}
-                  style={{ height: 48, paddingHorizontal: 16, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', opacity: deptBusy ? 0.6 : 1, marginBottom: 14 }}
+                  style={{ height: 48, paddingHorizontal: 16, borderRadius: 12, backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center', opacity: deptBusy ? 0.6 : 1, marginBottom: 14 }}
                 >
                   <Ionicons name="add" size={22} color="#fff" />
                 </TouchableOpacity>
@@ -960,16 +964,16 @@ export default function TeamScreen() {
                           value={editingDeptName}
                           onChangeText={setEditingDeptName}
                           placeholder="Department name"
-                          style={{ flex: 1, fontSize: 14, color: '#111827', backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(229,231,235,0.6)', paddingHorizontal: 12, height: 40 }}
+                          style={{ flex: 1, fontSize: 14, color: '#0F172A', backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12, height: 40 }}
                         />
                         <ActionChip label="Save" icon="checkmark-outline" color="#16a34a" onPress={() => handleRenameDept(d.id)} />
-                        <ActionChip label="Cancel" icon="close-outline" color="#6B7280" onPress={() => { setEditingDeptId(null); setEditingDeptName(''); }} />
+                        <ActionChip label="Cancel" icon="close-outline" color="#64748B" onPress={() => { setEditingDeptId(null); setEditingDeptName(''); }} />
                       </View>
                     ) : (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', flex: 1, paddingRight: 8 }}>{d.name || '—'}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, paddingRight: 8 }}>{d.name || '—'}</Text>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <ActionChip label="Rename" icon="pencil-outline" color="#2563EB" onPress={() => { setEditingDeptId(d.id); setEditingDeptName(d.name || ''); }} />
+                          <ActionChip label="Rename" icon="pencil-outline" color="#6A2C90" onPress={() => { setEditingDeptId(d.id); setEditingDeptName(d.name || ''); }} />
                           <ActionChip label="Delete" icon="trash-outline" color="#dc2626" onPress={() => handleDeleteDept(d)} />
                         </View>
                       </View>
@@ -1008,15 +1012,15 @@ function MemberCard({ member, onEdit, onDelete, onPayment, onAttendance, onExit,
             </View>
             {member.designation ? <Text style={styles.memberMeta}>{member.designation}{member.department ? ` · ${member.department}` : ''}</Text> : null}
             <Text style={styles.memberMeta}>
-              <Ionicons name="call-outline" size={12} color="#6B7280" /> {member.phone || '—'}
+              <Ionicons name="call-outline" size={12} color="#64748B" /> {member.phone || '—'}
             </Text>
             {member.salary_amount ? (
               <Text style={styles.memberMeta}>
-                <Ionicons name="cash-outline" size={12} color="#6B7280" /> ₹{Number(member.salary_amount).toLocaleString('en-IN')}/mo
+                <Ionicons name="cash-outline" size={12} color="#64748B" /> ₹{Number(member.salary_amount).toLocaleString('en-IN')}/mo
               </Text>
             ) : null}
           </View>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" />
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#64748B" />
         </View>
       </TouchableOpacity>
 
@@ -1025,8 +1029,8 @@ function MemberCard({ member, onEdit, onDelete, onPayment, onAttendance, onExit,
           {(member.specialties || member.specializations)?.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {(member.specialties || member.specializations).map((s: string) => (
-                <View key={s} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '600' }}>{s}</Text>
+                <View key={s} style={{ backgroundColor: '#F3ECF9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, color: '#6A2C90', fontWeight: '600' }}>{s}</Text>
                 </View>
               ))}
             </View>
@@ -1046,7 +1050,7 @@ function MemberCard({ member, onEdit, onDelete, onPayment, onAttendance, onExit,
             )}
           </View>
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-            <ActionChip label="Edit" icon="pencil-outline" color="#2563EB" onPress={onEdit} />
+            <ActionChip label="Edit" icon="pencil-outline" color="#6A2C90" onPress={onEdit} />
             <ActionChip label="Payment" icon="cash-outline" color="#16a34a" onPress={onPayment} />
             <ActionChip label="Attendance" icon="calendar-outline" color="#2563eb" onPress={onAttendance} />
             {member.status === 'inactive' ? (
@@ -1092,15 +1096,15 @@ function PaymentRow({ payment, members, onEdit, onDelete }: any) {
     <View style={[styles.card, { padding: 12 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, paddingRight: 8 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>{name}</Text>
-          <Text style={{ fontSize: 12, color: '#6B7280' }}>{payment.payment_type} · {payment.payment_mode}</Text>
-          <Text style={{ fontSize: 12, color: '#6B7280' }}>{formatDate(payment.payment_date)}{payment.payment_month ? ` · ${payment.payment_month}` : ''}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>{name}</Text>
+          <Text style={{ fontSize: 12, color: '#64748B' }}>{payment.payment_type} · {payment.payment_mode}</Text>
+          <Text style={{ fontSize: 12, color: '#64748B' }}>{formatDate(payment.payment_date)}{payment.payment_month ? ` · ${payment.payment_month}` : ''}</Text>
         </View>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: '#16a34a' }}>₹{Number(payment.amount || 0).toLocaleString('en-IN')}</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>₹{Number(payment.amount || 0).toLocaleString('en-IN')}</Text>
       </View>
       {(onEdit || onDelete) && (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-          {onEdit && <ActionChip label="Edit" icon="pencil-outline" color="#2563EB" onPress={onEdit} />}
+          {onEdit && <ActionChip label="Edit" icon="pencil-outline" color="#6A2C90" onPress={onEdit} />}
           {onDelete && <ActionChip label="Delete" icon="trash-outline" color="#dc2626" onPress={onDelete} />}
         </View>
       )}
@@ -1115,14 +1119,14 @@ const ATT_COLORS: Record<string, string> = {
 function AttendanceRow({ record, members }: any) {
   const member = members.find((m: any) => m.id === record.team_member_id);
   const name = member ? `${member.first_name || ''} ${member.last_name || ''}`.trim() : '—';
-  const color = ATT_COLORS[record.status] || '#6B7280';
+  const color = ATT_COLORS[record.status] || '#64748B';
   return (
     <View style={[styles.card, { padding: 12 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>{name}</Text>
-          <Text style={{ fontSize: 12, color: '#6B7280' }}>{formatDate(record.date)}</Text>
-          {record.check_in ? <Text style={{ fontSize: 12, color: '#6B7280' }}>{record.check_in} → {record.check_out || '—'}</Text> : null}
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>{name}</Text>
+          <Text style={{ fontSize: 12, color: '#64748B' }}>{formatDate(record.date)}</Text>
+          {record.check_in ? <Text style={{ fontSize: 12, color: '#64748B' }}>{record.check_in} → {record.check_out || '—'}</Text> : null}
         </View>
         <View style={{ backgroundColor: color + '18', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color, textTransform: 'capitalize' }}>{(record.status || '').replace('_', ' ')}</Text>
@@ -1147,7 +1151,7 @@ function PerformanceView({ rows, totalTickets }: { rows: any[]; totalTickets: nu
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
         {[
           { label: 'Tickets', value: String(totalTickets), color: '#0F172A' },
-          { label: 'Assigned', value: String(totalAssigned), color: '#2563EB' },
+          { label: 'Assigned', value: String(totalAssigned), color: '#6A2C90' },
           { label: 'Resolved', value: String(totalResolved), color: '#16a34a' },
           { label: 'Resolve %', value: `${overallRate}%`, color: rateColor(overallRate) },
         ].map(it => (
@@ -1160,7 +1164,7 @@ function PerformanceView({ rows, totalTickets }: { rows: any[]; totalTickets: nu
 
       {/* Per-member table */}
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-        <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }}>
+        <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6' }}>
           <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: '#64748B' }}>EMPLOYEE</Text>
           <Text style={{ width: 62, fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'center' }}>ASSIGNED</Text>
           <Text style={{ width: 62, fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'center' }}>RESOLVED</Text>
@@ -1171,8 +1175,8 @@ function PerformanceView({ rows, totalTickets }: { rows: any[]; totalTickets: nu
             key={r.id}
             style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 0.5, borderTopColor: '#F1F5F9' }}
           >
-            <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#111827', paddingRight: 6 }} numberOfLines={1}>{r.name}</Text>
-            <Text style={{ width: 62, fontSize: 13, color: '#2563EB', textAlign: 'center', fontWeight: '600' }}>{r.assigned}</Text>
+            <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#0F172A', paddingRight: 6 }} numberOfLines={1}>{r.name}</Text>
+            <Text style={{ width: 62, fontSize: 13, color: '#6A2C90', textAlign: 'center', fontWeight: '600' }}>{r.assigned}</Text>
             <Text style={{ width: 62, fontSize: 13, color: '#16a34a', textAlign: 'center', fontWeight: '600' }}>{r.resolved}</Text>
             <Text style={{ width: 52, fontSize: 13, fontWeight: '800', color: r.assigned > 0 ? rateColor(r.rate) : '#94A3B8', textAlign: 'right' }}>{r.assigned > 0 ? `${r.rate}%` : '—'}</Text>
           </View>
@@ -1188,7 +1192,7 @@ function PerformanceView({ rows, totalTickets }: { rows: any[]; totalTickets: nu
 // ─── Attendance KPI header (Members list) ───────────────────────────────────────
 function KpiHeader({ teamSize, presentToday, attendanceRate }: { teamSize: number; presentToday: number; attendanceRate: number }) {
   const items = [
-    { label: 'Team Size',   value: String(teamSize),          icon: 'people-outline',   color: '#2563EB' },
+    { label: 'Team Size',   value: String(teamSize),          icon: 'people-outline',   color: '#6A2C90' },
     { label: 'Present Today', value: String(presentToday),    icon: 'checkmark-circle-outline', color: '#16a34a' },
     { label: 'Attend. Rate', value: `${attendanceRate}%`,     icon: 'stats-chart-outline', color: '#ea580c' },
   ];
@@ -1224,10 +1228,10 @@ function StatusBar({ rollup }: { rollup: any }) {
 
   return (
     <View style={[styles.card, { padding: 14 }]}>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 2 }}>Status distribution</Text>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 2 }}>Status distribution</Text>
       <Text style={{ fontSize: 24, fontWeight: '800', color: '#0F172A' }}>{total}</Text>
       <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>Man-days this month</Text>
-      <View style={{ flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', backgroundColor: '#E5E7EB' }}>
+      <View style={{ flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', backgroundColor: '#EEF1F6' }}>
         {segs.filter(s => s.pct > 0).map(s => (
           <View key={s.key} style={{ width: `${s.pct}%`, backgroundColor: DASH_SEG_COLORS[s.key] }} />
         ))}
@@ -1236,8 +1240,8 @@ function StatusBar({ rollup }: { rollup: any }) {
         {segs.map(s => (
           <View key={s.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, width: '45%' }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: DASH_SEG_COLORS[s.key] }} />
-            <Text style={{ fontSize: 11, color: '#6B7280' }}>{s.label}</Text>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#111827', marginLeft: 'auto' }}>{s.pct}%</Text>
+            <Text style={{ fontSize: 11, color: '#64748B' }}>{s.label}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#0F172A', marginLeft: 'auto' }}>{s.pct}%</Text>
           </View>
         ))}
       </View>
@@ -1246,7 +1250,7 @@ function StatusBar({ rollup }: { rollup: any }) {
 }
 
 function rateColor(rate: number | null): string {
-  if (rate === null) return '#6B7280';
+  if (rate === null) return '#64748B';
   if (rate >= 90) return '#16a34a';
   if (rate >= 75) return '#ea580c';
   return '#dc2626';
@@ -1276,7 +1280,7 @@ function AttendanceDashboardView({ memberCount, rollup, today, rows, attention, 
       {/* Attendance rate KPI */}
       <View style={[styles.card, { padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
         <View>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>Attendance rate</Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>Attendance rate</Text>
           <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>Current month · all members</Text>
         </View>
         <Text style={{ fontSize: 30, fontWeight: '800', color: rateColor(rollup.ratePct) }}>{rollup.ratePct}%</Text>
@@ -1311,7 +1315,7 @@ function AttendanceDashboardView({ memberCount, rollup, today, rows, attention, 
 
       {/* Per-employee rate list */}
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-        <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }}>
+        <View style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6' }}>
           <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: '#64748B' }}>EMPLOYEE</Text>
           <Text style={{ width: 42, fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'center' }}>P</Text>
           <Text style={{ width: 42, fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'center' }}>A</Text>
@@ -1319,7 +1323,7 @@ function AttendanceDashboardView({ memberCount, rollup, today, rows, attention, 
           <Text style={{ width: 52, fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'right' }}>RATE</Text>
         </View>
         {rows.length === 0 ? (
-          <Text style={{ padding: 14, fontSize: 12, color: '#6B7280' }}>No attendance data this month.</Text>
+          <Text style={{ padding: 14, fontSize: 12, color: '#64748B' }}>No attendance data this month.</Text>
         ) : rows.map((r: MemberDashRow, i: number) => (
           <TouchableOpacity
             key={r.member.id}
@@ -1327,7 +1331,7 @@ function AttendanceDashboardView({ memberCount, rollup, today, rows, attention, 
             onPress={() => onOpenMember(r.member)}
             style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 0.5, borderTopColor: '#F1F5F9' }}
           >
-            <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#111827', paddingRight: 6 }} numberOfLines={1}>{r.name}</Text>
+            <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#0F172A', paddingRight: 6 }} numberOfLines={1}>{r.name}</Text>
             <Text style={{ width: 42, fontSize: 13, color: '#16a34a', textAlign: 'center', fontWeight: '600' }}>{r.summary.presentUnits}</Text>
             <Text style={{ width: 42, fontSize: 13, color: '#dc2626', textAlign: 'center', fontWeight: '600' }}>{r.summary.absentDays}</Text>
             <Text style={{ width: 42, fontSize: 13, color: '#2563eb', textAlign: 'center', fontWeight: '600' }}>{r.summary.leaveDays}</Text>
@@ -1379,8 +1383,8 @@ function MemberAttendancePanel({ member, attendance }: any) {
     <View>
       {/* Member banner */}
       <View style={styles.selectedBanner}>
-        <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
-        <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 8 }}>
+        <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
           {`${member.first_name || ''} ${member.last_name || ''}`.trim()}
         </Text>
       </View>
@@ -1397,7 +1401,7 @@ function MemberAttendancePanel({ member, attendance }: any) {
 
       {/* Calendar heat grid */}
       <View style={[styles.card, { padding: 14 }]}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 10 }}>Attendance calendar</Text>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 10 }}>Attendance calendar</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {DAY_LABELS.map((d, i) => (
             <View key={`dl-${i}`} style={{ width: `${100 / 7}%`, alignItems: 'center', marginBottom: 4 }}>
@@ -1421,7 +1425,7 @@ function MemberAttendancePanel({ member, attendance }: any) {
           {[['Present', '#16a34a'], ['Late', '#65a30d'], ['Leave', '#2563eb'], ['Absent', '#dc2626'], ['Off', '#E2E8F0']].map(([l, c]) => (
             <View key={l} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c }} />
-              <Text style={{ fontSize: 10, color: '#6B7280' }}>{l}</Text>
+              <Text style={{ fontSize: 10, color: '#64748B' }}>{l}</Text>
             </View>
           ))}
         </View>
@@ -1445,7 +1449,7 @@ function MemberAttendancePanel({ member, attendance }: any) {
             {
               key: 'worked', label: 'Hours worked',
               value: `${work.totalWorkedHours.toFixed(1)}h`,
-              sub: `of ${work.expectedHours.toFixed(1)}h · ${work.daysWithTimes} days`, color: '#2563EB',
+              sub: `of ${work.expectedHours.toFixed(1)}h · ${work.daysWithTimes} days`, color: '#6A2C90',
             },
             {
               key: 'comp', label: 'Late compensated',
@@ -1466,7 +1470,7 @@ function MemberAttendancePanel({ member, attendance }: any) {
           ))}
         </View>
       ) : (
-        <Text style={{ fontSize: 12, color: '#6B7280', textAlign: 'center', marginTop: 4 }}>No check-in/out times logged this month.</Text>
+        <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4 }}>No check-in/out times logged this month.</Text>
       )}
     </View>
   );
@@ -1490,7 +1494,7 @@ function MemberFormModal({ visible, title, form, setF, deptOptions, selectedSpec
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#111827" />
+              <Ionicons name="close" size={24} color="#0F172A" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{title}</Text>
             <View style={{ width: 24 }} />
@@ -1513,7 +1517,7 @@ function MemberFormModal({ visible, title, form, setF, deptOptions, selectedSpec
             <PickerRow label="Department" value={form.department}
               options={deptChoices.map((d: string) => ({ label: d, value: d }))}
               onSelect={setF('department')} />
-            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#556274', marginBottom: 6 }}>Joining Date</Text><DateField value={form.joining_date} onChange={setF('joining_date')} /></View>
+            <View style={{ marginBottom: 14 }}><Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 }}>Joining Date</Text><DateField value={form.joining_date} onChange={setF('joining_date')} /></View>
             <Input label="Salary (₹/month)" value={form.salary_amount} onChangeText={setF('salary_amount')} placeholder="0" keyboardType="numeric" icon="cash-outline" />
 
             <SectionLabel title="Specializations" icon="star-outline" />
@@ -1526,11 +1530,11 @@ function MemberFormModal({ visible, title, form, setF, deptOptions, selectedSpec
                     onPress={() => toggleSpec(s)}
                     style={{
                       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-                      backgroundColor: active ? '#2563EB' : 'rgba(255,255,255,0.6)',
-                      borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(229,231,235,0.5)',
+                      backgroundColor: active ? '#6A2C90' : '#F1F3F9',
+                      borderWidth: 1, borderColor: active ? '#6A2C90' : '#EEF1F6',
                     }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : '#556274' }}>{s}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : '#64748B' }}>{s}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -1570,8 +1574,8 @@ function MemberFormModal({ visible, title, form, setF, deptOptions, selectedSpec
 function SectionLabel({ title, icon }: { title: string; icon: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, marginTop: 18 }}>
-      <Ionicons name={icon as any} size={14} color="#2563EB" />
-      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB', letterSpacing: 0.8, textTransform: 'uppercase' }}>{title}</Text>
+      <Ionicons name={icon as any} size={14} color="#6A2C90" />
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6A2C90', letterSpacing: 0.8, textTransform: 'uppercase' }}>{title}</Text>
     </View>
   );
 }
@@ -1579,7 +1583,7 @@ function SectionLabel({ title, icon }: { title: string; icon: string }) {
 function PickerRow({ label, value, options, onSelect }: any) {
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontSize: 11, fontWeight: '600', color: '#556274', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
+      <Text style={{ fontSize: 11, fontWeight: '600', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>{label}</Text>
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         {options.map((opt: any) => (
           <TouchableOpacity
@@ -1587,11 +1591,11 @@ function PickerRow({ label, value, options, onSelect }: any) {
             onPress={() => onSelect(opt.value)}
             style={{
               paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-              backgroundColor: value === opt.value ? '#2563EB' : 'rgba(255,255,255,0.6)',
-              borderWidth: 1, borderColor: value === opt.value ? '#2563EB' : 'rgba(229,231,235,0.5)',
+              backgroundColor: value === opt.value ? '#6A2C90' : '#F1F3F9',
+              borderWidth: 1, borderColor: value === opt.value ? '#6A2C90' : '#EEF1F6',
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: '600', color: value === opt.value ? '#fff' : '#556274' }}>{opt.label}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: value === opt.value ? '#fff' : '#64748B' }}>{opt.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -1603,55 +1607,63 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
+    borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6',
   },
   menuBtn: { padding: 4 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
   headerSub: { fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 },
   addBtn: {
     width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center',
+  },
+  tabRowScroll: {
+    flexGrow: 0,
+    borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6',
   },
   tabRow: {
-    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8, gap: 8,
-    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
+    flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center',
   },
   tab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.4)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#F1F3F9',
   },
-  tabActive: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#E5E7EB' },
-  tabLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
-  tabLabelActive: { color: '#2563EB' },
+  tabActive: { backgroundColor: '#6A2C90' },
+  tabLabel: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+  tabLabelActive: { color: '#fff' },
   searchRow: { paddingHorizontal: 16, paddingVertical: 8 },
   searchBox: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.65)',
-    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(229,231,235,0.5)',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14, borderWidth: 1, borderColor: '#EEF1F6',
     paddingHorizontal: 14, height: 44,
   },
-  searchInput: { flex: 1, fontSize: 15, color: '#111827' },
-  card: { ...glass.card, marginBottom: 10, padding: 14 },
-  avatar: {
-    width: 46, height: 46, borderRadius: 14,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#E5E7EB',
+  searchInput: { flex: 1, fontSize: 15, color: '#0F172A' },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16, borderWidth: 1, borderColor: '#EEF1F6',
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+    marginBottom: 10, padding: 14,
   },
-  avatarText: { fontSize: 16, fontWeight: '800', color: '#2563EB' },
-  memberName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  memberMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  avatar: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: '#F3ECF9',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: '#EEF1F6',
+  },
+  avatarText: { fontSize: 16, fontWeight: '800', color: '#6A2C90' },
+  memberName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  memberMeta: { fontSize: 12, color: '#64748B', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   badgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
   selectedBanner: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#EFF6FF', borderRadius: 12,
+    backgroundColor: '#F3ECF9', borderRadius: 12,
     padding: 12, marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
+    borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6',
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
 });

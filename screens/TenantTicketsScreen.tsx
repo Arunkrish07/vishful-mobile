@@ -41,8 +41,8 @@ import {
   STATUS_CONFIG,
 } from '../services/ticketService';
 
-const BRAND       = '#312E81';
-const BRAND_LIGHT = 'rgba(49,46,129,0.1)';
+const BRAND       = '#6A2C90';
+const BRAND_LIGHT = 'rgba(106,44,144,0.10)';
 const CONVEX_BASE = CONVEX_SITE_URL;
 const TICKET_URL  = `${CONVEX_BASE}/api/voice-ticket-direct`;
 
@@ -372,7 +372,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
           </View>
           <TouchableOpacity
             onPress={() => { resetVoice(); setVoiceOpen(true); }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#6366F1', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, marginRight: 8 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#6A2C90', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, marginRight: 8 }}
           >
             <Ionicons name="mic" size={16} color="#fff" />
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.sm }}>Voice</Text>
@@ -434,14 +434,14 @@ export default function TenantTicketsScreen({ navigation }: any) {
                     onPress={() => setActiveTab(f.key)}
                     style={{
                       flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: borderRadius.lg,
-                      backgroundColor: selected ? BRAND : (colors.surfaceSecondary || '#F3F0F9'),
-                      borderWidth: 1, borderColor: selected ? BRAND : colors.border,
+                      backgroundColor: selected ? BRAND : '#F1F3F9',
+                      borderWidth: 1, borderColor: selected ? BRAND : '#EEF1F6',
                     }}
                   >
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: selected ? '#fff' : colors.text }}>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: selected ? '#fff' : '#0F172A' }}>
                       {f.label}
                     </Text>
-                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: selected ? 'rgba(255,255,255,0.85)' : colors.textTertiary, marginTop: 1 }}>
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: selected ? 'rgba(255,255,255,0.85)' : '#94A3B8', marginTop: 1 }}>
                       {tabCounts[f.key]}
                     </Text>
                   </TouchableOpacity>
@@ -460,7 +460,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
 
             {tickets.length > 0 && filteredTickets.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#EEF3FF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                   <Ionicons name="checkmark-done-outline" size={36} color={BRAND} />
                 </View>
                 <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>No {activeFilter.label.toLowerCase()} tickets</Text>
@@ -469,7 +469,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
 
             {tickets.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#EEF3FF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                   <Ionicons name="construct-outline" size={36} color={BRAND} />
                 </View>
                 <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>No tickets yet</Text>
@@ -534,7 +534,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
                     )}
                     {approvalTicket.assigned_to_name && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>{approvalTicket.assigned_to_name[0]}</Text>
                         </View>
                         <Text style={{ fontSize: 13, color: colors.textSecondary }}>Technician: <Text style={{ fontWeight: '700', color: colors.text }}>{approvalTicket.assigned_to_name}</Text></Text>
@@ -551,7 +551,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
                 ) : approvalEstimates.length > 0 ? (
                   <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <Ionicons name="receipt-outline" size={16} color="#6366F1" />
+                      <Ionicons name="receipt-outline" size={16} color="#6A2C90" />
                       <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>Approved Parts & Costs</Text>
                     </View>
                     <View style={{ gap: 10 }}>
@@ -561,7 +561,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
                             <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{est.item_name}</Text>
                             <Text style={{ fontSize: 11, color: colors.textTertiary }}>{est.quantity} × ₹{est.unit_price.toLocaleString('en-IN')}</Text>
                           </View>
-                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#6366F1' }}>₹{est.total.toLocaleString('en-IN')}</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#6A2C90' }}>₹{est.total.toLocaleString('en-IN')}</Text>
                         </View>
                       ))}
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8 }}>
@@ -573,7 +573,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
                     </View>
                   </View>
                 ) : (
-                  <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <Ionicons name="information-circle-outline" size={18} color={colors.textTertiary} />
                     <Text style={{ fontSize: 13, color: colors.textSecondary }}>No additional parts or costs for this repair.</Text>
                   </View>
@@ -642,13 +642,13 @@ export default function TenantTicketsScreen({ navigation }: any) {
         <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
 
           {/* Modal header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#fff' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#EEF1F6', backgroundColor: '#fff' }}>
             <TouchableOpacity onPress={closeVoice} style={{ marginRight: 12, padding: 4 }}>
-              <Ionicons name="close" size={24} color="#111827" />
+              <Ionicons name="close" size={24} color="#0F172A" />
             </TouchableOpacity>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="mic" size={18} color={BRAND} />
-              <Text style={{ fontSize: 17, fontWeight: '800', color: '#111827' }}>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>
                 {voiceStep === 'review'     ? 'Review & Confirm'
                   : voiceStep === 'submitting' ? 'Creating Ticket…'
                   : voiceStep === 'success'    ? 'Ticket Raised!'
@@ -663,7 +663,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
             {/* ── IDLE / RECORDING / PROCESSING ── */}
             {(voiceStep === 'idle' || voiceStep === 'recording' || voiceStep === 'processing') && (
               <View style={{ alignItems: 'center', paddingVertical: 32, gap: 24 }}>
-                <Text style={{ fontSize: 14, color: '#556274', textAlign: 'center', lineHeight: 22 }}>
+                <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22 }}>
                   {voiceStep === 'recording'  ? 'Listening… tap Stop when done.'
                     : voiceStep === 'processing' ? 'Transcribing your voice…'
                     : 'Tap the mic and describe your issue clearly.'}
@@ -700,14 +700,14 @@ export default function TenantTicketsScreen({ navigation }: any) {
                     <Text style={{ fontSize: 15, fontWeight: '800', color: '#DC2626' }}>
                       {`${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`}
                     </Text>
-                    <Text style={{ fontSize: 12, color: '#6B7280' }}>auto-stops on silence</Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>auto-stops on silence</Text>
                   </View>
                 )}
 
                 {/* Quick-select phrases */}
                 {voiceStep === 'idle' && (
                   <View style={{ width: '100%', gap: 8 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#6B7280', letterSpacing: 0.8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', letterSpacing: 0.8 }}>
                       EXAMPLE PHRASES — tap to use without recording
                     </Text>
                     {['AC is not working in my room', 'Water is leaking from the bathroom', 'Door lock is broken', 'WiFi is not connecting', 'Light bulb needs replacement'].map(phrase => (
@@ -735,7 +735,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
             {voiceStep === 'review' && (
               <View style={{ gap: 16 }}>
                 <View style={{ backgroundColor: '#F0F4FF', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#4338CA', letterSpacing: 0.6, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6A2C90', letterSpacing: 0.6, marginBottom: 8 }}>
                     {transcript ? 'WHAT YOU SAID (tap to edit)' : 'DESCRIBE YOUR ISSUE'}
                   </Text>
                   <TextInput
@@ -748,9 +748,9 @@ export default function TenantTicketsScreen({ navigation }: any) {
                     }}
                     multiline
                     placeholder="e.g. AC not cooling, water leaking…"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor="#94A3B8"
                     autoFocus={!transcript}
-                    style={{ fontSize: 15, color: '#111827', lineHeight: 22, minHeight: 80 }}
+                    style={{ fontSize: 15, color: '#0F172A', lineHeight: 22, minHeight: 80 }}
                   />
                 </View>
 
@@ -759,23 +759,23 @@ export default function TenantTicketsScreen({ navigation }: any) {
                     <Ionicons name="sparkles" size={16} color={BRAND} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND, letterSpacing: 0.5 }}>AUTO-DETECTED ISSUE TYPE</Text>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{selTypeName}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F172A' }}>{selTypeName}</Text>
                     </View>
                   </View>
                 )}
 
                 <View style={{ gap: 6 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#556274' }}>ISSUE CATEGORY</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B' }}>ISSUE CATEGORY</Text>
                   {issueTypes.map((it: any) => (
                     <TouchableOpacity
                       key={it.id}
                       onPress={() => { setSelTypeId(it.id); setSelTypeName(it.name); }}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: selTypeId === it.id ? 'rgba(49,46,129,0.08)' : '#fff', borderRadius: 10, padding: 12, borderWidth: 1.5, borderColor: selTypeId === it.id ? BRAND : '#E5E7EB' }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: selTypeId === it.id ? 'rgba(49,46,129,0.08)' : '#fff', borderRadius: 10, padding: 12, borderWidth: 1.5, borderColor: selTypeId === it.id ? BRAND : '#EEF1F6' }}
                     >
                       <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: selTypeId === it.id ? BRAND : '#94A3B8', backgroundColor: selTypeId === it.id ? BRAND : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                         {selTypeId === it.id && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />}
                       </View>
-                      <Text style={{ fontSize: 14, flex: 1, fontWeight: selTypeId === it.id ? '700' : '400', color: selTypeId === it.id ? '#111827' : '#556274' }}>{it.name}</Text>
+                      <Text style={{ fontSize: 14, flex: 1, fontWeight: selTypeId === it.id ? '700' : '400', color: selTypeId === it.id ? '#0F172A' : '#64748B' }}>{it.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -794,8 +794,8 @@ export default function TenantTicketsScreen({ navigation }: any) {
             {voiceStep === 'submitting' && (
               <View style={{ alignItems: 'center', paddingVertical: 60, gap: 16 }}>
                 <ActivityIndicator size="large" color={BRAND} />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Creating your ticket…</Text>
-                <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center' }}>AI is classifying and assigning a technician</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>Creating your ticket…</Text>
+                <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>AI is classifying and assigning a technician</Text>
               </View>
             )}
 
@@ -805,16 +805,16 @@ export default function TenantTicketsScreen({ navigation }: any) {
                 <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#86EFAC' }}>
                   <Ionicons name="checkmark-circle" size={48} color="#16A34A" />
                 </View>
-                <Text style={{ fontSize: 22, fontWeight: '900', color: '#111827' }}>Ticket Raised!</Text>
+                <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A' }}>Ticket Raised!</Text>
                 {!!ticketNum && (
                   <View style={{ backgroundColor: BRAND_LIGHT, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(49,46,129,0.25)' }}>
                     <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND, letterSpacing: 1 }}>{ticketNum}</Text>
                   </View>
                 )}
-                <Text style={{ fontSize: 14, color: '#556274', textAlign: 'center', lineHeight: 21, paddingHorizontal: 16 }}>
+                <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 21, paddingHorizontal: 16 }}>
                   Your complaint has been logged and a technician has been assigned.
                 </Text>
-                <TouchableOpacity onPress={closeVoice} style={{ backgroundColor: BRAND, borderRadius: 14, paddingHorizontal: 40, paddingVertical: 14 }}>
+                <TouchableOpacity onPress={closeVoice} style={{ backgroundColor: BRAND, borderRadius: 12, paddingHorizontal: 40, paddingVertical: 14 }}>
                   <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Done</Text>
                 </TouchableOpacity>
               </View>
@@ -826,14 +826,14 @@ export default function TenantTicketsScreen({ navigation }: any) {
                 <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="alert-circle" size={40} color="#DC2626" />
                 </View>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: '#111827' }}>Something Went Wrong</Text>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>Something Went Wrong</Text>
                 <Text style={{ fontSize: 13, color: '#DC2626', textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 }}>{voiceError}</Text>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TouchableOpacity onPress={() => { setVoiceError(''); setVoiceStep('idle'); }} style={{ backgroundColor: BRAND, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
                     <Text style={{ color: '#fff', fontWeight: '800' }}>Try Again</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={closeVoice} style={{ backgroundColor: '#F3F0F7', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                    <Text style={{ color: '#556274', fontWeight: '700' }}>Cancel</Text>
+                  <TouchableOpacity onPress={closeVoice} style={{ backgroundColor: '#F1F3F9', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: '#EEF1F6' }}>
+                    <Text style={{ color: '#64748B', fontWeight: '700' }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -843,11 +843,11 @@ export default function TenantTicketsScreen({ navigation }: any) {
 
           {/* Footer — Raise Ticket button, only on review step */}
           {voiceStep === 'review' && (
-            <View style={{ padding: 20, paddingBottom: Platform.OS === 'ios' ? 8 : 20, borderTopWidth: 1, borderTopColor: '#E5E7EB', backgroundColor: '#fff' }}>
+            <View style={{ padding: 20, paddingBottom: Platform.OS === 'ios' ? 8 : 20, borderTopWidth: 1, borderTopColor: '#EEF1F6', backgroundColor: '#fff' }}>
               <TouchableOpacity
                 onPress={submitVoiceTicket}
                 disabled={!transcript.trim() || !selTypeId}
-                style={{ backgroundColor: transcript.trim() && selTypeId ? BRAND : '#94A3B8', borderRadius: 14, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                style={{ backgroundColor: transcript.trim() && selTypeId ? BRAND : '#94A3B8', borderRadius: 12, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
               >
                 <Ionicons name="paper-plane-outline" size={18} color="#fff" />
                 <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Raise Ticket</Text>
@@ -873,10 +873,14 @@ function TenantTicketCard({ ticket, onPress, showApprovalCta }: {
   return (
     <TouchableOpacity
       onPress={onPress} activeOpacity={0.85}
-      style={[glass.card, { marginBottom: 0, borderWidth: isPendingApproval ? 2 : 1, borderColor: isPendingApproval ? '#D97706' : colors.border }]}
+      style={[glass.card, {
+        marginBottom: 0, borderRadius: 16,
+        borderWidth: isPendingApproval ? 2 : 1, borderColor: isPendingApproval ? '#D97706' : '#EEF1F6',
+        shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+      }]}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#312E81', letterSpacing: 0.3 }}>{ticket.ticket_number}</Text>
+        <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6A2C90', letterSpacing: 0.3 }}>{ticket.ticket_number}</Text>
         <View style={{ paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: statusCfg.bg }}>
           <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: statusCfg.color }}>{statusCfg.label}</Text>
         </View>
@@ -886,7 +890,7 @@ function TenantTicketCard({ ticket, onPress, showApprovalCta }: {
       {ticket.description  && <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 8 }} numberOfLines={2}>{ticket.description}</Text>}
       {ticket.assigned_to_name && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-          <View style={{ width: 22, height: 22, borderRadius: 7, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 22, height: 22, borderRadius: 7, backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{ticket.assigned_to_name[0]}</Text>
           </View>
           <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Assigned to {ticket.assigned_to_name}</Text>

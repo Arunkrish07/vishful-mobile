@@ -33,6 +33,25 @@ const PRIORITY_OPTIONS = [
   { value: 'critical', label: 'Critical', color: '#7C2D12', bg: '#FEE2E2' },
 ];
 
+// ─── Local design tokens (mirrors DASH/VBRAND token objects used on other
+// restyled admin screens — kept file-local, visual only). ───────────────────
+const CT = {
+  ink: '#0F172A',
+  ink2: '#64748B',
+  ink3: '#94A3B8',
+  border: '#EEF1F6',
+  soft: '#F8FAFC',
+  surface: '#FFFFFF',
+  blue: '#6A2C90',
+  blueDeep: '#1D4ED8',
+  blueSoft: '#EEF3FF',
+  blueTint: 'rgba(106,44,144,0.08)',
+  blueTintStrong: 'rgba(106,44,144,0.12)',
+};
+const CT_CARD_SHADOW = {
+  shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+} as const;
+
 export default function CreateTicketScreen({ navigation }: any) {
   const { colors } = useTheme();
   const { user, tenantLocation } = useAuth();
@@ -500,7 +519,7 @@ export default function CreateTicketScreen({ navigation }: any) {
     return (
       <GlassBackground>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#312E81" />
+          <ActivityIndicator size="large" color="#1D4ED8" />
         </View>
       </GlassBackground>
     );
@@ -510,17 +529,17 @@ export default function CreateTicketScreen({ navigation }: any) {
     return (
       <GlassBackground>
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-          <View style={[glass.header, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+          <View style={[glass.header, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, backgroundColor: CT.surface, borderBottomColor: CT.border }]}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 12 }}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+              <Ionicons name="arrow-back" size={24} color={CT.ink} />
             </TouchableOpacity>
-            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.text }}>New Ticket</Text>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: CT.ink, letterSpacing: -0.3 }}>New Ticket</Text>
           </View>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl }}>
-            <View style={{ backgroundColor: '#FEF3C7', borderRadius: borderRadius.xl, padding: spacing.xxl, alignItems: 'center' }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: CT.border, ...CT_CARD_SHADOW, padding: spacing.xxl, alignItems: 'center' }}>
               <Ionicons name="warning-outline" size={48} color="#D97706" />
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginTop: 16, textAlign: 'center' }}>Pending Approval Required</Text>
-              <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 8, textAlign: 'center' }}>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: CT.ink, marginTop: 16, textAlign: 'center', letterSpacing: -0.3 }}>Pending Approval Required</Text>
+              <Text style={{ fontSize: fontSize.sm, color: CT.ink2, marginTop: 8, textAlign: 'center' }}>
                 You have tickets pending your approval. Please review them before creating new tickets.
               </Text>
               <TouchableOpacity
@@ -541,13 +560,13 @@ export default function CreateTicketScreen({ navigation }: any) {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           {/* Header */}
-          <View style={[glass.header, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+          <View style={[glass.header, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, backgroundColor: CT.surface, borderBottomColor: CT.border }]}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 12 }}>
-              <Ionicons name="arrow-back" size={24} color={colors.text} />
+              <Ionicons name="arrow-back" size={24} color={CT.ink} />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: '600' }}>NEW</Text>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.text }}>Create Ticket</Text>
+              <Text style={{ fontSize: fontSize.xs, color: CT.ink3, fontWeight: '700', letterSpacing: 0.4 }}>NEW</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: CT.ink, letterSpacing: -0.3 }}>Create Ticket</Text>
             </View>
           </View>
 
@@ -555,17 +574,17 @@ export default function CreateTicketScreen({ navigation }: any) {
 
             {/* Tenant: auto-filled location card */}
             {isTenant && tenantLocation && (
-              <View style={[glass.card, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE', borderWidth: 1, marginBottom: spacing.lg }]}>
+              <View style={[glass.card, { backgroundColor: CT.blueSoft, borderColor: '#DCE7FF', borderWidth: 1, borderRadius: 16, marginBottom: spacing.lg, shadowOpacity: 0 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <Ionicons name="location-outline" size={16} color="#312E81" />
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#312E81' }}>Your Location</Text>
+                  <Ionicons name="location-outline" size={16} color={CT.blueDeep} />
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: CT.blueDeep }}>Your Location</Text>
                 </View>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>{tenantLocation.propertyName}</Text>
-                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: CT.ink }}>{tenantLocation.propertyName}</Text>
+                <Text style={{ fontSize: fontSize.sm, color: CT.ink2 }}>
                   {tenantLocation.unitNumber} • Bed: {tenantLocation.bedCode}
                 </Text>
                 {linkedAsset && (
-                  <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 4 }}>
+                  <Text style={{ fontSize: fontSize.sm, color: CT.ink2, marginTop: 4 }}>
                     Linked to your room's allocated asset: {linkedAsset.name}
                   </Text>
                 )}
@@ -576,17 +595,17 @@ export default function CreateTicketScreen({ navigation }: any) {
             {isTenant && (
               <>
                 {/* Step 1: Describe the problem */}
-                <View style={[glass.card, { marginBottom: spacing.lg }]}>
+                <View style={[glass.card, { marginBottom: spacing.lg, borderRadius: 16, borderColor: CT.border, ...CT_CARD_SHADOW }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                    <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: CT.blueDeep, alignItems: 'center', justifyContent: 'center' }}>
                       <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>1</Text>
                     </View>
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>What's the problem?</Text>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: CT.ink }}>What's the problem?</Text>
                   </View>
                   <TextInput
-                    style={[glass.input, { padding: spacing.md, fontSize: fontSize.md, color: colors.text, minHeight: 100, textAlignVertical: 'top', marginBottom: 0 }]}
+                    style={[glass.input, { padding: spacing.md, fontSize: fontSize.md, color: CT.ink, minHeight: 100, textAlignVertical: 'top', marginBottom: 0, borderRadius: 12, borderColor: CT.border, backgroundColor: CT.soft }]}
                     placeholder="Describe the issue — e.g. 'water leaking from tap', 'fan not working'..."
-                    placeholderTextColor={colors.textTertiary}
+                    placeholderTextColor={CT.ink3}
                     value={description}
                     onChangeText={setDescription}
                     multiline
@@ -596,41 +615,41 @@ export default function CreateTicketScreen({ navigation }: any) {
                   {/* AI scanning indicator */}
                   {description.trim().length >= 4 && classifying && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                      <ActivityIndicator size="small" color="#312E81" />
-                      <Text style={{ fontSize: fontSize.xs, color: '#312E81' }}>Identifying issue type…</Text>
+                      <ActivityIndicator size="small" color={CT.blueDeep} />
+                      <Text style={{ fontSize: fontSize.xs, color: CT.blueDeep }}>Identifying issue type…</Text>
                     </View>
                   )}
                 </View>
 
                 {/* Step 2: Issue Type — auto-selected silently, user can change */}
                 {(selectedIssueType || classifierAction === 'auto_select' || classifierAction === 'manual') && (
-                  <View style={[glass.card, { marginBottom: spacing.lg }]}>
+                  <View style={[glass.card, { marginBottom: spacing.lg, borderRadius: 16, borderColor: CT.border, ...CT_CARD_SHADOW }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: CT.blueDeep, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>2</Text>
                       </View>
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Issue Type</Text>
+                      <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: CT.ink }}>Issue Type</Text>
                       {selectedIssueType && (
-                        <View style={{ backgroundColor: 'rgba(49,46,129,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, color: '#312E81', fontWeight: '700' }}>AUTO-DETECTED</Text>
+                        <View style={{ backgroundColor: CT.blueTintStrong, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, color: CT.blueDeep, fontWeight: '700' }}>AUTO-DETECTED</Text>
                         </View>
                       )}
                     </View>
 
                     {selectedIssueType ? (
                       /* Auto-selected result — tap X to change */
-                      <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Ionicons name="sparkles" size={18} color="#312E81" />
+                      <View style={{ backgroundColor: CT.blueTint, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Ionicons name="sparkles" size={18} color={CT.blueDeep} />
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#312E81' }}>{selectedIssueType.name}</Text>
+                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: CT.blueDeep }}>{selectedIssueType.name}</Text>
                           {selectedIssueType.sla_hours && (
-                            <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h</Text>
+                            <Text style={{ fontSize: 11, color: CT.ink2, marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h</Text>
                           )}
                         </View>
                         <TouchableOpacity
                           onPress={() => { setSelectedIssueType(null); setSelectedSubType(null); setSubTypes([]); setClassifierOverridden(true); setClassifierAction('idle'); lastClassifiedDescRef.current = ''; }}
                           style={{ padding: 6 }}>
-                          <Ionicons name="close-circle" size={20} color="#6B7280" />
+                          <Ionicons name="close-circle" size={20} color={CT.ink2} />
                         </TouchableOpacity>
                       </View>
                     ) : (
@@ -650,28 +669,28 @@ export default function CreateTicketScreen({ navigation }: any) {
 
                 {/* Step 3: Issue Details — auto-selected, user can change */}
                 {selectedIssueType && (
-                  <View style={[glass.card, { marginBottom: spacing.lg }]}>
+                  <View style={[glass.card, { marginBottom: spacing.lg, borderRadius: 16, borderColor: CT.border, ...CT_CARD_SHADOW }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: '#312E81', alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: 24, height: 24, borderRadius: 99, backgroundColor: CT.blueDeep, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>3</Text>
                       </View>
-                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Issue Details</Text>
+                      <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: CT.ink }}>Issue Details</Text>
                       {selectedSubType && (
-                        <View style={{ backgroundColor: 'rgba(49,46,129,0.1)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, color: '#312E81', fontWeight: '700' }}>AUTO-DETECTED</Text>
+                        <View style={{ backgroundColor: CT.blueTintStrong, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, color: CT.blueDeep, fontWeight: '700' }}>AUTO-DETECTED</Text>
                         </View>
                       )}
                     </View>
                     {loadingSubTypes ? (
                       <LoadingRow colors={colors} label="Identifying issue details…" />
                     ) : subTypes.length === 0 ? (
-                      <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>No sub-categories for this issue type.</Text>
+                      <Text style={{ fontSize: fontSize.sm, color: CT.ink3 }}>No sub-categories for this issue type.</Text>
                     ) : selectedSubType ? (
-                      <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Ionicons name="sparkles" size={16} color="#312E81" />
-                        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: '#312E81' }}>{selectedSubType.name}</Text>
+                      <View style={{ backgroundColor: CT.blueTint, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Ionicons name="sparkles" size={16} color={CT.blueDeep} />
+                        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: CT.blueDeep }}>{selectedSubType.name}</Text>
                         <TouchableOpacity onPress={() => setSelectedSubType(null)} style={{ padding: 4 }}>
-                          <Ionicons name="close-circle" size={18} color="#6B7280" />
+                          <Ionicons name="close-circle" size={18} color={CT.ink2} />
                         </TouchableOpacity>
                       </View>
                     ) : (
@@ -726,9 +745,9 @@ export default function CreateTicketScreen({ navigation }: any) {
                         selectedId={selectedApartment?.id}
                       />
                     ) : (
-                      <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-                        <Ionicons name="information-circle-outline" size={16} color={colors.textTertiary} />
-                        <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>No apartments found</Text>
+                      <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderColor: CT.border, backgroundColor: CT.soft }]}>
+                        <Ionicons name="information-circle-outline" size={16} color={CT.ink3} />
+                        <Text style={{ fontSize: fontSize.sm, color: CT.ink3 }}>No apartments found</Text>
                       </View>
                     )}
                   </>
@@ -753,9 +772,9 @@ export default function CreateTicketScreen({ navigation }: any) {
                         selectedId={selectedBed?.id}
                       />
                     ) : (
-                      <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-                        <Ionicons name="information-circle-outline" size={16} color={colors.textTertiary} />
-                        <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>No beds found</Text>
+                      <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderColor: CT.border, backgroundColor: CT.soft }]}>
+                        <Ionicons name="information-circle-outline" size={16} color={CT.ink3} />
+                        <Text style={{ fontSize: fontSize.sm, color: CT.ink3 }}>No beds found</Text>
                       </View>
                     )}
                   </>
@@ -768,9 +787,9 @@ export default function CreateTicketScreen({ navigation }: any) {
                     {/* Description — AI fires after typing, auto-selects Issue Type + Details */}
                     <SectionLabel>Description *</SectionLabel>
                     <TextInput
-                      style={[glass.input, { padding: spacing.md, fontSize: fontSize.md, color: colors.text, minHeight: 100, textAlignVertical: 'top', marginBottom: 0 }]}
+                      style={[glass.input, { padding: spacing.md, fontSize: fontSize.md, color: CT.ink, minHeight: 100, textAlignVertical: 'top', marginBottom: 0, borderRadius: 12, borderColor: CT.border, backgroundColor: CT.soft }]}
                       placeholder="Describe the issue — e.g. 'water leaking from tap', 'AC not cooling'..."
-                      placeholderTextColor={colors.textTertiary}
+                      placeholderTextColor={CT.ink3}
                       value={description}
                       onChangeText={txt => { setDescription(txt); setClassifierOverridden(false); lastClassifiedDescRef.current = ''; }}
                       multiline
@@ -778,8 +797,8 @@ export default function CreateTicketScreen({ navigation }: any) {
                     />
                     {description.trim().length >= 4 && classifying && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: spacing.lg }}>
-                        <ActivityIndicator size="small" color="#312E81" />
-                        <Text style={{ fontSize: fontSize.xs, color: '#312E81' }}>Analyzing issue description…</Text>
+                        <ActivityIndicator size="small" color={CT.blueDeep} />
+                        <Text style={{ fontSize: fontSize.xs, color: CT.blueDeep }}>Analyzing issue description…</Text>
                       </View>
                     )}
                     {!(description.trim().length >= 4 && classifying) && <View style={{ marginBottom: spacing.lg }} />}
@@ -789,16 +808,16 @@ export default function CreateTicketScreen({ navigation }: any) {
                       <>
                         <SectionLabel>Issue Type *</SectionLabel>
                         {selectedIssueType ? (
-                          <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
-                            <Ionicons name="sparkles" size={18} color="#312E81" />
+                          <View style={{ backgroundColor: CT.blueTint, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
+                            <Ionicons name="sparkles" size={18} color={CT.blueDeep} />
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#312E81', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
-                              <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#312E81' }}>{selectedIssueType.name}</Text>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: CT.blueDeep, letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
+                              <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: CT.blueDeep }}>{selectedIssueType.name}</Text>
                             </View>
                             <TouchableOpacity
                               onPress={() => { setSelectedIssueType(null); setSelectedSubType(null); setSubTypes([]); setClassifierOverridden(true); setClassifierAction('idle'); lastClassifiedDescRef.current = ''; }}
                               style={{ padding: 6 }}>
-                              <Ionicons name="close-circle" size={20} color="#6B7280" />
+                              <Ionicons name="close-circle" size={20} color={CT.ink2} />
                             </TouchableOpacity>
                           </View>
                         ) : (
@@ -823,14 +842,14 @@ export default function CreateTicketScreen({ navigation }: any) {
                           <LoadingRow colors={colors} label="Identifying issue details…" />
                         ) : subTypes.length > 0 ? (
                           selectedSubType ? (
-                            <View style={{ backgroundColor: 'rgba(49,46,129,0.08)', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
-                              <Ionicons name="sparkles" size={16} color="#312E81" />
+                            <View style={{ backgroundColor: CT.blueTint, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.lg }}>
+                              <Ionicons name="sparkles" size={16} color={CT.blueDeep} />
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#312E81', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
-                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#312E81' }}>{selectedSubType.name}</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: CT.blueDeep, letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
+                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: CT.blueDeep }}>{selectedSubType.name}</Text>
                               </View>
                               <TouchableOpacity onPress={() => setSelectedSubType(null)} style={{ padding: 4 }}>
-                                <Ionicons name="close-circle" size={18} color="#6B7280" />
+                                <Ionicons name="close-circle" size={18} color={CT.ink2} />
                               </TouchableOpacity>
                             </View>
                           ) : (
@@ -847,9 +866,9 @@ export default function CreateTicketScreen({ navigation }: any) {
                             />
                           )
                         ) : (
-                          <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-                            <Ionicons name="information-circle-outline" size={16} color={colors.textTertiary} />
-                            <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>No sub-categories for this type</Text>
+                          <View style={[glass.input, { paddingHorizontal: spacing.md, paddingVertical: 14, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderColor: CT.border, backgroundColor: CT.soft }]}>
+                            <Ionicons name="information-circle-outline" size={16} color={CT.ink3} />
+                            <Text style={{ fontSize: fontSize.sm, color: CT.ink3 }}>No sub-categories for this type</Text>
                           </View>
                         )}
                       </>
@@ -886,7 +905,7 @@ export default function CreateTicketScreen({ navigation }: any) {
                           icon="cube-outline"
                           selectedId={selectedAssetId || undefined}
                         />
-                        <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: -spacing.md, marginBottom: spacing.lg }}>
+                        <Text style={{ fontSize: fontSize.xs, color: CT.ink3, marginTop: -spacing.md, marginBottom: spacing.lg }}>
                           {candidateAssets.length === 1
                             ? 'Auto-linked from this location — tap to change.'
                             : `${candidateAssets.length} assets found for this location — best match auto-selected.`}
@@ -899,9 +918,9 @@ export default function CreateTicketScreen({ navigation }: any) {
                     <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.lg }}>
                       {PRIORITY_OPTIONS.map(p => (
                         <TouchableOpacity key={p.value} onPress={() => setPriority(p.value)}
-                          style={{ flex: 1, paddingVertical: 8, borderRadius: borderRadius.md, alignItems: 'center',
-                            backgroundColor: priority === p.value ? p.color : colors.surface,
-                            borderWidth: 1, borderColor: priority === p.value ? p.color : colors.border }}>
+                          style={{ flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center',
+                            backgroundColor: priority === p.value ? p.color : CT.surface,
+                            borderWidth: 1, borderColor: priority === p.value ? p.color : CT.border }}>
                           <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: priority === p.value ? '#fff' : p.color }}>{p.label}</Text>
                         </TouchableOpacity>
                       ))}
@@ -936,26 +955,26 @@ export default function CreateTicketScreen({ navigation }: any) {
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity
                     onPress={takePhoto}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#312E81', backgroundColor: '#EEF2FF' }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: CT.blueDeep, backgroundColor: CT.blueSoft }}
                   >
-                    <Ionicons name="camera-outline" size={18} color="#312E81" />
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#312E81' }}>
+                    <Ionicons name="camera-outline" size={18} color={CT.blueDeep} />
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: CT.blueDeep }}>
                       {isTenant && selectedPhotos.length > 0 ? 'Retake' : 'Camera'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={pickPhotos}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: borderRadius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#312E81', backgroundColor: '#EEF2FF' }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: CT.blueDeep, backgroundColor: CT.blueSoft }}
                   >
-                    <Ionicons name="image-outline" size={18} color="#312E81" />
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#312E81' }}>
+                    <Ionicons name="image-outline" size={18} color={CT.blueDeep} />
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: CT.blueDeep }}>
                       {isTenant && selectedPhotos.length > 0 ? 'Replace' : 'Gallery'}
                     </Text>
                   </TouchableOpacity>
                 </View>
               )}
               {selectedPhotos.length > 0 && (
-                <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: 6, textAlign: 'center' }}>
+                <Text style={{ fontSize: fontSize.xs, color: CT.ink3, marginTop: 6, textAlign: 'center' }}>
                   {selectedPhotos.length}/{maxPhotos} photo{selectedPhotos.length > 1 ? 's' : ''} selected
                 </Text>
               )}
@@ -963,9 +982,9 @@ export default function CreateTicketScreen({ navigation }: any) {
 
             {/* SLA info */}
             {selectedIssueType && (
-              <View style={{ backgroundColor: '#EEF2FF', borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="timer-outline" size={16} color="#312E81" />
-                <Text style={{ fontSize: fontSize.sm, color: '#312E81', fontWeight: '600' }}>
+              <View style={{ backgroundColor: CT.blueSoft, borderRadius: 12, padding: spacing.md, marginBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="timer-outline" size={16} color={CT.blueDeep} />
+                <Text style={{ fontSize: fontSize.sm, color: CT.blueDeep, fontWeight: '700' }}>
                   SLA: {selectedIssueType.sla_hours}h from creation
                 </Text>
               </View>
@@ -975,7 +994,7 @@ export default function CreateTicketScreen({ navigation }: any) {
             <TouchableOpacity
               onPress={handleSubmit}
               disabled={submitting}
-              style={{ backgroundColor: '#312E81', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', opacity: submitting ? 0.6 : 1 }}
+              style={{ backgroundColor: CT.blue, borderRadius: 12, paddingVertical: 16, alignItems: 'center', opacity: submitting ? 0.6 : 1, shadowColor: CT.blue, shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 3 }}
             >
               {submitting ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1005,9 +1024,8 @@ function capitalize(s: string) {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  const { colors } = useTheme();
   return (
-    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>
+    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: CT.ink2, marginBottom: 8 }}>
       {children}
     </Text>
   );
@@ -1018,12 +1036,12 @@ function LoadingRow({ colors, label }: { colors: any; label: string }) {
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: 10,
       paddingHorizontal: spacing.md, paddingVertical: 14,
-      borderRadius: borderRadius.md, borderWidth: 1,
-      borderColor: colors.border, backgroundColor: colors.surface,
+      borderRadius: 12, borderWidth: 1,
+      borderColor: CT.border, backgroundColor: CT.soft,
       marginBottom: spacing.lg,
     }}>
-      <ActivityIndicator size="small" color="#312E81" />
-      <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>{label}</Text>
+      <ActivityIndicator size="small" color={CT.blueDeep} />
+      <Text style={{ fontSize: fontSize.sm, color: CT.ink3 }}>{label}</Text>
     </View>
   );
 }
@@ -1054,40 +1072,40 @@ function DropdownPicker({ placeholder, value, items, labelKey, labelFormatter, o
         style={{
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: spacing.md, paddingVertical: 14,
-          borderRadius: borderRadius.md, borderWidth: 1,
-          borderColor: value ? '#312E81' : colors.border,
-          backgroundColor: value ? '#EEF2FF' : colors.surface,
+          borderRadius: 12, borderWidth: 1,
+          borderColor: value ? CT.blueDeep : CT.border,
+          backgroundColor: value ? CT.blueSoft : CT.surface,
           marginBottom: spacing.lg, gap: 10,
         }}
       >
-        {icon && <Ionicons name={icon as any} size={18} color={value ? '#312E81' : colors.textTertiary} />}
-        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: value ? '700' : '400', color: value ? '#312E81' : colors.textTertiary }}>
+        {icon && <Ionicons name={icon as any} size={18} color={value ? CT.blueDeep : CT.ink3} />}
+        <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: value ? '700' : '400', color: value ? CT.blueDeep : CT.ink3 }}>
           {value || placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={16} color={value ? '#312E81' : colors.textTertiary} />
+        <Ionicons name="chevron-down" size={16} color={value ? CT.blueDeep : CT.ink3} />
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', paddingHorizontal: 24 }}
+          style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', paddingHorizontal: 24 }}
           activeOpacity={1}
           onPress={() => setOpen(false)}
         >
           <TouchableOpacity activeOpacity={1}>
             <View style={{
-              backgroundColor: colors.surface ?? '#fff',
-              borderRadius: borderRadius.xl, maxHeight: 380,
-              overflow: 'hidden', shadowColor: '#000',
+              backgroundColor: CT.surface,
+              borderRadius: 18, maxHeight: 380,
+              overflow: 'hidden', shadowColor: '#0F172A',
               shadowOpacity: 0.18, shadowRadius: 16, elevation: 10,
             }}>
               <View style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                 paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-                borderBottomWidth: 1, borderBottomColor: colors.border,
+                borderBottomWidth: 1, borderBottomColor: CT.border,
               }}>
-                <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: colors.text }}>{placeholder}</Text>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: CT.ink }}>{placeholder}</Text>
                 <TouchableOpacity onPress={() => setOpen(false)}>
-                  <Ionicons name="close-circle" size={22} color={colors.textTertiary} />
+                  <Ionicons name="close-circle" size={22} color={CT.ink3} />
                 </TouchableOpacity>
               </View>
 
@@ -1106,14 +1124,14 @@ function DropdownPicker({ placeholder, value, items, labelKey, labelFormatter, o
                       style={{
                         flexDirection: 'row', alignItems: 'center',
                         paddingHorizontal: spacing.lg, paddingVertical: 14,
-                        borderBottomWidth: 1, borderBottomColor: colors.border,
-                        backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
+                        borderBottomWidth: 1, borderBottomColor: CT.border,
+                        backgroundColor: isSelected ? CT.blueSoft : 'transparent',
                       }}
                     >
-                      <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#312E81' : colors.text }}>
+                      <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: isSelected ? '700' : '500', color: isSelected ? CT.blueDeep : CT.ink }}>
                         {label}
                       </Text>
-                      {isSelected && <Ionicons name="checkmark-circle" size={18} color="#312E81" />}
+                      {isSelected && <Ionicons name="checkmark-circle" size={18} color={CT.blueDeep} />}
                     </TouchableOpacity>
                   );
                 }}
