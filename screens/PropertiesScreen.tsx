@@ -16,14 +16,23 @@ import { useQuery } from '@tanstack/react-query';
 
 // ─── Blue / slate design tokens (web chrome) ──────────────────────────────────
 const VBRAND = {
-  purple: '#2563EB', purpleDeep: '#1D4ED8', orange: '#4F46E5',
-  ink900: '#111827', ink700: '#374151', ink600: '#6B7280',
-  ink500: '#6B7280', ink400: '#9CA3AF',
+  purple: '#6A2C90', purpleDeep: '#4E2069', orange: '#E8841A',
+  ink900: '#0F172A', ink700: '#374151', ink600: '#64748B',
+  ink500: '#64748B', ink400: '#94A3B8',
   surface: '#FFFFFF',
-  cardBorder: '#E5E7EB',
-  soft: '#EFF6FF',
+  cardBorder: '#EEF1F6',
+  soft: '#F3ECF9',
   shadow: '#0F172A',
+  good: '#16A34A', goodBg: '#DCFCE7',
+  warn: '#EA580C', warnBg: '#FFEDD5',
+  bad: '#DC2626', badBg: '#FEE2E2',
+  info: '#1D4ED8', infoBg: '#EEF3FF',
 };
+
+/** Soft elevation used across cards/panels (design-language shadow token). */
+const CARD_SHADOW = {
+  shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+} as const;
 
 const STATUS_OPTS = [
   { label: 'Live',        value: 'live'        },
@@ -36,12 +45,12 @@ const STATUS_OPTS = [
 // ─── Status visual helpers ────────────────────────────────────────────────────
 const statusMeta = (s: string) => {
   switch (s) {
-    case 'live':        return { color: '#22C55E', bg: '#ECFDF5',   label: 'Live',        dot: '#22C55E' };
-    case 'in_progress': return { color: '#F59E0B', bg: '#FFFBEB',   label: 'In Progress', dot: '#F59E0B' };
-    case 'inactive':    return { color: '#6B7280', bg: '#F1F5F9', label: 'Inactive',    dot: '#9CA3AF' };
-    case 'exited':      return { color: '#EF4444', bg: '#FEF2F2', label: 'Exited',      dot: '#EF4444' };
-    case 'signed':      return { color: VBRAND.purple, bg: '#EEF2FF', label: 'Signed',  dot: VBRAND.purple };
-    default:            return { color: VBRAND.ink600, bg: '#EEF2FF', label: s,        dot: VBRAND.ink400 };
+    case 'live':        return { color: VBRAND.good, bg: VBRAND.goodBg, label: 'Live',        dot: VBRAND.good };
+    case 'in_progress': return { color: VBRAND.warn, bg: VBRAND.warnBg, label: 'In Progress', dot: VBRAND.warn };
+    case 'inactive':    return { color: '#64748B', bg: '#F1F5F9',       label: 'Inactive',    dot: '#94A3B8' };
+    case 'exited':      return { color: VBRAND.bad,  bg: VBRAND.badBg, label: 'Exited',      dot: VBRAND.bad };
+    case 'signed':      return { color: VBRAND.info, bg: VBRAND.infoBg, label: 'Signed',  dot: VBRAND.info };
+    default:            return { color: VBRAND.ink600, bg: VBRAND.infoBg, label: s,        dot: VBRAND.ink400 };
   }
 };
 
@@ -97,7 +106,7 @@ function PropertyCard({
       {/* Apts + Beds footer */}
       <View style={styles.cardFooter}>
         <View style={styles.footerChip}>
-          <View style={[styles.footerIcon, { backgroundColor: '#EFF6FF' }]}>
+          <View style={[styles.footerIcon, { backgroundColor: '#F3ECF9' }]}>
             <Ionicons name="grid-outline" size={12} color={VBRAND.purple} />
           </View>
           <View>
@@ -421,7 +430,7 @@ export default function PropertiesScreen({ navigation }: any) {
                   style={[styles.submitBtn, (!addName.trim() || addLoading) && { opacity: 0.5 }]}
                 >
                   <LinearGradient
-                    colors={!addName.trim() || addLoading ? ['#9CA3AF', '#6B7280'] : ['#1D4ED8', '#2563EB']}
+                    colors={!addName.trim() || addLoading ? ['#9CA3AF', '#64748B'] : ['#4E2069', '#6A2C90']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={styles.submitGradient}
                   >
@@ -485,7 +494,7 @@ export default function PropertiesScreen({ navigation }: any) {
                   style={[styles.submitBtn, (!editName.trim() || editLoading) && { opacity: 0.5 }]}
                 >
                   <LinearGradient
-                    colors={!editName.trim() || editLoading ? ['#9CA3AF', '#6B7280'] : ['#1D4ED8', '#2563EB']}
+                    colors={!editName.trim() || editLoading ? ['#9CA3AF', '#64748B'] : ['#4E2069', '#6A2C90']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={styles.submitGradient}
                   >
@@ -534,10 +543,11 @@ const styles = StyleSheet.create({
   // ── Property card ────────────────────────────────────────────────────────
   card: {
     backgroundColor: VBRAND.surface,
-    borderRadius: 14, padding: 16, marginBottom: 12,
+    borderRadius: 16, padding: 16, marginBottom: 12,
     borderWidth: 1, borderColor: VBRAND.cardBorder,
+    ...CARD_SHADOW,
   },
-  codePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: '#DBEAFE' },
+  codePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F3ECF9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: '#E4D3EF' },
   codeDot:  { width: 5, height: 5, borderRadius: 3, backgroundColor: VBRAND.purple },
   codePillText: { fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep, letterSpacing: 0.5 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
@@ -546,7 +556,7 @@ const styles = StyleSheet.create({
   menuBtn: { padding: 4 },
   propName: { fontSize: 17, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.3 },
   propAddr: { fontSize: 12, fontWeight: '500', color: VBRAND.ink500, flex: 1 },
-  cardFooter: { flexDirection: 'row', gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  cardFooter: { flexDirection: 'row', gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: VBRAND.cardBorder },
   footerChip: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12 },
   footerIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   footerVal:  { fontSize: 14, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 },
@@ -559,30 +569,30 @@ const styles = StyleSheet.create({
     paddingTop: 8, paddingBottom: 40, paddingHorizontal: 20,
     shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: -4 },
   },
-  menuPropName: { fontSize: 13, fontWeight: '700', color: VBRAND.ink500, paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', marginBottom: 4 },
+  menuPropName: { fontSize: 13, fontWeight: '700', color: VBRAND.ink500, paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: VBRAND.cardBorder, marginBottom: 4 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 4 },
   menuRowTxt: { fontSize: 15, fontWeight: '600', color: VBRAND.ink900 },
-  menuDivider: { height: 1, backgroundColor: '#E5E7EB', marginVertical: 4 },
+  menuDivider: { height: 1, backgroundColor: VBRAND.cardBorder, marginVertical: 4 },
 
   // ── Empty state ─────────────────────────────────────────────────────────
-  emptyBox: { backgroundColor: VBRAND.surface, borderRadius: 14, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: VBRAND.cardBorder, marginTop: 10 },
-  emptyIcon: { width: 64, height: 64, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyBox: { backgroundColor: VBRAND.surface, borderRadius: 16, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: VBRAND.cardBorder, marginTop: 10, ...CARD_SHADOW },
+  emptyIcon: { width: 64, height: 64, borderRadius: 14, backgroundColor: '#F3ECF9', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 },
   emptySub:   { fontSize: 13, fontWeight: '500', color: VBRAND.ink500, marginTop: 4, textAlign: 'center' },
 
   // ── Modals ───────────────────────────────────────────────────────────────
   modalHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 14 },
-  modalCloseBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  modalCloseBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: VBRAND.cardBorder, alignItems: 'center', justifyContent: 'center' },
   modalHeaderSub:   { fontSize: 13, color: VBRAND.ink600, fontWeight: '500' },
   modalHeaderTitle: { fontSize: 22, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.4, marginTop: 2 },
   modalScroll: { padding: 18, paddingBottom: 80, gap: 12 },
 
-  formCard: { backgroundColor: VBRAND.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: VBRAND.cardBorder, gap: 14 },
+  formCard: { backgroundColor: VBRAND.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: VBRAND.cardBorder, gap: 14, ...CARD_SHADOW },
   formCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
-  formCardIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
+  formCardIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#F3ECF9', alignItems: 'center', justifyContent: 'center' },
   formCardTitle: { fontSize: 14, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 },
 
-  submitBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 4, shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
+  submitBtn: { borderRadius: 12, overflow: 'hidden', marginTop: 4, shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   submitGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   submitTxt: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
 });
