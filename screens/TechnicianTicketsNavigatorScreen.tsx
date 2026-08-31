@@ -71,9 +71,9 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 // ─── Design tokens ────────────────────────────────────────────
-const BRAND       = '#6A2C90';
+const BRAND       = '#2563EB';
 const BRAND_DARK  = '#1E3A8A';
-const BRAND_LIGHT = 'rgba(106,44,144,0.12)';
+const BRAND_LIGHT = 'rgba(37,99,235,0.12)';
 
 // ─── Pill ─────────────────────────────────────────────────────
 function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
@@ -538,8 +538,8 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
               <Text style={{ fontSize: 11, fontWeight: '800', color: BRAND, letterSpacing: 0.3 }}>{ticket.ticket_number}</Text>
               {photoUrls.length > 0 && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 }}>
-                  <Ionicons name="camera" size={9} color="#6A2C90" />
-                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#6A2C90' }}>{photoUrls.length}</Text>
+                  <Ionicons name="camera" size={9} color="#2563EB" />
+                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#2563EB' }}>{photoUrls.length}</Text>
                 </View>
               )}
             </View>
@@ -1171,7 +1171,7 @@ function TicketDetailScreen({ navigation, route }: any) {
               </View>
             </SectionCard>
           )}
-          <SectionCard title="Tenant & Location" icon="person-outline" iconColor="#6A2C90" iconBg="rgba(106,44,144,0.1)">
+          <SectionCard title="Tenant & Location" icon="person-outline" iconColor="#2563EB" iconBg="rgba(37,99,235,0.1)">
             <View style={{ gap: 10 }}>
               {ticket.tenant_name && <InfoRow icon="person-circle-outline" label="Tenant" value={ticket.tenant_name} />}
               {ticket.tenant_phone && <InfoRow icon="call-outline" label="Phone" value={ticket.tenant_phone} />}
@@ -1242,7 +1242,7 @@ function TicketDetailScreen({ navigation, route }: any) {
             const totalApproved = approvedEstimates.reduce((s, e) => s + e.total, 0);
             const totalPending  = pendingEstimates.reduce((s, e)  => s + e.total, 0);
             return (
-              <SectionCard title="Cost Estimates" icon="receipt-outline" iconColor="#6A2C90" iconBg="rgba(106,44,144,0.1)">
+              <SectionCard title="Cost Estimates" icon="receipt-outline" iconColor="#2563EB" iconBg="rgba(37,99,235,0.1)">
                 <View style={{ gap: 10 }}>
                   {visibleEstimates.map((est: any) => (
                     <View key={est.id}>
@@ -1386,11 +1386,11 @@ function TicketDetailScreen({ navigation, route }: any) {
 
           {/* ══ TIME METRICS (mirrors web timeMetrics card) ══ */}
           {timeMetrics && (timeMetrics.responseTime || timeMetrics.workDuration || timeMetrics.totalTime) && (
-            <SectionCard title="Time Metrics" icon="timer-outline" iconColor="#6A2C90" iconBg="rgba(106,44,144,0.1)">
+            <SectionCard title="Time Metrics" icon="timer-outline" iconColor="#2563EB" iconBg="rgba(37,99,235,0.1)">
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 {timeMetrics.responseTime && (
-                  <View style={{ flex: 1, backgroundColor: 'rgba(106,44,144,0.06)', borderRadius: 12, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#6A2C90' }}>{timeMetrics.responseTime}</Text>
+                  <View style={{ flex: 1, backgroundColor: 'rgba(37,99,235,0.06)', borderRadius: 12, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#2563EB' }}>{timeMetrics.responseTime}</Text>
                     <Text style={{ fontSize: 10, fontWeight: '600', color: colors.textTertiary, marginTop: 2, textAlign: 'center' }}>RESPONSE TIME</Text>
                   </View>
                 )}
@@ -1470,7 +1470,7 @@ function TicketDetailScreen({ navigation, route }: any) {
                     <TouchableOpacity
                       onPress={handlePostComment}
                       disabled={postingComment || !commentText.trim()}
-                      style={{ flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10, borderRadius: 10, backgroundColor: '#6A2C90' }}
+                      style={{ flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 10, borderRadius: 10, backgroundColor: '#2563EB' }}
                     >
                       {postingComment
                         ? <ActivityIndicator size="small" color="#fff" />
@@ -2248,8 +2248,8 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, a
         <SafeAreaView style={{ flex: 1 }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(106,44,144,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-              <Ionicons name="receipt-outline" size={19} color="#6A2C90" />
+            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(37,99,235,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+              <Ionicons name="receipt-outline" size={19} color="#2563EB" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>Cost Estimate</Text>
@@ -2349,7 +2349,7 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, a
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleSubmit} disabled={loading || noCostLoading}
-              style={{ backgroundColor: '#6A2C90', borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              style={{ backgroundColor: '#2563EB', borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
               {loading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="send-outline" size={20} color="#fff" />}
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Send to Admin for Approval</Text>
             </TouchableOpacity>
@@ -2616,8 +2616,8 @@ function ReassignModal({ visible, ticketId, userId, onClose, onSubmit }: any) {
       <GlassBackground>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(106,44,144,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-              <Ionicons name="swap-horizontal-outline" size={19} color="#6A2C90" />
+            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: 'rgba(37,99,235,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+              <Ionicons name="swap-horizontal-outline" size={19} color="#2563EB" />
             </View>
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 }}>Reassign Ticket</Text>
             <TouchableOpacity onPress={onClose}><Ionicons name="close-circle" size={28} color={colors.textTertiary} /></TouchableOpacity>
@@ -2650,7 +2650,7 @@ function ReassignModal({ visible, ticketId, userId, onClose, onSubmit }: any) {
           )}
           <View style={{ padding: 20 }}>
             <TouchableOpacity onPress={handleSubmit} disabled={loading || !selected}
-              style={{ backgroundColor: selected ? '#6A2C90' : colors.border, borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              style={{ backgroundColor: selected ? '#2563EB' : colors.border, borderRadius: 16, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
               {loading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="swap-horizontal-outline" size={20} color="#fff" />}
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Confirm Reassignment</Text>
             </TouchableOpacity>
@@ -2736,7 +2736,7 @@ function TechnicianTabNavigator() {
           shadowOffset: { width: 0, height: -4 },
           elevation: 0,
         },
-        tabBarActiveTintColor: '#6A2C90',
+        tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#71809A',
         tabBarActiveBackgroundColor: '#EFF6FF',
         tabBarItemStyle: {

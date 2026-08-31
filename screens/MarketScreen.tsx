@@ -20,9 +20,9 @@ const fmtInr = (v: number) => `₹${(Number(v) || 0).toLocaleString('en-IN')}`;
 
 // Design tokens (matches DashboardScreen/PropertiesScreen visual language).
 const MKT = {
-  accent: '#6A2C90', accentDeep: '#1D4ED8', purple: '#6A2C90',
+  accent: '#2563EB', accentDeep: '#1D4ED8', purple: '#2563EB',
   ink900: '#0F172A', ink700: '#374151', ink600: '#64748B', ink500: '#64748B', ink400: '#94A3B8',
-  surface: '#FFFFFF', soft: '#F8FAFC', accentSoft: '#F3ECF9',
+  surface: '#FFFFFF', soft: '#F8FAFC', accentSoft: '#EFF6FF',
   cardBorder: '#EEF1F6',
   good: '#16A34A', goodBg: '#DCFCE7',
   warn: '#EA580C', warnBg: '#FFEDD5',

@@ -20,7 +20,7 @@ import { client as convexClient, api as convexApi } from '../lib/convexApi';
 
 // ─── Reference palette (mobile theme, aligned to the vercel reference) ─────────
 const C = {
-  primary:      '#6A2C90',   // --primary (277 53% 37%) — reference purple
+  primary:      '#2563EB',   // --primary (277 53% 37%) — reference purple
   primaryFg:    '#FFFFFF',   // --primary-foreground
   muted:        '#F1F5F9',   // --muted
   mutedFg:      '#64748B',   // --muted-foreground

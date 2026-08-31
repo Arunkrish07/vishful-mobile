@@ -16,12 +16,12 @@ import { useQuery } from '@tanstack/react-query';
 
 // ─── Blue / slate design tokens (web chrome) ──────────────────────────────────
 const VBRAND = {
-  purple: '#6A2C90', purpleDeep: '#4E2069', orange: '#E8841A',
+  purple: '#2563EB', purpleDeep: '#1D4ED8', orange: '#E8841A',
   ink900: '#0F172A', ink700: '#374151', ink600: '#64748B',
   ink500: '#64748B', ink400: '#94A3B8',
   surface: '#FFFFFF',
   cardBorder: '#EEF1F6',
-  soft: '#F3ECF9',
+  soft: '#EFF6FF',
   shadow: '#0F172A',
   good: '#16A34A', goodBg: '#DCFCE7',
   warn: '#EA580C', warnBg: '#FFEDD5',
@@ -106,7 +106,7 @@ function PropertyCard({
       {/* Apts + Beds footer */}
       <View style={styles.cardFooter}>
         <View style={styles.footerChip}>
-          <View style={[styles.footerIcon, { backgroundColor: '#F3ECF9' }]}>
+          <View style={[styles.footerIcon, { backgroundColor: '#EFF6FF' }]}>
             <Ionicons name="grid-outline" size={12} color={VBRAND.purple} />
           </View>
           <View>
@@ -430,7 +430,7 @@ export default function PropertiesScreen({ navigation }: any) {
                   style={[styles.submitBtn, (!addName.trim() || addLoading) && { opacity: 0.5 }]}
                 >
                   <LinearGradient
-                    colors={!addName.trim() || addLoading ? ['#9CA3AF', '#64748B'] : ['#4E2069', '#6A2C90']}
+                    colors={!addName.trim() || addLoading ? ['#9CA3AF', '#64748B'] : ['#1D4ED8', '#2563EB']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={styles.submitGradient}
                   >
@@ -494,7 +494,7 @@ export default function PropertiesScreen({ navigation }: any) {
                   style={[styles.submitBtn, (!editName.trim() || editLoading) && { opacity: 0.5 }]}
                 >
                   <LinearGradient
-                    colors={!editName.trim() || editLoading ? ['#9CA3AF', '#64748B'] : ['#4E2069', '#6A2C90']}
+                    colors={!editName.trim() || editLoading ? ['#9CA3AF', '#64748B'] : ['#1D4ED8', '#2563EB']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={styles.submitGradient}
                   >
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: VBRAND.cardBorder,
     ...CARD_SHADOW,
   },
-  codePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F3ECF9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: '#E4D3EF' },
+  codePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: '#DBEAFE' },
   codeDot:  { width: 5, height: 5, borderRadius: 3, backgroundColor: VBRAND.purple },
   codePillText: { fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep, letterSpacing: 0.5 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
 
   // ── Empty state ─────────────────────────────────────────────────────────
   emptyBox: { backgroundColor: VBRAND.surface, borderRadius: 16, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: VBRAND.cardBorder, marginTop: 10, ...CARD_SHADOW },
-  emptyIcon: { width: 64, height: 64, borderRadius: 14, backgroundColor: '#F3ECF9', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 },
   emptySub:   { fontSize: 13, fontWeight: '500', color: VBRAND.ink500, marginTop: 4, textAlign: 'center' },
 
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
 
   formCard: { backgroundColor: VBRAND.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: VBRAND.cardBorder, gap: 14, ...CARD_SHADOW },
   formCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
-  formCardIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#F3ECF9', alignItems: 'center', justifyContent: 'center' },
+  formCardIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
   formCardTitle: { fontSize: 14, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 },
 
   submitBtn: { borderRadius: 12, overflow: 'hidden', marginTop: 4, shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.2, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },

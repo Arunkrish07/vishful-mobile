@@ -13,8 +13,8 @@ import { getActiveSession } from '../services/getActiveSession';
 // ─── Blue / slate design tokens (web chrome) ──────────────────────────────────
 const TP = {
   ink: '#0F172A', sub: '#64748B', ter: '#94A3B8',
-  blue: '#6A2C90', blueDeep: '#1D4ED8',
-  surface: '#FFFFFF', bg: '#F8FAFC', border: '#EEF1F6', soft: '#F3ECF9',
+  blue: '#2563EB', blueDeep: '#1D4ED8',
+  surface: '#FFFFFF', bg: '#F8FAFC', border: '#EEF1F6', soft: '#EFF6FF',
   good: '#16A34A', goodBg: '#DCFCE7',
   warn: '#EA580C', warnBg: '#FFEDD5',
   bad: '#DC2626', badBg: '#FEE2E2',

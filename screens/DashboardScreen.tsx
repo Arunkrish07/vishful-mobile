@@ -29,7 +29,7 @@ const DASH = {
   ink: '#0F172A',
   ink2: '#64748B',
   ink3: '#94A3B8',
-  indigo: '#6A2C90',
+  indigo: '#2563EB',
   brandSub: '#556274',
   blue: '#1856FF',
   blueInk: '#1240C7',
@@ -135,7 +135,7 @@ function Panel({
     <View style={[styles.panel, darkHead && styles.panelAttention]}>
       {darkHead ? (
         <LinearGradient
-          colors={['#6A2C90', '#4E2069'] as const}
+          colors={['#2563EB', '#1D4ED8'] as const}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.panelHeadDark}
@@ -494,8 +494,8 @@ function RevenueTrendChart({
       <Svg width={width} height={height}>
         <Defs>
           <SvgGradient id="revArea" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#6A2C90" stopOpacity={0.22} />
-            <Stop offset="1" stopColor="#6A2C90" stopOpacity={0} />
+            <Stop offset="0" stopColor="#2563EB" stopOpacity={0.22} />
+            <Stop offset="1" stopColor="#2563EB" stopOpacity={0} />
           </SvgGradient>
         </Defs>
         <Path d={areaPath} fill="url(#revArea)" />
@@ -504,11 +504,11 @@ function RevenueTrendChart({
           stroke="#C7D2FE" strokeWidth={1} strokeDasharray="3 3"
         />
         <Path
-          d={linePath} fill="none" stroke="#6A2C90" strokeWidth={2.5}
+          d={linePath} fill="none" stroke="#2563EB" strokeWidth={2.5}
           strokeLinecap="round" strokeLinejoin="round"
         />
-        <Circle cx={last.x} cy={last.y} r={8} fill="#6A2C90" fillOpacity={0.16} />
-        <Circle cx={last.x} cy={last.y} r={4.5} fill="#fff" stroke="#6A2C90" strokeWidth={2.5} />
+        <Circle cx={last.x} cy={last.y} r={8} fill="#2563EB" fillOpacity={0.16} />
+        <Circle cx={last.x} cy={last.y} r={4.5} fill="#fff" stroke="#2563EB" strokeWidth={2.5} />
       </Svg>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
         {labels.map((l, i) => (
@@ -587,7 +587,7 @@ function PeriodModal({
         <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 28 }}>
           <TouchableWithoutFeedback>
             <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', maxWidth: 320, alignSelf: 'center', width: '100%' }}>
-              <View style={{ backgroundColor: '#6A2C90', paddingHorizontal: 16, paddingVertical: 12 }}>
+              <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 12 }}>
                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Period</Text>
               </View>
 
@@ -972,7 +972,7 @@ export default function DashboardScreen() {
           {/* ── Financials ── */}
           <Panel title="Financials">
             <LinearGradient
-              colors={['#6A2C90', '#4E2069'] as const}
+              colors={['#2563EB', '#1D4ED8'] as const}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.finHero}
@@ -997,7 +997,7 @@ export default function DashboardScreen() {
                 { label: 'Deposits held', value: fmtINR(depositsHeldV), tone: 'green' as const, icon: 'arrow-down-circle-outline' as const, spark: [] as number[], delta: undefined },
               ].map((c) => {
                 const tone = {
-                  indigo: { bg: '#F3ECF9', fg: '#6A2C90' },
+                  indigo: { bg: '#EFF6FF', fg: '#2563EB' },
                   rose: { bg: '#FFF1F2', fg: '#BE123C' },
                   amber: { bg: '#FFFBEB', fg: '#B45309' },
                   green: { bg: '#F0FDF4', fg: '#15803D' },
@@ -1569,7 +1569,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   trendSegText: { fontSize: 12, fontWeight: '700', color: DASH.ink3 },
-  trendSegTextOn: { color: '#6A2C90' },
+  trendSegTextOn: { color: '#2563EB' },
   trendDeltaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   trendDeltaPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,

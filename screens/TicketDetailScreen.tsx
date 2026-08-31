@@ -398,7 +398,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
     return (
       <GlassBackground>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#6A2C90" />
+          <ActivityIndicator size="large" color="#2563EB" />
         </View>
       </GlassBackground>
     );
@@ -497,7 +497,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
               onPress={() => setActiveTab(tab)}
               style={{
                 flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center',
-                backgroundColor: activeTab === tab ? '#6A2C90' : '#F1F3F9',
+                backgroundColor: activeTab === tab ? '#2563EB' : '#F1F3F9',
                 borderWidth: 0,
               }}
             >
@@ -522,7 +522,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
                 <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#B45309' }}>Awaiting Your Review</Text>
                 <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Review the work, then approve to close or send back for rework.</Text>
               </View>
-              <View style={{ backgroundColor: '#6A2C90', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <View style={{ backgroundColor: '#2563EB', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
                 <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>Review</Text>
               </View>
             </TouchableOpacity>
@@ -590,7 +590,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           {canReopen && (
             <TouchableOpacity
               onPress={() => setShowStatusModal(true)}
-              style={{ backgroundColor: '#6A2C90', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
+              style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
             >
               <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>Reopen Ticket</Text>
             </TouchableOpacity>
@@ -601,7 +601,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
           {canReassign && (
             <TouchableOpacity
               onPress={() => setShowReassignModal(true)}
-              style={{ backgroundColor: '#6A2C90', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
+              style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 14, alignItems: 'center' }}
             >
               <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>
                 {ticket.status === 'open' ? 'Assign Technician' : 'Reassign Technician'}
@@ -670,7 +670,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
                 <Ionicons name="close" size={26} color={colors.text} />
               </TouchableOpacity>
               <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.text }}>Linked Asset</Text>
-              {savingAsset && <ActivityIndicator style={{ marginLeft: 'auto' }} color="#6A2C90" />}
+              {savingAsset && <ActivityIndicator style={{ marginLeft: 'auto' }} color="#2563EB" />}
             </View>
             <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
               {/* No specific asset */}
@@ -678,7 +678,7 @@ export default function TicketDetailScreen({ route, navigation }: any) {
                 onPress={() => handleAssetChange(null)}
                 disabled={savingAsset}
                 style={{ paddingVertical: 14, paddingHorizontal: 12, borderRadius: borderRadius.md, marginBottom: 8,
-                  backgroundColor: !(ticket as any).linked_asset ? '#F3ECF9' : 'transparent',
+                  backgroundColor: !(ticket as any).linked_asset ? '#EFF6FF' : 'transparent',
                   borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}
               >
                 <Ionicons name="remove-circle-outline" size={20} color="#64748B" />
@@ -693,8 +693,8 @@ export default function TicketDetailScreen({ route, navigation }: any) {
                     onPress={() => handleAssetChange(a.id)}
                     disabled={savingAsset}
                     style={{ paddingVertical: 14, paddingHorizontal: 12, borderRadius: borderRadius.md, marginBottom: 8,
-                      backgroundColor: selected ? '#F3ECF9' : 'transparent',
-                      borderWidth: 1, borderColor: selected ? '#6A2C90' : colors.border }}
+                      backgroundColor: selected ? '#EFF6FF' : 'transparent',
+                      borderWidth: 1, borderColor: selected ? '#2563EB' : colors.border }}
                   >
                     <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>{label}</Text>
                     {a.asset_code && <Text style={{ fontSize: fontSize.sm, color: '#64748B', marginTop: 2 }}>{a.asset_code}</Text>}
@@ -902,11 +902,11 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
               disabled={savingAsset}
               style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6,
                 alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 14,
-                borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#6A2C90',
+                borderRadius: borderRadius.md, borderWidth: 1, borderColor: '#2563EB',
                 opacity: savingAsset ? 0.5 : 1 }}
             >
-              <Ionicons name={(ticket as any).linked_asset ? 'swap-horizontal' : 'add'} size={16} color="#6A2C90" />
-              <Text style={{ color: '#6A2C90', fontWeight: '700', fontSize: fontSize.sm }}>
+              <Ionicons name={(ticket as any).linked_asset ? 'swap-horizontal' : 'add'} size={16} color="#2563EB" />
+              <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: fontSize.sm }}>
                 {(ticket as any).linked_asset ? 'Change asset' : 'Assign asset'}
               </Text>
             </TouchableOpacity>
@@ -1000,7 +1000,7 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
                 {st === 'pending_tenant_approval' && onOpenApproval && (
                   <TouchableOpacity
                     onPress={onOpenApproval}
-                    style={{ marginTop: 12, backgroundColor: '#6A2C90', borderRadius: borderRadius.lg, paddingVertical: 12, alignItems: 'center' }}
+                    style={{ marginTop: 12, backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 12, alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#fff' }}>Review & Approve</Text>
                   </TouchableOpacity>
@@ -1089,14 +1089,14 @@ function DetailsTab({ ticket, priorityCfg, statusCfg, resolution, isAdmin, isTen
               <View style={{ flexDirection: 'row', gap: 16, marginTop: 12 }}>
                 {resolution.proof_of_purchase_url && (
                   <TouchableOpacity onPress={() => Linking.openURL(resolution.proof_of_purchase_url)}>
-                    <Text style={{ fontSize: fontSize.xs, color: '#6A2C90', textDecorationLine: 'underline' }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', textDecorationLine: 'underline' }}>
                       📄 Bill of purchase
                     </Text>
                   </TouchableOpacity>
                 )}
                 {resolution.proof_of_payment_url && (
                   <TouchableOpacity onPress={() => Linking.openURL(resolution.proof_of_payment_url)}>
-                    <Text style={{ fontSize: fontSize.xs, color: '#6A2C90', textDecorationLine: 'underline' }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', textDecorationLine: 'underline' }}>
                       🧾 Proof of payment
                     </Text>
                   </TouchableOpacity>
@@ -1333,7 +1333,7 @@ function CostsTab({ ticket, estimates, purchases, isAssignedTechnician, isAdmin,
           ))}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
             <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.textSecondary }}>Total Estimated</Text>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#6A2C90' }}>₹{totalEstimated.toFixed(2)}</Text>
+            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#2563EB' }}>₹{totalEstimated.toFixed(2)}</Text>
           </View>
           {allEstimatesApproved && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, backgroundColor: '#DCFCE7', borderRadius: borderRadius.md, padding: spacing.sm }}>
@@ -1508,7 +1508,7 @@ function TimelineTab({ logs }: { logs: TicketLog[] }) {
                 return (
                   <View style={{ marginTop: 2 }}>
                     {fmt.summary && (
-                      <View style={{ backgroundColor: '#F3ECF9', borderRadius: 8, padding: 8, marginBottom: fmt.body ? 6 : 0 }}>
+                      <View style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8, marginBottom: fmt.body ? 6 : 0 }}>
                         <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 2 }}>Diagnosis summary</Text>
                         {!!fmt.summary.cause && <Text style={{ fontSize: 11, color: colors.textSecondary }}>Cause: <Text style={{ color: colors.text }}>{fmt.summary.cause}</Text></Text>}
                         {!!fmt.summary.severity && <Text style={{ fontSize: 11, color: colors.textSecondary }}>Severity: <Text style={{ color: colors.text }}>{fmt.summary.severity}</Text></Text>}
@@ -1815,7 +1815,7 @@ function ResolutionFormModal({
                     onPress={() => !isReadOnly && setForm((p: TicketResolutionForm) => ({ ...p, resolution_type: opt.value as any }))}
                     style={{
                       paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
-                      backgroundColor: form.resolution_type === opt.value ? '#6A2C90' : '#F1F3F9',
+                      backgroundColor: form.resolution_type === opt.value ? '#2563EB' : '#F1F3F9',
                       borderWidth: 0,
                     }}
                   >
@@ -1894,8 +1894,8 @@ function ResolutionFormModal({
                 <Text style={formLabel}>Items Used</Text>
                 {!isReadOnly && (
                   <TouchableOpacity onPress={addItem} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="add-circle-outline" size={18} color="#6A2C90" />
-                    <Text style={{ fontSize: fontSize.xs, color: '#6A2C90', fontWeight: '700' }}>Add Item</Text>
+                    <Ionicons name="add-circle-outline" size={18} color="#2563EB" />
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', fontWeight: '700' }}>Add Item</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1944,7 +1944,7 @@ function ResolutionFormModal({
                     <View style={{ flex: 2 }}>
                       <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 2 }}>Total (₹)</Text>
                       <View style={[glass.input, { padding: spacing.sm, justifyContent: 'center' }]}>
-                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6A2C90' }}>₹{Math.round(item.total)}</Text>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>₹{Math.round(item.total)}</Text>
                       </View>
                     </View>
                   </View>
@@ -1953,7 +1953,7 @@ function ResolutionFormModal({
               {form.items.length > 0 && (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                   <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Parts subtotal</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6A2C90' }}>₹{Math.round(totalParts)}</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>₹{Math.round(totalParts)}</Text>
                 </View>
               )}
             </View>
@@ -1973,9 +1973,9 @@ function ResolutionFormModal({
             </View>
 
             {/* Total cost display */}
-            <View style={{ backgroundColor: '#F3ECF9', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ backgroundColor: '#EFF6FF', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#64748B' }}>Total Cost</Text>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#6A2C90' }}>₹{Math.round(totalCost).toLocaleString('en-IN')}</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#2563EB' }}>₹{Math.round(totalCost).toLocaleString('en-IN')}</Text>
             </View>
 
             {/* ── PAYMENT DETAILS — shown only when total > 0 ── */}
@@ -2152,7 +2152,7 @@ function ResolutionFormModal({
               <TouchableOpacity
                 onPress={onSave}
                 disabled={saving}
-                style={{ backgroundColor: '#6A2C90', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', opacity: saving ? 0.6 : 1, marginTop: 8 }}
+                style={{ backgroundColor: '#2563EB', borderRadius: borderRadius.lg, paddingVertical: 16, alignItems: 'center', opacity: saving ? 0.6 : 1, marginTop: 8 }}
               >
                 {saving
                   ? <ActivityIndicator color="#fff" />
@@ -2188,7 +2188,7 @@ function ResolutionFormModal({
                     </Text>
                   ) : null}
                 </View>
-                {form.vendor_id === v.id && <Ionicons name="checkmark" size={20} color="#6A2C90" />}
+                {form.vendor_id === v.id && <Ionicons name="checkmark" size={20} color="#2563EB" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -2217,7 +2217,7 @@ function ResolutionFormModal({
                     ••••{String(b.account_number || '').slice(-4)}{b.is_primary ? ' (Primary)' : ''}
                   </Text>
                 </View>
-                {form.bank_account_id === b.id && <Ionicons name="checkmark" size={20} color="#6A2C90" />}
+                {form.bank_account_id === b.id && <Ionicons name="checkmark" size={20} color="#2563EB" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -2315,7 +2315,7 @@ function ReassignModal({ visible, onClose, teamMembers, onReassign, submitting }
               disabled={submitting}
               style={[vCard, { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 0 }]}
             >
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.md }}>
                   {(m.first_name || 'T')[0].toUpperCase()}
                 </Text>
@@ -2455,7 +2455,7 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
                           onPress={() => { const n = [...items]; n[idx] = { ...n[idx], cost_type: ct.value }; setItems(n); }}
                           style={{
                             flex: 1, paddingVertical: 7, borderRadius: borderRadius.md, alignItems: 'center',
-                            backgroundColor: item.cost_type === ct.value ? '#6A2C90' : '#F1F3F9',
+                            backgroundColor: item.cost_type === ct.value ? '#2563EB' : '#F1F3F9',
                             borderWidth: 0,
                           }}
                         >
@@ -2486,22 +2486,22 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
                         />
                       </View>
                     </View>
-                    <Text style={{ fontSize: fontSize.xs, color: '#6A2C90', marginTop: 6, fontWeight: '700', textAlign: 'right' }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', marginTop: 6, fontWeight: '700', textAlign: 'right' }}>
                       Subtotal: ₹{((item.quantity || 1) * (item.unit_price || 0)).toLocaleString('en-IN')}
                     </Text>
                   </View>
                 ))}
 
                 <TouchableOpacity onPress={addItem} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.md }}>
-                  <Ionicons name="add-circle-outline" size={20} color="#6A2C90" />
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6A2C90' }}>Add Another Item</Text>
+                  <Ionicons name="add-circle-outline" size={20} color="#2563EB" />
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>Add Another Item</Text>
                 </TouchableOpacity>
 
                 {/* Running total — mirrors web */}
                 {items.some(i => i.item_name || i.unit_price > 0) && (
-                  <View style={{ backgroundColor: '#F3ECF9', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ backgroundColor: '#EFF6FF', borderRadius: borderRadius.md, padding: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#64748B' }}>Total</Text>
-                    <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#6A2C90' }}>
+                    <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#2563EB' }}>
                       ₹{totalEstimate.toLocaleString('en-IN')}
                     </Text>
                   </View>
@@ -2513,7 +2513,7 @@ function CostEstimateModal({ visible, onClose, guard, onSubmit, submitting }: an
               onPress={handleSubmit}
               disabled={submitting || !canSubmit}
               style={{
-                backgroundColor: noCost ? '#16A34A' : '#6A2C90',
+                backgroundColor: noCost ? '#16A34A' : '#2563EB',
                 borderRadius: borderRadius.lg, paddingVertical: 14,
                 alignItems: 'center', opacity: (submitting || !canSubmit) ? 0.6 : 1,
               }}
@@ -2636,7 +2636,7 @@ function PurchaseModal({ visible, onClose, onSubmit, submitting, vendors = [] }:
                     </Text>
                   ) : null}
                 </View>
-                {selectedVendorId === v.id && <Ionicons name="checkmark" size={20} color="#6A2C90" />}
+                {selectedVendorId === v.id && <Ionicons name="checkmark" size={20} color="#2563EB" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -2659,8 +2659,8 @@ function ApprovalModal({ visible, onClose, onApprove, submitting }: any) {
           <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A' }}>Review Completion</Text>
         </View>
         <View style={{ flex: 1, padding: spacing.xl, gap: 16 }}>
-          <View style={{ backgroundColor: '#F3ECF9', borderRadius: borderRadius.xl, padding: spacing.xl, alignItems: 'center' }}>
-            <Ionicons name="checkmark-circle-outline" size={48} color="#6A2C90" />
+          <View style={{ backgroundColor: '#EFF6FF', borderRadius: borderRadius.xl, padding: spacing.xl, alignItems: 'center' }}>
+            <Ionicons name="checkmark-circle-outline" size={48} color="#2563EB" />
             <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: '#0F172A', marginTop: 12, textAlign: 'center' }}>
               Maintenance work has been completed
             </Text>

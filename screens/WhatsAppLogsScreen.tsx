@@ -280,7 +280,7 @@ export default function WhatsAppLogsScreen() {
               placeholderTextColor="#94A3B8"
               autoCapitalize="none"
             />
-            {searching ? <ActivityIndicator size="small" color="#6A2C90" />
+            {searching ? <ActivityIndicator size="small" color="#2563EB" />
               : search ? (
                 <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color="#94A3B8" /></TouchableOpacity>
               ) : null}
@@ -291,7 +291,7 @@ export default function WhatsAppLogsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 }}>
           {JOB_TYPE_OPTIONS.map(o => (
             <TouchableOpacity key={o.key} onPress={() => setJobType(o.key)}
-              style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: jobType === o.key ? '#6A2C90' : '#F1F3F9' }}>
+              style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: jobType === o.key ? '#2563EB' : '#F1F3F9' }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: jobType === o.key ? '#fff' : '#64748B' }}>{o.label}</Text>
             </TouchableOpacity>
           ))}
@@ -299,13 +299,13 @@ export default function WhatsAppLogsScreen() {
 
         {loading && !refreshing ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#6A2C90" />
+            <ActivityIndicator size="large" color="#2563EB" />
             <Text style={{ marginTop: 12, color: '#64748B' }}>Loading WhatsApp logs…</Text>
           </View>
         ) : (
           <ScrollView
             contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#6A2C90" />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
           >
             {searchResults !== null ? (
               searchResults.length === 0 ? (
@@ -340,7 +340,7 @@ export default function WhatsAppLogsScreen() {
                           )}
                           {canResend && (
                             <TouchableOpacity disabled={!!busy} onPress={() => doResendOne(d.id, d.jobId)} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
-                              {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#6A2C90" /> : <Ionicons name="refresh" size={16} color="#6A2C90" />}
+                              {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="refresh" size={16} color="#2563EB" />}
                             </TouchableOpacity>
                           )}
                         </View>
@@ -376,7 +376,7 @@ export default function WhatsAppLogsScreen() {
                       )}
                       {canResend && (
                         <TouchableOpacity disabled={!!busy} onPress={() => doResendOne(d.id, job.id)} style={{ padding: 4, opacity: busy ? 0.5 : 1 }}>
-                          {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#6A2C90" /> : <Ionicons name="refresh" size={16} color="#6A2C90" />}
+                          {busy === 'one:' + d.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="refresh" size={16} color="#2563EB" />}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -394,7 +394,7 @@ export default function WhatsAppLogsScreen() {
                         </View>
                         <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{job.label || (job.jobType || '').replace(/_/g, ' ') || 'Campaign'}</Text>
                       </View>
-                      <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#6A2C90" />
+                      <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#2563EB" />
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                       <Text style={{ fontSize: 12, color: '#64748B' }}>Total <Text style={{ fontWeight: '800' }}>{job.totalCount}</Text></Text>
@@ -413,7 +413,7 @@ export default function WhatsAppLogsScreen() {
                       return (
                         <View style={{ marginTop: 8 }}>
                           <View style={{ height: 6, borderRadius: 3, backgroundColor: '#EEF1F6', overflow: 'hidden', flexDirection: 'row' }}>
-                            {sentPct > 0 && <View style={{ width: `${sentPct}%`, backgroundColor: done ? '#16A34A' : '#6A2C90' }} />}
+                            {sentPct > 0 && <View style={{ width: `${sentPct}%`, backgroundColor: done ? '#16A34A' : '#2563EB' }} />}
                             {failedPct > 0 && <View style={{ width: `${failedPct}%`, backgroundColor: '#DC2626' }} />}
                           </View>
                           <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 3 }}>{sentPct}% sent{failed > 0 ? ` · ${failedPct}% failed` : ''}</Text>
@@ -429,20 +429,20 @@ export default function WhatsAppLogsScreen() {
                         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                           {job.failedCount > 0 && (
                             <TouchableOpacity disabled={!!busy} onPress={() => doResendAll(job.id)}
-                              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#6A2C90', opacity: busy ? 0.5 : 1 }}>
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#2563EB', opacity: busy ? 0.5 : 1 }}>
                               {busy === 'resendAll:' + job.id ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="refresh" size={13} color="#fff" />}
                               <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>Resend failed ({job.failedCount})</Text>
                             </TouchableOpacity>
                           )}
                           <TouchableOpacity disabled={!!busy} onPress={() => doResume(job.id)}
                             style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', opacity: busy ? 0.5 : 1 }}>
-                            {busy === 'resume:' + job.id ? <ActivityIndicator size="small" color="#6A2C90" /> : <Ionicons name="play" size={13} color="#6A2C90" />}
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#6A2C90' }}>Resume</Text>
+                            {busy === 'resume:' + job.id ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="play" size={13} color="#2563EB" />}
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Resume</Text>
                           </TouchableOpacity>
                         </View>
                       )}
                       {dLoading ? (
-                        <ActivityIndicator color="#6A2C90" style={{ paddingVertical: 12 }} />
+                        <ActivityIndicator color="#2563EB" style={{ paddingVertical: 12 }} />
                       ) : deliveries.length === 0 ? (
                         <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', paddingVertical: 10 }}>No delivery rows</Text>
                       ) : (
@@ -484,7 +484,7 @@ export default function WhatsAppLogsScreen() {
                 <TouchableOpacity onPress={() => { setEditPhone(null); setPhoneInput(''); }} style={{ paddingHorizontal: 14, paddingVertical: 9 }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B' }}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity disabled={!!busy} onPress={doEditPhoneSave} style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, backgroundColor: '#6A2C90', opacity: busy ? 0.6 : 1 }}>
+                <TouchableOpacity disabled={!!busy} onPress={doEditPhoneSave} style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, backgroundColor: '#2563EB', opacity: busy ? 0.6 : 1 }}>
                   {busy && String(busy).startsWith('phone:') ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Save & Resend</Text>}
                 </TouchableOpacity>
               </View>

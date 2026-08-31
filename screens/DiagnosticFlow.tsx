@@ -25,7 +25,7 @@ import { saveTicketResolution, submitDiagnosis } from '../services/ticketService
 import * as sb from '../lib/supabaseService';
 
 const BRAND = '#1D4ED8';
-const BRAND_LIGHT = 'rgba(106,44,144,0.12)';
+const BRAND_LIGHT = 'rgba(37,99,235,0.12)';
 
 // ─── Diagnostic questions (UNCHANGED) ────────────────────────────────────────
 interface DiagOption   { value: string; label: string }
@@ -779,7 +779,7 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
 
             <View style={{ gap:10 }}>
               <TouchableOpacity onPress={handleFinalSubmit} disabled={submitting||validParts.length===0}
-                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#6A2C90', borderRadius:12, padding:14, opacity:(submitting||validParts.length===0)?0.55:1 }}>
+                style={{ flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8, backgroundColor:'#2563EB', borderRadius:12, padding:14, opacity:(submitting||validParts.length===0)?0.55:1 }}>
                 {submitting ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send-outline" size={18} color="#fff" />}
                 <Text style={{ fontSize:15, fontWeight:'800', color:'#fff' }}>{submitting?'Submitting…':'Submit Cost Estimate'}</Text>
               </TouchableOpacity>

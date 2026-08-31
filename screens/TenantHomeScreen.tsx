@@ -745,7 +745,7 @@ export default function TenantHomeScreen({ navigation }: any) {
               <TouchableOpacity
                 key={phrase}
                 onPress={() => moveToReview(phrase)}
-                style={{ backgroundColor: 'rgba(106,44,144,0.05)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(106,44,144,0.12)' }}
+                style={{ backgroundColor: 'rgba(37,99,235,0.05)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(37,99,235,0.12)' }}
               >
                 <Text style={{ fontSize: 12, color: '#1D4ED8' }}>"{phrase}"</Text>
               </TouchableOpacity>
@@ -803,7 +803,7 @@ export default function TenantHomeScreen({ navigation }: any) {
             : issueTypes.map(it => (
               <TouchableOpacity
                 key={it.id} onPress={() => setSelectedTypeId(it.id)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: selectedTypeId === it.id ? 'rgba(106,44,144,0.08)' : '#fff', borderRadius: 10, padding: 11, borderWidth: 1.5, borderColor: selectedTypeId === it.id ? '#1D4ED8' : '#E5E7EB' }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: selectedTypeId === it.id ? 'rgba(37,99,235,0.08)' : '#fff', borderRadius: 10, padding: 11, borderWidth: 1.5, borderColor: selectedTypeId === it.id ? '#1D4ED8' : '#E5E7EB' }}
               >
                 <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: selectedTypeId === it.id ? '#1D4ED8' : '#94A3B8', backgroundColor: selectedTypeId === it.id ? '#1D4ED8' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                   {selectedTypeId === it.id && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />}
@@ -830,7 +830,7 @@ export default function TenantHomeScreen({ navigation }: any) {
       </View>
       <Text style={{ fontSize: 20, fontWeight: '800', color: '#0F172A' }}>Ticket Raised!</Text>
       {createdTicketNumber ? (
-        <View style={{ backgroundColor: 'rgba(106,44,144,0.08)', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(106,44,144,0.2)' }}>
+        <View style={{ backgroundColor: 'rgba(37,99,235,0.08)', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(37,99,235,0.2)' }}>
           <Text style={{ fontSize: 16, fontWeight: '800', color: '#1D4ED8', letterSpacing: 1 }}>{createdTicketNumber}</Text>
         </View>
       ) : null}

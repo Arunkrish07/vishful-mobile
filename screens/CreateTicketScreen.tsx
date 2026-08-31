@@ -42,11 +42,11 @@ const CT = {
   border: '#EEF1F6',
   soft: '#F8FAFC',
   surface: '#FFFFFF',
-  blue: '#6A2C90',
-  blueDeep: '#6A2C90',
-  blueSoft: '#F3ECF9',
-  blueTint: 'rgba(106,44,144,0.08)',
-  blueTintStrong: 'rgba(106,44,144,0.12)',
+  blue: '#2563EB',
+  blueDeep: '#2563EB',
+  blueSoft: '#EFF6FF',
+  blueTint: 'rgba(37,99,235,0.08)',
+  blueTintStrong: 'rgba(37,99,235,0.12)',
 };
 const CT_CARD_SHADOW = {
   shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
@@ -519,7 +519,7 @@ export default function CreateTicketScreen({ navigation }: any) {
     return (
       <GlassBackground>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#6A2C90" />
+          <ActivityIndicator size="large" color="#2563EB" />
         </View>
       </GlassBackground>
     );
@@ -574,7 +574,7 @@ export default function CreateTicketScreen({ navigation }: any) {
 
             {/* Tenant: auto-filled location card */}
             {isTenant && tenantLocation && (
-              <View style={[glass.card, { backgroundColor: CT.blueSoft, borderColor: '#E4D3EF', borderWidth: 1, borderRadius: 16, marginBottom: spacing.lg, shadowOpacity: 0 }]}>
+              <View style={[glass.card, { backgroundColor: CT.blueSoft, borderColor: '#DBEAFE', borderWidth: 1, borderRadius: 16, marginBottom: spacing.lg, shadowOpacity: 0 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <Ionicons name="location-outline" size={16} color={CT.blueDeep} />
                   <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: CT.blueDeep }}>Your Location</Text>

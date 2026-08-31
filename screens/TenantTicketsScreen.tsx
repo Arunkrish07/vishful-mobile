@@ -41,8 +41,8 @@ import {
   STATUS_CONFIG,
 } from '../services/ticketService';
 
-const BRAND       = '#6A2C90';
-const BRAND_LIGHT = 'rgba(106,44,144,0.10)';
+const BRAND       = '#2563EB';
+const BRAND_LIGHT = 'rgba(37,99,235,0.10)';
 const CONVEX_BASE = CONVEX_SITE_URL;
 const TICKET_URL  = `${CONVEX_BASE}/api/voice-ticket-direct`;
 
@@ -372,7 +372,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
           </View>
           <TouchableOpacity
             onPress={() => { resetVoice(); setVoiceOpen(true); }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#6A2C90', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, marginRight: 8 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#2563EB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, marginRight: 8 }}
           >
             <Ionicons name="mic" size={16} color="#fff" />
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.sm }}>Voice</Text>
@@ -534,7 +534,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
                     )}
                     {approvalTicket.assigned_to_name && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }}>{approvalTicket.assigned_to_name[0]}</Text>
                         </View>
                         <Text style={{ fontSize: 13, color: colors.textSecondary }}>Technician: <Text style={{ fontWeight: '700', color: colors.text }}>{approvalTicket.assigned_to_name}</Text></Text>
@@ -551,7 +551,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
                 ) : approvalEstimates.length > 0 ? (
                   <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <Ionicons name="receipt-outline" size={16} color="#6A2C90" />
+                      <Ionicons name="receipt-outline" size={16} color="#2563EB" />
                       <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>Approved Parts & Costs</Text>
                     </View>
                     <View style={{ gap: 10 }}>
@@ -561,7 +561,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
                             <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{est.item_name}</Text>
                             <Text style={{ fontSize: 11, color: colors.textTertiary }}>{est.quantity} × ₹{est.unit_price.toLocaleString('en-IN')}</Text>
                           </View>
-                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#6A2C90' }}>₹{est.total.toLocaleString('en-IN')}</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#2563EB' }}>₹{est.total.toLocaleString('en-IN')}</Text>
                         </View>
                       ))}
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8 }}>
@@ -735,7 +735,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
             {voiceStep === 'review' && (
               <View style={{ gap: 16 }}>
                 <View style={{ backgroundColor: '#F0F4FF', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6A2C90', letterSpacing: 0.6, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB', letterSpacing: 0.6, marginBottom: 8 }}>
                     {transcript ? 'WHAT YOU SAID (tap to edit)' : 'DESCRIBE YOUR ISSUE'}
                   </Text>
                   <TextInput
@@ -880,7 +880,7 @@ function TenantTicketCard({ ticket, onPress, showApprovalCta }: {
       }]}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6A2C90', letterSpacing: 0.3 }}>{ticket.ticket_number}</Text>
+        <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB', letterSpacing: 0.3 }}>{ticket.ticket_number}</Text>
         <View style={{ paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: statusCfg.bg }}>
           <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: statusCfg.color }}>{statusCfg.label}</Text>
         </View>
@@ -890,7 +890,7 @@ function TenantTicketCard({ ticket, onPress, showApprovalCta }: {
       {ticket.description  && <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 8 }} numberOfLines={2}>{ticket.description}</Text>}
       {ticket.assigned_to_name && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-          <View style={{ width: 22, height: 22, borderRadius: 7, backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 22, height: 22, borderRadius: 7, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{ticket.assigned_to_name[0]}</Text>
           </View>
           <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Assigned to {ticket.assigned_to_name}</Text>

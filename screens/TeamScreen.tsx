@@ -618,10 +618,10 @@ export default function TeamScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10 }}>
                 <TouchableOpacity
                   onPress={() => { setNewDeptName(''); setEditingDeptId(null); setEditingDeptName(''); setShowDepartments(true); }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#6A2C9014', borderWidth: 1, borderColor: '#6A2C9030' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#2563EB14', borderWidth: 1, borderColor: '#2563EB30' }}
                 >
-                  <Ionicons name="business-outline" size={14} color="#6A2C90" />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#6A2C90' }}>Departments{departments.length ? ` (${departments.length})` : ''}</Text>
+                  <Ionicons name="business-outline" size={14} color="#2563EB" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Departments{departments.length ? ` (${departments.length})` : ''}</Text>
                 </TouchableOpacity>
               </View>
               <KpiHeader
@@ -674,7 +674,7 @@ export default function TeamScreen() {
 
           {activeTab === 'salary' && (
             salaryLoading ? (
-              <ActivityIndicator color="#6A2C90" style={{ marginTop: 30 }} />
+              <ActivityIndicator color="#2563EB" style={{ marginTop: 30 }} />
             ) : salaryBills.length === 0 ? (
               <EmptyState icon="receipt-outline" title="No salary bills" subtitle="Pay slips are generated from attendance on the web app; they appear here to approve and mark paid." />
             ) : (
@@ -708,7 +708,7 @@ export default function TeamScreen() {
                     {st !== 'paid' && (
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                         {st === 'draft' && (
-                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'approved')} style={{ flex: 1, backgroundColor: '#6A2C90', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
+                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'approved')} style={{ flex: 1, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
                             {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Approve</Text>}
                           </TouchableOpacity>
                         )}
@@ -775,7 +775,7 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={[styles.selectedBanner]}>
-                  <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
@@ -813,7 +813,7 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={styles.selectedBanner}>
-                  <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
@@ -883,7 +883,7 @@ export default function TeamScreen() {
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
               {selected && (
                 <View style={styles.selectedBanner}>
-                  <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
                     {`${selected.first_name || ''} ${selected.last_name || ''}`.trim()}
                   </Text>
@@ -915,7 +915,7 @@ export default function TeamScreen() {
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Attendance</Text>
               <TouchableOpacity onPress={() => { if (selected) openAttendance(selected); }}>
-                <Ionicons name="add-circle-outline" size={24} color="#6A2C90" />
+                <Ionicons name="add-circle-outline" size={24} color="#2563EB" />
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
@@ -947,7 +947,7 @@ export default function TeamScreen() {
                 <TouchableOpacity
                   onPress={handleAddDept}
                   disabled={deptBusy}
-                  style={{ height: 48, paddingHorizontal: 16, borderRadius: 12, backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center', opacity: deptBusy ? 0.6 : 1, marginBottom: 14 }}
+                  style={{ height: 48, paddingHorizontal: 16, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', opacity: deptBusy ? 0.6 : 1, marginBottom: 14 }}
                 >
                   <Ionicons name="add" size={22} color="#fff" />
                 </TouchableOpacity>
@@ -973,7 +973,7 @@ export default function TeamScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, paddingRight: 8 }}>{d.name || '—'}</Text>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <ActionChip label="Rename" icon="pencil-outline" color="#6A2C90" onPress={() => { setEditingDeptId(d.id); setEditingDeptName(d.name || ''); }} />
+                          <ActionChip label="Rename" icon="pencil-outline" color="#2563EB" onPress={() => { setEditingDeptId(d.id); setEditingDeptName(d.name || ''); }} />
                           <ActionChip label="Delete" icon="trash-outline" color="#dc2626" onPress={() => handleDeleteDept(d)} />
                         </View>
                       </View>
@@ -1029,8 +1029,8 @@ function MemberCard({ member, onEdit, onDelete, onPayment, onAttendance, onExit,
           {(member.specialties || member.specializations)?.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {(member.specialties || member.specializations).map((s: string) => (
-                <View key={s} style={{ backgroundColor: '#F3ECF9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, color: '#6A2C90', fontWeight: '600' }}>{s}</Text>
+                <View key={s} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '600' }}>{s}</Text>
                 </View>
               ))}
             </View>
@@ -1050,7 +1050,7 @@ function MemberCard({ member, onEdit, onDelete, onPayment, onAttendance, onExit,
             )}
           </View>
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-            <ActionChip label="Edit" icon="pencil-outline" color="#6A2C90" onPress={onEdit} />
+            <ActionChip label="Edit" icon="pencil-outline" color="#2563EB" onPress={onEdit} />
             <ActionChip label="Payment" icon="cash-outline" color="#16a34a" onPress={onPayment} />
             <ActionChip label="Attendance" icon="calendar-outline" color="#2563eb" onPress={onAttendance} />
             {member.status === 'inactive' ? (
@@ -1104,7 +1104,7 @@ function PaymentRow({ payment, members, onEdit, onDelete }: any) {
       </View>
       {(onEdit || onDelete) && (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-          {onEdit && <ActionChip label="Edit" icon="pencil-outline" color="#6A2C90" onPress={onEdit} />}
+          {onEdit && <ActionChip label="Edit" icon="pencil-outline" color="#2563EB" onPress={onEdit} />}
           {onDelete && <ActionChip label="Delete" icon="trash-outline" color="#dc2626" onPress={onDelete} />}
         </View>
       )}
@@ -1151,7 +1151,7 @@ function PerformanceView({ rows, totalTickets }: { rows: any[]; totalTickets: nu
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
         {[
           { label: 'Tickets', value: String(totalTickets), color: '#0F172A' },
-          { label: 'Assigned', value: String(totalAssigned), color: '#6A2C90' },
+          { label: 'Assigned', value: String(totalAssigned), color: '#2563EB' },
           { label: 'Resolved', value: String(totalResolved), color: '#16a34a' },
           { label: 'Resolve %', value: `${overallRate}%`, color: rateColor(overallRate) },
         ].map(it => (
@@ -1176,7 +1176,7 @@ function PerformanceView({ rows, totalTickets }: { rows: any[]; totalTickets: nu
             style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 0.5, borderTopColor: '#F1F5F9' }}
           >
             <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#0F172A', paddingRight: 6 }} numberOfLines={1}>{r.name}</Text>
-            <Text style={{ width: 62, fontSize: 13, color: '#6A2C90', textAlign: 'center', fontWeight: '600' }}>{r.assigned}</Text>
+            <Text style={{ width: 62, fontSize: 13, color: '#2563EB', textAlign: 'center', fontWeight: '600' }}>{r.assigned}</Text>
             <Text style={{ width: 62, fontSize: 13, color: '#16a34a', textAlign: 'center', fontWeight: '600' }}>{r.resolved}</Text>
             <Text style={{ width: 52, fontSize: 13, fontWeight: '800', color: r.assigned > 0 ? rateColor(r.rate) : '#94A3B8', textAlign: 'right' }}>{r.assigned > 0 ? `${r.rate}%` : '—'}</Text>
           </View>
@@ -1192,7 +1192,7 @@ function PerformanceView({ rows, totalTickets }: { rows: any[]; totalTickets: nu
 // ─── Attendance KPI header (Members list) ───────────────────────────────────────
 function KpiHeader({ teamSize, presentToday, attendanceRate }: { teamSize: number; presentToday: number; attendanceRate: number }) {
   const items = [
-    { label: 'Team Size',   value: String(teamSize),          icon: 'people-outline',   color: '#6A2C90' },
+    { label: 'Team Size',   value: String(teamSize),          icon: 'people-outline',   color: '#2563EB' },
     { label: 'Present Today', value: String(presentToday),    icon: 'checkmark-circle-outline', color: '#16a34a' },
     { label: 'Attend. Rate', value: `${attendanceRate}%`,     icon: 'stats-chart-outline', color: '#ea580c' },
   ];
@@ -1383,7 +1383,7 @@ function MemberAttendancePanel({ member, attendance }: any) {
     <View>
       {/* Member banner */}
       <View style={styles.selectedBanner}>
-        <Ionicons name="person-circle-outline" size={20} color="#6A2C90" />
+        <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
         <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
           {`${member.first_name || ''} ${member.last_name || ''}`.trim()}
         </Text>
@@ -1449,7 +1449,7 @@ function MemberAttendancePanel({ member, attendance }: any) {
             {
               key: 'worked', label: 'Hours worked',
               value: `${work.totalWorkedHours.toFixed(1)}h`,
-              sub: `of ${work.expectedHours.toFixed(1)}h · ${work.daysWithTimes} days`, color: '#6A2C90',
+              sub: `of ${work.expectedHours.toFixed(1)}h · ${work.daysWithTimes} days`, color: '#2563EB',
             },
             {
               key: 'comp', label: 'Late compensated',
@@ -1530,8 +1530,8 @@ function MemberFormModal({ visible, title, form, setF, deptOptions, selectedSpec
                     onPress={() => toggleSpec(s)}
                     style={{
                       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-                      backgroundColor: active ? '#6A2C90' : '#F1F3F9',
-                      borderWidth: 1, borderColor: active ? '#6A2C90' : '#EEF1F6',
+                      backgroundColor: active ? '#2563EB' : '#F1F3F9',
+                      borderWidth: 1, borderColor: active ? '#2563EB' : '#EEF1F6',
                     }}
                   >
                     <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : '#64748B' }}>{s}</Text>
@@ -1574,8 +1574,8 @@ function MemberFormModal({ visible, title, form, setF, deptOptions, selectedSpec
 function SectionLabel({ title, icon }: { title: string; icon: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, marginTop: 18 }}>
-      <Ionicons name={icon as any} size={14} color="#6A2C90" />
-      <Text style={{ fontSize: 11, fontWeight: '700', color: '#6A2C90', letterSpacing: 0.8, textTransform: 'uppercase' }}>{title}</Text>
+      <Ionicons name={icon as any} size={14} color="#2563EB" />
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB', letterSpacing: 0.8, textTransform: 'uppercase' }}>{title}</Text>
     </View>
   );
 }
@@ -1591,8 +1591,8 @@ function PickerRow({ label, value, options, onSelect }: any) {
             onPress={() => onSelect(opt.value)}
             style={{
               paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-              backgroundColor: value === opt.value ? '#6A2C90' : '#F1F3F9',
-              borderWidth: 1, borderColor: value === opt.value ? '#6A2C90' : '#EEF1F6',
+              backgroundColor: value === opt.value ? '#2563EB' : '#F1F3F9',
+              borderWidth: 1, borderColor: value === opt.value ? '#2563EB' : '#EEF1F6',
             }}
           >
             <Text style={{ fontSize: 13, fontWeight: '600', color: value === opt.value ? '#fff' : '#64748B' }}>{opt.label}</Text>
@@ -1614,7 +1614,7 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 },
   addBtn: {
     width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
   },
   tabRowScroll: {
     flexGrow: 0,
@@ -1627,7 +1627,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#F1F3F9',
   },
-  tabActive: { backgroundColor: '#6A2C90' },
+  tabActive: { backgroundColor: '#2563EB' },
   tabLabel: { fontSize: 12, fontWeight: '700', color: '#64748B' },
   tabLabelActive: { color: '#fff' },
   searchRow: { paddingHorizontal: 16, paddingVertical: 8 },
@@ -1646,18 +1646,18 @@ const styles = StyleSheet.create({
   },
   avatar: {
     width: 46, height: 46, borderRadius: 23,
-    backgroundColor: '#F3ECF9',
+    backgroundColor: '#EFF6FF',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: '#EEF1F6',
   },
-  avatarText: { fontSize: 16, fontWeight: '800', color: '#6A2C90' },
+  avatarText: { fontSize: 16, fontWeight: '800', color: '#2563EB' },
   memberName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   memberMeta: { fontSize: 12, color: '#64748B', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   badgeText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
   selectedBanner: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F3ECF9', borderRadius: 12,
+    backgroundColor: '#EFF6FF', borderRadius: 12,
     padding: 12, marginBottom: 16,
   },
   modalHeader: {

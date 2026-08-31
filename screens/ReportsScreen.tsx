@@ -50,8 +50,8 @@ const RPT = {
   ink: '#0F172A',
   ink2: '#64748B',
   ink3: '#94A3B8',
-  blue: '#6A2C90',
-  purple: '#6A2C90',
+  blue: '#2563EB',
+  purple: '#2563EB',
   line: '#EEF1F6',
   good: '#16A34A', goodBg: '#DCFCE7',
   warn: '#EA580C', warnBg: '#FFEDD5',
@@ -158,7 +158,7 @@ export default function ReportsScreen() {
 
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#6A2C90" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
         >
           {error ? (
             <View style={{ backgroundColor: RPT.bg, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: 'rgba(220,38,38,0.25)', alignItems: 'center', marginTop: 8, ...cardShadow }}>
@@ -176,7 +176,7 @@ export default function ReportsScreen() {
             <KpiCard big value={t.activeTenants} label="Active Tenants" />
             <KpiCard big value={`${ps.occupancyPct}%`} label="Occupancy Rate" />
             <KpiCard big value={fmtLacs(a.totalInvoiced)} label="Total Revenue" />
-            <KpiCard big value={fmtLacs(a.totalPendingCollection)} label="Pending Collection" color="#6A2C90" />
+            <KpiCard big value={fmtLacs(a.totalPendingCollection)} label="Pending Collection" color="#2563EB" />
             <KpiCard big value={tk.open} label="Active Tickets" />
           </View>
 
@@ -213,7 +213,7 @@ export default function ReportsScreen() {
           {/* Occupancy tab */}
           {tab === 'occupancy' && (<>
             <View style={{ backgroundColor: RPT.bg, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: RPT.line, alignItems: 'center', ...cardShadow }}>
-              <Ionicons name="bar-chart-outline" size={56} color="rgba(106,44,144,0.18)" />
+              <Ionicons name="bar-chart-outline" size={56} color="rgba(37,99,235,0.18)" />
               <Text style={{ fontSize: 34, fontWeight: '800', letterSpacing: -0.5, color: RPT.ink, marginTop: 12 }}>{ps.occupancyPct}%</Text>
               <Text style={{ fontSize: 14, color: RPT.ink2 }}>Current Occupancy</Text>
               <Text style={{ fontSize: 13, color: RPT.ink2, marginTop: 8 }}>{ps.occupied} / {ps.total} beds occupied</Text>

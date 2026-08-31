@@ -40,9 +40,9 @@ const getStatus = (s?: string): StatusDef =>
 // STAT CHIPS — web order: All Status | New | Booked | Staying | On Notice | Exited
 // ─────────────────────────────────────────────────────────────────────────────
 const STAT_CHIPS = [
-  { key: 'all',        label: 'All Status', color: '#6A2C90' },
-  { key: 'new',        label: 'New',        color: '#6A2C90' },
-  { key: 'booked',     label: 'Booked',     color: '#6A2C90' },
+  { key: 'all',        label: 'All Status', color: '#2563EB' },
+  { key: 'new',        label: 'New',        color: '#2563EB' },
+  { key: 'booked',     label: 'Booked',     color: '#2563EB' },
   { key: 'staying',    label: 'Staying',    color: '#16A34A' },
   { key: 'on-notice',  label: 'On Notice',  color: '#EA580C' },
   { key: 'exited',     label: 'Exited',     color: '#64748B' },
@@ -609,7 +609,7 @@ export default function TenantsScreen() {
                 style={tenantStyles.ghostIconBtn}
                 onPress={() => { setDupPhone(''); setDupResults([]); setDupGroups([]); setShowDuplicates(true); runDuplicateScanAll(); }}
               >
-                <Ionicons name="copy-outline" size={17} color="#6A2C90" />
+                <Ionicons name="copy-outline" size={17} color="#2563EB" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={tenantStyles.ghostIconBtn}
@@ -652,7 +652,7 @@ export default function TenantsScreen() {
               <Ionicons
                 name={tab.icon}
                 size={15}
-                color={activeTab === tab.key ? '#6A2C90' : colors.textTertiary}
+                color={activeTab === tab.key ? '#2563EB' : colors.textTertiary}
               />
               <Text style={[tenantStyles.tabText, activeTab === tab.key && tenantStyles.tabTextActive]}>
                 {tab.label}
@@ -1627,7 +1627,7 @@ const tenantStyles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
   iconBtn: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#6A2C90',
+    backgroundColor: '#2563EB',
     alignItems: 'center', justifyContent: 'center',
   },
   ghostIconBtn: {
@@ -1646,9 +1646,9 @@ const tenantStyles = StyleSheet.create({
     justifyContent: 'center', gap: 6, paddingVertical: 11,
     borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
-  tabItemActive:  { borderBottomColor: '#6A2C90' },
+  tabItemActive:  { borderBottomColor: '#2563EB' },
   tabText:        { fontSize: 13, color: colors.textTertiary, fontWeight: '500' },
-  tabTextActive:  { color: '#6A2C90', fontWeight: '700' },
+  tabTextActive:  { color: '#2563EB', fontWeight: '700' },
 
   chip: {
     alignItems: 'center', minWidth: 68,

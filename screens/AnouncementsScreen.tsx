@@ -287,7 +287,7 @@ export default function AnnouncementsScreen() {
 
         {/* Stat row */}
         <View style={styles.statRow}>
-          <StatChip icon="megaphone-outline" label="Total" value={total} color="#6A2C90" />
+          <StatChip icon="megaphone-outline" label="Total" value={total} color="#2563EB" />
           <StatChip icon="eye-outline" label="Published" value={published} color="#16A34A" />
           <StatChip icon="alert-circle-outline" label="Urgent" value={urgent} color="#DC2626" />
         </View>
@@ -412,7 +412,7 @@ function AnnouncementCard({ ann, canManage, onEdit, onDelete, onTogglePublish, o
         <View style={{ marginTop: 12 }}>
           {/* Banner image (if any) */}
           {ann.image_url && /^https?:\/\//i.test(String(ann.image_url)) ? (
-            <Image source={{ uri: ann.image_url }} style={{ width: '100%', height: 160, borderRadius: 12, marginBottom: 10, backgroundColor: 'rgba(106,44,144,0.05)' }} resizeMode="cover" />
+            <Image source={{ uri: ann.image_url }} style={{ width: '100%', height: 160, borderRadius: 12, marginBottom: 10, backgroundColor: 'rgba(37,99,235,0.05)' }} resizeMode="cover" />
           ) : null}
 
           {/* Content preview */}
@@ -423,7 +423,7 @@ function AnnouncementCard({ ann, canManage, onEdit, onDelete, onTogglePublish, o
           {/* Actions — admin/super_admin only */}
           {canManage && (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <ActionChip label="Edit" icon="pencil-outline" color="#6A2C90" onPress={onEdit} />
+              <ActionChip label="Edit" icon="pencil-outline" color="#2563EB" onPress={onEdit} />
               <ActionChip
                 label={ann.is_published ? 'Unpublish' : 'Publish'}
                 icon={ann.is_published ? 'eye-off-outline' : 'eye-outline'}
@@ -534,11 +534,11 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
               </Text>
               {form.image_url ? (
                 <View>
-                  <Image source={{ uri: form.image_url }} style={{ width: '100%', height: 150, borderRadius: 12, backgroundColor: 'rgba(106,44,144,0.05)' }} resizeMode="cover" />
+                  <Image source={{ uri: form.image_url }} style={{ width: '100%', height: 150, borderRadius: 12, backgroundColor: 'rgba(37,99,235,0.05)' }} resizeMode="cover" />
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                    <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#6A2C90', backgroundColor: '#F3ECF9' }}>
-                      <Ionicons name="image-outline" size={16} color="#6A2C90" />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#6A2C90' }}>Replace</Text>
+                    <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#2563EB', backgroundColor: '#EFF6FF' }}>
+                      <Ionicons name="image-outline" size={16} color="#2563EB" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Replace</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={onClearImage} disabled={imgUploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#DC2626', backgroundColor: 'rgba(220,38,38,0.06)' }}>
                       <Ionicons name="trash-outline" size={16} color="#DC2626" />
@@ -547,11 +547,11 @@ function AnnouncementFormModal({ visible, title, form, setF, loading, onSave, on
                   </View>
                 </View>
               ) : (
-                <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(106,44,144,0.4)', borderStyle: 'dashed', backgroundColor: 'rgba(106,44,144,0.04)' }}>
+                <TouchableOpacity onPress={onPickImage} disabled={imgUploading} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(37,99,235,0.4)', borderStyle: 'dashed', backgroundColor: 'rgba(37,99,235,0.04)' }}>
                   {imgUploading
-                    ? <ActivityIndicator size="small" color="#6A2C90" />
-                    : <Ionicons name="cloud-upload-outline" size={18} color="#6A2C90" />}
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#6A2C90' }}>{imgUploading ? 'Uploading…' : 'Upload Image'}</Text>
+                    ? <ActivityIndicator size="small" color="#2563EB" />
+                    : <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />}
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#2563EB' }}>{imgUploading ? 'Uploading…' : 'Upload Image'}</Text>
                 </TouchableOpacity>
               )}
             </View>

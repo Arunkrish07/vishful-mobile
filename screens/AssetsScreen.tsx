@@ -10,7 +10,7 @@ import {
   TextInput, Platform, Linking, ActivityIndicator,
   KeyboardAvoidingView, RefreshControl, Pressable, Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { GlassBackground, PickerSelect, IconBtnSolid } from '../components/shared';
@@ -136,7 +136,7 @@ function Inp({ label, value, onChange, placeholder, multi, num, required }: any)
       )}
       <TextInput
         style={{
-          backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB',
+          backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#EEF1F6',
           paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827',
           height: multi ? 80 : undefined, textAlignVertical: multi ? 'top' : 'auto',
         }}
@@ -155,7 +155,7 @@ function Inp({ label, value, onChange, placeholder, multi, num, required }: any)
 function Row({ children }: any) { return <View style={{ flexDirection: 'row', gap: 10 }}>{children}</View>; }
 function Sec({ title }: any) {
   return (
-    <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', marginVertical: 12, paddingTop: 12 }}>
+    <View style={{ borderTopWidth: 1, borderTopColor: '#EEF1F6', marginVertical: 12, paddingTop: 12 }}>
       <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{title}</Text>
     </View>
   );
@@ -201,7 +201,7 @@ function AssetCard({ a, onView, onQR, onEdit, onAlloc, onDealloc, onDelete }: an
   const [open, setOpen] = useState(false);
   const isAllocated = a.status === 'allocated';
   return (
-    <View style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#2563EB', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+    <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
         <TouchableOpacity activeOpacity={0.7} onPress={() => onView?.()} style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', gap: 5, flexWrap: 'wrap', marginBottom: 3 }}>
@@ -228,7 +228,7 @@ function AssetCard({ a, onView, onQR, onEdit, onAlloc, onDealloc, onDelete }: an
         </TouchableOpacity>
       </View>
       {open && (
-        <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 10, paddingTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <View style={{ borderTopWidth: 1, borderTopColor: '#EEF1F6', marginTop: 10, paddingTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {[
             { icon: 'eye-outline',        label: 'View',       fn: () => { setOpen(false); onView(); },        color: '#2563EB' },
             { icon: 'qr-code-outline',    label: 'QR Code',    fn: () => { setOpen(false); onQR(); },          color: '#2563EB' },
@@ -276,8 +276,8 @@ function AssetModal({ visible, onClose, onSave, init, title, types, vendors, bra
   };
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAF7FC' }} edges={['top']}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top']}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
           <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>{title}</Text>
           <TouchableOpacity onPress={onClose} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 999 }}>
             <Ionicons name="close" size={20} color="#556274" />
@@ -304,7 +304,7 @@ function AssetModal({ visible, onClose, onSave, init, title, types, vendors, bra
                 </View>
                 {brands.length > 0
                   ? <PickerSelect label="" value={f.brand} options={brands.map((b: any) => ({ label: b.name, value: b.name }))} onSelect={(v: string) => s('brand', v)} />
-                  : <TextInput style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827' }} value={f.brand} onChangeText={(v) => s('brand', v)} placeholder="Brand name" placeholderTextColor="#6B7280" />}
+                  : <TextInput style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#111827' }} value={f.brand} onChangeText={(v) => s('brand', v)} placeholder="Brand name" placeholderTextColor="#6B7280" />}
               </View>
               <View style={{ flex: 1 }}><Inp label="Model" value={f.model} onChange={(v: string) => s('model', v)} placeholder="e.g. WTL600UEA" /></View>
             </Row>
@@ -352,7 +352,7 @@ function AssetModal({ visible, onClose, onSave, init, title, types, vendors, bra
               </View>
             </Row>
             <Inp label="Notes" value={f.notes} onChange={(v: string) => s('notes', v)} multi placeholder="Optional notes..." />
-            <TouchableOpacity style={{ backgroundColor: isValid() ? '#2563EB' : '#aaa', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 }} onPress={save} disabled={saving || !isValid()}>
+            <TouchableOpacity style={{ backgroundColor: isValid() ? '#2563EB' : '#aaa', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 8 }} onPress={save} disabled={saving || !isValid()}>
               {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Save Asset</Text>}
             </TouchableOpacity>
           </ScrollView>
@@ -378,8 +378,8 @@ function VendorModal({ visible, onClose, onSave, init, title }: any) {
   };
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAF7FC' }} edges={['top']}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top']}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
           <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>{title}</Text>
           <TouchableOpacity onPress={onClose} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 999 }}>
             <Ionicons name="close" size={20} color="#556274" />
@@ -408,7 +408,7 @@ function VendorModal({ visible, onClose, onSave, init, title }: any) {
             </Row>
             <Inp label="IFSC Code" value={f.bank_ifsc} onChange={(v: string) => s('bank_ifsc', v)} />
             <Inp label="Notes" value={f.notes} onChange={(v: string) => s('notes', v)} multi />
-            <TouchableOpacity style={{ backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8, opacity: saving ? 0.6 : 1 }} onPress={save} disabled={saving}>
+            <TouchableOpacity style={{ backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 8, opacity: saving ? 0.6 : 1 }} onPress={save} disabled={saving}>
               {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Save Vendor</Text>}
             </TouchableOpacity>
           </ScrollView>
@@ -440,8 +440,8 @@ function VendorDetailModal({ visible, onClose, vendor, remarks, onAddRemark, onR
   const vName = vendor.name || vendor.vendor_name;
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAF7FC' }} edges={['top']}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top']}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
           <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827', flex: 1 }} numberOfLines={1}>{vName}</Text>
           <TouchableOpacity onPress={onClose} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 999, marginLeft: 8 }}>
             <Ionicons name="close" size={20} color="#556274" />
@@ -459,7 +459,7 @@ function VendorDetailModal({ visible, onClose, vendor, remarks, onAddRemark, onR
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 50 }}>
           {tab === 'details' ? (
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
               {[
                 ['Name',    vName],
                 ['Contact', vendor.contactPerson || vendor.contact_person || '—'],
@@ -468,7 +468,7 @@ function VendorDetailModal({ visible, onClose, vendor, remarks, onAddRemark, onR
                 ['GST',     vendor.gstNumber || vendor.gst_number || '—'],
                 ['PAN',     vendor.panNumber || vendor.pan_number || '—'],
               ].map(([k, v], i) => (
-                <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < 5 ? 1 : 0, borderBottomColor: '#E5E7EB' }}>
+                <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: i < 5 ? 1 : 0, borderBottomColor: '#EEF1F6' }}>
                   <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600', width: 70 }}>{k}</Text>
                   <Text style={{ fontSize: 13, color: '#111827', fontWeight: '600', flex: 1, textAlign: 'right' }}>{v}</Text>
                 </View>
@@ -488,7 +488,7 @@ function VendorDetailModal({ visible, onClose, vendor, remarks, onAddRemark, onR
                 </TouchableOpacity>
               </View>
               {rmkOpen && (
-                <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#EEF1F6' }}>
                   <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 10 }}>New Remark</Text>
                   <Lbl>Type</Lbl>
                   <PickerSelect label="" value={rType} options={RMK_TYPES.map(t => ({ label: `${t.charAt(0).toUpperCase()}${t.slice(1)}`, value: t }))} onSelect={setRType} />
@@ -502,7 +502,7 @@ function VendorDetailModal({ visible, onClose, vendor, remarks, onAddRemark, onR
                     <TouchableOpacity style={{ flex: 1, backgroundColor: '#2563EB', borderRadius: 10, paddingVertical: 12, alignItems: 'center', opacity: saving ? 0.6 : 1 }} onPress={saveRemark} disabled={saving}>
                       <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>{saving ? '…' : 'Save'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={{ flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB' }} onPress={() => setRmkOpen(false)}>
+                    <TouchableOpacity style={{ flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#EEF1F6' }} onPress={() => setRmkOpen(false)}>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: '#556274' }}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
@@ -514,7 +514,7 @@ function VendorDetailModal({ visible, onClose, vendor, remarks, onAddRemark, onR
                   <View key={r.id} style={{ backgroundColor: rBg(r.remark_type), borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: rCl(r.remark_type) + '40' }}>
                     <View style={{ flexDirection: 'row', gap: 6, marginBottom: 5 }}>
                       <Pill label={r.remark_type} color={rCl(r.remark_type)} bg={rCl(r.remark_type) + '22'} />
-                      <Pill label={r.severity} color="#6B7280" bg="#E5E7EB" />
+                      <Pill label={r.severity} color="#6B7280" bg="#EEF1F6" />
                     </View>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>{r.title}</Text>
                     {!!r.description && <Text style={{ fontSize: 12, color: '#556274', marginTop: 3 }}>{r.description}</Text>}
@@ -555,8 +555,8 @@ function AllocModal({ visible, onClose, onSave, asset, properties, apartments, b
   };
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAF7FC' }} edges={['top']}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top']}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
           <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>Allocate Asset</Text>
           <TouchableOpacity onPress={onClose} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 999 }}>
             <Ionicons name="close" size={20} color="#556274" />
@@ -599,7 +599,7 @@ function AllocModal({ visible, onClose, onSave, asset, properties, apartments, b
                 )}
               </View>
               <Text style={{ fontSize: 11, color: '#6B7280', marginBottom: 8 }}>Cost (₹{price.toLocaleString('en-IN')}) shared equally across selected beds</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6' }}>
                 {filtBeds.length === 0
                   ? <Text style={{ fontSize: 12, color: '#6B7280' }}>No beds in selected apartment</Text>
                   : filtBeds.map((b: any) => {
@@ -616,7 +616,7 @@ function AllocModal({ visible, onClose, onSave, asset, properties, apartments, b
               </View>
             </View>
           )}
-          <TouchableOpacity style={{ backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 20, opacity: saving ? 0.6 : 1 }} onPress={save} disabled={saving}>
+          <TouchableOpacity style={{ backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 20, opacity: saving ? 0.6 : 1 }} onPress={save} disabled={saving}>
             {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Allocate Asset</Text>}
           </TouchableOpacity>
         </ScrollView>
@@ -684,7 +684,7 @@ function QuickModal({ visible, onClose, title, onSave, fields, initial }: any) {
             <Inp key={f.key} label={f.label} value={vals[f.key]} onChange={(v: string) => setVals((p: any) => ({ ...p, [f.key]: v }))} placeholder={f.placeholder} />
           ))}
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-            <TouchableOpacity style={{ flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB' }} onPress={onClose}>
+            <TouchableOpacity style={{ flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center', borderWidth: 1.5, borderColor: '#EEF1F6' }} onPress={onClose}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#556274' }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{ flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center', backgroundColor: '#2563EB', opacity: saving ? 0.6 : 1 }} onPress={save} disabled={saving}>
@@ -732,13 +732,13 @@ function ImageUploadField({ label, value, onChange, folder, token }: { label: st
     <View style={{ marginBottom: 12 }}>
       <Lbl>{label}</Lbl>
       {value ? (
-        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden', backgroundColor: '#fff' }}>
-          <View style={{ width: '100%', height: 140, backgroundColor: '#F3F0F8', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', overflow: 'hidden', backgroundColor: '#fff' }}>
+          <View style={{ width: '100%', height: 140, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
             <Ionicons name="image" size={44} color="#2563EB" />
             <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 6, textAlign: 'center' }} numberOfLines={2}>{value.split('/').pop()}</Text>
             <Text style={{ fontSize: 11, color: '#16a34a', marginTop: 4, fontWeight: '700' }}>✓ Uploaded</Text>
           </View>
-          <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#EEF1F6' }}>
             <TouchableOpacity onPress={pickFromGallery} disabled={uploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10 }}>
               <Ionicons name="swap-horizontal-outline" size={14} color="#2563EB" />
               <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Change</Text>
@@ -752,10 +752,10 @@ function ImageUploadField({ label, value, onChange, folder, token }: { label: st
         </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity onPress={pickFromGallery} disabled={uploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', borderStyle: 'dashed', backgroundColor: 'rgba(37,99,235,0.04)' }}>
+          <TouchableOpacity onPress={pickFromGallery} disabled={uploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#EEF1F6', borderStyle: 'dashed', backgroundColor: 'rgba(37,99,235,0.04)' }}>
             {uploading ? <ActivityIndicator size="small" color="#2563EB" /> : (<><Ionicons name="image-outline" size={18} color="#2563EB" /><Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Gallery</Text></>)}
           </TouchableOpacity>
-          <TouchableOpacity onPress={takePhoto} disabled={uploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', borderStyle: 'dashed', backgroundColor: 'rgba(37,99,235,0.04)' }}>
+          <TouchableOpacity onPress={takePhoto} disabled={uploading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#EEF1F6', borderStyle: 'dashed', backgroundColor: 'rgba(37,99,235,0.04)' }}>
             <Ionicons name="camera-outline" size={18} color="#2563EB" />
             <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Camera</Text>
           </TouchableOpacity>
@@ -789,7 +789,7 @@ function DatePickerInput({ label, value, onChange, required }: { label: string; 
         <Lbl>{label}</Lbl>
         {required && <Text style={{ fontSize: 12, color: '#DC2626', marginLeft: 2 }}>*</Text>}
       </View>
-      <TouchableOpacity onPress={() => setOpen(true)} style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <TouchableOpacity onPress={() => setOpen(true)} style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Ionicons name="calendar-outline" size={16} color={value ? '#2563EB' : '#6B7280'} />
         <Text style={{ flex: 1, fontSize: 14, color: value ? '#111827' : '#6B7280' }}>{displayValue || 'Select date…'}</Text>
         {!!value && (
@@ -802,7 +802,7 @@ function DatePickerInput({ label, value, onChange, required }: { label: string; 
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setOpen(false)}>
           <View style={{ backgroundColor: '#F8FAFC', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 44 }} onStartShouldSetResponder={() => true}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(37,99,235,0.2)', alignSelf: 'center', marginTop: 12, marginBottom: 4 }} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>{label}</Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <TouchableOpacity onPress={() => setOpen(false)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: '#EFF6FF' }}>
@@ -865,7 +865,7 @@ function DKV({ k, v, vColor }: { k: string; v: string; vColor?: string }) {
 }
 function DSection({ title, right, children }: any) {
   return (
-    <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{title}</Text>
         {right}
@@ -920,8 +920,8 @@ function AssetDetailModal({ visible, onClose, assetId, onQR, onChanged }: any) {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAF7FC' }} edges={['top']}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top']}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 12, fontWeight: '800', color: '#2563EB' }}>{d?.assetCode || 'Asset'}</Text>
             <Text style={{ fontSize: 17, fontWeight: '800', color: '#111827' }} numberOfLines={1}>{d?.typeName || 'Asset Detail'}</Text>
@@ -954,17 +954,17 @@ function AssetDetailModal({ visible, onClose, assetId, onQR, onChanged }: any) {
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
             {tab === 'overview' && (<>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                   <Ionicons name="cash-outline" size={18} color="#16a34a" />
                   <Text style={{ fontSize: 15, fontWeight: '900', color: '#16a34a', marginTop: 4 }}>{fmtFull(d.purchasePrice)}</Text>
                   <Text style={{ fontSize: 10, color: '#6B7280' }}>Purchase Price</Text>
                 </View>
-                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                   <Ionicons name="shield-checkmark-outline" size={18} color={d.warrantyActive ? '#16a34a' : '#DC2626'} />
                   <Text style={{ fontSize: 15, fontWeight: '900', color: d.warrantyActive ? '#16a34a' : '#DC2626', marginTop: 4 }}>{d.warrantyActive ? `${d.warrantyMonthsLeft ?? ''}m` : 'Expired'}</Text>
                   <Text style={{ fontSize: 10, color: '#6B7280' }}>Warranty</Text>
                 </View>
-                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                   <Ionicons name="construct-outline" size={18} color="#2563EB" />
                   <Text style={{ fontSize: 15, fontWeight: '900', color: '#2563EB', marginTop: 4 }}>{d.maintenance?.length || 0}</Text>
                   <Text style={{ fontSize: 10, color: '#6B7280' }}>Maint. Records</Text>
@@ -1252,21 +1252,21 @@ function AssetPaymentsTab() {
   return (
     <View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
           <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '800', textTransform: 'uppercase' }}>Purchase</Text>
           <Text style={{ fontSize: 15, fontWeight: '900', color: '#111827', marginTop: 4 }}>{fmtShort(totals.purchase)}</Text>
         </View>
-        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
           <Text style={{ fontSize: 10, color: '#16a34a', fontWeight: '800', textTransform: 'uppercase' }}>Paid</Text>
           <Text style={{ fontSize: 15, fontWeight: '900', color: '#16a34a', marginTop: 4 }}>{fmtShort(totals.paid)}</Text>
         </View>
-        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
           <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '800', textTransform: 'uppercase' }}>Due</Text>
           <Text style={{ fontSize: 15, fontWeight: '900', color: '#DC2626', marginTop: 4 }}>{fmtShort(totals.due)}</Text>
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 10, marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 10, marginBottom: 10 }}>
         <Ionicons name="search-outline" size={16} color="#6B7280" />
         <TextInput value={search} onChangeText={setSearch} placeholder="Search asset, vendor, invoice…" placeholderTextColor="#6B7280" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#111827' }} />
         {!!search && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={16} color="#6B7280" /></TouchableOpacity>}
@@ -1306,7 +1306,7 @@ function AssetPaymentsTab() {
           const isMulti = g.rows.length > 1;
           const expanded = expandedKey === g.groupKey;
           return (
-            <View key={g.groupKey} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <View key={g.groupKey} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1332,7 +1332,7 @@ function AssetPaymentsTab() {
                 </TouchableOpacity>
               )}
               {isMulti && expanded && (
-                <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 8 }}>
+                <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#EEF1F6', paddingTop: 8 }}>
                   {g.rows.map((r: any) => (
                     <View key={r.assetId} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 }}>
                       <Text style={{ fontSize: 12, color: '#111827', fontWeight: '600' }}>{r.assetCode}</Text>
@@ -1348,13 +1348,13 @@ function AssetPaymentsTab() {
 
       <Modal visible={formOpen} animationType="slide" transparent onRequestClose={() => setFormOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(30,18,48,0.45)' }}>
-          <View style={{ backgroundColor: '#FAF7FC', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36, maxHeight: '90%' }}>
+          <View style={{ backgroundColor: '#F8FAFC', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36, maxHeight: '90%' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>Record Payment</Text>
               <TouchableOpacity onPress={() => setFormOpen(false)} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 999 }}><Ionicons name="close" size={18} color="#556274" /></TouchableOpacity>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ fontSize: 13, color: '#6B7280' }}>Asset</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>{form.assetCode}</Text></View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}><Text style={{ fontSize: 13, color: '#6B7280' }}>Balance Due</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>{fmtFull(form.balanceDue)}</Text></View>
               </View>
@@ -1409,6 +1409,9 @@ const TABS = [
 ];
 
 export default function AssetsScreen() {
+  const insets = useSafeAreaInsets();
+  // Clear the app-level FLOATING bottom nav rail (App.tsx NAV.rail: ~50px + safe-area) so the FAB isn't hidden behind it.
+  const navClear = 76 + Math.max(insets.bottom, 10);
   const navigation = useNavigation<any>();
   const mountedRef = useMountedRef();
   const { token, user } = useAuth() as any;
@@ -1693,7 +1696,7 @@ export default function AssetsScreen() {
     }
     return (
       <View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 10, marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 10, marginBottom: 10 }}>
           <Ionicons name="search-outline" size={16} color="#6B7280" />
           <TextInput value={search} onChangeText={setSearch} placeholder="Search inventory…" placeholderTextColor="#6B7280" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#111827' }} />
           {!!search && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={16} color="#6B7280" /></TouchableOpacity>}
@@ -1723,7 +1726,7 @@ export default function AssetsScreen() {
         {filteredAssets.length > assetLimit && (
           <TouchableOpacity
             onPress={() => setAssetLimit(l => l + ASSET_PAGE)}
-            style={{ marginTop: 4, marginBottom: 12, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#EFF6FF', alignItems: 'center' }}
+            style={{ marginTop: 4, marginBottom: 12, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#EEF1F6', backgroundColor: '#EFF6FF', alignItems: 'center' }}
           >
             <Text style={{ fontSize: 14, fontWeight: '800', color: '#2563EB' }}>
               Load more ({Math.min(assetLimit, filteredAssets.length)} of {filteredAssets.length})
@@ -1738,7 +1741,7 @@ export default function AssetsScreen() {
   const renderVendors = () => (
     <View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 10 }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 10 }}>
           <Ionicons name="search-outline" size={16} color="#6B7280" />
           <TextInput value={vendorSearch} onChangeText={setVendorSearch} placeholder="Search vendors…" placeholderTextColor="#6B7280" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#111827' }} />
         </View>
@@ -1749,7 +1752,7 @@ export default function AssetsScreen() {
       {filteredVendors.length === 0
         ? <View style={{ alignItems: 'center', paddingVertical: 48 }}><Ionicons name="people-outline" size={52} color="#e0d9ec" /><Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No vendors</Text></View>
         : filteredVendors.map((v: any) => (
-          <TouchableOpacity key={v.id} activeOpacity={0.7} onPress={() => openVendorDetail(v)} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+          <TouchableOpacity key={v.id} activeOpacity={0.7} onPress={() => openVendorDetail(v)} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{v.name || v.vendor_name}</Text>
@@ -1787,7 +1790,7 @@ export default function AssetsScreen() {
           const price = asset?.purchasePrice || first.assets?.purchase_price || 0;
           const perBed = first.allocation_type === 'bed' && grp.length > 0 ? Math.round(price / grp.length) : 0;
           return (
-            <View key={`${first.asset_id}-${idx}`} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <View key={`${first.asset_id}-${idx}`} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>{asset?.assetCode || first.assets?.asset_code || '—'}</Text>
@@ -1796,7 +1799,7 @@ export default function AssetsScreen() {
                 </View>
                 <Pill label={first.allocation_type} color="#2563EB" bg="rgba(37,99,235,0.12)" />
               </View>
-              <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 10, paddingTop: 10, gap: 6 }}>
+              <View style={{ borderTopWidth: 1, borderTopColor: '#EEF1F6', marginTop: 10, paddingTop: 10, gap: 6 }}>
                 {grp.map((al: any, i: number) => (
                   <View key={al.id || i} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
@@ -1810,12 +1813,12 @@ export default function AssetsScreen() {
                 ))}
               </View>
               {/* Allocation date + action row (QR / Edit / Delete) — web parity */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 10, paddingTop: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#EEF1F6', marginTop: 10, paddingTop: 10 }}>
                 <Text style={{ fontSize: 11, color: '#6B7280' }}>{first.allocated_date ? `Allocated ${fmtDate(first.allocated_date)}` : ''}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity
                     onPress={() => { setQrAsset(asset || { _id: first.asset_id, assetCode: first.assets?.asset_code, typeName: first.assets?.asset_types?.name, brand: first.assets?.brand, model: first.assets?.model }); setQrOpen(true); }}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#EFF6FF' }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#EEF1F6', backgroundColor: '#EFF6FF' }}>
                     <Ionicons name="qr-code-outline" size={14} color="#2563EB" />
                     <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>QR</Text>
                   </TouchableOpacity>
@@ -1844,10 +1847,10 @@ export default function AssetsScreen() {
   const renderCategories = () => (
     <View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-        <TouchableOpacity onPress={() => setCatOpen(true)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: 'rgba(37,99,235,0.04)' }}>
+        <TouchableOpacity onPress={() => setCatOpen(true)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#EEF1F6', backgroundColor: 'rgba(37,99,235,0.04)' }}>
           <Ionicons name="add" size={16} color="#2563EB" /><Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Add Category</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => { setTypeCatId(categories[0]?._id || ''); setTypeOpen(true); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: 'rgba(37,99,235,0.04)' }}>
+        <TouchableOpacity onPress={() => { setTypeCatId(categories[0]?._id || ''); setTypeOpen(true); }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#EEF1F6', backgroundColor: 'rgba(37,99,235,0.04)' }}>
           <Ionicons name="add" size={16} color="#2563EB" /><Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>Add Asset Type</Text>
         </TouchableOpacity>
       </View>
@@ -1857,7 +1860,7 @@ export default function AssetsScreen() {
           const catTypes = types.filter((t: any) => t.categoryId === c._id);
           const assetCount = assets.filter((a: any) => a.categoryName === c.name).length;
           return (
-            <View key={c._id} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <View key={c._id} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{c.name}</Text>
                 <Text style={{ fontSize: 12, color: '#6B7280' }}>{assetCount} asset{assetCount !== 1 ? 's' : ''} · {catTypes.length} type{catTypes.length !== 1 ? 's' : ''}</Text>
@@ -1889,11 +1892,11 @@ export default function AssetsScreen() {
     const condCounts = assets.reduce((acc: any, a: any) => { const c = a.condition || 'new'; acc[c] = (acc[c] || 0) + 1; return acc; }, {});
     return (
       <View>
-        <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
           <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 14 }}>Assets by Category</Text>
           <MiniBar data={(stats.byCategory || []).map((c: any) => ({ name: c.name, count: c.count }))} />
         </View>
-        <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
           <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Condition Breakdown</Text>
           {CONDITIONS.map(c => {
             const count = condCounts[c] || 0;
@@ -1922,7 +1925,7 @@ export default function AssetsScreen() {
     return (
       <View>
         {forecasts.map((f: any, i: number) => (
-          <View key={f.id || i} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+          <View key={f.id || i} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>{f.assetCode || f.asset_code || '—'}</Text>
@@ -1968,15 +1971,15 @@ export default function AssetsScreen() {
       <View>
         {/* KPI strip */}
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
             <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '800', textTransform: 'uppercase' }}>Assets w/ Tickets</Text>
             <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', marginTop: 4 }}>{maintKpis.assetsWithTickets}</Text>
           </View>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
             <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '800', textTransform: 'uppercase' }}>Open Tickets</Text>
             <Text style={{ fontSize: 18, fontWeight: '900', color: '#DC2626', marginTop: 4 }}>{maintKpis.totalOpen}</Text>
           </View>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
             <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: '800', textTransform: 'uppercase' }}>Repeat (≥2)</Text>
             <Text style={{ fontSize: 18, fontWeight: '900', color: '#F59E0B', marginTop: 4 }}>{maintKpis.repeatOffenders}</Text>
           </View>
@@ -1984,7 +1987,7 @@ export default function AssetsScreen() {
 
         {/* Repair-vs-Replace insights (pure compute, no AI) */}
         {replaceFlags.length > 0 && (
-          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#F59E0B40' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#F59E0B40' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
               <Ionicons name="bulb-outline" size={16} color="#F59E0B" />
               <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>Repair vs Replace</Text>
@@ -2020,7 +2023,7 @@ export default function AssetsScreen() {
           const expanded = expandedMaint.has(g.assetId);
           const apt = g.asset?.locationName;
           return (
-            <View key={g.assetId} style={{ backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <View key={g.assetId} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
               <TouchableOpacity activeOpacity={0.7} onPress={() => g.tickets.length > 0 && toggleExpand(g.assetId)} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2040,7 +2043,7 @@ export default function AssetsScreen() {
                 {g.tickets.length > 0 && <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" style={{ padding: 4 }} />}
               </TouchableOpacity>
               {expanded && g.tickets.length > 0 && (
-                <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 10, paddingTop: 8 }}>
+                <View style={{ borderTopWidth: 1, borderTopColor: '#EEF1F6', marginTop: 10, paddingTop: 8 }}>
                   {g.tickets.map((t: any) => (
                     <View key={t.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -2103,7 +2106,7 @@ export default function AssetsScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Asset Management</Text>
-              <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Track assets, vendors, allocations</Text>
+              <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 2 }}>Track assets, vendors, allocations</Text>
             </View>
           </View>
           <IconBtnSolid
@@ -2120,10 +2123,12 @@ export default function AssetsScreen() {
             { label: 'Allocated',  value: assets.filter((a: any) => a.status === 'allocated').length, color: '#2563EB', icon: 'location' },
             { label: 'Maint.',     value: stats.needsMaintenance ?? stats.maintenance ?? 0, color: '#2563EB', icon: 'construct' },
           ].map(s => (
-            <View key={s.label} style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
-              <Ionicons name={s.icon as any} size={15} color={s.color} />
-              <Text style={{ fontSize: 14, fontWeight: '900', color: s.color, marginTop: 3 }}>{s.value}</Text>
-              <Text style={{ fontSize: 9, color: '#6B7280' }}>{s.label}</Text>
+            <View key={s.label} style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+              <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: s.color + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                <Ionicons name={s.icon as any} size={14} color={s.color} />
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: '900', color: '#0F172A' }}>{s.value}</Text>
+              <Text style={{ fontSize: 9, color: '#64748B' }}>{s.label}</Text>
             </View>
           ))}
         </View>
@@ -2131,9 +2136,9 @@ export default function AssetsScreen() {
         {/* Tab bar */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 46, marginBottom: 6 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}>
           {visibleTabs.map((t: any) => (
-            <TouchableOpacity key={t.key} onPress={() => setActiveTab(t.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: activeTab === t.key ? '#2563EB' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: activeTab === t.key ? '#2563EB' : 'rgba(37,99,235,0.15)' }}>
-              <Ionicons name={t.icon} size={14} color={activeTab === t.key ? '#fff' : '#2563EB'} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: activeTab === t.key ? '#fff' : '#2563EB' }}>{t.label}</Text>
+            <TouchableOpacity key={t.key} onPress={() => setActiveTab(t.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: activeTab === t.key ? '#6D28D9' : '#F1F3F9' }}>
+              <Ionicons name={t.icon} size={14} color={activeTab === t.key ? '#fff' : '#64748B'} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: activeTab === t.key ? '#fff' : '#64748B' }}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -2155,7 +2160,7 @@ export default function AssetsScreen() {
 
         {/* FAB on inventory */}
         {activeTab === 'inventory' && (
-          <TouchableOpacity onPress={() => { setEditAsset(null); setAssetModalOpen(true); }} style={{ position: 'absolute', right: 20, bottom: 28, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', shadowColor: '#2563EB', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
+          <TouchableOpacity onPress={() => { setEditAsset(null); setAssetModalOpen(true); }} style={{ position: 'absolute', right: 20, bottom: navClear + 12, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', shadowColor: '#2563EB', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
             <Ionicons name="add" size={28} color="#fff" />
           </TouchableOpacity>
         )}

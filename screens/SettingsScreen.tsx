@@ -82,7 +82,7 @@ const ROLE_LABELS: Record<string, string> = {
   employee: 'Employee', technician: 'Technician', tenant: 'Tenant',
 };
 const ROLE_COLORS: Record<string, string> = {
-  super_admin: '#DC2626', org_admin: '#6A2C90', property_manager: '#6A2C90',
+  super_admin: '#DC2626', org_admin: '#2563EB', property_manager: '#2563EB',
   employee: '#16A34A', technician: '#EA580C', tenant: '#64748B',
 };
 
@@ -120,7 +120,7 @@ const Card = ({ children, style }: any) => (
 );
 const SaveBtn = ({ onPress, loading, label = 'Save Changes' }: any) => (
   <TouchableOpacity onPress={onPress} disabled={loading}
-    style={{ backgroundColor: '#6A2C90', borderRadius: 12, padding: 13, alignItems: 'center', marginTop: 8, opacity: loading ? 0.6 : 1 }}>
+    style={{ backgroundColor: '#2563EB', borderRadius: 12, padding: 13, alignItems: 'center', marginTop: 8, opacity: loading ? 0.6 : 1 }}>
     {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{label}</Text>}
   </TouchableOpacity>
 );
@@ -504,7 +504,7 @@ export default function SettingsScreen() {
           <TextInput style={{ flex: 1, fontSize: 14, color: colors.text, paddingVertical: 9 }} value={roleSearch} onChangeText={setRoleSearch} placeholder="Search team members…" placeholderTextColor={colors.textTertiary} />
         </View>
         <TouchableOpacity onPress={() => { setAssignMember(''); setAssignRole(''); setAssignOpen(true); }}
-          style={{ backgroundColor: '#6A2C90', borderRadius: 10, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' }}>
+          style={{ backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="person-add-outline" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -560,7 +560,7 @@ export default function SettingsScreen() {
                 const active = selectedRole === role;
                 return (
                   <TouchableOpacity key={role} onPress={() => setSelectedRole(role)}
-                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#6A2C90') : '#F1F5F9', borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#6A2C90') : '#EEF1F6' }}>
+                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#2563EB') : '#F1F5F9', borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#2563EB') : '#EEF1F6' }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{ROLE_LABELS[role]}</Text>
                   </TouchableOpacity>
                 );
@@ -598,12 +598,12 @@ export default function SettingsScreen() {
               <TouchableOpacity onPress={() => setOpenModules(prev => { const n = new Set(prev); n.has(mod.module) ? n.delete(mod.module) : n.add(mod.module); return n; })}
                 style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
                 <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={14} color={colors.textTertiary} />
-                <Ionicons name={mod.icon as any} size={16} color="#6A2C90" style={{ marginHorizontal: 8 }} />
+                <Ionicons name={mod.icon as any} size={16} color="#2563EB" style={{ marginHorizontal: 8 }} />
                 <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: colors.text }}>{mod.label}</Text>
-                {hasTabs && <View style={{ backgroundColor: '#F3ECF9', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 8 }}>
-                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#6A2C90' }}>{mod.tabs.length} TABS</Text>
+                {hasTabs && <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 8 }}>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#2563EB' }}>{mod.tabs.length} TABS</Text>
                 </View>}
-                <Switch value={enabled} onValueChange={(v) => handleModuleToggle(mod.module, v)} trackColor={{ true: '#6A2C90' }} thumbColor="#fff" />
+                <Switch value={enabled} onValueChange={(v) => handleModuleToggle(mod.module, v)} trackColor={{ true: '#2563EB' }} thumbColor="#fff" />
               </TouchableOpacity>
 
               {/* Expanded content */}
@@ -618,7 +618,7 @@ export default function SettingsScreen() {
                         return (
                           <TouchableOpacity key={key} onPress={() => handleCrudToggle(mod.module, key, !checked)}
                             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: checked ? '#6A2C90' : '#EEF1F6', backgroundColor: checked ? '#6A2C90' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                            <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: checked ? '#2563EB' : '#EEF1F6', backgroundColor: checked ? '#2563EB' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                               {checked && <Ionicons name="checkmark" size={10} color="#fff" />}
                             </View>
                             <Text style={{ fontSize: 11, color: colors.textSecondary }}>{label}</Text>
@@ -638,10 +638,10 @@ export default function SettingsScreen() {
                         return (
                           <View key={tab.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#EEF1F6' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Ionicons name={isVisible ? 'eye-outline' : 'eye-off-outline'} size={14} color={isVisible ? '#6A2C90' : '#DC2626'} />
+                              <Ionicons name={isVisible ? 'eye-outline' : 'eye-off-outline'} size={14} color={isVisible ? '#2563EB' : '#DC2626'} />
                               <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{tab.label}</Text>
                             </View>
-                            <Switch value={isVisible} onValueChange={(v) => handleTabVisibilityToggle(mod.module, tab.key, v)} trackColor={{ true: '#6A2C90' }} thumbColor="#fff" />
+                            <Switch value={isVisible} onValueChange={(v) => handleTabVisibilityToggle(mod.module, tab.key, v)} trackColor={{ true: '#2563EB' }} thumbColor="#fff" />
                           </View>
                         );
                       })}
@@ -664,7 +664,7 @@ export default function SettingsScreen() {
   const renderRules = () => (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
       <TouchableOpacity onPress={() => { setEditRule(null); setRuleForm({ rule_type: 'issue_type', issue_type_id: '', apartment_code: '', assigned_employee_id: '', priority: '0' }); setRuleOpen(true); }}
-        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#6A2C90', borderRadius: 10, padding: 11, marginBottom: 14 }}>
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, padding: 11, marginBottom: 14 }}>
         <Ionicons name="add" size={16} color="#fff" />
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add Rule</Text>
       </TouchableOpacity>
@@ -679,8 +679,8 @@ export default function SettingsScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
-                  <View style={{ backgroundColor: '#F3ECF9', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#6A2C90' }}>{r.rule_type === 'issue_type' ? 'Issue' : 'Apartment'}</Text>
+                  <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB' }}>{r.rule_type === 'issue_type' ? 'Issue' : 'Apartment'}</Text>
                   </View>
                   <View style={{ backgroundColor: '#F1F5F9', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
                     <Text style={{ fontSize: 10, color: colors.textTertiary }}>Priority {r.priority}</Text>
@@ -695,7 +695,7 @@ export default function SettingsScreen() {
               </View>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity onPress={() => { setEditRule(r); setRuleForm({ rule_type: r.rule_type, issue_type_id: r.issue_type_id || '', apartment_code: r.apartment_code || '', assigned_employee_id: r.assigned_employee_id || '', priority: String(r.priority || 0) }); setRuleOpen(true); }}>
-                  <Ionicons name="pencil-outline" size={18} color="#6A2C90" />
+                  <Ionicons name="pencil-outline" size={18} color="#2563EB" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => Alert.alert('Delete Rule', 'Delete this assignment rule?', [
                   { text: 'Cancel', style: 'cancel' },
@@ -717,7 +717,7 @@ export default function SettingsScreen() {
   const renderBedTypes = () => (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
       <TouchableOpacity onPress={() => { setBedTypeName(''); setBedTypeOpen(true); }}
-        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#6A2C90', borderRadius: 10, padding: 11, marginBottom: 14 }}>
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, padding: 11, marginBottom: 14 }}>
         <Ionicons name="add" size={16} color="#fff" />
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add Bed Type</Text>
       </TouchableOpacity>
@@ -749,7 +749,7 @@ export default function SettingsScreen() {
   const renderBankAccounts = () => (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
       <TouchableOpacity onPress={() => { setEditBank(null); setBankForm({ bank_name: '', account_number: '', account_holder: '', ifsc: '', branch: '', is_primary: false }); setBankOpen(true); }}
-        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#6A2C90', borderRadius: 10, padding: 11, marginBottom: 14 }}>
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, padding: 11, marginBottom: 14 }}>
         <Ionicons name="add" size={16} color="#fff" />
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add Bank Account</Text>
       </TouchableOpacity>
@@ -759,7 +759,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{acc.bank_name}</Text>
-                {acc.is_primary && <View style={{ backgroundColor: '#F3ECF9', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}><Text style={{ fontSize: 9, fontWeight: '700', color: '#6A2C90' }}>PRIMARY</Text></View>}
+                {acc.is_primary && <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}><Text style={{ fontSize: 9, fontWeight: '700', color: '#2563EB' }}>PRIMARY</Text></View>}
               </View>
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>••••{String(acc.account_number || '').slice(-4)}</Text>
               {acc.account_holder && <Text style={{ fontSize: 12, color: colors.textSecondary }}>{acc.account_holder}</Text>}
@@ -767,7 +767,7 @@ export default function SettingsScreen() {
             </View>
             <View style={{ flexDirection: 'row', gap: 14 }}>
               <TouchableOpacity onPress={() => { setEditBank(acc); setBankForm({ bank_name: acc.bank_name || '', account_number: acc.account_number || '', account_holder: acc.account_holder || '', ifsc: acc.ifsc || '', branch: acc.branch || '', is_primary: acc.is_primary || false }); setBankOpen(true); }}>
-                <Ionicons name="pencil-outline" size={18} color="#6A2C90" />
+                <Ionicons name="pencil-outline" size={18} color="#2563EB" />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => {
                 Alert.alert('Delete Bank Account', `Delete "${acc.bank_name}" (••••${String(acc.account_number || '').slice(-4)})?`, [
@@ -820,7 +820,7 @@ export default function SettingsScreen() {
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Ionicons name="log-out-outline" size={18} color="#6A2C90" />
+          <Ionicons name="log-out-outline" size={18} color="#2563EB" />
           <Text style={S.cardTitle}>Pre-Exit Task Auto-Assignment</Text>
         </View>
         <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 14, lineHeight: 18 }}>
@@ -835,7 +835,7 @@ export default function SettingsScreen() {
               const active = exitForm.exit_task_assignee_1 === uid;
               return (
                 <TouchableOpacity key={m.id} onPress={() => setExitForm(f => ({ ...f, exit_task_assignee_1: uid }))}
-                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#6A2C90' : colors.surface, borderWidth: 1, borderColor: active ? '#6A2C90' : '#EEF1F6' }}>
+                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: active ? '#2563EB' : '#EEF1F6' }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{name}</Text>
                 </TouchableOpacity>
               );
@@ -847,7 +847,7 @@ export default function SettingsScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity onPress={() => setExitForm(f => ({ ...f, exit_task_assignee_2: '' }))}
-              style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: !exitForm.exit_task_assignee_2 ? '#6A2C90' : colors.surface, borderWidth: 1, borderColor: !exitForm.exit_task_assignee_2 ? '#6A2C90' : '#EEF1F6' }}>
+              style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: !exitForm.exit_task_assignee_2 ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: !exitForm.exit_task_assignee_2 ? '#2563EB' : '#EEF1F6' }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: !exitForm.exit_task_assignee_2 ? '#fff' : colors.textSecondary }}>None</Text>
             </TouchableOpacity>
             {exitMembers.map((m: any) => {
@@ -856,7 +856,7 @@ export default function SettingsScreen() {
               const active = exitForm.exit_task_assignee_2 === uid;
               return (
                 <TouchableOpacity key={m.id} onPress={() => setExitForm(f => ({ ...f, exit_task_assignee_2: uid }))}
-                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#6A2C90' : colors.surface, borderWidth: 1, borderColor: active ? '#6A2C90' : '#EEF1F6' }}>
+                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: active ? '#2563EB' : '#EEF1F6' }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{name}</Text>
                 </TouchableOpacity>
               );
@@ -893,7 +893,7 @@ export default function SettingsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           {[500, 1000, 1500, 2000].map(p => (
             <TouchableOpacity key={p} onPress={() => setAutoForm(f => ({ ...f, ticket_auto_approve_threshold: String(p) }))}
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_auto_approve_threshold === String(p) ? '#6A2C90' : colors.surface, borderWidth: 1, borderColor: '#EEF1F6' }}>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_auto_approve_threshold === String(p) ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: '#EEF1F6' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: autoForm.ticket_auto_approve_threshold === String(p) ? '#fff' : colors.textSecondary }}>₹{p.toLocaleString('en-IN')}</Text>
             </TouchableOpacity>
           ))}
@@ -905,7 +905,7 @@ export default function SettingsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           {[14, 30, 60, 90].map(p => (
             <TouchableOpacity key={p} onPress={() => setAutoForm(f => ({ ...f, ticket_repeat_check_days: String(p) }))}
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_repeat_check_days === String(p) ? '#6A2C90' : colors.surface, borderWidth: 1, borderColor: '#EEF1F6' }}>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_repeat_check_days === String(p) ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: '#EEF1F6' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: autoForm.ticket_repeat_check_days === String(p) ? '#fff' : colors.textSecondary }}>{p}d</Text>
             </TouchableOpacity>
           ))}
@@ -936,7 +936,7 @@ export default function SettingsScreen() {
   const renderMaintenance = () => (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
       <TouchableOpacity onPress={() => { setMaintForm({ name: '', unit: '', description: '' }); setMaintOpen(true); }}
-        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#6A2C90', borderRadius: 10, padding: 11, marginBottom: 14 }}>
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, padding: 11, marginBottom: 14 }}>
         <Ionicons name="add" size={16} color="#fff" />
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add Maintenance Item</Text>
       </TouchableOpacity>
@@ -968,7 +968,7 @@ export default function SettingsScreen() {
   // ─── TAB CONTENT ROUTER ───────────────────────────────────────────────────
   const renderContent = () => {
     if (loading && ['permissions', 'roles', 'rules'].includes(activeTab)) {
-      return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#6A2C90" size="large" /></View>;
+      return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2563EB" size="large" /></View>;
     }
     switch (activeTab) {
       case 'organization':  return renderOrganization();
@@ -1031,7 +1031,7 @@ export default function SettingsScreen() {
         {/* Plan / workspace usage card (reference parity) — real counts */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
           <LinearGradient
-            colors={['#6A2C90', '#4F46E5'] as const}
+            colors={['#2563EB', '#4F46E5'] as const}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
@@ -1061,7 +1061,7 @@ export default function SettingsScreen() {
             const active = activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} onPress={() => setActiveTab(tab.key)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: active ? '#6A2C90' : '#F1F3F9', borderWidth: 1, borderColor: active ? '#6A2C90' : '#F1F3F9' }}>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: active ? '#2563EB' : '#F1F3F9', borderWidth: 1, borderColor: active ? '#2563EB' : '#F1F3F9' }}>
                 <Ionicons name={tab.icon as any} size={14} color={active ? '#fff' : '#64748B'} />
                 <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{tab.label}</Text>
               </TouchableOpacity>
@@ -1112,8 +1112,8 @@ export default function SettingsScreen() {
                     const active = assignMember === m.id;
                     return (
                       <TouchableOpacity key={m.id} onPress={() => setAssignMember(m.id)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#F3ECF9' : 'transparent' }}>
-                        <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#6A2C90' : colors.textTertiary} />
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
+                        <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#2563EB' : colors.textTertiary} />
                         <Text style={{ fontSize: 14, color: colors.text }}>{name}</Text>
                       </TouchableOpacity>
                     );
@@ -1125,7 +1125,7 @@ export default function SettingsScreen() {
                     const active = assignRole === role;
                     return (
                       <TouchableOpacity key={role} onPress={() => setAssignRole(role)}
-                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#6A2C90') : colors.surface, borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#6A2C90') : '#EEF1F6' }}>
+                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#2563EB') : colors.surface, borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#2563EB') : '#EEF1F6' }}>
                         <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{ROLE_LABELS[role]}</Text>
                       </TouchableOpacity>
                     );
@@ -1162,7 +1162,7 @@ export default function SettingsScreen() {
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                   {[{ key: 'issue_type', label: 'Issue-specific' }, { key: 'apartment', label: 'Apartment-based' }].map(rt => (
                     <TouchableOpacity key={rt.key} onPress={() => setRuleForm(f => ({ ...f, rule_type: rt.key }))}
-                      style={{ flex: 1, padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: ruleForm.rule_type === rt.key ? '#6A2C90' : colors.surface, borderWidth: 1, borderColor: ruleForm.rule_type === rt.key ? '#6A2C90' : '#EEF1F6' }}>
+                      style={{ flex: 1, padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: ruleForm.rule_type === rt.key ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: ruleForm.rule_type === rt.key ? '#2563EB' : '#EEF1F6' }}>
                       <Text style={{ fontSize: 12, fontWeight: '700', color: ruleForm.rule_type === rt.key ? '#fff' : colors.textSecondary }}>{rt.label}</Text>
                     </TouchableOpacity>
                   ))}
@@ -1175,8 +1175,8 @@ export default function SettingsScreen() {
                         const active = ruleForm.issue_type_id === it.id;
                         return (
                           <TouchableOpacity key={it.id} onPress={() => setRuleForm(f => ({ ...f, issue_type_id: it.id }))}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#F3ECF9' : 'transparent' }}>
-                            <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#6A2C90' : colors.textTertiary} />
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
+                            <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#2563EB' : colors.textTertiary} />
                             <Text style={{ fontSize: 13, color: colors.text }}>{it.name}</Text>
                           </TouchableOpacity>
                         );
@@ -1194,8 +1194,8 @@ export default function SettingsScreen() {
                     const active = ruleForm.assigned_employee_id === m.id;
                     return (
                       <TouchableOpacity key={m.id} onPress={() => setRuleForm(f => ({ ...f, assigned_employee_id: m.id }))}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#F3ECF9' : 'transparent' }}>
-                        <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#6A2C90' : colors.textTertiary} />
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
+                        <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#2563EB' : colors.textTertiary} />
                         <Text style={{ fontSize: 13, color: colors.text }}>{name}</Text>
                       </TouchableOpacity>
                     );
@@ -1258,7 +1258,7 @@ export default function SettingsScreen() {
                 <TInput label="IFSC Code" value={bankForm.ifsc} onChangeText={(v: string) => setBankForm(f => ({ ...f, ifsc: v.toUpperCase() }))} placeholder="e.g. HDFC0001234" autoCapitalize="characters" />
                 <TInput label="Branch" value={bankForm.branch} onChangeText={(v: string) => setBankForm(f => ({ ...f, branch: v }))} placeholder="Branch name" />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <Switch value={bankForm.is_primary} onValueChange={(v) => setBankForm(f => ({ ...f, is_primary: v }))} trackColor={{ true: '#6A2C90' }} thumbColor="#fff" />
+                  <Switch value={bankForm.is_primary} onValueChange={(v) => setBankForm(f => ({ ...f, is_primary: v }))} trackColor={{ true: '#2563EB' }} thumbColor="#fff" />
                   <Text style={{ fontSize: 14, color: colors.text }}>Set as primary account</Text>
                 </View>
                 <SaveBtn label={editBank ? 'Update Account' : 'Add Account'} loading={loading} onPress={async () => {

@@ -209,7 +209,7 @@ export default function AvailabilityScreen() {
                 activeOpacity={0.85}
                 style={{
                   minHeight: 36, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
-                  backgroundColor: active ? '#6A2C90' : '#F1F3F9',
+                  backgroundColor: active ? '#2563EB' : '#F1F3F9',
                 }}
               >
                 <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{f.label}</Text>
@@ -224,7 +224,7 @@ export default function AvailabilityScreen() {
           <TouchableOpacity onPress={() => setPropOpen(true)} disabled={loadingProps}
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12, paddingVertical: 12, marginBottom: 16 }}>
             <Text style={{ fontSize: 14, color: selectedPropertyId ? '#0F172A' : '#94A3B8' }}>{loadingProps ? 'Loading…' : selectedPropName}</Text>
-            <Ionicons name="chevron-down" size={16} color="#6A2C90" />
+            <Ionicons name="chevron-down" size={16} color="#2563EB" />
           </TouchableOpacity>
 
           {/* Tenant criteria */}
@@ -235,7 +235,7 @@ export default function AvailabilityScreen() {
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               {(['male', 'female'] as const).map(g => (
                 <TouchableOpacity key={g} onPress={() => { setTenantGender(g); setOutput(null); }}
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: 'center', backgroundColor: tenantGender === g ? '#6A2C90' : '#F1F3F9' }}>
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: 'center', backgroundColor: tenantGender === g ? '#2563EB' : '#F1F3F9' }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: tenantGender === g ? '#fff' : '#64748B', textTransform: 'capitalize' }}>{g}</Text>
                 </TouchableOpacity>
               ))}
@@ -259,8 +259,8 @@ export default function AvailabilityScreen() {
                 const active = preferredBedTypes.includes(t);
                 return (
                   <TouchableOpacity key={t} onPress={() => toggleBedType(t)}
-                    style={{ flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: active ? '#6A2C90' : '#EEF1F6', backgroundColor: active ? '#6A2C90' : '#F8FAFC' }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: active ? '#fff' : '#6A2C90' }}>{t}</Text>
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: active ? '#2563EB' : '#EEF1F6', backgroundColor: active ? '#2563EB' : '#F8FAFC' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: active ? '#fff' : '#2563EB' }}>{t}</Text>
                     <Text style={{ fontSize: 9, color: active ? 'rgba(255,255,255,0.85)' : '#64748B' }}>{TYPE_LABEL[t]}</Text>
                   </TouchableOpacity>
                 );
@@ -270,7 +270,7 @@ export default function AvailabilityScreen() {
 
           {/* Run button */}
           <TouchableOpacity onPress={runRecommendations} disabled={!recommendationInput || loadingData}
-            style={{ backgroundColor: (!recommendationInput || loadingData) ? '#CBD5E1' : '#6A2C90', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginBottom: 16 }}>
+            style={{ backgroundColor: (!recommendationInput || loadingData) ? '#CBD5E1' : '#2563EB', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginBottom: 16 }}>
             {loadingData ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>Generate Recommendations</Text>}
           </TouchableOpacity>
 
@@ -350,8 +350,8 @@ export default function AvailabilityScreen() {
                 ) : properties.map(p => (
                   <TouchableOpacity key={p.id} onPress={() => { setSelectedPropertyId(p.id); setPropOpen(false); }}
                     style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
-                    <Text style={{ fontSize: 14, fontWeight: selectedPropertyId === p.id ? '800' : '500', color: selectedPropertyId === p.id ? '#6A2C90' : '#0F172A' }}>{p.name}</Text>
-                    {selectedPropertyId === p.id && <Ionicons name="checkmark" size={18} color="#6A2C90" />}
+                    <Text style={{ fontSize: 14, fontWeight: selectedPropertyId === p.id ? '800' : '500', color: selectedPropertyId === p.id ? '#2563EB' : '#0F172A' }}>{p.name}</Text>
+                    {selectedPropertyId === p.id && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                   </TouchableOpacity>
                 ))}
               </ScrollView>

@@ -17,7 +17,7 @@ const ACC = {
   ink3: '#94A3B8',
   line: '#EEF1F6',
   soft: '#F8FAFC',
-  purple: '#6A2C90',
+  purple: '#2563EB',
   pillInactiveBg: '#F1F3F9',
   good: '#16A34A',
   goodBg: '#DCFCE7',

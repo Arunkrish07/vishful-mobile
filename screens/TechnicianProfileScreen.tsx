@@ -60,8 +60,8 @@ export default function TechnicianProfileScreen() {
           }]}>
             <View style={{
               width: 80, height: 80, borderRadius: 40,
-              backgroundColor: '#6A2C90', alignItems: 'center', justifyContent: 'center',
-              shadowColor: '#6A2C90', shadowOpacity: 0.25, shadowRadius: 14, elevation: 6,
+              backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
+              shadowColor: '#2563EB', shadowOpacity: 0.25, shadowRadius: 14, elevation: 6,
               marginBottom: spacing.lg,
             }}>
               <Text style={{ fontSize: 32, fontWeight: '800', color: '#fff' }}>{initials}</Text>
@@ -87,7 +87,7 @@ export default function TechnicianProfileScreen() {
           <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
             {[
               { label: 'Total', value: stats.total, color: '#1D4ED8', bg: '#EEF3FF', icon: 'layers-outline' },
-              { label: 'Active', value: stats.active, color: '#6A2C90', bg: '#F3ECF9', icon: 'construct-outline' },
+              { label: 'Active', value: stats.active, color: '#2563EB', bg: '#EFF6FF', icon: 'construct-outline' },
               { label: 'Done', value: stats.completed, color: '#16A34A', bg: '#DCFCE7', icon: 'checkmark-circle-outline' },
               { label: 'Avg Time', value: stats.avgResolution, color: '#EA580C', bg: '#FFEDD5', icon: 'time-outline' },
             ].map(s => (

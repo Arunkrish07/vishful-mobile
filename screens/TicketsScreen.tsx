@@ -17,7 +17,7 @@ import { glass, spacing, borderRadius, fontSize } from '../lib/theme';
 
 // Blue / slate design tokens (web chrome)
 const VBRAND = {
-  purple: '#6A2C90', purpleDeep: '#1D4ED8', orange: '#6A2C90',
+  purple: '#2563EB', purpleDeep: '#1D4ED8', orange: '#2563EB',
   ink900: '#0F172A', ink700: '#374151', ink600: '#64748B', ink500: '#64748B', ink400: '#94A3B8',
   panel: '#FFFFFF', panelBorder: '#EEF1F6',
   surface: '#FFFFFF', divider: '#EEF1F6', soft: '#F8FAFC',
@@ -410,7 +410,7 @@ function AdminRaiseTicketModal({
                 {[!!selectedProperty, !!description.trim(), !!selectedIssueType].map((done, i) => (
                   <View key={i} style={{
                     width: done ? 18 : 6, height: 6, borderRadius: 3,
-                    backgroundColor: done ? VBRAND.purple : '#F3ECF9',
+                    backgroundColor: done ? VBRAND.purple : '#EFF6FF',
                   }} />
                 ))}
               </View>
@@ -418,7 +418,7 @@ function AdminRaiseTicketModal({
 
             {loading ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#F3ECF9', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
                   <ActivityIndicator size="large" color={VBRAND.purple} />
                 </View>
                 <Text style={{ fontSize: 13, color: VBRAND.ink500, fontWeight: '600' }}>Loading…</Text>
@@ -452,7 +452,7 @@ function AdminRaiseTicketModal({
                       </Text>
                       {loadingApartments ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }}>
-                          <ActivityIndicator size="small" color="#6A2C90" />
+                          <ActivityIndicator size="small" color="#2563EB" />
                           <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>Loading apartments...</Text>
                         </View>
                       ) : apartments.length > 0 ? (
@@ -478,7 +478,7 @@ function AdminRaiseTicketModal({
                       </Text>
                       {loadingBeds ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }}>
-                          <ActivityIndicator size="small" color="#6A2C90" />
+                          <ActivityIndicator size="small" color="#2563EB" />
                           <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>Loading beds...</Text>
                         </View>
                       ) : beds.length > 0 ? (
@@ -523,8 +523,8 @@ function AdminRaiseTicketModal({
                     {/* AI scanning indicator */}
                     {description.trim().length >= 4 && classifying && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                        <ActivityIndicator size="small" color="#6A2C90" />
-                        <Text style={{ fontSize: fontSize.xs, color: '#6A2C90' }}>Identifying issue type…</Text>
+                        <ActivityIndicator size="small" color="#2563EB" />
+                        <Text style={{ fontSize: fontSize.xs, color: '#2563EB' }}>Identifying issue type…</Text>
                       </View>
                     )}
                   </View>
@@ -536,7 +536,7 @@ function AdminRaiseTicketModal({
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                       <View style={{
                         width: 26, height: 26, borderRadius: 8,
-                        backgroundColor: selectedIssueType ? '#6A2C90' : colors.border,
+                        backgroundColor: selectedIssueType ? '#2563EB' : colors.border,
                         alignItems: 'center', justifyContent: 'center',
                       }}>
                         {selectedIssueType
@@ -546,18 +546,18 @@ function AdminRaiseTicketModal({
                       </View>
                       <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Issue Type *</Text>
                       {selectedIssueType && (
-                        <View style={{ backgroundColor: '#F3ECF9', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, color: '#6A2C90', fontWeight: '700' }}>AUTO-DETECTED</Text>
+                        <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>AUTO-DETECTED</Text>
                         </View>
                       )}
                     </View>
 
                     {selectedIssueType ? (
                       /* Auto-selected result — tap X to change manually */
-                      <View style={{ backgroundColor: '#F3ECF9', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                        <Ionicons name="sparkles" size={18} color="#6A2C90" />
+                      <View style={{ backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                        <Ionicons name="sparkles" size={18} color="#2563EB" />
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#6A2C90' }}>{selectedIssueType.name}</Text>
+                          <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#2563EB' }}>{selectedIssueType.name}</Text>
                           {selectedIssueType.sla_hours != null && (
                             <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h · Default priority: {selectedIssueType.priority}</Text>
                           )}
@@ -600,16 +600,16 @@ function AdminRaiseTicketModal({
                         </Text>
                         {loadingSubTypes ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }}>
-                            <ActivityIndicator size="small" color="#6A2C90" />
+                            <ActivityIndicator size="small" color="#2563EB" />
                             <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>Loading details…</Text>
                           </View>
                         ) : subTypes.length > 0 ? (
                           selectedSubType ? (
-                            <View style={{ backgroundColor: '#F3ECF9', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                              <Ionicons name="sparkles" size={16} color="#6A2C90" />
+                            <View style={{ backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                              <Ionicons name="sparkles" size={16} color="#2563EB" />
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#6A2C90', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
-                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#6A2C90' }}>{selectedSubType.name}</Text>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
+                                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>{selectedSubType.name}</Text>
                               </View>
                               <TouchableOpacity onPress={() => setSelectedSubType(null)} style={{ padding: 4 }}>
                                 <Ionicons name="close-circle" size={18} color="#94A3B8" />
@@ -648,7 +648,7 @@ function AdminRaiseTicketModal({
                           style={{
                             flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
                             backgroundColor: priority === p.value ? p.color : '#FFFFFF',
-                            borderWidth: 1, borderColor: priority === p.value ? p.color : '#F3ECF9',
+                            borderWidth: 1, borderColor: priority === p.value ? p.color : '#EFF6FF',
                             shadowColor: priority === p.value ? p.color : 'transparent',
                             shadowOpacity: priority === p.value ? 0.25 : 0,
                             shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
@@ -704,7 +704,7 @@ function AdminRaiseTicketModal({
                           flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                           gap: 8, paddingVertical: 12, borderRadius: 12,
                           borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#EEF1F6',
-                          backgroundColor: '#F3ECF9',
+                          backgroundColor: '#EFF6FF',
                         }}
                       >
                         <Ionicons name="camera-outline" size={16} color={VBRAND.purple} />
@@ -717,7 +717,7 @@ function AdminRaiseTicketModal({
                           flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                           gap: 8, paddingVertical: 12, borderRadius: 12,
                           borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#EEF1F6',
-                          backgroundColor: '#F3ECF9',
+                          backgroundColor: '#EFF6FF',
                         }}
                       >
                         <Ionicons name="image-outline" size={16} color={VBRAND.purple} />
@@ -731,7 +731,7 @@ function AdminRaiseTicketModal({
                 {/* Auto-assign info */}
                 {selectedProperty && selectedIssueType && (
                   <View style={{
-                    backgroundColor: '#F3ECF9', borderRadius: 16,
+                    backgroundColor: '#EFF6FF', borderRadius: 16,
                     padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10,
                     borderWidth: 0.5, borderColor: '#EEF1F6',
                   }}>
@@ -823,8 +823,8 @@ function RaiseTicketDropdown({
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: 14, paddingVertical: 14,
           borderRadius: 12, borderWidth: 1,
-          borderColor: value ? '#6A2C90' : '#F3ECF9',
-          backgroundColor: value ? '#F3ECF9' : '#fff',
+          borderColor: value ? '#2563EB' : '#EFF6FF',
+          backgroundColor: value ? '#EFF6FF' : '#fff',
           marginBottom: 12, gap: 10,
           opacity: disabled ? 0.45 : 1,
         }}
@@ -832,7 +832,7 @@ function RaiseTicketDropdown({
         {icon && (
           <View style={{
             width: 28, height: 28, borderRadius: 8,
-            backgroundColor: value ? '#F3ECF9' : '#F3ECF9',
+            backgroundColor: value ? '#EFF6FF' : '#EFF6FF',
             alignItems: 'center', justifyContent: 'center',
           }}>
             <Ionicons name={icon as any} size={15} color={value ? VBRAND.purple : VBRAND.ink400} />
@@ -866,7 +866,7 @@ function RaiseTicketDropdown({
                 <Text style={{ fontSize: 15, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 }}>{placeholder}</Text>
                 <TouchableOpacity
                   onPress={() => setOpen(false)}
-                  style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: '#F3ECF9', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <Ionicons name="close" size={18} color={VBRAND.ink600} />
                 </TouchableOpacity>
@@ -884,7 +884,7 @@ function RaiseTicketDropdown({
                         flexDirection: 'row', alignItems: 'center',
                         paddingHorizontal: 18, paddingVertical: 15,
                         borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6',
-                        backgroundColor: isSelected ? '#F3ECF9' : 'transparent',
+                        backgroundColor: isSelected ? '#EFF6FF' : 'transparent',
                       }}
                     >
                       <Text style={{ flex: 1, fontSize: 14, fontWeight: isSelected ? '700' : '500', color: isSelected ? VBRAND.purpleDeep : VBRAND.ink900, letterSpacing: -0.1 }}>
@@ -915,7 +915,7 @@ function StepHeader({ step, title, done, doneLabel }: { step: number; title: str
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
       <View style={{
         width: 28, height: 28, borderRadius: 9,
-        backgroundColor: done ? VBRAND.purple : '#F3ECF9',
+        backgroundColor: done ? VBRAND.purple : '#EFF6FF',
         alignItems: 'center', justifyContent: 'center',
         shadowColor: done ? VBRAND.purple : 'transparent',
         shadowOpacity: done ? 0.3 : 0,
@@ -1166,9 +1166,9 @@ export default function TicketsScreen({ navigation }: any) {
                       flexDirection: 'row', alignItems: 'center', gap: 6,
                       paddingHorizontal: 14, paddingVertical: 9,
                       borderRadius: 999,
-                      backgroundColor: active ? '#6A2C90' : '#F1F3F9',
+                      backgroundColor: active ? '#2563EB' : '#F1F3F9',
                       borderWidth: 1,
-                      borderColor: active ? '#6A2C90' : '#F1F3F9',
+                      borderColor: active ? '#2563EB' : '#F1F3F9',
                     }}
                   >
                     <Ionicons name={tab.icon as any} size={13} color={active ? '#fff' : VBRAND.ink600} />
@@ -1287,7 +1287,7 @@ export default function TicketsScreen({ navigation }: any) {
         {(!isAdmin || mainTab === 'list') && (
           loading ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#F3ECF9', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
                 <ActivityIndicator size="large" color={VBRAND.purple} />
               </View>
               <Text style={{ fontSize: 13, color: VBRAND.ink500, fontWeight: '600' }}>Loading tickets…</Text>
@@ -1351,7 +1351,7 @@ export default function TicketsScreen({ navigation }: any) {
 
           return (
             <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 14 }}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6A2C90']} />}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />}
             >
               {/* KPI cards row 1 */}
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -1436,7 +1436,7 @@ export default function TicketsScreen({ navigation }: any) {
         {/* ── REGULAR MAINTENANCE TAB ───────────────────────────────────── */}
         {isAdmin && mainTab === 'regular' && (
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 12 }}
-            refreshControl={<RefreshControl refreshing={regularLoading} onRefresh={loadRegularRules} colors={['#6A2C90']} />}
+            refreshControl={<RefreshControl refreshing={regularLoading} onRefresh={loadRegularRules} colors={['#2563EB']} />}
           >
             {/* Info banner */}
             <View style={{ backgroundColor:'#EEF3FF', borderRadius:16, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8 }}>
@@ -1448,7 +1448,7 @@ export default function TicketsScreen({ navigation }: any) {
 
             {regularLoading ? (
               <View style={{ alignItems:'center', paddingVertical:40 }}>
-                <ActivityIndicator color="#6A2C90" />
+                <ActivityIndicator color="#2563EB" />
               </View>
             ) : regularRules.length === 0 ? (
               <View style={{ alignItems:'center', paddingVertical:60 }}>
@@ -1464,7 +1464,7 @@ export default function TicketsScreen({ navigation }: any) {
                   <View style={{ flex:1 }}>
                     <Text style={{ fontSize:14, fontWeight:'800', color:'#0F172A' }}>{r.name || r.title || '—'}</Text>
                     {r.frequency && <Text style={{ fontSize:12, color:'#94A3B8', marginTop:2 }}>{r.frequency}</Text>}
-                    {r.issue_type && <Text style={{ fontSize:12, color:'#6A2C90', marginTop:2 }}>{r.issue_type}</Text>}
+                    {r.issue_type && <Text style={{ fontSize:12, color:'#2563EB', marginTop:2 }}>{r.issue_type}</Text>}
                   </View>
                   <View style={{ backgroundColor: r.is_active !== false ? '#DCFCE7' : '#F3F4F6', borderRadius:99, paddingHorizontal:10, paddingVertical:4 }}>
                     <Text style={{ fontSize:11, fontWeight:'700', color: r.is_active !== false ? '#16A34A' : '#64748B' }}>
@@ -1489,7 +1489,7 @@ export default function TicketsScreen({ navigation }: any) {
 
             {!issueTypesLoaded ? (
               <View style={{ alignItems:'center', paddingVertical:40 }}>
-                <ActivityIndicator color="#6A2C90" />
+                <ActivityIndicator color="#2563EB" />
               </View>
             ) : issueTypes.length === 0 ? (
               <View style={{ alignItems:'center', paddingVertical:40, gap:8 }}>
@@ -1515,7 +1515,7 @@ export default function TicketsScreen({ navigation }: any) {
                       </Text>
                     </View>
                     {it.sla_hours != null && (
-                      <Text style={{ fontSize:10, color:'#6A2C90', fontWeight:'600' }}>SLA: {it.sla_hours}h</Text>
+                      <Text style={{ fontSize:10, color:'#2563EB', fontWeight:'600' }}>SLA: {it.sla_hours}h</Text>
                     )}
                   </View>
                 </View>
@@ -1528,8 +1528,8 @@ export default function TicketsScreen({ navigation }: any) {
         {isAdmin && mainTab === 'ai' && (
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 14 }}>
             {/* Header card */}
-            <View style={{ backgroundColor:'#F3ECF9', borderRadius:16, padding:16, borderWidth:1, borderColor:'#EEF1F6', alignItems:'center', gap:8 }}>
-              <Ionicons name="sparkles" size={32} color="#6A2C90" />
+            <View style={{ backgroundColor:'#EFF6FF', borderRadius:16, padding:16, borderWidth:1, borderColor:'#EEF1F6', alignItems:'center', gap:8 }}>
+              <Ionicons name="sparkles" size={32} color="#2563EB" />
               <Text style={{ fontSize:16, fontWeight:'800', color:'#0F172A', textAlign:'center' }}>AI Ticket Insights</Text>
               <Text style={{ fontSize:12, color:'#64748B', textAlign:'center', lineHeight:18 }}>
                 Analyse patterns across {tickets.length} tickets to find top issues, predict maintenance needs, and surface actionable insights.
@@ -1569,7 +1569,7 @@ export default function TicketsScreen({ navigation }: any) {
                 }}
                 style={{
                   flexDirection:'row', alignItems:'center', gap:8,
-                  backgroundColor:'#6A2C90', borderRadius:99, paddingHorizontal:20, paddingVertical:10,
+                  backgroundColor:'#2563EB', borderRadius:99, paddingHorizontal:20, paddingVertical:10,
                   opacity: aiLoading ? 0.6 : 1,
                 }}
               >
@@ -1587,12 +1587,12 @@ export default function TicketsScreen({ navigation }: any) {
             {aiAnalysis && (
               <View style={{ backgroundColor:'#FFFFFF', borderRadius:16, padding:16, borderWidth:1, borderColor:'#EEF1F6' }}>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:6, marginBottom:12 }}>
-                  <Ionicons name="bulb-outline" size={16} color="#6A2C90" />
+                  <Ionicons name="bulb-outline" size={16} color="#2563EB" />
                   <Text style={{ fontSize:13, fontWeight:'800', color:'#0F172A' }}>Insights</Text>
                 </View>
                 {aiAnalysis.split('\n').filter(l=>l.trim()).map((line, i) => (
                   <View key={i} style={{ flexDirection:'row', alignItems:'flex-start', gap:8, marginBottom:10 }}>
-                    <View style={{ width:6, height:6, borderRadius:3, backgroundColor:'#6A2C90', marginTop:6 }} />
+                    <View style={{ width:6, height:6, borderRadius:3, backgroundColor:'#2563EB', marginTop:6 }} />
                     <Text style={{ flex:1, fontSize:13, color:'#0F172A', lineHeight:20 }}>{line.replace(/^[\d•\-\*\.]+\s*/,'')}</Text>
                   </View>
                 ))}
@@ -1610,7 +1610,7 @@ export default function TicketsScreen({ navigation }: any) {
               ].map(s => (
                 <View key={s.label} style={{ flexDirection:'row', justifyContent:'space-between', paddingVertical:6, borderBottomWidth:1, borderBottomColor:'rgba(0,0,0,0.06)' }}>
                   <Text style={{ fontSize:12, color:'#64748B' }}>{s.label}</Text>
-                  <Text style={{ fontSize:12, fontWeight:'800', color:'#6A2C90' }}>{s.value}</Text>
+                  <Text style={{ fontSize:12, fontWeight:'800', color:'#2563EB' }}>{s.value}</Text>
                 </View>
               ))}
             </View>

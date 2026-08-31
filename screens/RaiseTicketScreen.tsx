@@ -527,7 +527,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
     return (
       <GlassBackground>
         <SafeAreaView style={[styles.flex, { alignItems: 'center', justifyContent: 'center' }]}>
-          <ActivityIndicator size="large" color="#6A2C90" />
+          <ActivityIndicator size="large" color="#2563EB" />
           <Text style={{ marginTop: 12, color: '#64748B' }}>Loading your profile…</Text>
         </SafeAreaView>
       </GlassBackground>
@@ -630,7 +630,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
               {/* ── TRANSCRIBING */}
               {screenState === 'transcribing' && (
                 <View style={styles.centerSection}>
-                  <ActivityIndicator size="large" color="#6A2C90" />
+                  <ActivityIndicator size="large" color="#2563EB" />
                   <Text style={styles.processingTitle}>Transcribing your voice…</Text>
                   <Text style={styles.processingSubtext}>Analysing and classifying issue</Text>
                 </View>
@@ -659,8 +659,8 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                               {classification.priority.toUpperCase()}
                             </Text>
                           </View>
-                          <View style={[styles.badge, { backgroundColor: '#6A2C9018' }]}>
-                            <Text style={[styles.badgeText, { color: '#6A2C90' }]}>
+                          <View style={[styles.badge, { backgroundColor: '#2563EB18' }]}>
+                            <Text style={[styles.badgeText, { color: '#2563EB' }]}>
                               {issueTypes.find((t: { id: string; name: string }) => t.id === selectedIssueTypeId)?.name?.toUpperCase() || classification.title.toUpperCase()}
                             </Text>
                           </View>
@@ -718,11 +718,11 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                     ) : (
                       <View style={styles.photoButtonRow}>
                         <TouchableOpacity style={styles.photoBtn} onPress={handleTakePhoto}>
-                          <Ionicons name="camera" size={22} color="#6A2C90" />
+                          <Ionicons name="camera" size={22} color="#2563EB" />
                           <Text style={styles.photoBtnText}>Camera</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.photoBtn} onPress={handlePickPhoto}>
-                          <Ionicons name="image" size={22} color="#6A2C90" />
+                          <Ionicons name="image" size={22} color="#2563EB" />
                           <Text style={styles.photoBtnText}>Gallery</Text>
                         </TouchableOpacity>
                       </View>
@@ -736,7 +736,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                       onPress={handleReset}
                       disabled={screenState === 'submitting'}
                     >
-                      <Ionicons name="refresh" size={18} color="#6A2C90" />
+                      <Ionicons name="refresh" size={18} color="#2563EB" />
                       <Text style={styles.redoBtnLabel}>Redo</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -789,7 +789,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
                       style={[styles.redoBtn, { marginTop: 24, flex: 0, paddingHorizontal: 32 }]}
                       onPress={handleReset}
                     >
-                      <Ionicons name="refresh" size={18} color="#6A2C90" />
+                      <Ionicons name="refresh" size={18} color="#2563EB" />
                       <Text style={styles.redoBtnLabel}>Try Again</Text>
                     </TouchableOpacity>
                   </View>
@@ -805,7 +805,7 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 
-const INDIGO = '#6A2C90';
+const INDIGO = '#2563EB';
 const RED    = '#DC2626';
 
 /** Soft elevation used across cards/panels (design-language shadow token). */
@@ -827,7 +827,7 @@ const styles = StyleSheet.create({
   },
   backBtn:        { marginRight: 12, padding: 4 },
   headerTitle:    { fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
-  headerLocation: { fontSize: 12, color: '#6A2C90', marginTop: 1, fontWeight: '600' },
+  headerLocation: { fontSize: 12, color: '#2563EB', marginTop: 1, fontWeight: '600' },
 
   tabRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4, gap: 10 },
   tab: {
@@ -912,7 +912,7 @@ const styles = StyleSheet.create({
   photoBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 14, borderRadius: 12,
-    borderWidth: 1, borderColor: '#E4D3EF', backgroundColor: '#F3ECF9',
+    borderWidth: 1, borderColor: '#DBEAFE', backgroundColor: '#EFF6FF',
   },
   photoBtnText:   { fontSize: 14, fontWeight: '700', color: INDIGO },
   photoPreview:   { width: '100%', height: 180, borderRadius: 12, marginBottom: 10 },
