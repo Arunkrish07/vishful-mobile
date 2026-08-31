@@ -42,6 +42,7 @@ import TeamScreen from './screens/TeamScreen';
 import MarketScreen from './screens/MarketScreen';
 import WhatsAppLogsScreen from './screens/WhatsAppLogsScreen';
 import AuditLogsScreen from './screens/AuditLogsScreen';
+import FloatingAIAssistant from './screens/Floatingaiassistant';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
 
@@ -360,7 +361,7 @@ function MainDrawer() {
   if (isPermissionsLoading) {
     return (
       <LinearGradient
-        colors={['#EDE4F8', '#F2EAF6', '#FBF0E8']}
+        colors={['#F8FAFC', '#F4F6FB', '#EFF6FF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
@@ -492,21 +493,27 @@ function TenantTabNavigator() {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#1D4ED8',
-        tabBarInactiveTintColor: '#556274',
+        tabBarInactiveTintColor: '#71809A',
+        tabBarActiveBackgroundColor: '#EFF6FF',
+        tabBarItemStyle: {
+          borderRadius: 16,
+          marginHorizontal: 4,
+          marginVertical: 4,
+        },
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: '#FFFFFFF0',
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
           height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
+          paddingBottom: 6,
+          paddingTop: 4,
           elevation: 0,
           shadowColor: '#0F172A',
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
+          shadowOpacity: 0.08,
+          shadowRadius: 14,
           shadowOffset: { width: 0, height: -2 },
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: -2 },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 1 },
       })}
     >
       <TenantTab.Screen name="Home" component={TenantHomeScreen} />
@@ -570,157 +577,12 @@ function AIMarkdown({ text, style }: { text: string; style?: any }) {
     </View>
   );
 }
-function FloatingAIAssistant({ raised }: { raised?: boolean }) {
-  const { user } = useAuth();
-  const [open, setOpen]         = useState(false);
-  const [messages, setMessages] = useState<AIMessage[]>([]);
-  const [input, setInput]       = useState('');
-  const [busy, setBusy]         = useState(false);
-  const scrollRef               = useRef<any>(null);
-  const pulseAnim               = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!open) {
-      Animated.loop(Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,   duration: 1000, useNativeDriver: true }),
-      ])).start();
-    } else { pulseAnim.stopAnimation(); pulseAnim.setValue(1); }
-  }, [open]);
-
-  useEffect(() => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }, [messages, busy]);
-
-  useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages([{ role: 'assistant', content: "Hi! I'm your Vishful AI assistant. I have live access to your tenants, tickets, properties and EB data.\n\nAsk me anything!" }]);
-    }
-  }, [open]);
-
-  const handleSend = async (text?: string) => {
-    const q = (text || input).trim();
-    if (!q || busy) return;
-    setInput('');
-    const hist: AIMessage[] = [...messages, { role: 'user', content: q }];
-    setMessages(hist);
-    setBusy(true);
-    try {
-      const { client: cc, api: ca } = require('./lib/convexApi');
-      const res = await cc.action((ca as any).aiAssistant.askAssistant, { question: q, history: hist.slice(-6).map((m: AIMessage) => ({ role: m.role, content: m.content })) });
-      setMessages(p => [...p, { role: 'assistant', content: res.answer || 'No response.' }]);
-    } catch (e: any) {
-      setMessages(p => [...p, { role: 'assistant', content: `Error: ${e.message || 'Could not reach AI.'}` }]);
-    }
-    setBusy(false);
-  };
-
-  const role = (user as any)?.role || '';
-  if (role === 'tenant') return null;
-
-  const AS = StyleSheet.create({
-    fab: { position: 'absolute', bottom: 28, right: 20, zIndex: 999, shadowColor: '#2563EB', shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
-    fabBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
-    panel: { width: AI_W, height: Dimensions.get('window').height, backgroundColor: '#F8FAFC' },
-    hdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: 'rgba(255,255,255,0.95)', borderBottomWidth: 1, borderBottomColor: 'rgba(123,47,190,0.1)' },
-    avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
-    bubble: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10, gap: 6 },
-    bInner: { maxWidth: AI_W * 0.78, borderRadius: 18, padding: 12 },
-    bUser: { backgroundColor: '#2563EB', borderBottomRightRadius: 4 },
-    bBot: { backgroundColor: 'rgba(255,255,255,0.95)', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: 'rgba(123,47,190,0.1)' },
-    inpArea: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.95)', borderTopWidth: 1, borderTopColor: 'rgba(123,47,190,0.1)' },
-    inp: { flex: 1, minHeight: 42, maxHeight: 120, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#111827', textAlignVertical: 'top' },
-    send: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
-  });
-
-  return (
-    <>
-      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={AS.panel}>
-          <View style={{ flex: 1 }}>
-              {/* Header */}
-              <View style={AS.hdr}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={AS.avatar}><Ionicons name="sparkles" size={16} color="#fff" /></View>
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>AI Assistant</Text>
-                    <Text style={{ fontSize: 11, color: '#9B8BAE' }}>Ask about your data</Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                  {messages.length > 1 && (
-                    <TouchableOpacity onPress={() => setMessages([])} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(123,47,190,0.07)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
-                      <Ionicons name="trash-outline" size={14} color="#9B8BAE" />
-                      <Text style={{ fontSize: 11, color: '#9B8BAE', fontWeight: '600' }}>Clear</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity onPress={() => setOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(123,47,190,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="close" size={20} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              {/* Messages */}
-              <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 8 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {messages.map((msg, i) => (
-                  <View key={i} style={[AS.bubble, msg.role === 'user' ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
-                    {msg.role === 'assistant' && <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginBottom: 2, flexShrink: 0 }}><Ionicons name="sparkles" size={10} color="#fff" /></View>}
-                    <View style={[AS.bInner, msg.role === 'user' ? AS.bUser : AS.bBot]}>
-                      {msg.role === 'user'
-                        ? <Text style={{ fontSize: 14, color: '#fff', lineHeight: 20 }}>{msg.content}</Text>
-                        : <AIMarkdown text={msg.content} style={{ fontSize: 14, color: '#111827', lineHeight: 20 }} />}
-                    </View>
-                  </View>
-                ))}
-                {busy && (
-                  <View style={[AS.bubble, { justifyContent: 'flex-start' }]}>
-                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}><Ionicons name="sparkles" size={10} color="#fff" /></View>
-                    <View style={[AS.bInner, AS.bBot, { paddingVertical: 12 }]}>
-                      <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-                        <ActivityIndicator size="small" color="#2563EB" />
-                        <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '600' }}>Thinking…</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-                {messages.length === 1 && !busy && (
-                  <View style={{ marginTop: 12 }}>
-                    <Text style={{ fontSize: 11, color: '#9B8BAE', fontWeight: '700', marginBottom: 8 }}>SUGGESTED QUESTIONS</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                      {AI_SUGGESTIONS.map((s, i) => (
-                        <TouchableOpacity key={i} onPress={() => handleSend(s)} style={{ backgroundColor: 'rgba(123,47,190,0.08)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(123,47,190,0.15)' }}>
-                          <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '600' }}>{s}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </ScrollView>
-              {/* Input */}
-              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={8}>
-                <View style={AS.inpArea}>
-                  <TextInput style={AS.inp} value={input} onChangeText={setInput} placeholder="Ask anything about your data…" placeholderTextColor="#9B8BAE" multiline maxLength={500} editable={!busy} onSubmitEditing={() => handleSend()} returnKeyType="send" blurOnSubmit />
-                  <TouchableOpacity onPress={() => handleSend()} disabled={!input.trim() || busy} style={[AS.send, (!input.trim() || busy) && { opacity: 0.4 }]}>
-                    <Ionicons name="send" size={16} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </KeyboardAvoidingView>
-            </View>
-        </View>
-      </Modal>
-      {!open && (
-        <Animated.View style={[AS.fab, raised && { bottom: 78 }, { transform: [{ scale: pulseAnim }] }]}>
-          <TouchableOpacity onPress={() => setOpen(true)} style={AS.fabBtn} activeOpacity={0.85}>
-            <Ionicons name="sparkles" size={24} color="#fff" />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-    </>
-  );
-}
 
 // ── Bottom nav rail — exact match to vishful-mobile-app nav-rail ───────────
 const NAV_UI = {
-  brand: '#1D4ED8',
+  brand: '#4F46E5',
   accent: '#2563EB',
-  idle: '#556274',
+  idle: '#8A94A6',
   muted: '#6B7280',
   line: '#E5E7EB',
   trackBg: 'rgba(255,255,255,0.97)',
@@ -754,8 +616,8 @@ const ADMIN_NAV_RAIL: NavItem[] = [
   { name: 'Market AI',        label: 'Market AI',     icon: 'sparkles-outline',        module: 'Market AI' },
   { name: 'WhatsApp Logs',    label: 'WhatsApp',      icon: 'logo-whatsapp',           module: 'WhatsApp Logs' },
   { name: 'Audit Logs',       label: 'Audit Logs',    icon: 'document-text-outline',   module: 'Audit Logs' },
-  { name: 'Settings',         label: 'Settings',      icon: 'settings-outline',        always: true },
   { name: 'Team',             label: 'Team',          icon: 'briefcase-outline',       module: 'Team' },
+  { name: 'Settings',         label: 'Settings',      icon: 'settings-outline',        always: true },
 ];
 
 function AdminFloatingNav({ navRef }: { navRef: any }) {
@@ -801,7 +663,7 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
   return (
     <View
       pointerEvents="box-none"
-      style={[NAV.rail, { paddingBottom: Math.max(insets.bottom, 8) }]}
+      style={[NAV.rail, { bottom: Math.max(insets.bottom, 10) }]}
     >
       <ScrollView
         ref={scrollRef}
@@ -844,44 +706,35 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
 const NAV = StyleSheet.create({
   rail: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 12,
+    right: 12,
     bottom: 0,
     zIndex: 900,
-    elevation: 24,
-    backgroundColor: NAV_UI.trackBg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: NAV_UI.line,
+    elevation: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 26,
     shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
   },
   track: {
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingTop: 4,
-    height: 50,
+    paddingVertical: 8,
     gap: 2,
   },
   item: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 68,
+    minWidth: 58,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 18,
+    paddingVertical: 7,
+    borderRadius: 16,
     position: 'relative',
   },
   itemOn: {
-    backgroundColor: NAV_UI.onBg,
-    shadowColor: '#2563EB',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(147,197,253,0.55)',
+    backgroundColor: '#EEF0FF',
   },
   label: {
     marginTop: 2,
