@@ -8,6 +8,27 @@ import {
 } from "./lib/supabaseAdmin";
 import { getExitMonthEbBreakdown } from "./exiteb";
 
+// Guard: a gender-restricted apartment (gender_allowed 'male'/'female') must not
+// take a tenant of the other gender. 'both'/null apartments and null-gender tenants
+// are treated as unrestricted. Enforced here on the server so a bypassed or
+// out-of-date UI still cannot write a cross-gender allotment (the web app only
+// enforces this client-side — this closes that gap for both apps' shared data).
+async function assertGenderCompatible(tenantId?: string, bedId?: string): Promise<void> {
+  if (!tenantId || !bedId) return;
+  const sb = getSupabase();
+  const beds = await safeList(sb.from("beds").select("apartment_id").eq("id", bedId));
+  const apartmentId = (beds[0] as any)?.apartment_id;
+  if (!apartmentId) return;
+  const apts = await safeList(sb.from("apartments").select("gender_allowed").eq("id", apartmentId));
+  const ga = String((apts[0] as any)?.gender_allowed || "").toLowerCase();
+  if (!ga || ga === "both") return; // apartment accepts any gender
+  const tenants = await safeList(sb.from("tenants").select("gender").eq("id", tenantId));
+  const tg = String((tenants[0] as any)?.gender || "").toLowerCase();
+  if (tg && tg !== ga) {
+    throw new Error(`Gender mismatch: this ${ga}-only room cannot be allotted to a ${tg} tenant.`);
+  }
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 const WORK_START_MINS = 9 * 60 + 30;
@@ -1542,6 +1563,7 @@ export const createAllotment = action({
   args: { data: v.any() },
   returns: v.any(),
   handler: async (_ctx, { data }) => {
+    await assertGenderCompatible(data.tenant_id, data.bed_id);
     return await insertRow("tenant_allotments", data);
   },
 });
@@ -1551,7 +1573,11 @@ export const createAllotment = action({
 export const updateAllotmentStatus = action({
   args: { allotmentId: v.string(), status: v.string(), bedId: v.optional(v.string()), tenantId: v.optional(v.string()) },
   returns: v.any(),
-  handler: async (_ctx, { allotmentId, status }) => {
+  handler: async (_ctx, { allotmentId, status, bedId, tenantId }) => {
+    // Only guard when moving into an active (occupying) state with both ids known.
+    if (["Staying", "On-Notice", "Booked"].includes(status)) {
+      await assertGenderCompatible(tenantId, bedId);
+    }
     return await updateRow("tenant_allotments", allotmentId, { staying_status: status });
   },
 });
@@ -1579,6 +1605,10 @@ export const switchRoom = action({
   args: { data: v.any() },
   returns: v.any(),
   handler: async (_ctx, { data }) => {
+    // Resolve the tenant from the allotment and guard the destination bed's gender.
+    const sb = getSupabase();
+    const al = await safeList(sb.from("tenant_allotments").select("tenant_id").eq("id", data.allotmentId));
+    await assertGenderCompatible((al[0] as any)?.tenant_id, data.newBedId);
     return await updateRow("tenant_allotments", data.allotmentId, {
       bed_id:       data.newBedId,
       apartment_id: data.newApartmentId || undefined,

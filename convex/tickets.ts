@@ -1413,6 +1413,66 @@ export const getIssueTypes = action({
   },
 });
 
+// Lightweight asset-type list for the category edit multi-select.
+export const listAssetTypesLite = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    return await safeList(
+      sb.from("asset_types").select("id, name").eq("organization_id", ORG_ID).order("name", { ascending: true })
+    );
+  },
+});
+
+// Edit a ticket category (issue type) + replace its linked asset types (web parity).
+export const updateIssueType = action({
+  args: {
+    issueTypeId: v.string(),
+    name: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    priority: v.optional(v.string()),
+    slaHours: v.optional(v.number()),
+    assetTypeIds: v.optional(v.array(v.string())),
+  },
+  returns: v.any(),
+  handler: async (_ctx, args) => {
+    const sb = getSupabase();
+    const patch: any = {};
+    if (args.name !== undefined) patch.name = args.name;
+    if (args.icon !== undefined) patch.icon = args.icon;
+    if (args.priority !== undefined) patch.priority = args.priority;
+    if (args.slaHours !== undefined) patch.sla_hours = args.slaHours;
+    if (Object.keys(patch).length > 0) {
+      const { error } = await sb.from("issue_types").update(patch).eq("id", args.issueTypeId).eq("organization_id", ORG_ID);
+      if (error) throw new Error(`Update category failed: ${error.message}`);
+    }
+    // Replace asset-type links: delete all for this category, re-insert the selection.
+    if (args.assetTypeIds !== undefined) {
+      await sb.from("issue_type_asset_types").delete().eq("issue_type_id", args.issueTypeId).eq("organization_id", ORG_ID);
+      if (args.assetTypeIds.length > 0) {
+        const rows = args.assetTypeIds.map((atId) => ({ organization_id: ORG_ID, issue_type_id: args.issueTypeId, asset_type_id: atId }));
+        const { error } = await sb.from("issue_type_asset_types").insert(rows);
+        if (error) throw new Error(`Link asset types failed: ${error.message}`);
+      }
+    }
+    return { success: true };
+  },
+});
+
+// Delete a ticket category — remove its asset-type links first, then the category.
+export const deleteIssueType = action({
+  args: { issueTypeId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { issueTypeId }) => {
+    const sb = getSupabase();
+    await sb.from("issue_type_asset_types").delete().eq("issue_type_id", issueTypeId).eq("organization_id", ORG_ID);
+    const { error } = await sb.from("issue_types").delete().eq("id", issueTypeId).eq("organization_id", ORG_ID);
+    if (error) throw new Error(`Delete category failed: ${error.message}`);
+    return { success: true };
+  },
+});
+
 // Regular (recurring) maintenance rules — powers the admin Tickets → "Regular" tab.
 // Reads the real `regular_maintenance_rules` table and resolves the issue-type name
 // for display. (Previously this tab wrongly loaded issue types as stand-in "rules".)
