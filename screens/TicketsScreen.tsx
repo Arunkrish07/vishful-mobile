@@ -962,6 +962,14 @@ export default function TicketsScreen({ navigation }: any) {
   // Extra data for admin tabs
   const [issueTypes,     setIssueTypes]    = useState<IssueType[]>([]);
   const [issueTypesLoaded, setIssueTypesLoaded] = useState(false);
+  // Category (issue-type) edit modal
+  const [assetTypesLite, setAssetTypesLite] = useState<{ id: string; name: string }[]>([]);
+  const [editCat, setEditCat]     = useState<any | null>(null);
+  const [catName, setCatName]     = useState('');
+  const [catPriority, setCatPriority] = useState('medium');
+  const [catSla, setCatSla]       = useState('');
+  const [catAssetIds, setCatAssetIds] = useState<string[]>([]);
+  const [savingCat, setSavingCat] = useState(false);
   const [regularRules,   setRegularRules]  = useState<any[]>([]);
   const [regularLoading, setRegularLoading] = useState(false);
   const [aiAnalysis,     setAiAnalysis]    = useState<string | null>(null);
@@ -996,6 +1004,57 @@ export default function TicketsScreen({ navigation }: any) {
       setIssueTypes(types);
     } catch {} finally { setIssueTypesLoaded(true); }
   }, [issueTypes.length]);
+
+  // Always-refetch (loadIssueTypes short-circuits once loaded) — used after edit/delete.
+  const refreshCategories = useCallback(async () => {
+    try { setIssueTypes(await fetchIssueTypes()); } catch {}
+  }, []);
+
+  const openEditCat = async (it: any) => {
+    setEditCat(it);
+    setCatName(it.name || '');
+    setCatPriority(it.priority || 'medium');
+    setCatSla(it.sla_hours != null ? String(it.sla_hours) : '');
+    setCatAssetIds((it.issue_type_asset_types || []).map((l: any) => l.asset_type_id));
+    if (assetTypesLite.length === 0) {
+      try {
+        const { fetchAssetTypesLite } = await import('../services/ticketService');
+        setAssetTypesLite(await fetchAssetTypesLite());
+      } catch {}
+    }
+  };
+
+  const saveCat = async () => {
+    if (!editCat || !catName.trim()) return;
+    setSavingCat(true);
+    try {
+      const { updateIssueType } = await import('../services/ticketService');
+      await updateIssueType({
+        issueTypeId: editCat.id, name: catName.trim(), priority: catPriority,
+        slaHours: catSla ? Number(catSla) : undefined, assetTypeIds: catAssetIds,
+      });
+      setEditCat(null);
+      await refreshCategories();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to save category');
+    } finally { setSavingCat(false); }
+  };
+
+  const confirmDeleteCat = (it: any) => {
+    const doDelete = async () => {
+      try {
+        const { deleteIssueType } = await import('../services/ticketService');
+        await deleteIssueType(it.id);
+        await refreshCategories();
+      } catch (e: any) { Alert.alert('Error', e?.message || 'Failed to delete category'); }
+    };
+    // react-native-web's Alert.alert ignores button onPress → branch to window.confirm.
+    if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Delete category "${it.name}"?`)) doDelete(); }
+    else Alert.alert('Delete category', `Delete "${it.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: doDelete },
+    ]);
+  };
 
   // Load regular maintenance rules for the Regular tab
   const loadRegularRules = useCallback(async () => {
@@ -1483,7 +1542,7 @@ export default function TicketsScreen({ navigation }: any) {
             <View style={{ backgroundColor:'#EEF3FF', borderRadius:16, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8, marginBottom:4 }}>
               <Ionicons name="pricetags-outline" size={16} color="#1D4ED8" style={{ marginTop:1 }} />
               <Text style={{ flex:1, fontSize:12, color:'#64748B', lineHeight:18 }}>
-                Ticket categories (issue types) and their sub-types. Manage them in the web app Settings → Ticket Categories.
+                Edit a category's name, priority, SLA or linked asset types below. Creating new categories and sub-types is done in the web app.
               </Text>
             </View>
 
@@ -1525,6 +1584,16 @@ export default function TicketsScreen({ navigation }: any) {
                       <Text style={{ fontSize:10, color:'#2563EB', fontWeight:'600' }}>SLA: {it.sla_hours}h</Text>
                     )}
                   </View>
+                </View>
+                <View style={{ flexDirection:'row', gap:8, marginTop:12, justifyContent:'flex-end' }}>
+                  <TouchableOpacity onPress={() => openEditCat(it)} style={{ flexDirection:'row', alignItems:'center', gap:4, backgroundColor:'#EEF3FF', borderRadius:10, paddingHorizontal:12, paddingVertical:7 }}>
+                    <Ionicons name="create-outline" size={14} color="#2563EB" />
+                    <Text style={{ fontSize:12, fontWeight:'700', color:'#2563EB' }}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => confirmDeleteCat(it)} style={{ flexDirection:'row', alignItems:'center', gap:4, backgroundColor:'#FEF2F2', borderRadius:10, paddingHorizontal:12, paddingVertical:7 }}>
+                    <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                    <Text style={{ fontSize:12, fontWeight:'700', color:'#DC2626' }}>Delete</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ))}
@@ -1633,6 +1702,57 @@ export default function TicketsScreen({ navigation }: any) {
           onCreated={load}
           user={user}
         />
+
+        {/* ── Category Edit Modal ───────────────────────────────────────── */}
+        <Modal visible={!!editCat} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditCat(null)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:16, borderBottomWidth:1, borderBottomColor:'#E2E8F0' }}>
+              <Text style={{ fontSize:16, fontWeight:'800', color:'#0F172A' }}>Edit Category</Text>
+              <TouchableOpacity onPress={() => setEditCat(null)}><Ionicons name="close" size={24} color="#64748B" /></TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding:16, gap:18 }}>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>NAME</Text>
+                <TextInput value={catName} onChangeText={setCatName} placeholder="Category name" style={{ backgroundColor:'#fff', borderWidth:1, borderColor:'#E2E8F0', borderRadius:10, padding:12, fontSize:14, color:'#0F172A' }} />
+              </View>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>PRIORITY</Text>
+                <View style={{ flexDirection:'row', gap:8, flexWrap:'wrap' }}>
+                  {['low','medium','high','critical'].map(p => (
+                    <TouchableOpacity key={p} onPress={() => setCatPriority(p)} style={{ paddingHorizontal:14, paddingVertical:8, borderRadius:10, backgroundColor: catPriority===p ? '#2563EB' : '#EEF1F6' }}>
+                      <Text style={{ fontSize:12, fontWeight:'700', color: catPriority===p ? '#fff' : '#64748B' }}>{p.toUpperCase()}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>SLA HOURS</Text>
+                <TextInput value={catSla} onChangeText={setCatSla} keyboardType="number-pad" placeholder="e.g. 24" style={{ backgroundColor:'#fff', borderWidth:1, borderColor:'#E2E8F0', borderRadius:10, padding:12, fontSize:14, color:'#0F172A' }} />
+              </View>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>LINKED ASSET TYPES</Text>
+                <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8 }}>
+                  {assetTypesLite.length === 0 ? (
+                    <Text style={{ fontSize:12, color:'#94A3B8' }}>Loading…</Text>
+                  ) : assetTypesLite.map(at => {
+                    const on = catAssetIds.includes(at.id);
+                    return (
+                      <TouchableOpacity key={at.id} onPress={() => setCatAssetIds(on ? catAssetIds.filter(x=>x!==at.id) : [...catAssetIds, at.id])} style={{ flexDirection:'row', alignItems:'center', gap:4, paddingHorizontal:10, paddingVertical:7, borderRadius:99, backgroundColor: on ? '#EEF3FF' : '#F1F5F9', borderWidth:1, borderColor: on ? '#2563EB' : 'transparent' }}>
+                        {on && <Ionicons name="checkmark" size={12} color="#2563EB" />}
+                        <Text style={{ fontSize:12, fontWeight:'600', color: on ? '#2563EB' : '#64748B' }}>{at.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </ScrollView>
+            <View style={{ padding:16, borderTopWidth:1, borderTopColor:'#E2E8F0' }}>
+              <TouchableOpacity onPress={saveCat} disabled={savingCat || !catName.trim()} style={{ backgroundColor: (savingCat || !catName.trim()) ? '#93C5FD' : '#2563EB', borderRadius:12, padding:14, alignItems:'center' }}>
+                <Text style={{ color:'#fff', fontSize:15, fontWeight:'800' }}>{savingCat ? 'Saving…' : 'Save Changes'}</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </Modal>
 
         {/* ── Admin Approval Modal ──────────────────────────────────────── */}
         <Modal visible={showApprovalModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowApprovalModal(false)}>
