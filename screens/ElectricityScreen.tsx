@@ -252,6 +252,7 @@ const TABS = [
   { key: 'current-eb',  label: 'Current EB',     icon: 'speedometer-outline' },
   { key: 'rates',       label: 'EB Rates',       icon: 'pricetag-outline'    },
   { key: 'eb-payments', label: 'EB Payments',    icon: 'card-outline'        },
+  { key: 'eb-profit',   label: 'EB Profit',      icon: 'trending-up-outline' },
   { key: 'analytics',   label: 'Analytics',      icon: 'bar-chart-outline'   },
 ];
 
@@ -330,6 +331,31 @@ function mmmYY(s: string | null | undefined): string {
     if (isNaN(y) || isNaN(m) || m < 0 || m > 11) return s;
     return MON[m] + String(y).slice(2);
   } catch { return s; }
+}
+
+// "YYYY-MM" → display label "MMM yy" (e.g. "2026-08" → "Aug 26"), for EB Profit rows.
+function ymLabel(ym: string): string {
+  const y = parseInt(ym.slice(0, 4));
+  const m = parseInt(ym.slice(5, 7)) - 1;
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (isNaN(y) || isNaN(m) || m < 0 || m > 11) return ym;
+  return `${MON[m]} ${String(y).slice(2)}`;
+}
+
+// List of "YYYY-MM" calendar months from start..end (inclusive), for apportioning a
+// bi-monthly EB board bill across the months it spans (matches the web EB Profit calc).
+function ymsBetween(startDate: string, endDate: string): string[] {
+  if (!startDate || !endDate || startDate.length < 7 || endDate.length < 7) return [];
+  let y = parseInt(startDate.slice(0, 4)), m = parseInt(startDate.slice(5, 7));
+  const ey = parseInt(endDate.slice(0, 4)), em = parseInt(endDate.slice(5, 7));
+  if ([y, m, ey, em].some(isNaN)) return [];
+  const out: string[] = [];
+  let guard = 0;
+  while ((y < ey || (y === ey && m <= em)) && guard++ < 120) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`);
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return out;
 }
 
 // Derive a billing period (calendar-month bounds) from a 'YYYY-MM-DD' bill date.
@@ -424,12 +450,12 @@ export default function ElectricityScreen() {
     if (r.canceled || !r.assets?.length) return;
     setBulkScanBusy(true);
     try {
-      const { uploadTicketPhoto } = await import('../services/ticketService') as any;
+      // meter photos now upload via sb.uploadMeterPhoto (documents/meter-photos bucket)
       const rows = [...bulkRows];
       let matched = 0, unmatched = 0, failed = 0;
       for (const asset of r.assets) {
         try {
-          const url = await uploadTicketPhoto(asset.uri, asset.base64, 'image/jpeg', 'meter-photos');
+          const url = await sb.uploadMeterPhoto(asset.base64);
           if (!url) { failed++; continue; }
           const res: any = await sb.scanMeterReading(url);
           const code = String(res?.apartment_code || '').trim().toLowerCase();
@@ -466,8 +492,8 @@ export default function ElectricityScreen() {
             setMeterPhotoUris(prev => ({ ...prev, [idx]: { uri: r.assets[0].uri, base64: r.assets[0].base64 } }));
             // Upload immediately
             try {
-              const { uploadTicketPhoto } = await import('../services/ticketService') as any;
-              const url = await uploadTicketPhoto(r.assets[0].uri, r.assets[0].base64, 'image/jpeg', 'meter-photos');
+              // meter photos now upload via sb.uploadMeterPhoto (documents/meter-photos bucket)
+              const url = await sb.uploadMeterPhoto(r.assets[0].base64);
               if (url) { setBulkRows(prev => prev.map((row, i) => i === idx ? { ...row, meter_photo_url: url } : row)); await scanAndFill(idx, url); }
             } catch { /* photo saved locally, will retry on save */ }
           }
@@ -482,8 +508,8 @@ export default function ElectricityScreen() {
           if (!r.canceled && r.assets[0]) {
             setMeterPhotoUris(prev => ({ ...prev, [idx]: { uri: r.assets[0].uri, base64: r.assets[0].base64 } }));
             try {
-              const { uploadTicketPhoto } = await import('../services/ticketService') as any;
-              const url = await uploadTicketPhoto(r.assets[0].uri, r.assets[0].base64, 'image/jpeg', 'meter-photos');
+              // meter photos now upload via sb.uploadMeterPhoto (documents/meter-photos bucket)
+              const url = await sb.uploadMeterPhoto(r.assets[0].base64);
               if (url) { setBulkRows(prev => prev.map((row, i) => i === idx ? { ...row, meter_photo_url: url } : row)); await scanAndFill(idx, url); }
             } catch { /* saved locally */ }
           }
@@ -558,6 +584,32 @@ export default function ElectricityScreen() {
   const totalCostFiltered     = useMemo(() => groupsInPeriod.reduce((s: number, g: any) => s + (g.total_amount || 0), 0), [groupsInPeriod]);
   const totalReadingsFiltered = useMemo(() => groupsInPeriod.reduce((s: number, g: any) => s + (g.readings?.length || 0), 0), [groupsInPeriod]);
   const totalEbPaidFiltered   = useMemo(() => ebPaymentsInPeriod.reduce((s: number, p: any) => s + Number(p.bill_amount || 0), 0), [ebPaymentsInPeriod]);
+
+  // EB Profit per month: collected (readings units×cost, from group totals) minus paid
+  // (eb_payments bill amounts; a bi-monthly bill is split evenly across the months it
+  // spans). Mirrors the web EB Profit tab exactly. Keyed by "YYYY-MM" (sorts chrono).
+  const ebProfitRows = useMemo(() => {
+    const map: Record<string, { ym: string; collected: number; paid: number }> = {};
+    const bump = (ym: string) => (map[ym] ||= { ym, collected: 0, paid: 0 });
+    for (const g of groupsInPeriod as any[]) {
+      const ym = billingMonthToYM(g.billing_month);
+      if (ym) bump(ym).collected += Number(g.total_amount || 0);
+    }
+    for (const p of ebPaymentsInPeriod as any[]) {
+      const amt = Number(p.bill_amount || 0);
+      if (p.billing_period_start && p.billing_period_end) {
+        const yms = ymsBetween(p.billing_period_start, p.billing_period_end);
+        if (yms.length) { const per = amt / yms.length; for (const ym of yms) bump(ym).paid += per; }
+        else { const ym = (p.bill_date || '').slice(0, 7); if (ym) bump(ym).paid += amt; }
+      } else {
+        const ym = (p.bill_date || '').slice(0, 7);
+        if (ym) bump(ym).paid += amt;
+      }
+    }
+    return Object.values(map)
+      .map((r) => ({ ...r, profit: r.collected - r.paid }))
+      .sort((a, b) => b.ym.localeCompare(a.ym));
+  }, [groupsInPeriod, ebPaymentsInPeriod]);
 
   // Group EB payments by property + billing period so the list shows one summed
   // collapsible row per cycle (e.g. "Feb26 – Apr26"), expandable into each payment.
@@ -1391,6 +1443,53 @@ export default function ElectricityScreen() {
   );
 
   // ─── RENDER ANALYTICS TAB ─────────────────────────────────────────────────
+  const renderEbProfit = () => {
+    const tot = ebProfitRows.reduce(
+      (a, r) => ({ collected: a.collected + r.collected, paid: a.paid + r.paid, profit: a.profit + r.profit }),
+      { collected: 0, paid: 0, profit: 0 },
+    );
+    const money = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+    return (
+      <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 120, gap: 12 }}>
+        <View style={{ backgroundColor:'#EEF3FF', borderRadius:16, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8 }}>
+          <Ionicons name="trending-up-outline" size={16} color="#1D4ED8" style={{ marginTop:1 }} />
+          <Text style={{ flex:1, fontSize:12, color:'#64748B', lineHeight:18 }}>
+            EB Profit = collected from tenants (units × rate) − paid to the board. Bi-monthly board bills are split across the months they cover.
+          </Text>
+        </View>
+        {ebProfitRows.length === 0 ? (
+          <View style={{ alignItems:'center', paddingVertical:40, gap:8 }}>
+            <Ionicons name="trending-up-outline" size={28} color="#B9A8CE" />
+            <Text style={{ fontSize:13, color:'#7A6A8E' }}>No EB data for this period.</Text>
+          </View>
+        ) : (
+          <View style={{ backgroundColor:'#FFFFFF', borderRadius:16, borderWidth:1, borderColor:'#EEF1F6', overflow:'hidden' }}>
+            <View style={{ flexDirection:'row', backgroundColor:'#F8FAFC', paddingVertical:10, paddingHorizontal:12 }}>
+              <Text style={{ flex:1.2, fontSize:11, fontWeight:'700', color:'#64748B' }}>MONTH</Text>
+              <Text style={{ flex:1, fontSize:11, fontWeight:'700', color:'#64748B', textAlign:'right' }}>COLLECTED</Text>
+              <Text style={{ flex:1, fontSize:11, fontWeight:'700', color:'#64748B', textAlign:'right' }}>PAID</Text>
+              <Text style={{ flex:1, fontSize:11, fontWeight:'700', color:'#64748B', textAlign:'right' }}>PROFIT</Text>
+            </View>
+            {ebProfitRows.map((r) => (
+              <View key={r.ym} style={{ flexDirection:'row', paddingVertical:11, paddingHorizontal:12, borderTopWidth:1, borderTopColor:'#F1F5F9' }}>
+                <Text style={{ flex:1.2, fontSize:13, fontWeight:'700', color:'#0F172A' }}>{ymLabel(r.ym)}</Text>
+                <Text style={{ flex:1, fontSize:13, color:'#334155', textAlign:'right' }}>{money(r.collected)}</Text>
+                <Text style={{ flex:1, fontSize:13, color:'#334155', textAlign:'right' }}>{money(r.paid)}</Text>
+                <Text style={{ flex:1, fontSize:13, fontWeight:'700', textAlign:'right', color: r.profit >= 0 ? '#16A34A' : '#DC2626' }}>{money(r.profit)}</Text>
+              </View>
+            ))}
+            <View style={{ flexDirection:'row', paddingVertical:12, paddingHorizontal:12, borderTopWidth:2, borderTopColor:'#E2E8F0', backgroundColor:'#F8FAFC' }}>
+              <Text style={{ flex:1.2, fontSize:13, fontWeight:'800', color:'#0F172A' }}>Total</Text>
+              <Text style={{ flex:1, fontSize:13, fontWeight:'700', color:'#0F172A', textAlign:'right' }}>{money(tot.collected)}</Text>
+              <Text style={{ flex:1, fontSize:13, fontWeight:'700', color:'#0F172A', textAlign:'right' }}>{money(tot.paid)}</Text>
+              <Text style={{ flex:1, fontSize:13, fontWeight:'800', textAlign:'right', color: tot.profit >= 0 ? '#16A34A' : '#DC2626' }}>{money(tot.profit)}</Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderAnalytics = () => {
     if (analyticsLoading || !analytics) {
       return (
@@ -1713,7 +1812,7 @@ export default function ElectricityScreen() {
         </View>
 
         {/* Tab content */}
-        {activeTab === 'readings' ? renderReadings() : activeTab === 'current-eb' ? renderCurrentEb() : activeTab === 'eb-payments' ? renderEbPayments() : activeTab === 'analytics' ? renderAnalytics() : renderRates()}
+        {activeTab === 'readings' ? renderReadings() : activeTab === 'current-eb' ? renderCurrentEb() : activeTab === 'eb-payments' ? renderEbPayments() : activeTab === 'eb-profit' ? renderEbProfit() : activeTab === 'analytics' ? renderAnalytics() : renderRates()}
 
       </SafeAreaView>
 

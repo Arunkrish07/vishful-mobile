@@ -385,6 +385,26 @@ export async function scanMeterReading(imageUrl: string): Promise<{
   return client.action((api as any).electricity.scanMeterReading, { imageUrl });
 }
 
+// Upload a meter photo to the shared `documents/meter-photos` bucket (the same path
+// the web app uses) via the working owners.uploadDocument action, and return its
+// public URL. Replaces the old uploadTicketPhoto path, which went through the no-op
+// supabase storage stub and always returned null.
+export async function uploadMeterPhoto(base64?: string | null): Promise<string | null> {
+  if (!base64) return null;
+  try {
+    const res: any = await client.action((api as any).owners.uploadDocument, {
+      base64,
+      fileName: `meter_${Date.now()}.jpg`,
+      folder: "meter-photos",
+      contentType: "image/jpeg",
+    });
+    return res?.url || null;
+  } catch (e) {
+    console.warn("[uploadMeterPhoto]", (e as any)?.message);
+    return null;
+  }
+}
+
 export async function getEBAnalytics(propertyId?: string) {
   return client.action((api as any).electricity.getEBAnalytics, { propertyId });
 }
