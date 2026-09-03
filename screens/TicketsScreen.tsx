@@ -1109,7 +1109,7 @@ export default function TicketsScreen({ navigation }: any) {
                     });
                     const csvContent = [header, ...rows].join('\n');
                     const filename = `tickets-${new Date().toISOString().split('T')[0]}.csv`;
-                    const FileSystem = await import('expo-file-system') as any;
+                    const FileSystem = await import('expo-file-system/legacy') as any;
                     const fileUri = FileSystem.cacheDirectory + filename;
                     await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
                     const Sharing = await import('expo-sharing') as any;
@@ -1501,8 +1501,15 @@ export default function TicketsScreen({ navigation }: any) {
                 <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center' }}>
                   <View style={{ flex:1 }}>
                     <Text style={{ fontSize:14, fontWeight:'800', color:'#0F172A' }}>{it.name}</Text>
-                    {it.description && (
-                      <Text style={{ fontSize:12, color:'#94A3B8', marginTop:2 }} numberOfLines={2}>{it.description}</Text>
+                    {Array.isArray(it.issue_type_asset_types) && it.issue_type_asset_types.length > 0 && (
+                      <View style={{ flexDirection:'row', flexWrap:'wrap', gap:6, marginTop:6 }}>
+                        {it.issue_type_asset_types.map((lnk: any) => (
+                          <View key={lnk.asset_type_id} style={{ flexDirection:'row', alignItems:'center', gap:3, backgroundColor:'#EEF3FF', borderRadius:99, paddingHorizontal:8, paddingVertical:3 }}>
+                            <Ionicons name="link-outline" size={10} color="#2563EB" />
+                            <Text style={{ fontSize:10, fontWeight:'600', color:'#2563EB' }}>{lnk.asset_types?.name || 'Asset'}</Text>
+                          </View>
+                        ))}
+                      </View>
                     )}
                   </View>
                   <View style={{ alignItems:'flex-end', gap:4 }}>

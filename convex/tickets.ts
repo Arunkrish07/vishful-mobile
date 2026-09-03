@@ -1402,8 +1402,13 @@ export const getIssueTypes = action({
   returns: v.any(),
   handler: async () => {
     const sb = getSupabase();
+    // Embed the linked asset types (via the issue_type_asset_types junction) so the
+    // mobile Categories tab can show them, matching the web app.
     return await safeList(
-      sb.from("issue_types").select("*").eq("organization_id", ORG_ID).order("name", { ascending: true })
+      sb.from("issue_types")
+        .select("*, issue_type_asset_types(asset_type_id, asset_types(id, name))")
+        .eq("organization_id", ORG_ID)
+        .order("name", { ascending: true })
     );
   },
 });

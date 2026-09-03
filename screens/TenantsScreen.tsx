@@ -101,6 +101,7 @@ export default function TenantsScreen() {
   }, [user?.role]);
   // Default filter = 'staying' so the list is useful immediately
   const [statusFilter, setStatusFilter] = useState('staying');
+  const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female'>('all');
   const [search,       setSearch]       = useState('');
   const [loading,      setLoading]      = useState(false);
 
@@ -214,6 +215,7 @@ export default function TenantsScreen() {
   // ─────────────────────────────────────────────────────────────────────────
   const filtered = (tenants || []).filter(t => {
     const matchStatus = statusFilter === 'all' || t.stayingStatus === statusFilter;
+    const matchGender = genderFilter === 'all' || (t.gender || '').toLowerCase() === genderFilter;
     const q = search.toLowerCase();
     const matchSearch = !q ||
       (t.name        || '').toLowerCase().includes(q) ||
@@ -221,7 +223,7 @@ export default function TenantsScreen() {
       (t.email       || '').toLowerCase().includes(q) ||
       (t.companyName || '').toLowerCase().includes(q) ||
       (t.designation || '').toLowerCase().includes(q);
-    return matchStatus && matchSearch;
+    return matchStatus && matchGender && matchSearch;
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -688,6 +690,21 @@ export default function TenantsScreen() {
                   ))}
                 </View>
               </ScrollView>
+
+              {/* Gender filter — Men / Women (list is already alphabetical) */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                {([['all', 'All'], ['male', 'Men'], ['female', 'Women']] as const).map(([key, label]) => (
+                  <FilterChip
+                    key={key}
+                    label={label}
+                    active={genderFilter === key}
+                    count={key === 'all'
+                      ? (tenants || []).length
+                      : (tenants || []).filter((t: any) => (t.gender || '').toLowerCase() === key).length}
+                    onPress={() => setGenderFilter(key)}
+                  />
+                ))}
+              </View>
 
               {/* Search bar */}
               <SearchField
