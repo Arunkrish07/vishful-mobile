@@ -60,8 +60,11 @@ export const getStats = action({
         safeList(sb.from("beds").select("*").eq("organization_id", ORG_ID)),
         safeList(sb.from("invoices").select("*").eq("organization_id", ORG_ID)),
         safeList(sb.from("apartments").select("*").eq("organization_id", ORG_ID)),
-        // Source of truth for bed occupancy — allotments with active staying_status
-        safeList(sb.from("tenant_allotments").select("bed_id,staying_status").eq("organization_id", ORG_ID)),
+        // Source of truth for bed occupancy — only ACTIVE allotments. Filtering here
+        // keeps the result under PostgREST's 1000-row default cap; unfiltered, the
+        // ~1200-row allotment history truncated and dropped active rows → beds that
+        // were occupied got miscounted as vacant (79% instead of the real 91%).
+        safeList(sb.from("tenant_allotments").select("bed_id,staying_status").eq("organization_id", ORG_ID).in("staying_status", ["Staying", "On-Notice", "Booked"])),
       ]);
 
       // Build a map of bed_id → staying_status from allotments (source of truth)
@@ -289,6 +292,9 @@ export const getExtendedStats = action({
           sb.from("tenant_allotments")
             .select("bed_id, staying_status")
             .eq("organization_id", ORG_ID)
+            // Active only — see getStats note: unfiltered this exceeds the 1000-row
+            // PostgREST cap and silently drops active allotments.
+            .in("staying_status", ["Staying", "On-Notice", "Booked"])
         ),
         safeList(
           sb.from("announcements")
@@ -525,9 +531,21 @@ export const getExtendedStats = action({
           starCustomers,
         },
         announcements: announcements as any[],
-        // Headline occupancy is canonical point-in-time: (Staying + On-Notice) / live beds,
-        // matching Reports/getStats/metrics.ts so every screen shows the same number.
-        propertyStatus: computePropertyStatus(liveBedsList, allotments),
+        // Headline occupancy = canonical point-in-time (Staying + On-Notice) / live beds.
+        // Prefer the server RPC (get_universal_metrics_v2), the SAME source the web app
+        // uses, so mobile matches web exactly (occupied/vacant/pct). Fall back to the
+        // client compute — now correct too, since the allotment fetch is filtered to
+        // active statuses above — only if the RPC is unavailable.
+        propertyStatus: rpcPropertyStatus
+          ? {
+              total: Number(rpcPropertyStatus.total ?? 0),
+              occupied: Number(rpcPropertyStatus.occupied ?? 0),
+              notice: Number(rpcPropertyStatus.notice ?? 0),
+              booked: Number(rpcPropertyStatus.booked ?? 0),
+              vacant: Number(rpcPropertyStatus.vacant ?? 0),
+              occupancyPct: Math.round(Number(rpcPropertyStatus.occupancyPct ?? 0)),
+            }
+          : computePropertyStatus(liveBedsList, allotments),
         // Month bed-days occupancy (ledger RPC) kept available but NOT the headline —
         // it answers "how filled was this month" and reads higher than point-in-time.
         monthOccupancy: rpcPropertyStatus ?? null,
