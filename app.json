@@ -29,20 +29,6 @@
         "projectId": "6a9c678e-87a9-4eb1-ac8d-34fe9e5c89d0"
       }
     },
-    "owner": "krisharun6789",
-    "plugins": [
-      "expo-sharing",
-      "expo-font",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/splash-icon.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
-        }
-      ],
-      "expo-audio",
-      "expo-asset"
-    ]
+    "owner": "krisharun6789"
   }
 }
