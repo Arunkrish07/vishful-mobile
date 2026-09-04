@@ -220,6 +220,7 @@ export default function TeamScreen() {
         `Created ${r?.created ?? 0}`,
         `updated ${r?.updated ?? 0}`,
         (r?.skippedPaid ?? 0) > 0 ? `${r.skippedPaid} already paid` : null,
+        (r?.skippedApproved ?? 0) > 0 ? `${r.skippedApproved} approved (locked)` : null,
         (r?.skippedEmpty ?? 0) > 0 ? `${r.skippedEmpty} no attendance` : null,
         (r?.failed ?? 0) > 0 ? `${r.failed} failed` : null,
       ].filter(Boolean).join(', ');

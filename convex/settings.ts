@@ -191,7 +191,7 @@ export const generateSalaryBills = action({
       attByMember.set(a.team_member_id, list);
     }
 
-    let created = 0, updated = 0, skippedPaid = 0, skippedEmpty = 0, failed = 0, membersConsidered = 0;
+    let created = 0, updated = 0, skippedPaid = 0, skippedApproved = 0, skippedEmpty = 0, failed = 0, membersConsidered = 0;
     const now = new Date();
 
     for (const m of members as any[]) {
@@ -210,7 +210,11 @@ export const generateSalaryBills = action({
         );
         const existing = (existingList as any[])[0];
 
-        if (String(existing?.status || "").toLowerCase() === "paid") { skippedPaid += 1; continue; }
+        // Locked bills are never recomputed: paid is a settled payment; approved
+        // is an amount a reviewer signed off on (regen must not silently re-cost it).
+        const existingStatus = String(existing?.status || "").toLowerCase();
+        if (existingStatus === "paid") { skippedPaid += 1; continue; }
+        if (existingStatus === "approved") { skippedApproved += 1; continue; }
         if (!existing && summary.recordedDays === 0) { skippedEmpty += 1; continue; }
 
         const present_days = capPresentDays(summary.presentUnits, wd);
@@ -236,7 +240,7 @@ export const generateSalaryBills = action({
       } catch { failed += 1; }
     }
 
-    return { month, created, updated, skippedPaid, skippedEmpty, failed, membersConsidered };
+    return { month, created, updated, skippedPaid, skippedApproved, skippedEmpty, failed, membersConsidered };
   },
 });
 
