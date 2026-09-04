@@ -18,7 +18,9 @@ The three tasks were implemented and reviewed as written, then these deltas were
 2. **`approved` bills immutable** (commit `591f444`, product decision — **DIVERGES from web**): the action skips an existing `approved` bill just like `paid` (via a case-insensitive `existingStatus`), returning a new `skippedApproved` count; the Salary-tab Alert shows "N approved (locked)". Revert an approved bill to draft to recompute it.
 3. **Case-insensitive paid guard + `skippedEmpty` surfaced** (commit `5f07874`, from final review): paid/approved skip uses `String(status).toLowerCase()`; the Alert surfaces the no-attendance count.
 4. **Return shape** is `{ month, created, updated, skippedPaid, skippedApproved, skippedEmpty, failed, membersConsidered }`.
-5. **Deployed** to `dev:polished-sockeye-740` on 2026-09-04 (via `npx convex dev --once --typecheck=disable`, orphan `convex/registrationpdf.ts` moved aside for the push). On-device QA still pending.
+5. **Deployed** to `dev:polished-sockeye-740` on 2026-09-04 (via `npx convex dev --once --typecheck=disable`, orphan `convex/registrationpdf.ts` moved aside for the push).
+6. **Generated-columns fix** (commit `4627826`, from on-device QA): `earned_salary`/`net_payable` are DB-generated columns — the planned defensive write of them made every insert/update fail (`failed:6/6`). The action now writes inputs only (web parity); the DB computes earned/net as decimals. Also added `console.warn` in the per-member catch (its absence hid this bug during QA). **This supersedes the "write earned/net defensively" step in Task 2's code below.**
+7. **On-device QA — DONE** (2026-09-04, dev): guards verified live (paid + approved skipped and unchanged; `skippedApproved` works), `present_days` hand-calc matched the deployed action exactly (7 logged + 5 auto-paid Sundays = 12), recompute is idempotent for a fixed date/attendance. Note: unlogged **future** Sundays are pre-paid (verbatim web rule); a recompute reflects the current date, so re-running on a later day legitimately changes draft amounts.
 
 ## Global Constraints
 

@@ -57,7 +57,7 @@ Implemented in a new pure module **`lib/payroll.ts`** (as-built; the plan chose 
    - If `summary.recordedDays === 0` and no existing bill → **skip** (don't create empty bills — web parity).
    - `present_days = cap(presentUnits, workingDays)`; preserve existing `advance_deducted`/`other_deductions` (default 0); `{earned_salary, net_payable} = computePaySlipAmounts(...)`.
    - **Upsert:** update the existing `draft` (the only non-locked existing state left here) OR insert a new `draft`. `notes = "Auto from attendance (${recordedDays} days, ${absentDays} absent)"`.
-   - Write inputs **and** `earned_salary`/`net_payable` (defensive — identical to the trigger's formula, so numbers match whether or not the trigger fires for these writes).
+   - Write **only the inputs**. `earned_salary`/`net_payable` are DB-computed (generated columns) — **writing them is rejected by Postgres** (found in on-device QA: every insert/update failed until removed), and web parity never writes them either. The DB computes them as decimals (`base*present/working`).
 4. Return `{ month, created, updated, skippedPaid, skippedApproved, skippedEmpty, failed, membersConsidered }`.
 
 `lib/supabaseService.ts`: add `generateSalaryBills(month, workingDays?)` wrapper calling the action.
@@ -85,5 +85,5 @@ Existing `listSalaryBills` / `setSalaryBillStatus` are unchanged. The `convex/se
 
 ## Risks
 
-- **No live DB access from this environment** (Supabase MCP can't see this project) — schema is taken from the web app's generated types; the generated-column/trigger assumption is inferred from existing populated rows. The defensive earned/net write de-risks this. On-device QA against real data is required before trusting payroll numbers.
+- **No live DB access during development** (Supabase MCP can't see this project) — schema was taken from the web app's generated types, which list `earned_salary`/`net_payable` as writable Insert fields. They are in fact **generated columns**; the planned "defensive write" of them made every insert/update fail. Caught only by on-device QA (2026-09-04) and fixed (commit `4627826`): the action now writes inputs only. Lesson: verify generated/computed columns against the live DB, not the generated types, before writing money-flow code.
 - **Attendance status variants** in `team_attendance` are normalized with the same alias table as web; any org-specific status string not in the table is treated as unlogged (→ absent unless gated). QA should confirm the org's status strings are covered.
