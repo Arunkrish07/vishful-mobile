@@ -11,6 +11,7 @@ import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
+import { generateAndSharePayslip } from '../lib/payslipPdf';
 import {
   teamKpis, computeMemberRows, orgRollup, daySnapshot, needsAttention,
   calendarHeat, heatDominant, summarizeWorkHours, memberMonthRows,
@@ -83,6 +84,8 @@ export default function TeamScreen() {
   const [salaryBills, setSalaryBills] = useState<any[]>([]);
   const [salaryLoading, setSalaryLoading] = useState(false);
   const [salaryBusy, setSalaryBusy] = useState<string | null>(null);
+  const [payslipBusy, setPayslipBusy] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState('Vishful Spaces LLP');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -166,6 +169,43 @@ export default function TeamScreen() {
     finally { if (mounted.current) setSalaryLoading(false); }
   }, []);
   useEffect(() => { if (activeTab === 'salary') loadSalary(); }, [activeTab, loadSalary]);
+
+  // Org name for the pay-slip header — fetched once when the Salary tab opens.
+  useEffect(() => {
+    if (activeTab !== 'salary') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const s: any = await sb.getOrgSettings();
+        if (!cancelled && mounted.current && s?.organizationName) setOrgName(String(s.organizationName));
+      } catch { /* keep default */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
+  const handleDownloadPayslip = useCallback(async (bill: any, memberName: string, designation?: string | null) => {
+    setPayslipBusy(bill.id);
+    try {
+      await generateAndSharePayslip({
+        orgName,
+        employeeName: memberName,
+        designation: designation || null,
+        month: bill.month || '',
+        presentDays: Number(bill.present_days) || 0,
+        workingDays: Number(bill.working_days) || 0,
+        baseSalary: Number(bill.base_salary) || 0,
+        earnedSalary: Number(bill.earned_salary) || 0,
+        advanceDeducted: Number(bill.advance_deducted) || 0,
+        otherDeductions: Number(bill.other_deductions) || 0,
+        netPayable: Number(bill.net_payable ?? bill.earned_salary) || 0,
+        status: bill.status || 'draft',
+      });
+    } catch (e: any) {
+      Alert.alert('Pay-slip', e?.message || 'Could not generate the pay-slip. Please try again.');
+    } finally {
+      if (mounted.current) setPayslipBusy(null);
+    }
+  }, [orgName]);
 
   const handleSalaryStatus = useCallback(async (bill: any, status: string) => {
     setSalaryBusy(bill.id);
@@ -705,8 +745,12 @@ export default function TeamScreen() {
                       {deductions > 0 && <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Deductions</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>−₹{Math.round(deductions).toLocaleString('en-IN')}</Text></View>}
                       <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Net payable</Text><Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>₹{Math.round(net).toLocaleString('en-IN')}</Text></View>
                     </View>
-                    {st !== 'paid' && (
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                        <TouchableOpacity disabled={payslipBusy === b.id} onPress={() => handleDownloadPayslip(b, name, m?.designation)} style={{ backgroundColor: '#fff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: '#EEF1F6' }}>
+                          {payslipBusy === b.id
+                            ? <ActivityIndicator size="small" color="#2563EB" />
+                            : <><Ionicons name="download-outline" size={15} color="#2563EB" /><Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 13 }}>Payslip</Text></>}
+                        </TouchableOpacity>
                         {st === 'draft' && (
                           <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'approved')} style={{ flex: 1, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
                             {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Approve</Text>}
@@ -722,8 +766,7 @@ export default function TeamScreen() {
                             <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 13 }}>Revert</Text>
                           </TouchableOpacity>
                         )}
-                      </View>
-                    )}
+                    </View>
                   </View>
                 );
               })
