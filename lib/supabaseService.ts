@@ -332,6 +332,10 @@ export async function recordPayment(args: any) {
   return client.action(api.accounting.recordPayment, { data: args });
 }
 
+export async function fetchOutstandingRecipients() {
+  return client.action((api as any).accounting.fetchOutstandingRecipients, {});
+}
+
 export async function getPendingDues() {
   return client.action(api.accounting.getPendingDues, {});
 }

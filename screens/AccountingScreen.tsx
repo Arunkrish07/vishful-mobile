@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Image, Linking, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
@@ -9,6 +9,7 @@ import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { fetchBankAccounts } from '../services/ticketService';
+import { buildReminderMessage, formatPendingAmount } from '../lib/outstandingReminders';
 
 // ── design tokens (web dashboard parity — see DASH in DashboardScreen.tsx) ──
 const ACC = {
@@ -125,6 +126,11 @@ export default function AccountingScreen() {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  // Outstanding Dues — ledger-backed reminder audience (read-only preview).
+  const [showOutstanding, setShowOutstanding] = useState(false);
+  const [outstanding, setOutstanding] = useState<any[]>([]);
+  const [outstandingLoading, setOutstandingLoading] = useState(false);
+  const [orgName, setOrgName] = useState('Vishful Spaces LLP');
 
   useEffect(() => {
     if (!token) return;
@@ -275,6 +281,41 @@ export default function AccountingScreen() {
     setLoading(false);
   };
 
+  // Outstanding Dues — ledger-backed audience of who currently owes money.
+  const openOutstanding = async () => {
+    setShowOutstanding(true);
+    setOutstandingLoading(true);
+    try {
+      const [rows, org]: [any, any] = await Promise.all([
+        sb.fetchOutstandingRecipients(),
+        sb.getOrgSettings().catch(() => null),
+      ]);
+      if (!mounted.current) return;
+      setOutstanding(Array.isArray(rows) ? rows : []);
+      if (org?.organizationName) setOrgName(String(org.organizationName));
+    } catch (e: any) {
+      if (mounted.current && !isAbortError(e)) { setOutstanding([]); Alert.alert('Outstanding Dues', e?.message || 'Could not load outstanding dues.'); }
+    } finally {
+      if (mounted.current) setOutstandingLoading(false);
+    }
+  };
+
+  // Open the phone's WhatsApp (falls back to SMS) with a prefilled reminder.
+  const remindOnWhatsApp = async (rec: any) => {
+    const digits = String(rec?.phone || '').replace(/\D/g, '');
+    if (digits.length < 10) { Alert.alert('No phone', `No mobile number on file for ${rec?.tenant_name || 'this tenant'}.`); return; }
+    const e164 = digits.length === 10 ? `91${digits}` : digits; // assume India when no country code
+    const text = buildReminderMessage(rec?.tenant_name || '', Number(rec?.pending_amount) || 0, orgName);
+    const wa = `https://wa.me/${e164}?text=${encodeURIComponent(text)}`;
+    try {
+      const ok = await Linking.canOpenURL(wa);
+      if (ok) { await Linking.openURL(wa); return; }
+      await Linking.openURL(`sms:${e164}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(text)}`);
+    } catch {
+      Alert.alert('Could not open WhatsApp', 'No messaging app is available to send the reminder.');
+    }
+  };
+
   if (!invoices) return <LoadingScreen />;
 
   const filtered = (filter === 'all' ? invoices : invoices.filter((i: any) => i.status === filter))
@@ -400,12 +441,20 @@ export default function AccountingScreen() {
 
         {/* ── RECEIPTS + Add Collection ── */}
         {section === 'receipts' && (<>
-          <View style={{ marginBottom: spacing.md }}>
-            <Button
-              title="Add Collection"
-              icon="add-circle-outline"
-              onPress={() => { setColDate(new Date().toISOString().split('T')[0]); setShowCollect(true); }}
-            />
+          <View style={{ marginBottom: spacing.md, flexDirection: 'row', gap: spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Add Collection"
+                icon="add-circle-outline"
+                onPress={() => { setColDate(new Date().toISOString().split('T')[0]); setShowCollect(true); }}
+              />
+            </View>
+            <TouchableOpacity
+              onPress={openOutstanding}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line, backgroundColor: '#fff' }}>
+              <Ionicons name="notifications-outline" size={16} color={ACC.purple} />
+              <Text style={{ color: ACC.purple, fontWeight: '700', fontSize: fontSize.sm }}>Outstanding</Text>
+            </TouchableOpacity>
           </View>
           {receipts.length === 0 ? (
             <EmptyState title="No Receipts" subtitle="Recorded payments will appear here" icon="cash-outline" />
@@ -636,6 +685,55 @@ export default function AccountingScreen() {
             </Text>
             <Button title="Record Collection" onPress={handleAddCollection} loading={loading} icon="cash-outline" />
           </ScrollView>
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* Outstanding Dues — ledger-backed reminder audience (read-only preview) */}
+      <Modal visible={showOutstanding} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowOutstanding(false)}>
+              <Text style={{ color: colors.danger }}>Close</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Outstanding Dues</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          {outstandingLoading ? (
+            <ActivityIndicator color={ACC.purple} style={{ marginTop: 40 }} />
+          ) : outstanding.length === 0 ? (
+            <EmptyState title="All clear" subtitle="No tenant currently owes money on the ledger." icon="checkmark-done-outline" />
+          ) : (
+            <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 60 }}>
+              <Text style={{ fontSize: fontSize.sm, color: ACC.ink2, marginBottom: spacing.md }}>
+                {outstanding.length} tenant{outstanding.length === 1 ? '' : 's'} owe {formatPendingAmount(outstanding.reduce((s: number, r: any) => s + (Number(r.pending_amount) || 0), 0))} (ledger balance). Tap a row to send a WhatsApp reminder.
+              </Text>
+              {outstanding.map((r: any) => (
+                <View key={r.tenant_id} style={[styles.card, { opacity: r.auto_selected ? 1 : 0.7 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{r.tenant_name}</Text>
+                      <Text style={styles.cardSub}>
+                        {r.has_phone ? (r.phone || 'Reachable') : 'No phone number on file'}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.purple }}>{formatPendingAmount(r.pending_amount)}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => remindOnWhatsApp(r)}
+                    disabled={!r.has_phone}
+                    style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: borderRadius.md, backgroundColor: r.has_phone ? '#25D366' : ACC.line }}>
+                    <Ionicons name="logo-whatsapp" size={16} color={r.has_phone ? '#fff' : ACC.ink3} />
+                    <Text style={{ color: r.has_phone ? '#fff' : ACC.ink3, fontWeight: '700', fontSize: fontSize.sm }}>{r.has_phone ? 'Remind on WhatsApp' : 'No phone number'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <Text style={{ fontSize: fontSize.xs, color: ACC.ink3, marginTop: spacing.md }}>
+                Audience is drawn from the tenant ledger (current dues), not invoice status. Tenants in credit or square never appear. Rows without a phone number are dimmed and can't be messaged.
+              </Text>
+            </ScrollView>
+          )}
         </SafeAreaView>
         </GlassBackground>
       </Modal>

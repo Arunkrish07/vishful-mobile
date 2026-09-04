@@ -3,6 +3,8 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { getSupabase, ORG_ID, safeList, insertRow } from "./lib/supabaseAdmin";
+import { selectOutstandingRecipients, hasUsablePhone } from "../lib/outstandingReminders";
+
 
 // ─── LIST READINGS (grouped by billing_month + property_id) ──────────────────
 export const listReadings = action({
@@ -978,5 +980,57 @@ export const listFlatReadings = action({
       unitCost:      Number(r.unit_cost) || 0,
       isLocked:      !!r.is_locked,
     }));
+  },
+});
+
+// ─── OUTSTANDING DUES (ledger-backed reminder audience, web parity) ──────────
+// Who currently owes money and how much, drawn from the LEDGER views (not
+// invoices.status). Read-only preview. Enriches each recipient with the phone
+// number so the UI can open a per-tenant WhatsApp/dialer deep link.
+export const fetchOutstandingRecipients = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    // Audience is drawn from the reliable ledger view v_tenant_current_dues.
+    // NOTE (verified on dev 2026-09-04): the sibling v_invoice_settlement_status
+    // view is NOT reliably queryable via the service-role client — .range()/.limit()
+    // intermittently return 0 rows (the view is expensive and reads flake to empty).
+    // So we deliberately do NOT use it; auto_selected falls back to has_phone
+    // instead of the web's invoice-backed nuance. v_tenant_current_dues needs an
+    // explicit .order() before .range() or it too returns 0.
+    const dues: any[] = await safeList(
+      sb.from("v_tenant_current_dues")
+        .select("tenant_id, ar_balance")
+        .eq("organization_id", ORG_ID)
+        .order("tenant_id", { ascending: true })
+        .range(0, 99999),
+    );
+
+    const tenantIds = [...new Set((dues as any[]).map((d) => d.tenant_id).filter(Boolean))] as string[];
+    if (tenantIds.length === 0) return [];
+
+    const tenantNames = new Map<string, string>();
+    const tenantPhones = new Map<string, string>();
+    const tenantsMissingPhone = new Set<string>();
+    const CHUNK = 200;
+    for (let i = 0; i < tenantIds.length; i += CHUNK) {
+      const slice = tenantIds.slice(i, i + CHUNK);
+      const tRows: any[] = await safeList(
+        sb.from("tenants").select("id, full_name, phone").eq("organization_id", ORG_ID).in("id", slice),
+      );
+      for (const t of tRows) {
+        tenantNames.set(t.id, t.full_name || "Tenant");
+        if (hasUsablePhone(t.phone)) tenantPhones.set(t.id, String(t.phone));
+        else tenantsMissingPhone.add(t.id);
+      }
+    }
+    // A tenant absent from `tenants` entirely has no number either.
+    for (const id of tenantIds) if (!tenantNames.has(id)) tenantsMissingPhone.add(id);
+
+    // Settlements omitted (view unreliable) → auto_selected = has_phone.
+    const recipients = selectOutstandingRecipients(dues as any, tenantNames, tenantsMissingPhone);
+    // Attach the phone number (for the UI's WhatsApp/dialer deep link).
+    return recipients.map((r) => ({ ...r, phone: tenantPhones.get(r.tenant_id) || null }));
   },
 });
