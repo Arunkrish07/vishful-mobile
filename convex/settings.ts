@@ -210,7 +210,7 @@ export const generateSalaryBills = action({
         );
         const existing = (existingList as any[])[0];
 
-        if (existing?.status === "paid") { skippedPaid += 1; continue; }
+        if (String(existing?.status || "").toLowerCase() === "paid") { skippedPaid += 1; continue; }
         if (!existing && summary.recordedDays === 0) { skippedEmpty += 1; continue; }
 
         const present_days = capPresentDays(summary.presentUnits, wd);
