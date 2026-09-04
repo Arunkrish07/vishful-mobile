@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { fetchBankAccounts } from '../services/ticketService';
 import { buildReminderMessage, formatPendingAmount } from '../lib/outstandingReminders';
+import { shareInvoicePdf, shareReceiptPdf } from '../lib/invoicePdf';
 
 // ── design tokens (web dashboard parity — see DASH in DashboardScreen.tsx) ──
 const ACC = {
@@ -131,6 +132,19 @@ export default function AccountingScreen() {
   const [outstanding, setOutstanding] = useState<any[]>([]);
   const [outstandingLoading, setOutstandingLoading] = useState(false);
   const [orgName, setOrgName] = useState('Vishful Spaces LLP');
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+
+  // Org name for PDF headers — loaded once.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const s: any = await sb.getOrgSettings();
+        if (!cancelled && mounted.current && s?.organizationName) setOrgName(String(s.organizationName));
+      } catch { /* keep default */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -316,6 +330,19 @@ export default function AccountingScreen() {
     }
   };
 
+  const shareInv = async (inv: any) => {
+    setPdfBusy(inv._id || inv.id);
+    try { await shareInvoicePdf(inv, orgName); }
+    catch (e: any) { Alert.alert('Invoice PDF', e?.message || 'Could not generate the invoice PDF.'); }
+    finally { if (mounted.current) setPdfBusy(null); }
+  };
+  const shareRcpt = async (r: any) => {
+    setPdfBusy(r.id);
+    try { await shareReceiptPdf(r, tenantNameFor(r), orgName); }
+    catch (e: any) { Alert.alert('Receipt PDF', e?.message || 'Could not generate the receipt PDF.'); }
+    finally { if (mounted.current) setPdfBusy(null); }
+  };
+
   if (!invoices) return <LoadingScreen />;
 
   const filtered = (filter === 'all' ? invoices : invoices.filter((i: any) => i.status === filter))
@@ -435,6 +462,14 @@ export default function AccountingScreen() {
                   {inv.paidAmount > 0 && <Text style={{ fontSize: fontSize.sm, color: ACC.good, fontWeight: '600' }}>Paid: Rs {inv.paidAmount}</Text>}
                 </View>
               </View>
+              <TouchableOpacity
+                onPress={() => shareInv(inv)}
+                disabled={pdfBusy === (inv._id || inv.id)}
+                style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line }}>
+                {pdfBusy === (inv._id || inv.id)
+                  ? <ActivityIndicator size="small" color={ACC.purple} />
+                  : <><Ionicons name="download-outline" size={15} color={ACC.purple} /><Text style={{ color: ACC.purple, fontWeight: '700', fontSize: fontSize.sm }}>PDF</Text></>}
+              </TouchableOpacity>
             </TouchableOpacity>
           ))}
         </>)}
@@ -468,6 +503,14 @@ export default function AccountingScreen() {
                 <Text style={styles.cardSub}>{r.payment_date ? formatDate(r.payment_date) : '—'}{r.payment_mode ? ` · ${String(r.payment_mode).toUpperCase()}` : ''}</Text>
                 {!!r.reference_number && <Text style={styles.cardSub} numberOfLines={1}>Ref: {r.reference_number}</Text>}
               </View>
+              <TouchableOpacity
+                onPress={() => shareRcpt(r)}
+                disabled={pdfBusy === r.id}
+                style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line }}>
+                {pdfBusy === r.id
+                  ? <ActivityIndicator size="small" color={ACC.good} />
+                  : <><Ionicons name="download-outline" size={15} color={ACC.good} /><Text style={{ color: ACC.good, fontWeight: '700', fontSize: fontSize.sm }}>Receipt PDF</Text></>}
+              </TouchableOpacity>
             </View>
           ))}
         </>)}
