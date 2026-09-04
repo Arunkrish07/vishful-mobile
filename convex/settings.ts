@@ -224,7 +224,7 @@ export const generateSalaryBills = action({
         if (existing?.id) {
           const { error } = await sb.from("team_salary_bills")
             .update({ working_days: wd, present_days, base_salary: base, advance_deducted, other_deductions, earned_salary, net_payable, notes })
-            .eq("id", existing.id).neq("status", "paid");
+            .eq("id", existing.id).eq("organization_id", ORG_ID).neq("status", "paid");
           if (error) throw error;
           updated += 1;
         } else {
