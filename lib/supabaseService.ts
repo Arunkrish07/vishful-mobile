@@ -336,6 +336,13 @@ export async function fetchOutstandingRecipients() {
   return client.action((api as any).accounting.fetchOutstandingRecipients, {});
 }
 
+export async function previewBills(month: string, propertyId?: string) {
+  return client.action((api as any).billing.previewBills, { month, propertyId });
+}
+export async function generateBills(month: string, propertyId?: string, allotmentIds?: string[]) {
+  return client.action((api as any).billing.generateBills, { month, propertyId, allotmentIds });
+}
+
 export async function listExpenseCategories() {
   return client.action((api as any).settings.listExpenseCategories, {});
 }
