@@ -970,34 +970,61 @@ export default function AccountingScreen() {
         {section === 'expenses' && (
           expenses.length === 0 ? (
             <EmptyState title="No Expenses" subtitle="Recorded expenses will appear here" icon="receipt-outline" />
-          ) : expenses.map((e: any) => (
-            <View key={e.id} style={styles.card}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={styles.cardTitle} numberOfLines={1}>{e.category || 'Expense'}</Text>
-                <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.bad }}>Rs {Number(e.amount || 0).toLocaleString('en-IN')}</Text>
-              </View>
-              {!!e.description && <Text style={styles.cardSub} numberOfLines={2}>{e.description}</Text>}
-              <Text style={styles.cardSub}>{e.expense_date ? formatDate(e.expense_date) : '—'}</Text>
+          ) : (<>
+            <View style={{ backgroundColor: '#FEF2F2', borderRadius: 14, padding: 12, marginBottom: spacing.md }}>
+              <Text style={{ fontSize: 10, color: '#DC2626', textTransform: 'uppercase' }}>Total Expenses ({expenses.length})</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '900', color: '#DC2626' }}>{fmtMoney(expenses.reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0))}</Text>
             </View>
-          ))
+            {expenses.map((e: any) => (
+              <View key={e.id} style={styles.card}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>{e.category || 'Expense'}{e.locked ? ' 🔒' : ''}</Text>
+                  <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.bad }}>{fmtMoney(e.amount)}</Text>
+                </View>
+                {!!e.description && <Text style={styles.cardSub} numberOfLines={2}>{e.description}</Text>}
+                <Text style={styles.cardSub}>{e.expense_date ? formatDate(e.expense_date) : '—'}{e.propertyName ? ` · ${e.propertyName}` : ''}{e.vendorName ? ` · ${e.vendorName}` : ''}</Text>
+              </View>
+            ))}
+          </>)
         )}
 
         {/* ── RENTAL PAYMENTS / owner payouts (read-only) ── */}
         {section === 'payments' && (
           ownerPayments.length === 0 ? (
             <EmptyState title="No Rental Payments" subtitle="Owner payouts will appear here" icon="wallet-outline" />
-          ) : ownerPayments.map((p: any) => (
-            <View key={p.id ?? p._id ?? p.created_at} style={styles.card}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={styles.cardTitle} numberOfLines={1}>{p.owner_name || p.property_name || p.owner_id || 'Owner Payout'}</Text>
-                <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.primary }}>Rs {Number(p.amount || 0).toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                <Text style={styles.cardSub}>{p.payment_date ? formatDate(p.payment_date) : (p.created_at ? formatDate(p.created_at) : '—')}{p.payment_mode ? ` · ${String(p.payment_mode).toUpperCase()}` : ''}</Text>
-                {!!p.notes && <Text style={styles.cardSub} numberOfLines={1}>{p.notes}</Text>}
-              </View>
+          ) : (<>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md }}>
+              {([
+                ['Billed', ownerPayments.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0), ACC.ink],
+                ['Received', ownerPayments.filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0), ACC.good],
+                ['Outstanding', ownerPayments.filter((p: any) => p.status !== 'paid').reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0), '#DC2626'],
+              ] as const).map(([lbl, val, col]) => (
+                <View key={lbl} style={{ flexGrow: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: ACC.line, padding: 10 }}>
+                  <Text style={{ fontSize: 10, color: ACC.ink2, textTransform: 'uppercase' }}>{lbl}</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: col as string }}>{fmtMoney(val as number)}</Text>
+                </View>
+              ))}
             </View>
-          ))
+            {ownerPayments.map((p: any) => {
+              const stCfg = p.status === 'paid' ? { bg: '#DCFCE7', c: '#16A34A' } : p.status === 'overdue' ? { bg: '#FEE2E2', c: '#DC2626' } : { bg: '#FEF3C7', c: '#B45309' };
+              return (
+                <View key={p.id ?? p.created_at} style={styles.card}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{p.ownerName}{p.apartmentCode ? ` · ${p.apartmentCode}` : ''}</Text>
+                      <Text style={styles.cardSub}>{p.paymentMonth || (p.billDate ? formatDate(p.billDate) : '—')}{p.dueDate ? ` · due ${formatDate(p.dueDate)}` : ''}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: colors.primary }}>{fmtMoney(p.amount)}</Text>
+                      <View style={{ backgroundColor: stCfg.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: stCfg.c, textTransform: 'capitalize' }}>{p.status}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </>)
         )}
 
         {/* ── REPORTS (period-scoped) ── */}

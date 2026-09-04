@@ -908,22 +908,33 @@ export const listExpenses = action({
     // Real schema: expenses.category_id → expense_categories.label (there is no expenses.category column).
     const rows = await safeList(
       sb.from("expenses")
-        .select("id, category_id, description, amount, expense_date, created_at")
+        .select("id, category_id, property_id, vendor_id, description, amount, expense_date, billing_month, receipt_url, data_source, created_at")
         .eq("organization_id", ORG_ID)
-        .order("created_at", { ascending: false })
+        .order("expense_date", { ascending: false })
     );
     const catIds = [...new Set(rows.map((r: any) => r.category_id).filter(Boolean))];
-    const cats = catIds.length
-      ? await safeList(sb.from("expense_categories").select("id, label").eq("organization_id", ORG_ID).in("id", catIds))
-      : [];
-    const catLabel = new Map<string, string>();
-    for (const c of cats) catLabel.set(c.id, c.label);
+    const propIds = [...new Set(rows.map((r: any) => r.property_id).filter(Boolean))];
+    const venIds = [...new Set(rows.map((r: any) => r.vendor_id).filter(Boolean))];
+    const [cats, props, vens] = await Promise.all([
+      catIds.length ? safeList(sb.from("expense_categories").select("id, label").eq("organization_id", ORG_ID).in("id", catIds)) : Promise.resolve([]),
+      propIds.length ? safeList(sb.from("properties").select("id, property_name").eq("organization_id", ORG_ID).in("id", propIds)) : Promise.resolve([]),
+      venIds.length ? safeList(sb.from("vendors").select("id, name").in("id", venIds)) : Promise.resolve([]),
+    ]);
+    const catLabel = new Map<string, string>(); for (const c of cats as any[]) catLabel.set(c.id, c.label);
+    const propName = new Map<string, string>(); for (const p of props as any[]) propName.set(p.id, p.property_name);
+    const venName = new Map<string, string>(); for (const vv of vens as any[]) venName.set(vv.id, vv.name);
     return rows.map((row: any) => ({
       id: row.id,
+      categoryId: row.category_id || null,
       category: row.category_id ? (catLabel.get(row.category_id) || null) : null,
+      propertyName: propName.get(row.property_id) || "",
+      vendorName: venName.get(row.vendor_id) || "",
       description: row.description || null,
-      amount: row.amount ?? 0,
+      amount: Number(row.amount ?? 0),
       expense_date: row.expense_date || null,
+      billingMonth: row.billing_month || "",
+      receiptUrl: row.receipt_url || null,
+      locked: row.data_source === "locked",
       created_at: row.created_at || null,
     }));
   },
@@ -963,20 +974,39 @@ export const listOwnerPayments = action({
     const sb = getSupabase();
     const rows = await safeList(
       sb.from("owner_payments")
-        // Real schema: base_amount/escalated_amount (no `amount`), paid_date (no `payment_date`).
-        .select("id, owner_id, base_amount, escalated_amount, paid_date, payment_mode, notes, created_at")
+        .select("id, owner_id, apartment_id, base_amount, escalated_amount, bill_date, due_date, payment_month, status, paid_date, payment_mode, reference_number, notes, created_at")
         .eq("organization_id", ORG_ID)
-        .order("created_at", { ascending: false })
+        .order("bill_date", { ascending: false })
     );
-    return rows.map((row: any) => ({
-      id: row.id,
-      owner_id: row.owner_id || null,
-      amount: Number(row.escalated_amount ?? row.base_amount ?? 0),
-      payment_date: row.paid_date || null,
-      payment_mode: row.payment_mode || null,
-      notes: row.notes || null,
-      created_at: row.created_at || null,
-    }));
+    const ownerIds = [...new Set(rows.map((r: any) => r.owner_id).filter(Boolean))];
+    const aptIds = [...new Set(rows.map((r: any) => r.apartment_id).filter(Boolean))];
+    const [owners, apts] = await Promise.all([
+      ownerIds.length ? safeList(sb.from("owners").select("id, full_name").eq("organization_id", ORG_ID).in("id", ownerIds)) : Promise.resolve([]),
+      aptIds.length ? safeList(sb.from("apartments").select("id, apartment_code, property_id").eq("organization_id", ORG_ID).in("id", aptIds)) : Promise.resolve([]),
+    ]);
+    const oName = new Map<string, string>(); for (const o of owners as any[]) oName.set(o.id, o.full_name);
+    const aCode = new Map<string, string>(); for (const a of apts as any[]) aCode.set(a.id, a.apartment_code);
+    const today = new Date().toISOString().slice(0, 10);
+    return rows.map((row: any) => {
+      const stored = String(row.status || "").toLowerCase();
+      const computedStatus = stored === "paid" ? "paid" : (row.due_date && row.due_date < today ? "overdue" : "pending");
+      return {
+        id: row.id,
+        owner_id: row.owner_id || null,
+        ownerName: oName.get(row.owner_id) || "Unknown",
+        apartmentCode: aCode.get(row.apartment_id) || "",
+        amount: Number(row.escalated_amount ?? 0),
+        billDate: row.bill_date || null,
+        dueDate: row.due_date || null,
+        paymentMonth: row.payment_month || "",
+        status: computedStatus,
+        payment_date: row.paid_date || null,
+        payment_mode: row.payment_mode || null,
+        referenceNumber: row.reference_number || "",
+        notes: row.notes || null,
+        created_at: row.created_at || null,
+      };
+    });
   },
 });
 
