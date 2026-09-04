@@ -53,6 +53,8 @@ export interface InvoicePdfData {
   billingMonth?: string;
   rentAmount?: number;
   electricityAmount?: number;
+  estimatedEb?: number;
+  lateFee?: number;
   otherCharges?: number;
   totalAmount?: number;
   paidAmount?: number;
@@ -73,6 +75,8 @@ export function buildInvoiceHtml(inv: InvoicePdfData, orgName: string): string {
   const rows = [
     line('Rent', inv.rentAmount),
     line('Electricity', inv.electricityAmount),
+    line('Estimated EB', inv.estimatedEb),
+    line('Late fee', inv.lateFee),
     line('Other charges', inv.otherCharges),
   ].filter(Boolean).join('') || `<tr><td>Charges</td><td class="r">${inr(total)}</td></tr>`;
 

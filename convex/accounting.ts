@@ -456,7 +456,7 @@ export const listInvoices = action({
     let query = sb
       .from("invoices")
       .select(
-        "id, invoice_number, tenant_id, allotment_id, property_id, apartment_id, bed_id, billing_month, rent_amount, electricity_amount, other_charges, total_amount, amount_paid, due_date, status, is_deleted, created_at"
+        "id, invoice_number, tenant_id, allotment_id, property_id, apartment_id, bed_id, billing_month, rent_amount, electricity_amount, estimated_eb, late_fee, other_charges, total_amount, amount_paid, due_date, invoice_type, status, is_deleted, created_at"
       )
       .eq("organization_id", ORG_ID)
       .or("is_deleted.is.null,is_deleted.eq.false")
@@ -512,15 +512,35 @@ export const listInvoices = action({
         tenantName: tenantName.get(row.tenant_id) || "Unknown",
         propertyName: propName.get(row.property_id) || "",
         billingMonth: row.billing_month || "",
+        dueDate: row.due_date || null,
+        invoiceType: row.invoice_type || "regular",
         rentAmount: Number(row.rent_amount ?? 0),
         electricityAmount: Number(row.electricity_amount ?? 0),
+        estimatedEb: Number(row.estimated_eb ?? 0),
+        lateFee: Number(row.late_fee ?? 0),
         otherCharges: Number(row.other_charges ?? 0),
         totalAmount: total,
         paidAmount: paid,
+        balance: Math.max(total - paid, 0),
+        outstanding: s ? Number(s.amount_outstanding ?? 0) : Math.max(total - paid, 0),
         status: st,
       };
     });
     return status && status !== "all" ? mapped.filter((m) => m.status === status) : mapped;
+  },
+});
+
+// ─── INVOICE DETAIL (line items + EB tenant shares, read-only, web parity) ────
+export const getInvoiceDetail = action({
+  args: { invoiceId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { invoiceId }) => {
+    const sb = getSupabase();
+    const [lineItems, ebShares] = await Promise.all([
+      safeList(sb.from("invoice_line_items").select("id, invoice_id, line_type, amount, description, metadata, created_at").eq("invoice_id", invoiceId).order("created_at", { ascending: true })),
+      safeList(sb.from("eb_tenant_shares").select("*").eq("invoice_id", invoiceId)),
+    ]);
+    return { lineItems, ebShares };
   },
 });
 

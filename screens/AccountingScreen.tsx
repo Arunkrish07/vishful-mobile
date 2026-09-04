@@ -155,6 +155,9 @@ export default function AccountingScreen() {
   const [billPreviews, setBillPreviews] = useState<any[] | null>(null);
   const [billLoading, setBillLoading] = useState(false);
   const [billGenerating, setBillGenerating] = useState(false);
+  // Invoice detail (read-only, web parity)
+  const [invDetail, setInvDetail] = useState<{ inv: any; lineItems: any[]; ebShares: any[] } | null>(null);
+  const [invDetailLoading, setInvDetailLoading] = useState(false);
 
   // Org name for PDF headers — loaded once.
   useEffect(() => {
@@ -402,6 +405,19 @@ export default function AccountingScreen() {
     );
   };
 
+  const openInvoiceDetail = async (inv: any) => {
+    setInvDetail({ inv, lineItems: [], ebShares: [] });
+    setInvDetailLoading(true);
+    try {
+      const d: any = await sb.getInvoiceDetail(inv.id);
+      if (mounted.current) setInvDetail({ inv, lineItems: d?.lineItems || [], ebShares: d?.ebShares || [] });
+    } catch {
+      if (mounted.current) setInvDetail({ inv, lineItems: [], ebShares: [] });
+    } finally {
+      if (mounted.current) setInvDetailLoading(false);
+    }
+  };
+
   if (!invoices) return <LoadingScreen />;
 
   const filtered = (filter === 'all' ? invoices : invoices.filter((i: any) => i.status === filter))
@@ -565,10 +581,26 @@ export default function AccountingScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          {filtered.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md }}>
+              {([
+                ['Rental', filtered.reduce((s: number, i: any) => s + (Number(i.rentAmount) || 0), 0), ACC.ink],
+                ['EB', filtered.reduce((s: number, i: any) => s + (Number(i.electricityAmount) || 0) + (Number(i.estimatedEb) || 0), 0), colors.primary],
+                ['Other', filtered.reduce((s: number, i: any) => s + (Number(i.otherCharges) || 0) + (Number(i.lateFee) || 0), 0), ACC.ink2],
+                ['Total', filtered.reduce((s: number, i: any) => s + (Number(i.totalAmount) || 0), 0), ACC.good],
+              ] as const).map(([label, val, col]) => (
+                <View key={label} style={{ flexGrow: 1, minWidth: '46%', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: ACC.line, padding: 10 }}>
+                  <Text style={{ fontSize: 10, color: ACC.ink2, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: col as string, marginTop: 2 }}>{fmtMoney(val as number)}</Text>
+                </View>
+              ))}
+              <Text style={{ width: '100%', fontSize: 11, color: ACC.ink2 }}>{filtered.length} invoice{filtered.length === 1 ? '' : 's'} (filtered)</Text>
+            </View>
+          )}
           {filtered.length === 0 ? (
             <EmptyState title="No Invoices" subtitle="Create invoices for tenant billing" icon="receipt-outline" />
           ) : filtered.map((inv: any) => (
-            <TouchableOpacity key={inv._id} style={styles.card} onPress={() => setShowPay(inv)}>
+            <TouchableOpacity key={inv._id} style={styles.card} onPress={() => openInvoiceDetail(inv)}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                 <Text style={styles.invNum}>{inv.invoiceNumber}</Text>
                 <Badge text={inv.status} color={statusColor(inv.status)} />
@@ -579,6 +611,8 @@ export default function AccountingScreen() {
                 <View>
                   <Text style={styles.cardSub}>Rent: Rs {inv.rentAmount}</Text>
                   {inv.electricityAmount > 0 && <Text style={styles.cardSub}>Elec: Rs {inv.electricityAmount}</Text>}
+                  {inv.estimatedEb > 0 && <Text style={styles.cardSub}>Est. EB: Rs {inv.estimatedEb}</Text>}
+                  {inv.lateFee > 0 && <Text style={[styles.cardSub, { color: '#DC2626' }]}>Late fee: Rs {inv.lateFee}</Text>}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.ink }}>Rs {inv.totalAmount}</Text>
@@ -898,6 +932,95 @@ export default function AccountingScreen() {
               <Text style={{ fontSize: fontSize.xs, color: ACC.ink3, marginTop: spacing.md }}>
                 Audience is drawn from the tenant ledger (current dues), not invoice status. Tenants in credit or square never appear. Rows without a phone number are dimmed and can't be messaged.
               </Text>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* Invoice detail (read-only, web parity) */}
+      <Modal visible={invDetail !== null} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setInvDetail(null)}>
+              <Text style={{ color: colors.danger }}>Close</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }} numberOfLines={1}>{invDetail?.inv?.invoiceNumber || 'Invoice'}</Text>
+            <View style={{ width: 44 }} />
+          </View>
+          {invDetail && (
+            <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 80 }}>
+              {(() => { const iv = invDetail.inv; return (
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                    <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.ink }}>{iv.tenantName}</Text>
+                    <Badge text={iv.status} color={statusColor(iv.status)} />
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: spacing.lg }}>
+                    {[['Month', iv.billingMonth], ['Due', iv.dueDate ? formatDate(iv.dueDate) : '—'], ['Property', iv.propertyName || '—'], ['Type', iv.invoiceType || 'regular']].map(([k, val]) => (
+                      <View key={k as string} style={{ minWidth: '44%' }}>
+                        <Text style={{ fontSize: 10, color: ACC.ink3, textTransform: 'uppercase' }}>{k}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: ACC.ink }}>{String(val)}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: ACC.ink2, marginBottom: 6 }}>LINE ITEMS</Text>
+                  {invDetailLoading ? <ActivityIndicator color={ACC.purple} style={{ marginVertical: 12 }} /> : (invDetail.lineItems || []).length === 0 ? (
+                    <Text style={{ fontSize: 12, color: ACC.ink3, marginBottom: 12 }}>No stored line items for this invoice.</Text>
+                  ) : (
+                    <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: ACC.line, marginBottom: spacing.lg, overflow: 'hidden' }}>
+                      {invDetail.lineItems.map((li: any, i: number) => (
+                        <View key={li.id || i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: '#F1F5F9' }}>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: ACC.ink, textTransform: 'capitalize' }}>{String(li.line_type || '').replace(/_/g, ' ')}</Text>
+                            {!!li.description && <Text style={{ fontSize: 11, color: ACC.ink2 }} numberOfLines={2}>{li.description}</Text>}
+                          </View>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: ACC.ink }}>{fmtMoney(li.amount)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: ACC.ink2, marginBottom: 6 }}>SUMMARY</Text>
+                  <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: ACC.line, padding: 12, marginBottom: spacing.lg }}>
+                    {[
+                      ['Rent', iv.rentAmount], ['Actual EB', iv.electricityAmount], ['Estimated EB', iv.estimatedEb],
+                      ['Late Fee', iv.lateFee], ['Other Charges', iv.otherCharges],
+                    ].filter(([, val]) => Number(val) > 0).map(([k, val]) => (
+                      <View key={k as string} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 }}>
+                        <Text style={{ fontSize: 13, color: ACC.ink2 }}>{k}</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink }}>{fmtMoney(val as number)}</Text>
+                      </View>
+                    ))}
+                    <View style={{ height: 1, backgroundColor: ACC.line, marginVertical: 6 }} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: ACC.ink }}>Total</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '900', color: ACC.ink }}>{fmtMoney(iv.totalAmount)}</Text>
+                    </View>
+                    {iv.paidAmount > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 13, color: ACC.good }}>Paid</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: ACC.good }}>− {fmtMoney(iv.paidAmount)}</Text>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: ACC.bad }}>Balance Due</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '900', color: ACC.bad }}>{fmtMoney(iv.balance ?? Math.max((iv.totalAmount || 0) - (iv.paidAmount || 0), 0))}</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Button title="Download PDF" icon="download-outline" onPress={() => { const inv = iv; setInvDetail(null); shareInv(inv); }} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button title="Record Payment" icon="cash-outline" onPress={() => { const inv = iv; setInvDetail(null); setShowPay(inv); }} />
+                    </View>
+                  </View>
+                </>
+              ); })()}
             </ScrollView>
           )}
         </SafeAreaView>
