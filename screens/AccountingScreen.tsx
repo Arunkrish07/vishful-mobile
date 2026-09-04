@@ -111,7 +111,9 @@ export default function AccountingScreen() {
   const [section, setSection] = useState('invoices');
   const [period, setPeriod] = useState('current_fy');
   const [periodOpen, setPeriodOpen] = useState(false);
-  const [reportsTab, setReportsTab] = useState<'pnl' | 'beds' | 'eb'>('pnl');
+  const [reportsTab, setReportsTab] = useState<'pnl' | 'beds' | 'eb' | 'profit'>('pnl');
+  const [profitability, setProfitability] = useState<any | null>(null);
+  const [profitLoading, setProfitLoading] = useState(false);
 
   // period-scoped summary + reports
   const [summary, setSummary] = useState<any>(null);
@@ -192,6 +194,18 @@ export default function AccountingScreen() {
     })();
     return () => { cancelled = true; };
   }, [section, adjustments]);
+
+  // Profitability report loads when its sub-tab opens.
+  useEffect(() => {
+    if (section !== 'reports' || reportsTab !== 'profit' || profitability !== null) return;
+    let cancelled = false; setProfitLoading(true);
+    (async () => {
+      try { const r: any = await sb.getProfitability(); if (!cancelled) setProfitability(r || { rows: [], totals: {} }); }
+      catch { if (!cancelled) setProfitability({ rows: [], totals: {} }); }
+      finally { if (!cancelled) setProfitLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [section, reportsTab, profitability]);
 
   // Load the read-only accounting sections on demand (Settlements/Exit/GST/Trial Balance).
   useEffect(() => {
@@ -1030,7 +1044,7 @@ export default function AccountingScreen() {
         {/* ── REPORTS (period-scoped) ── */}
         {section === 'reports' && (<>
           <ScrollView horizontal style={{ marginBottom: spacing.md, maxHeight: 44 }} showsHorizontalScrollIndicator={false}>
-            {([['pnl', 'Property P&L'], ['beds', 'Bed Profitability'], ['eb', 'EB Reconciliation']] as const).map(([k, lbl]) => (
+            {([['pnl', 'Property P&L'], ['beds', 'Bed Profitability'], ['eb', 'EB Reconciliation'], ['profit', 'Profitability']] as const).map(([k, lbl]) => (
               <TouchableOpacity key={k} style={[styles.filterChip, reportsTab === k && styles.filterActive]} onPress={() => setReportsTab(k as any)}>
                 <Text style={[styles.filterText, { textTransform: 'none' }, reportsTab === k && styles.filterTextActive]}>{lbl}</Text>
               </TouchableOpacity>
@@ -1086,6 +1100,33 @@ export default function AccountingScreen() {
                 </View>
               </View>
             ))
+          )}
+
+          {reportsTab === 'profit' && (
+            profitLoading || profitability === null ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 24 }} /> :
+            (profitability.rows || []).length === 0 ? <EmptyState title="No profitability data" subtitle="No revenue/cost for this FY" icon="trending-up-outline" /> : (
+              <>
+                <View style={{ backgroundColor: '#EEF3FF', borderRadius: 14, padding: 12, marginBottom: spacing.md }}>
+                  <Text style={{ fontSize: 11, color: ACC.ink2 }}>FY {profitability.fyLabel}</Text>
+                  <Text style={{ fontSize: fontSize.lg, fontWeight: '900', color: (profitability.totals?.profit || 0) >= 0 ? ACC.good : ACC.bad }}>Net Profit {fmtMoney(profitability.totals?.profit || 0)}</Text>
+                  <Text style={{ fontSize: 11, color: ACC.ink2, marginTop: 2 }}>Revenue {fmtMoney(profitability.totals?.revenue || 0)} · Expenses {fmtMoney(profitability.totals?.expense || 0)} · Rental cost {fmtMoney(profitability.totals?.rentalCost || 0)}</Text>
+                </View>
+                {(profitability.rows || []).map((r: any) => (
+                  <View key={r.propertyId} style={styles.card}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{r.propertyName}</Text>
+                      <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: r.profit >= 0 ? ACC.good : ACC.bad }}>{Math.round(r.margin)}%</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      <KpiTile label="Revenue" value={fmtMoney(r.revenue)} color={ACC.good} />
+                      <KpiTile label="Expenses" value={fmtMoney(r.expense)} color={ACC.bad} />
+                      <KpiTile label="Rental Cost" value={fmtMoney(r.rentalCost)} color={colors.primary} />
+                      <KpiTile label="Profit" value={fmtMoney(r.profit)} color={r.profit >= 0 ? ACC.good : ACC.bad} />
+                    </View>
+                  </View>
+                ))}
+              </>
+            )
           )}
         </>)}
       </ScrollView>

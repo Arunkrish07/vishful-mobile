@@ -530,6 +530,41 @@ export const listInvoices = action({
   },
 });
 
+// ─── PROFITABILITY (property-level, read-only; web ProfitabilityTab top level) ─
+// profit = revenue − expenses − rentalCost, per property, for a financial year.
+export const getProfitability = action({
+  args: { fyStartYear: v.optional(v.number()) },
+  returns: v.any(),
+  handler: async (_ctx, { fyStartYear }) => {
+    const sb = getSupabase();
+    const now = new Date();
+    const fy = fyStartYear ?? (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1);
+    const fromDate = `${fy}-04-01`, toDate = `${fy + 1}-03-31`;
+
+    const [invoices, expenses, ownerPays, apts, props] = await Promise.all([
+      safeList(sb.from("invoices").select("property_id, total_amount, invoice_date, is_deleted").eq("organization_id", ORG_ID).or("is_deleted.is.null,is_deleted.eq.false").gte("invoice_date", fromDate).lte("invoice_date", toDate)),
+      safeList(sb.from("expenses").select("property_id, amount, expense_date").eq("organization_id", ORG_ID).gte("expense_date", fromDate).lte("expense_date", toDate)),
+      safeList(sb.from("owner_payments").select("apartment_id, escalated_amount, bill_date").eq("organization_id", ORG_ID).gte("bill_date", fromDate).lte("bill_date", toDate)),
+      safeList(sb.from("apartments").select("id, property_id").eq("organization_id", ORG_ID)),
+      safeList(sb.from("properties").select("id, property_name").eq("organization_id", ORG_ID)),
+    ]);
+    const aptProp = new Map<string, string>(); for (const a of apts as any[]) aptProp.set(a.id, a.property_id);
+    const acc = new Map<string, { revenue: number; expense: number; rentalCost: number }>();
+    const bump = (pid: string) => (acc.get(pid) || (acc.set(pid, { revenue: 0, expense: 0, rentalCost: 0 }), acc.get(pid)!));
+    for (const i of invoices as any[]) { if (i.property_id) bump(i.property_id).revenue += Number(i.total_amount) || 0; }
+    for (const e of expenses as any[]) { if (e.property_id) bump(e.property_id).expense += Number(e.amount) || 0; }
+    for (const o of ownerPays as any[]) { const pid = aptProp.get(o.apartment_id); if (pid) bump(pid).rentalCost += Number(o.escalated_amount) || 0; }
+
+    const pName = new Map<string, string>(); for (const p of props as any[]) pName.set(p.id, p.property_name);
+    const rows = [...acc.entries()].map(([pid, v2]) => {
+      const profit = v2.revenue - v2.expense - v2.rentalCost;
+      return { propertyId: pid, propertyName: pName.get(pid) || "Unknown", revenue: v2.revenue, expense: v2.expense, rentalCost: v2.rentalCost, profit, margin: v2.revenue > 0 ? (profit / v2.revenue) * 100 : 0 };
+    }).sort((a, b) => b.revenue - a.revenue);
+    const totals = rows.reduce((s, r) => ({ revenue: s.revenue + r.revenue, expense: s.expense + r.expense, rentalCost: s.rentalCost + r.rentalCost, profit: s.profit + r.profit }), { revenue: 0, expense: 0, rentalCost: 0, profit: 0 });
+    return { fyLabel: `${fy}-${String((fy + 1) % 100).padStart(2, "0")}`, rows, totals };
+  },
+});
+
 // ─── DEPOSIT SETTLEMENTS (read-only, web parity) ─────────────────────────────
 export const getDepositSettlements = action({
   args: {},

@@ -357,6 +357,9 @@ export async function getTenantLedger(args: { allotmentId?: string; tenantId?: s
 export async function getTrialBalance(from: string, to: string) {
   return client.action((api as any).accounting.getTrialBalance, { from, to });
 }
+export async function getProfitability(fyStartYear?: number) {
+  return client.action((api as any).accounting.getProfitability, { fyStartYear });
+}
 
 export async function previewBills(month: string, propertyId?: string) {
   return client.action((api as any).billing.previewBills, { month, propertyId });
