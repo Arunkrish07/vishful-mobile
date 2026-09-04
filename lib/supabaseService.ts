@@ -342,6 +342,21 @@ export async function getInvoiceDetail(invoiceId: string) {
 export async function listAdjustments() {
   return client.action((api as any).accounting.listAdjustments, {});
 }
+export async function getDepositSettlements() {
+  return client.action((api as any).accounting.getDepositSettlements, {});
+}
+export async function getExitReconciliationWorklist() {
+  return client.action((api as any).accounting.getExitReconciliationWorklist, {});
+}
+export async function getGstFiledWorkings() {
+  return client.action((api as any).accounting.getGstFiledWorkings, {});
+}
+export async function getTenantLedger(args: { allotmentId?: string; tenantId?: string }) {
+  return client.action((api as any).accounting.getTenantLedger, args);
+}
+export async function getTrialBalance(from: string, to: string) {
+  return client.action((api as any).accounting.getTrialBalance, { from, to });
+}
 
 export async function previewBills(month: string, propertyId?: string) {
   return client.action((api as any).billing.previewBills, { month, propertyId });

@@ -530,6 +530,134 @@ export const listInvoices = action({
   },
 });
 
+// ─── DEPOSIT SETTLEMENTS (read-only, web parity) ─────────────────────────────
+export const getDepositSettlements = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("deposit_settlements")
+        .select("id, tenant_id, allotment_id, deposit_amount, pending_rent, pending_eb, pending_late_fees, damages, other_deductions, total_deductions, refund_amount, settlement_date, status, notes, is_deleted")
+        .eq("organization_id", ORG_ID).or("is_deleted.is.null,is_deleted.eq.false")
+        .order("settlement_date", { ascending: false }),
+    );
+    const tenantIds = [...new Set(rows.map((r) => r.tenant_id).filter(Boolean))];
+    const tenants: any[] = tenantIds.length ? await safeList(sb.from("tenants").select("id, full_name").eq("organization_id", ORG_ID).in("id", tenantIds)) : [];
+    const tName = new Map<string, string>(); for (const t of tenants) tName.set(t.id, t.full_name);
+    return rows.map((r) => {
+      const totalDed = Number(r.total_deductions ?? ((Number(r.pending_rent) || 0) + (Number(r.pending_eb) || 0) + (Number(r.pending_late_fees) || 0) + (Number(r.damages) || 0) + (Number(r.other_deductions) || 0)));
+      const refund = Number(r.refund_amount ?? (Number(r.deposit_amount) || 0) - totalDed);
+      return {
+        id: r.id, tenantName: tName.get(r.tenant_id) || "Unknown", allotmentId: r.allotment_id,
+        depositAmount: Number(r.deposit_amount ?? 0), pendingRent: Number(r.pending_rent ?? 0), pendingEB: Number(r.pending_eb ?? 0),
+        pendingLateFees: Number(r.pending_late_fees ?? 0), damages: Number(r.damages ?? 0), otherDeductions: Number(r.other_deductions ?? 0),
+        totalDeductions: totalDed, refundAmount: refund, status: r.status || "settled", settlementDate: r.settlement_date || null, notes: r.notes || "",
+      };
+    });
+  },
+});
+
+// ─── EXIT RECONCILIATION WORKLIST (read-only, web parity) ─────────────────────
+export const getExitReconciliationWorklist = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("v_exit_reconciliation_worklist").select("*").eq("organization_id", ORG_ID),
+    );
+    return rows.map((r) => {
+      const duesNow = Number(r.dues_now ?? 0);
+      const addEb = Number(r.eb_already ?? 0) === 0 ? 0 : 0; // eb_already/exit_charge_already are "already billed" flags — no auto-add on read
+      const duesAfter = Math.round(duesNow);
+      const depositHeld = Number(r.deposit_held ?? 0);
+      const refund = Math.max(Math.round(depositHeld - Math.max(duesAfter, 0)), 0);
+      return {
+        allotmentId: r.allotment_id, tenantId: r.tenant_id, tenantName: r.tenant_name || "Unknown",
+        propertyName: r.property_name || "", bedLabel: r.bed_label || r.bed_code || `${r.apartment_code || ""}-${r.bed_code || ""}`,
+        actualExitDate: r.actual_exit_date || null, duesNow, depositHeld, ebAlready: Number(r.eb_already ?? 0),
+        exitChargeAlready: Number(r.exit_charge_already ?? 0), settlementStatus: r.settlement_status || "", duesAfter, refund,
+      };
+    });
+  },
+});
+
+// ─── GST FILED WORKINGS (read-only, web parity) ──────────────────────────────
+export const getGstFiledWorkings = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("gst_monthly_workings").select("id, month, year, generated_at, generated_by, summary_json, rcm_json")
+        .eq("organization_id", ORG_ID).order("year", { ascending: false }).order("month", { ascending: false }),
+    );
+    return rows.map((r) => {
+      const s = r.summary_json || {};
+      const rcm = r.rcm_json || {};
+      return {
+        id: r.id, month: r.month, year: r.year, generatedAt: r.generated_at || null,
+        summary: s, rcm: rcm,
+      };
+    });
+  },
+});
+
+// ─── TENANT LEDGER (v_tenant_ledger, read-only, web parity) ───────────────────
+export const getTenantLedger = action({
+  args: { allotmentId: v.optional(v.string()), tenantId: v.optional(v.string()) },
+  returns: v.any(),
+  handler: async (_ctx, { allotmentId, tenantId }) => {
+    const sb = getSupabase();
+    let q = sb.from("v_tenant_ledger")
+      .select("tenant_id, allotment_id, entry_date, posted_at, journal_entry_id, is_reversal_of, source_table, description, account_code, account_name, debit, credit, running_balance")
+      .eq("organization_id", ORG_ID).order("entry_date", { ascending: true }).order("posted_at", { ascending: true });
+    if (allotmentId) q = q.eq("allotment_id", allotmentId);
+    else if (tenantId) q = q.eq("tenant_id", tenantId);
+    const rows: any[] = await safeList(q);
+    // Drop reversal pairs (a reversal row + the entry it reverses).
+    const reversedJe = new Set(rows.map((r) => r.is_reversal_of).filter(Boolean));
+    const clean = rows.filter((r) => !r.is_reversal_of && !reversedJe.has(r.journal_entry_id));
+    let totalCharges = 0, totalPayments = 0;
+    for (const r of clean) { totalCharges += Number(r.debit) || 0; totalPayments += Number(r.credit) || 0; }
+    const last = clean.length ? clean[clean.length - 1] : null;
+    return {
+      entries: clean.map((r) => ({
+        entryDate: r.entry_date, accountCode: r.account_code, accountName: r.account_name, sourceTable: r.source_table,
+        description: r.description, debit: Number(r.debit) || 0, credit: Number(r.credit) || 0, runningBalance: Number(r.running_balance) || 0,
+      })),
+      summary: { totalCharges, totalPayments, outstandingDue: last ? Number(last.running_balance) || 0 : (totalCharges - totalPayments) },
+    };
+  },
+});
+
+// ─── TRIAL BALANCE (RPC get_trial_balance_detailed, read-only, web parity) ────
+export const getTrialBalance = action({
+  args: { from: v.string(), to: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { from, to }) => {
+    const sb = getSupabase();
+    const { data, error } = await sb.rpc("get_trial_balance_detailed", { p_org: ORG_ID, p_from: from, p_to: to });
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    const rows: any[] = Array.isArray(data) ? data : [];
+    let periodDebit = 0, periodCredit = 0, cumDebit = 0, cumCredit = 0;
+    for (const r of rows) {
+      periodDebit += Number(r.total_debit) || 0; periodCredit += Number(r.total_credit) || 0;
+      cumDebit += Number(r.cum_total_debit) || 0; cumCredit += Number(r.cum_total_credit) || 0;
+    }
+    return {
+      rows: rows.map((r) => ({
+        accountId: r.account_id, code: r.code, name: r.name, accountType: r.account_type, normalBalance: r.normal_balance, depth: Number(r.depth) || 0,
+        periodDebit: Number(r.total_debit) || 0, periodCredit: Number(r.total_credit) || 0, periodBalance: Number(r.balance) || 0,
+        cumDebit: Number(r.cum_total_debit) || 0, cumCredit: Number(r.cum_total_credit) || 0, cumBalance: Number(r.cum_balance) || 0,
+      })),
+      periodTotals: { debit: periodDebit, credit: periodCredit },
+      asOfTotals: { debit: cumDebit, credit: cumCredit },
+    };
+  },
+});
+
 // ─── TENANT ADJUSTMENTS (credit/debit notes, read-only, web parity) ──────────
 export const listAdjustments = action({
   args: {},

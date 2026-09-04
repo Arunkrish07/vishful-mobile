@@ -60,6 +60,11 @@ const SECTIONS = [
   { key: 'adjustments', label: 'Adjustments' },
   { key: 'expenses', label: 'Expenses' },
   { key: 'payments', label: 'Rental Payments' },
+  { key: 'settlements', label: 'Settlements' },
+  { key: 'exit_recon', label: 'Exit Recon' },
+  { key: 'gst', label: 'GST' },
+  { key: 'ledger', label: 'Tenant Ledger' },
+  { key: 'trial_balance', label: 'Trial Balance' },
   { key: 'reports',  label: 'Reports' },
 ];
 
@@ -163,6 +168,15 @@ export default function AccountingScreen() {
   const [adjustments, setAdjustments] = useState<any[] | null>(null);
   const [adjLoading, setAdjLoading] = useState(false);
   const [adjType, setAdjType] = useState<'all' | 'credit_note' | 'debit_note'>('all');
+  // Settlements / Exit-recon / GST / Trial balance (read-only, web parity)
+  const [settlements, setSettlements] = useState<any[] | null>(null);
+  const [exitRecon, setExitRecon] = useState<any[] | null>(null);
+  const [gstFiled, setGstFiled] = useState<any[] | null>(null);
+  const [trialBal, setTrialBal] = useState<any | null>(null);
+  const [secLoading, setSecLoading] = useState(false);
+  const [ledgerTenant, setLedgerTenant] = useState('');
+  const [ledger, setLedger] = useState<any | null>(null);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
 
   // Adjustments load when its tab opens.
   useEffect(() => {
@@ -178,6 +192,37 @@ export default function AccountingScreen() {
     })();
     return () => { cancelled = true; };
   }, [section, adjustments]);
+
+  // Load the read-only accounting sections on demand (Settlements/Exit/GST/Trial Balance).
+  useEffect(() => {
+    let cancelled = false;
+    const need = (
+      (section === 'settlements' && settlements === null) ||
+      (section === 'exit_recon' && exitRecon === null) ||
+      (section === 'gst' && gstFiled === null) ||
+      (section === 'trial_balance' && trialBal === null)
+    );
+    if (!need) return;
+    setSecLoading(true);
+    (async () => {
+      try {
+        if (section === 'settlements') { const r: any = await sb.getDepositSettlements(); if (!cancelled) setSettlements(Array.isArray(r) ? r : []); }
+        else if (section === 'exit_recon') { const r: any = await sb.getExitReconciliationWorklist(); if (!cancelled) setExitRecon(Array.isArray(r) ? r : []); }
+        else if (section === 'gst') { const r: any = await sb.getGstFiledWorkings(); if (!cancelled) setGstFiled(Array.isArray(r) ? r : []); }
+        else if (section === 'trial_balance') {
+          const now = new Date(); const fyStartY = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+          const r: any = await sb.getTrialBalance(`${fyStartY}-04-01`, `${fyStartY + 1}-03-31`);
+          if (!cancelled) setTrialBal(r || { rows: [], periodTotals: { debit: 0, credit: 0 }, asOfTotals: { debit: 0, credit: 0 } });
+        }
+      } catch {
+        if (!cancelled) {
+          if (section === 'settlements') setSettlements([]); else if (section === 'exit_recon') setExitRecon([]);
+          else if (section === 'gst') setGstFiled([]); else if (section === 'trial_balance') setTrialBal({ rows: [], periodTotals: { debit: 0, credit: 0 }, asOfTotals: { debit: 0, credit: 0 } });
+        }
+      } finally { if (!cancelled) setSecLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [section, settlements, exitRecon, gstFiled, trialBal]);
 
   // Org name for PDF headers — loaded once.
   useEffect(() => {
@@ -423,6 +468,19 @@ export default function AccountingScreen() {
         } },
       ],
     );
+  };
+
+  const openLedger = async (tenantId: string) => {
+    if (!tenantId) { setLedger(null); return; }
+    setLedger(null); setLedgerLoading(true);
+    try {
+      const d: any = await sb.getTenantLedger({ tenantId });
+      if (mounted.current) setLedger(d || { entries: [], summary: {} });
+    } catch {
+      if (mounted.current) setLedger({ entries: [], summary: {} });
+    } finally {
+      if (mounted.current) setLedgerLoading(false);
+    }
   };
 
   const openInvoiceDetail = async (inv: any) => {
@@ -744,6 +802,168 @@ export default function AccountingScreen() {
               </>
             );
           })()
+        )}
+
+        {/* ── SETTLEMENTS (deposit settlements, read-only) ── */}
+        {section === 'settlements' && (
+          secLoading || settlements === null ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 30 }} /> :
+          settlements.length === 0 ? <EmptyState title="No settlements" subtitle="Deposit settlements appear here" icon="wallet-outline" /> : (
+            <>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
+                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: ACC.line }}>
+                  <Text style={{ fontSize: 10, color: ACC.ink2, textTransform: 'uppercase' }}>Total Deposits</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '900', color: ACC.ink }}>{fmtMoney(settlements.reduce((s: number, x: any) => s + (Number(x.depositAmount) || 0), 0))}</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: ACC.line }}>
+                  <Text style={{ fontSize: 10, color: ACC.ink2, textTransform: 'uppercase' }}>Total Refunds</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '900', color: ACC.good }}>{fmtMoney(settlements.reduce((s: number, x: any) => s + Math.max(Number(x.refundAmount) || 0, 0), 0))}</Text>
+                </View>
+              </View>
+              {settlements.map((x: any) => {
+                const payable = Number(x.refundAmount) < 0;
+                return (
+                  <View key={x.id} style={styles.card}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{x.tenantName}</Text>
+                        <Text style={styles.cardSub}>{x.settlementDate ? formatDate(x.settlementDate) : '—'} · {x.status}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 10, color: ACC.ink3 }}>{payable ? 'Amount Payable' : 'Refund'}</Text>
+                        <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: payable ? '#DC2626' : ACC.good }}>{fmtMoney(Math.abs(x.refundAmount))}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                      <Text style={styles.cardSub}>Deposit {fmtMoney(x.depositAmount)}</Text>
+                      <Text style={styles.cardSub}>Deductions {fmtMoney(x.totalDeductions)}</Text>
+                      {x.damages > 0 && <Text style={styles.cardSub}>Damages {fmtMoney(x.damages)}</Text>}
+                    </View>
+                  </View>
+                );
+              })}
+            </>
+          )
+        )}
+
+        {/* ── EXIT RECONCILIATION (worklist, read-only) ── */}
+        {section === 'exit_recon' && (
+          secLoading || exitRecon === null ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 30 }} /> :
+          exitRecon.length === 0 ? <EmptyState title="All exits reconciled" subtitle="No pending exit settlements" icon="checkmark-done-outline" /> : (
+            <>
+              <Text style={{ fontSize: fontSize.sm, color: ACC.ink2, marginBottom: spacing.md }}>{exitRecon.length} unsettled exit{exitRecon.length === 1 ? '' : 's'}</Text>
+              {exitRecon.map((x: any) => (
+                <View key={x.allotmentId} style={styles.card}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{x.tenantName}</Text>
+                      <Text style={styles.cardSub}>{x.bedLabel} · exited {x.actualExitDate ? formatDate(x.actualExitDate) : '—'}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 10, color: ACC.ink3 }}>Suggested refund</Text>
+                      <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.good }}>{fmtMoney(x.refund)}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                    <Text style={styles.cardSub}>Dues {fmtMoney(x.duesNow)}</Text>
+                    <Text style={styles.cardSub}>Deposit {fmtMoney(x.depositHeld)}</Text>
+                    {!!x.settlementStatus && <Text style={styles.cardSub}>{x.settlementStatus}</Text>}
+                  </View>
+                </View>
+              ))}
+            </>
+          )
+        )}
+
+        {/* ── GST (filed workings, read-only) ── */}
+        {section === 'gst' && (
+          secLoading || gstFiled === null ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 30 }} /> :
+          gstFiled.length === 0 ? <EmptyState title="No filed GST workings" subtitle="Monthly GST filings appear here" icon="document-text-outline" /> : (
+            gstFiled.map((g: any) => {
+              const s = g.summary || {};
+              return (
+                <View key={g.id} style={styles.card}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.cardTitle}>{new Date(g.year, (g.month || 1) - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</Text>
+                    <Text style={{ fontSize: 10, color: ACC.ink3 }}>{g.generatedAt ? formatDate(g.generatedAt) : ''}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+                    <Text style={styles.cardSub}>Taxable {fmtMoney(s.taxableAmount || 0)}</Text>
+                    <Text style={styles.cardSub}>Exempt {fmtMoney(s.exemptAmount || 0)}</Text>
+                    <Text style={[styles.cardSub, { color: ACC.ink, fontWeight: '700' }]}>GST {fmtMoney(s.gstAmount5 || 0)}</Text>
+                    {(s.rcmGstAmount || 0) > 0 && <Text style={styles.cardSub}>RCM {fmtMoney(s.rcmGstAmount)}</Text>}
+                  </View>
+                </View>
+              );
+            })
+          )
+        )}
+
+        {/* ── TENANT LEDGER (v_tenant_ledger, read-only) ── */}
+        {section === 'ledger' && (
+          <>
+            <PickerSelect label="Tenant" value={ledgerTenant} options={tenantOpts} onSelect={(v: string) => { setLedgerTenant(v); openLedger(v); }} />
+            {!ledgerTenant ? <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 24 }}>Select a tenant to view their ledger.</Text> :
+             ledgerLoading || !ledger ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 24 }} /> : (
+              <>
+                <View style={{ flexDirection: 'row', gap: 8, marginVertical: spacing.md, flexWrap: 'wrap' }}>
+                  {[['Charges', ledger.summary?.totalCharges, ACC.ink], ['Payments', ledger.summary?.totalPayments, ACC.good], ['Outstanding', ledger.summary?.outstandingDue, (Number(ledger.summary?.outstandingDue) || 0) > 0 ? '#DC2626' : ACC.good]].map(([k, val, col]) => (
+                    <View key={k as string} style={{ flexGrow: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: ACC.line, padding: 10 }}>
+                      <Text style={{ fontSize: 10, color: ACC.ink2, textTransform: 'uppercase' }}>{k}</Text>
+                      <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: col as string }}>{fmtMoney(Math.abs(Number(val) || 0))}</Text>
+                    </View>
+                  ))}
+                </View>
+                {(ledger.entries || []).length === 0 ? <Text style={{ color: colors.textTertiary, textAlign: 'center' }}>No ledger entries.</Text> :
+                  (ledger.entries || []).map((e: any, i: number) => (
+                    <View key={i} style={[styles.card, { paddingVertical: 10 }]}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: ACC.ink }} numberOfLines={1}>{e.description || e.accountName}</Text>
+                          <Text style={{ fontSize: 10, color: ACC.ink3 }}>{e.entryDate ? formatDate(e.entryDate) : ''} · {e.accountCode} {e.accountName}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          {e.debit > 0 && <Text style={{ fontSize: 12, color: '#DC2626' }}>Dr {fmtMoney(e.debit)}</Text>}
+                          {e.credit > 0 && <Text style={{ fontSize: 12, color: ACC.good }}>Cr {fmtMoney(e.credit)}</Text>}
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: ACC.ink }}>{fmtMoney(e.runningBalance)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+              </>
+             )}
+          </>
+        )}
+
+        {/* ── TRIAL BALANCE (RPC, read-only) ── */}
+        {section === 'trial_balance' && (
+          secLoading || trialBal === null ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 30 }} /> :
+          (trialBal.rows || []).length === 0 ? <EmptyState title="No trial balance" subtitle="No journal accounts for this period" icon="calculator-outline" /> : (
+            <>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
+                {[['Period', trialBal.periodTotals], ['As-of', trialBal.asOfTotals]].map(([lbl, t]: any) => {
+                  const bal = Math.abs((Number(t.debit) || 0) - (Number(t.credit) || 0)) < 1;
+                  return (
+                    <View key={lbl} style={{ flex: 1, backgroundColor: bal ? '#ECFDF5' : '#FEF2F2', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: bal ? '#BBF7D0' : '#FECACA' }}>
+                      <Text style={{ fontSize: 10, color: bal ? '#16A34A' : '#DC2626', textTransform: 'uppercase' }}>{lbl} {bal ? 'balanced' : 'imbalanced'}</Text>
+                      <Text style={{ fontSize: 11, color: ACC.ink2 }}>Dr {fmtMoney(t.debit)} · Cr {fmtMoney(t.credit)}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+              <View style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: ACC.line, overflow: 'hidden' }}>
+                {(trialBal.rows || []).map((r: any, i: number) => {
+                  const isIE = r.accountType === 'INCOME' || r.accountType === 'EXPENSE';
+                  const bal = isIE ? r.periodBalance : r.cumBalance;
+                  return (
+                    <View key={r.accountId || i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: '#F1F5F9', paddingLeft: 12 + (Number(r.depth) || 0) * 10 }}>
+                      <Text style={{ flex: 1, fontSize: 12, color: (Number(r.depth) || 0) === 0 ? ACC.ink : ACC.ink2, fontWeight: (Number(r.depth) || 0) === 0 ? '800' : '500' }} numberOfLines={1}>{r.code} {r.name}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: Number(bal) < 0 ? '#DC2626' : ACC.ink }}>{fmtMoney(bal)}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )
         )}
 
         {/* ── EXPENSES (read-only) ── */}
