@@ -530,6 +530,42 @@ export const listInvoices = action({
   },
 });
 
+// ─── TENANT ADJUSTMENTS (credit/debit notes, read-only, web parity) ──────────
+export const listAdjustments = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("tenant_adjustments")
+        .select("id, adjustment_date, adjustment_type, category, amount, reason, reference_number, billing_month, tenant_id, allotment_id, property_id, apartment_id, bed_id, is_locked, created_at")
+        .eq("organization_id", ORG_ID)
+        .or("is_deleted.is.null,is_deleted.eq.false")
+        .order("adjustment_date", { ascending: false }),
+    );
+    const tenantIds = [...new Set(rows.map((r) => r.tenant_id).filter(Boolean))];
+    const propertyIds = [...new Set(rows.map((r) => r.property_id).filter(Boolean))];
+    const tenants: any[] = tenantIds.length ? await safeList(sb.from("tenants").select("id, full_name").eq("organization_id", ORG_ID).in("id", tenantIds)) : [];
+    const props: any[] = propertyIds.length ? await safeList(sb.from("properties").select("id, property_name").eq("organization_id", ORG_ID).in("id", propertyIds)) : [];
+    const tName = new Map<string, string>(); for (const t of tenants) tName.set(t.id, t.full_name);
+    const pName = new Map<string, string>(); for (const p of props) pName.set(p.id, p.property_name);
+    return rows.map((r) => ({
+      id: r.id,
+      adjustmentDate: r.adjustment_date || null,
+      adjustmentType: r.adjustment_type || "credit_note",
+      category: r.category || "others",
+      amount: Number(r.amount ?? 0),
+      reason: r.reason || "",
+      referenceNumber: r.reference_number || "",
+      billingMonth: r.billing_month || "",
+      tenantId: r.tenant_id,
+      tenantName: tName.get(r.tenant_id) || "Unknown",
+      propertyName: pName.get(r.property_id) || "",
+      isLocked: !!r.is_locked,
+    }));
+  },
+});
+
 // ─── INVOICE DETAIL (line items + EB tenant shares, read-only, web parity) ────
 export const getInvoiceDetail = action({
   args: { invoiceId: v.string() },

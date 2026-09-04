@@ -57,6 +57,7 @@ const SECTIONS = [
   { key: 'billing',  label: 'Generate Bills' },
   { key: 'invoices', label: 'Invoices' },
   { key: 'receipts', label: 'Receipts' },
+  { key: 'adjustments', label: 'Adjustments' },
   { key: 'expenses', label: 'Expenses' },
   { key: 'payments', label: 'Rental Payments' },
   { key: 'reports',  label: 'Reports' },
@@ -158,6 +159,25 @@ export default function AccountingScreen() {
   // Invoice detail (read-only, web parity)
   const [invDetail, setInvDetail] = useState<{ inv: any; lineItems: any[]; ebShares: any[] } | null>(null);
   const [invDetailLoading, setInvDetailLoading] = useState(false);
+  // Adjustments (read-only, web parity)
+  const [adjustments, setAdjustments] = useState<any[] | null>(null);
+  const [adjLoading, setAdjLoading] = useState(false);
+  const [adjType, setAdjType] = useState<'all' | 'credit_note' | 'debit_note'>('all');
+
+  // Adjustments load when its tab opens.
+  useEffect(() => {
+    if (section !== 'adjustments' || adjustments !== null) return;
+    let cancelled = false;
+    setAdjLoading(true);
+    (async () => {
+      try {
+        const rows: any = await sb.listAdjustments();
+        if (!cancelled && mounted.current) setAdjustments(Array.isArray(rows) ? rows : []);
+      } catch { if (!cancelled && mounted.current) setAdjustments([]); }
+      finally { if (!cancelled && mounted.current) setAdjLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [section, adjustments]);
 
   // Org name for PDF headers — loaded once.
   useEffect(() => {
@@ -671,6 +691,60 @@ export default function AccountingScreen() {
             </View>
           ))}
         </>)}
+
+        {/* ── ADJUSTMENTS (credit/debit notes, read-only) ── */}
+        {section === 'adjustments' && (
+          adjLoading || adjustments === null ? (
+            <ActivityIndicator color={ACC.purple} style={{ marginTop: 30 }} />
+          ) : (() => {
+            const cr = adjustments.filter((a: any) => a.adjustmentType === 'credit_note').reduce((s: number, a: any) => s + (Number(a.amount) || 0), 0);
+            const db = adjustments.filter((a: any) => a.adjustmentType === 'debit_note').reduce((s: number, a: any) => s + (Number(a.amount) || 0), 0);
+            const shown = adjType === 'all' ? adjustments : adjustments.filter((a: any) => a.adjustmentType === adjType);
+            return (
+              <>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
+                  <View style={{ flex: 1, backgroundColor: '#ECFDF5', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                    <Text style={{ fontSize: 10, color: '#16A34A', textTransform: 'uppercase' }}>Credits</Text>
+                    <Text style={{ fontSize: fontSize.md, fontWeight: '900', color: '#16A34A' }}>{fmtMoney(cr)}</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#FECACA' }}>
+                    <Text style={{ fontSize: 10, color: '#DC2626', textTransform: 'uppercase' }}>Debits</Text>
+                    <Text style={{ fontSize: fontSize.md, fontWeight: '900', color: '#DC2626' }}>{fmtMoney(db)}</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
+                  {([['all', 'All'], ['credit_note', 'Credits'], ['debit_note', 'Debits']] as const).map(([k, lbl]) => (
+                    <TouchableOpacity key={k} style={[styles.filterChip, adjType === k && styles.filterActive]} onPress={() => setAdjType(k as any)}>
+                      <Text style={[styles.filterText, { textTransform: 'none' }, adjType === k && styles.filterTextActive]}>{lbl}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {shown.length === 0 ? (
+                  <EmptyState title="No adjustments" subtitle="Credit and debit notes appear here" icon="swap-horizontal-outline" />
+                ) : shown.map((a: any) => {
+                  const isCredit = a.adjustmentType === 'credit_note';
+                  return (
+                    <View key={a.id} style={styles.card}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={styles.cardTitle} numberOfLines={1}>{a.tenantName}</Text>
+                          <Text style={styles.cardSub}>{a.adjustmentDate ? formatDate(a.adjustmentDate) : '—'} · {String(a.category).replace(/_/g, ' ')}{a.referenceNumber ? ` · ${a.referenceNumber}` : ''}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: isCredit ? '#16A34A' : '#DC2626' }}>{isCredit ? '+' : '−'} {fmtMoney(a.amount)}</Text>
+                          <View style={{ backgroundColor: isCredit ? '#DCFCE7' : '#FEE2E2', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 3 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: isCredit ? '#16A34A' : '#DC2626' }}>{isCredit ? 'Credit' : 'Debit'}</Text>
+                          </View>
+                        </View>
+                      </View>
+                      {!!a.reason && <Text style={[styles.cardSub, { marginTop: 6 }]} numberOfLines={2}>{a.reason}</Text>}
+                    </View>
+                  );
+                })}
+              </>
+            );
+          })()
+        )}
 
         {/* ── EXPENSES (read-only) ── */}
         {section === 'expenses' && (
