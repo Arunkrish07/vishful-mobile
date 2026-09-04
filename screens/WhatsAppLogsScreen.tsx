@@ -14,12 +14,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as sb from '../lib/supabaseService';
 import { GlassBackground } from '../components/shared';
+import { shareCsv } from '../lib/csvExport';
 
 const JOB_TYPE_OPTIONS: { key: string; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'announcement', label: 'Announcements' },
   { key: 'invoice', label: 'Invoices' },
   { key: 'receipt', label: 'Receipts' },
+];
+
+// Normalise a raw delivery status into a filter bucket.
+function statusBucket(raw: any): 'sent' | 'failed' | 'pending' | 'skipped' | 'other' {
+  const s = String(raw || '').toLowerCase();
+  if (['sent', 'success', 'delivered', 'completed'].includes(s)) return 'sent';
+  if (['failed', 'error'].includes(s)) return 'failed';
+  if (['pending', 'queued', 'running', 'processing'].includes(s)) return 'pending';
+  if (s === 'skipped') return 'skipped';
+  return 'other';
+}
+const STATUS_FILTERS: { key: string; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'sent', label: 'Sent' },
+  { key: 'failed', label: 'Failed' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'skipped', label: 'Skipped' },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -69,6 +87,8 @@ export default function WhatsAppLogsScreen() {
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [exporting, setExporting] = useState(false);
   const didAutoExpand = useRef(false); // auto-expand the first failing/running job once per mount
   const [editPhone, setEditPhone] = useState<{ deliveryId: string; tenantId: string; jobId: string } | null>(null);
   const [phoneInput, setPhoneInput] = useState('');
@@ -254,6 +274,38 @@ export default function WhatsAppLogsScreen() {
     } finally { setBusy(null); await afterWrite(jobId); }
   }, [editPhone, phoneInput, afterWrite]);
 
+  const applyStatus = (list: any[]) =>
+    statusFilter === 'all' ? list : list.filter((d) => statusBucket(d.status) === statusFilter);
+
+  // Export the currently-visible deliveries (search results, or the expanded
+  // job's deliveries), honouring the status filter. Falls back to a job summary.
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const visible = searchResults !== null ? applyStatus(searchResults)
+        : expandedId ? applyStatus(deliveries) : null;
+      if (visible) {
+        if (visible.length === 0) { Alert.alert('Export CSV', 'No messages match the current filter.'); return; }
+        const rows = visible.map((d: any) => [
+          d.tenantName || d.label || 'Recipient', d.phoneMasked || '', d.status || '',
+          d.deliveryKind || '', d.sentAt || '', d.errorMessage || '',
+        ]);
+        await shareCsv('whatsapp-messages', ['Recipient', 'Phone', 'Status', 'Kind', 'Sent At', 'Error'], rows);
+      } else {
+        if (jobs.length === 0) { Alert.alert('Export CSV', 'No send jobs to export.'); return; }
+        const rows = jobs.map((j: any) => [
+          j.jobType || j.job_type || '', j.status || '', j.totalCount ?? j.total_count ?? '',
+          j.sentCount ?? j.sent_count ?? '', j.failedCount ?? j.failed_count ?? '', j.createdAt || j.created_at || '',
+        ]);
+        await shareCsv('whatsapp-jobs', ['Type', 'Status', 'Total', 'Sent', 'Failed', 'Created At'], rows);
+      }
+    } catch (e: any) {
+      Alert.alert('Export CSV', e?.message || 'Could not export the CSV.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -297,6 +349,25 @@ export default function WhatsAppLogsScreen() {
           ))}
         </View>
 
+        {/* Status filter + CSV export */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {STATUS_FILTERS.map(o => (
+                <TouchableOpacity key={o.key} onPress={() => setStatusFilter(o.key)}
+                  style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: statusFilter === o.key ? '#0F172A' : '#F1F3F9' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: statusFilter === o.key ? '#fff' : '#64748B' }}>{o.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          <TouchableOpacity onPress={exportCsv} disabled={exporting}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: '#EEF1F6', backgroundColor: '#fff', opacity: exporting ? 0.6 : 1 }}>
+            {exporting ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="download-outline" size={14} color="#2563EB" />}
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>CSV</Text>
+          </TouchableOpacity>
+        </View>
+
         {loading && !refreshing ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color="#2563EB" />
@@ -316,9 +387,9 @@ export default function WhatsAppLogsScreen() {
               ) : (
                 <>
                   <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>
-                    {searchResults.length} message{searchResults.length === 1 ? '' : 's'} found
+                    {applyStatus(searchResults).length} message{applyStatus(searchResults).length === 1 ? '' : 's'}{statusFilter !== 'all' ? ` · ${statusFilter}` : ''} found
                   </Text>
-                  {searchResults.map((d) => {
+                  {applyStatus(searchResults).map((d) => {
                     const lc = (s: any) => String(s || '').toLowerCase();
                     const canResend = ['failed', 'pending', 'error', 'skipped'].includes(lc(d.status));
                     return (
@@ -443,14 +514,14 @@ export default function WhatsAppLogsScreen() {
                       )}
                       {dLoading ? (
                         <ActivityIndicator color="#2563EB" style={{ paddingVertical: 12 }} />
-                      ) : deliveries.length === 0 ? (
-                        <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', paddingVertical: 10 }}>No delivery rows</Text>
+                      ) : applyStatus(deliveries).length === 0 ? (
+                        <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', paddingVertical: 10 }}>{statusFilter === 'all' ? 'No delivery rows' : `No ${statusFilter} messages`}</Text>
                       ) : (
                         // Web parity: group by outcome, failures/skips first, so "who didn't get it" is up top.
                         [
-                          { title: 'NOT RECEIVED', color: '#DC2626', rows: deliveries.filter(d => ['failed', 'skipped', 'error'].includes(lc(d.status))) },
-                          { title: 'PENDING',      color: '#EA580C', rows: deliveries.filter(d => ['pending', 'queued', 'running'].includes(lc(d.status))) },
-                          { title: 'DELIVERED',    color: '#16A34A', rows: deliveries.filter(d => !['failed', 'skipped', 'error', 'pending', 'queued', 'running'].includes(lc(d.status))) },
+                          { title: 'NOT RECEIVED', color: '#DC2626', rows: applyStatus(deliveries).filter(d => ['failed', 'skipped', 'error'].includes(lc(d.status))) },
+                          { title: 'PENDING',      color: '#EA580C', rows: applyStatus(deliveries).filter(d => ['pending', 'queued', 'running'].includes(lc(d.status))) },
+                          { title: 'DELIVERED',    color: '#16A34A', rows: applyStatus(deliveries).filter(d => !['failed', 'skipped', 'error', 'pending', 'queued', 'running'].includes(lc(d.status))) },
                         ].filter(sec => sec.rows.length > 0).map(sec => (
                           <View key={sec.title}>
                             <Text style={{ fontSize: 10, fontWeight: '800', color: sec.color, letterSpacing: 0.5, marginTop: 8, marginBottom: 2 }}>{sec.title} ({sec.rows.length})</Text>
