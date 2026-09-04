@@ -54,12 +54,28 @@ const fmtMoney = (v: number) => {
 };
 
 const SECTIONS = [
+  { key: 'billing',  label: 'Generate Bills' },
   { key: 'invoices', label: 'Invoices' },
   { key: 'receipts', label: 'Receipts' },
   { key: 'expenses', label: 'Expenses' },
   { key: 'payments', label: 'Rental Payments' },
   { key: 'reports',  label: 'Reports' },
 ];
+
+// Last N calendar months as "yyyy-MM" (newest first), for the billing picker.
+function recentBillingMonths(n: number): string[] {
+  const now = new Date();
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+function monthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+}
 
 // run a fetch, swallow errors → fallback value (keeps one bad action from
 // wiping the rest of the screen); data is org-scoped server-side.
@@ -133,6 +149,12 @@ export default function AccountingScreen() {
   const [outstandingLoading, setOutstandingLoading] = useState(false);
   const [orgName, setOrgName] = useState('Vishful Spaces LLP');
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  // Generate Bills (billing) tab
+  const billMonths = React.useMemo(() => recentBillingMonths(4), []);
+  const [billMonth, setBillMonth] = useState<string>(() => recentBillingMonths(1)[0]);
+  const [billPreviews, setBillPreviews] = useState<any[] | null>(null);
+  const [billLoading, setBillLoading] = useState(false);
+  const [billGenerating, setBillGenerating] = useState(false);
 
   // Org name for PDF headers — loaded once.
   useEffect(() => {
@@ -343,6 +365,43 @@ export default function AccountingScreen() {
     finally { if (mounted.current) setPdfBusy(null); }
   };
 
+  const loadBillPreview = async () => {
+    setBillLoading(true);
+    try {
+      const rows: any = await sb.previewBills(billMonth);
+      if (mounted.current) setBillPreviews(Array.isArray(rows) ? rows : []);
+    } catch (e: any) {
+      if (mounted.current && !isAbortError(e)) { setBillPreviews([]); Alert.alert('Preview', e?.message || 'Could not build the billing preview.'); }
+    } finally {
+      if (mounted.current) setBillLoading(false);
+    }
+  };
+
+  const doGenerateBills = () => {
+    const n = billPreviews?.length || 0;
+    if (!n) { Alert.alert('Nothing to generate', 'Run a preview first.'); return; }
+    Alert.alert(
+      'Generate bills',
+      `This will create/replace ${n} invoice${n === 1 ? '' : 's'} for ${monthLabel(billMonth)}. Existing invoices for these tenants this month are replaced. Continue?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Generate', style: 'default', onPress: async () => {
+          setBillGenerating(true);
+          try {
+            const r: any = await sb.generateBills(billMonth);
+            Alert.alert('Bills generated', `Created/updated ${r?.count ?? 0} invoice${(r?.count ?? 0) === 1 ? '' : 's'} for ${monthLabel(billMonth)}.`);
+            setBillPreviews(null);
+            setRefreshKey((k: number) => k + 1);
+          } catch (e: any) {
+            Alert.alert('Generate failed', e?.message || 'Could not generate bills.');
+          } finally {
+            if (mounted.current) setBillGenerating(false);
+          }
+        } },
+      ],
+    );
+  };
+
   if (!invoices) return <LoadingScreen />;
 
   const filtered = (filter === 'all' ? invoices : invoices.filter((i: any) => i.status === filter))
@@ -431,6 +490,70 @@ export default function AccountingScreen() {
         </View>
 
         {/* ── INVOICES ── */}
+        {section === 'billing' && (<>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {billMonths.map(mo => {
+                const active = billMonth === mo;
+                return (
+                  <TouchableOpacity key={mo} onPress={() => { setBillMonth(mo); setBillPreviews(null); }}
+                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? ACC.purple : '#F1F3F9' }}>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{monthLabel(mo)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+          <Button title={billLoading ? 'Building preview…' : 'Preview Bills'} icon="calculator-outline" onPress={loadBillPreview} loading={billLoading} />
+          {billPreviews !== null && !billLoading && (
+            billPreviews.length === 0 ? (
+              <EmptyState title="No eligible tenants" subtitle={`No bills to generate for ${monthLabel(billMonth)}`} icon="document-text-outline" />
+            ) : (
+              <View style={{ marginTop: spacing.md }}>
+                <View style={{ backgroundColor: '#EEF3FF', borderRadius: 14, padding: 12, marginBottom: 10 }}>
+                  <Text style={{ fontSize: fontSize.sm, color: ACC.ink2 }}>{billPreviews.length} invoice{billPreviews.length === 1 ? '' : 's'} · {monthLabel(billMonth)}</Text>
+                  <Text style={{ fontSize: fontSize.lg, fontWeight: '900', color: ACC.ink, marginTop: 2 }}>
+                    Total {fmtMoney(billPreviews.reduce((s: number, p: any) => s + (Number(p.total) || 0), 0))}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: ACC.ink2, marginTop: 2 }}>
+                    Rent {fmtMoney(billPreviews.reduce((s: number, p: any) => s + (Number(p.rent_amount) || 0), 0))} · EB {fmtMoney(billPreviews.reduce((s: number, p: any) => s + (Number(p.eb_amount) || 0), 0))}
+                  </Text>
+                </View>
+                <Button title={billGenerating ? 'Generating…' : `Generate ${billPreviews.length} Bills`} icon="checkmark-done-outline" onPress={doGenerateBills} loading={billGenerating} />
+                <View style={{ height: 10 }} />
+                {billPreviews.map((p: any) => {
+                  const st = String(p.staying_status || '').toLowerCase();
+                  const stCfg = st.includes('notice') ? { bg: '#FFEDD5', c: '#EA580C', label: 'On Notice' }
+                    : st === 'exited' ? { bg: '#FEE2E2', c: '#DC2626', label: 'Vacated' }
+                    : { bg: '#DCFCE7', c: '#16A34A', label: 'Staying' };
+                  return (
+                    <View key={p.allotment_id} style={styles.card}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={styles.cardTitle} numberOfLines={1}>{p.tenant_name}</Text>
+                          <Text style={styles.cardSub}>{p.apartment_code}-{p.bed_code} · {p.stay_days}/{p.total_days_in_month} days</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.ink }}>{fmtMoney(p.total)}</Text>
+                          <View style={{ backgroundColor: stCfg.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 3 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: stCfg.c }}>{stCfg.label}</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+                        <Text style={styles.cardSub}>Rent {fmtMoney(p.rent_amount)}</Text>
+                        {Number(p.eb_amount) > 0 && <Text style={styles.cardSub}>EB {fmtMoney(p.eb_amount)}</Text>}
+                        {Number(p.estimated_eb_amount) > 0 && <Text style={styles.cardSub}>Est. EB {fmtMoney(p.estimated_eb_amount)}</Text>}
+                        {Number(p.exit_charges) > 0 && <Text style={[styles.cardSub, { color: '#DC2626' }]}>Exit {fmtMoney(p.exit_charges)}</Text>}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )
+          )}
+        </>)}
+
         {section === 'invoices' && (<>
           <View style={{ marginBottom: spacing.sm }}>
             <SearchField value={search} onChangeText={setSearch} placeholder="Search invoices..." />
