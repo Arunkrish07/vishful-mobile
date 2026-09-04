@@ -1038,7 +1038,9 @@ export default function ElectricityScreen() {
       const hasCur = r.currentReading !== '' && r.currentReading != null && !isNaN(cur);
       const units = hasCur ? Math.max(0, cur - (Number(r.startReading) || 0)) : 0;
       const bill = computeEbSlabBill(units);
-      return { ...r, hasCur, units, bill };
+      // Advance payable only when the bill crosses ₹19,000: (bill − 18,000) rounded to nearest ₹1,000 (web parity).
+      const advance = hasCur && bill.total > 19000 ? Math.round((bill.total - 18000) / 1000) * 1000 : 0;
+      return { ...r, hasCur, units, bill, advance };
     });
     const totalAmount = rowsComputed.reduce((s: number, r: any) => s + (r.hasCur ? r.bill.total : 0), 0);
     const anyDanger = rowsComputed.some((r: any) => r.hasCur && r.bill.isDanger);
@@ -1096,6 +1098,11 @@ export default function ElectricityScreen() {
                     </View>
                   )}
                 </View>
+                {r.hasCur && r.advance > 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#FFFBEB', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309' }}>Advance payable ₹{r.advance.toLocaleString('en-IN')}</Text>
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={{ fontSize: 12, color: colors.textSecondary }}>Current reading</Text>
                   <TextInput
