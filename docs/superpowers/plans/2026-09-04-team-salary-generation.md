@@ -10,6 +10,16 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-04-team-salary-generation-design.md`
 
+## As-built amendments (post-execution — the code differs from the task bodies below)
+
+The three tasks were implemented and reviewed as written, then these deltas were applied from review + a product decision. The commits are the source of truth; the task code blocks below are the pre-amendment version.
+
+1. **Org-scoped update** (commit `ceee6c1`, from Task-2 review): the `team_salary_bills` update also `.eq("organization_id", ORG_ID)`.
+2. **`approved` bills immutable** (commit `591f444`, product decision — **DIVERGES from web**): the action skips an existing `approved` bill just like `paid` (via a case-insensitive `existingStatus`), returning a new `skippedApproved` count; the Salary-tab Alert shows "N approved (locked)". Revert an approved bill to draft to recompute it.
+3. **Case-insensitive paid guard + `skippedEmpty` surfaced** (commit `5f07874`, from final review): paid/approved skip uses `String(status).toLowerCase()`; the Alert surfaces the no-attendance count.
+4. **Return shape** is `{ month, created, updated, skippedPaid, skippedApproved, skippedEmpty, failed, membersConsidered }`.
+5. **Deployed** to `dev:polished-sockeye-740` on 2026-09-04 (via `npx convex dev --once --typecheck=disable`, orphan `convex/registrationpdf.ts` moved aside for the push). On-device QA still pending.
+
 ## Global Constraints
 
 - **No test runner exists** (no jest/eslint in this repo). Per-task type verification = `npx tsc --noEmit` (expect no NEW errors in touched files; ~40 pre-existing errors are known). The pure module is additionally verified by a scratch script run with `npx --yes tsx` (money-critical core).
@@ -17,7 +27,7 @@
 - **`working_days` default = 26.**
 - **`month` stored format = `"yyyy-MM"`.**
 - **Pay-slip amounts:** `earned_salary = working_days>0 ? Math.round(base_salary*present_days/working_days) : 0`; `net_payable = max(earned_salary − advance_deducted − other_deductions, 0)`. Write these defensively in addition to the inputs.
-- **Never touch `paid` bills. Preserve existing `advance_deducted`/`other_deductions` and an existing `approved` status. Only CREATE a new bill when the member has attendance records in the period.**
+- **Never touch `paid` bills. Preserve existing `advance_deducted`/`other_deductions`. Only CREATE a new bill when the member has attendance records in the period.** (See As-built amendment #2: `approved` bills are also skipped entirely, not recomputed.)
 - **Eligibility:** members with `status === 'active'` AND `salary_amount > 0`.
 - **Out of scope:** external `attendance_logs` sync, auto-recompute on attendance change, salary→Expense sync, department exemption, `free_leave_days`, Excel.
 - **Convex codegen/deploy caveat:** `convex/registrationpdf.ts` (untracked, `require('expo-print')`) breaks Convex bundling. tsc does NOT need codegen because wrappers use `(api as any)`. Actually RUNNING the action needs a deploy — temporarily rename `convex/registrationpdf.ts` → `convex/registrationpdf.ts.orphan-bak` before `npx convex deploy --typecheck disable`, then rename back. Deploy is a manual post-implementation step (see Final Verification).

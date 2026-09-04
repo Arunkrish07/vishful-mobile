@@ -39,7 +39,9 @@ Let the mobile app **generate/recompute draft monthly salary bills from attendan
 - **`present_days`** for the bill = `min(presentUnits, working_days)` (capped), rounded to 2 dp.
 - **`working_days`** default = **26** (`DEFAULT_SALARY_WORKING_DAYS`).
 
-Implemented in a new pure module **`convex/teamSalary.ts`** with NO `date-fns` (plain `Date` + string y-m-d comparisons, zero-padded formatting to avoid timezone drift). Exposed functions: `payrollMonthKey(date)`, `payrollMonthRange(monthYm)`, `eachDateInPayrollMonth`, `isSundayDate`, `normalizeAttendanceStatus`, `summarizeMonthAttendance`, `computePaySlipAmounts`, `recentPayrollMonths(n)`.
+Implemented in a new pure module **`lib/payroll.ts`** (as-built; the plan chose `lib/` over `convex/teamSalary.ts` so the UI and the action share one source without the screen importing from `convex/`) with NO `date-fns` (plain `Date` + string y-m-d comparisons, zero-padded formatting to avoid timezone drift). Exposed functions: `payrollMonthKey(date)`, `payrollMonthRange(monthYm)`, `eachDateInPayrollMonth`, `isSundayDate`, `normalizeAttendanceStatus`, `summarizeMonthAttendance`, `capPresentDays`, `computePaySlipAmounts`, `recentPayrollMonths(n)`, `payrollPeriodLabel(monthYm)`.
+
+> **Amendment (2026-09-04, post-review product decision — DIVERGES from web).** Web recomputes any non-`paid` bill on regeneration, including `approved` ones. Per the user's decision, **an `approved` bill is now immutable to regeneration too** — it is skipped like `paid` (see step 3 below). Rationale: `approved` is an amount a reviewer signed off on; a silent re-cost with no re-approval is unacceptable. To recompute an approved bill, revert it to `draft` first (the existing Salary-tab Revert action). This is the one intentional departure from web parity in this feature.
 
 ## Backend — new Convex action
 
@@ -49,13 +51,14 @@ Implemented in a new pure module **`convex/teamSalary.ts`** with NO `date-fns` (
 2. Load `team_attendance` for the period `[start, end]` once (all members), group by `team_member_id`.
 3. For each eligible member:
    - `summary = summarizeMonthAttendance(rows, month, now, joining_date, exit_date)`.
+   - Look up existing bill (`team_member_id`, `month`). Status comparisons are **case-insensitive** (`String(status).toLowerCase()`) — web-created bills may store `"Paid"`/`"Approved"`.
+   - If existing `status === 'paid'` → **skip** (never touch a settled payment).
+   - If existing `status === 'approved'` → **skip** (immutable per the amendment above — do not re-cost a signed-off amount).
    - If `summary.recordedDays === 0` and no existing bill → **skip** (don't create empty bills — web parity).
-   - Look up existing bill (`team_member_id`, `month`).
-   - If existing `status === 'paid'` → **skip** (never touch paid).
    - `present_days = cap(presentUnits, workingDays)`; preserve existing `advance_deducted`/`other_deductions` (default 0); `{earned_salary, net_payable} = computePaySlipAmounts(...)`.
-   - **Upsert:** update existing (keep `approved` status, else `draft`) OR insert new `draft`. `notes = "Auto from attendance (${recordedDays} days, ${absentDays} absent)"`.
+   - **Upsert:** update the existing `draft` (the only non-locked existing state left here) OR insert a new `draft`. `notes = "Auto from attendance (${recordedDays} days, ${absentDays} absent)"`.
    - Write inputs **and** `earned_salary`/`net_payable` (defensive — identical to the trigger's formula, so numbers match whether or not the trigger fires for these writes).
-4. Return `{ month, created, updated, skippedPaid, skippedEmpty, membersConsidered }`.
+4. Return `{ month, created, updated, skippedPaid, skippedApproved, skippedEmpty, failed, membersConsidered }`.
 
 `lib/supabaseService.ts`: add `generateSalaryBills(month, workingDays?)` wrapper calling the action.
 
@@ -64,7 +67,7 @@ Existing `listSalaryBills` / `setSalaryBillStatus` are unchanged. The `convex/se
 ## Mobile UI — Salary tab (`screens/TeamScreen.tsx`)
 
 - A **payroll-month picker** (horizontal chips, last 6 payroll months, default = current payroll month via `payrollMonthKey(today)`), each labelled by period (`28 Jul – 27 Aug 2026`).
-- A **"Generate drafts"** button → calls `sb.generateSalaryBills(selectedMonth)`, shows a busy spinner, then `loadSalary()` and an `Alert` summary (`"Created 4, updated 2, 1 already paid."`). Uses the RNW-safe pattern (direct call, not an Alert-button `onPress`).
+- A **"Generate drafts"** button → calls `sb.generateSalaryBills(selectedMonth)`, shows a busy spinner, then `loadSalary()` and an `Alert` summary (e.g. `"Created 4, updated 2, 1 already paid, 1 approved (locked)."`). Uses the RNW-safe pattern (direct call, not an Alert-button `onPress`).
 - The bill list continues to show all bills; the existing per-bill Approve / Mark Paid / Revert / Payslip actions are unchanged.
 - Empty-state copy updated: bills can now be generated on mobile.
 
