@@ -494,6 +494,10 @@ export async function listTeamAttendance() {
   return client.action(api.settings.listTeamAttendance, {});
 }
 
+export async function generateSalaryBills(month: string, workingDays?: number) {
+  return client.action((api as any).settings.generateSalaryBills, { month, workingDays });
+}
+
 export async function createTeamAttendance(data: any) {
   return client.action(api.settings.createTeamAttendance, { data });
 }

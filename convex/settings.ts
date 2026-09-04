@@ -5,6 +5,10 @@ import { v } from "convex/values";
 import {
   getSupabase, ORG_ID, safeList, insertRow, updateRow, deleteRow,
 } from "./lib/supabaseAdmin";
+import {
+  summarizeMonthAttendance, capPresentDays, computePaySlipAmounts,
+  payrollMonthRange, DEFAULT_SALARY_WORKING_DAYS,
+} from "../lib/payroll";
 
 // ─── TEAM MEMBERS ────────────────────────────────────────────────────
 export const getTeamMembers = action({
@@ -153,9 +157,94 @@ export const setSalaryBillStatus = action({
   },
 });
 
+// ─── GENERATE SALARY BILLS (attendance → draft pay-slips, web parity) ─────────
+// Recompute/create DRAFT bills for a payroll month ("yyyy-MM", period 28th→27th).
+// Never touches `paid` bills; preserves existing deductions and `approved`
+// status; only creates a bill when the member has attendance in the period.
+export const generateSalaryBills = action({
+  args: { month: v.string(), workingDays: v.optional(v.number()) },
+  returns: v.any(),
+  handler: async (_ctx, { month, workingDays }) => {
+    const sb = getSupabase();
+    const wd = workingDays ?? DEFAULT_SALARY_WORKING_DAYS;
+    const { start, end } = payrollMonthRange(month);
+
+    const [members, attendance] = await Promise.all([
+      safeList(
+        sb.from("team_members")
+          .select("id, salary_amount, joining_date, exit_date, status")
+          .eq("organization_id", ORG_ID),
+      ),
+      safeList(
+        sb.from("team_attendance")
+          .select("team_member_id, date, status")
+          .eq("organization_id", ORG_ID)
+          .gte("date", start).lte("date", end),
+      ),
+    ]);
+
+    const attByMember = new Map<string, { date?: string | null; status?: string | null }[]>();
+    for (const a of attendance as any[]) {
+      if (!a.team_member_id) continue;
+      const list = attByMember.get(a.team_member_id) || [];
+      list.push({ date: a.date, status: a.status });
+      attByMember.set(a.team_member_id, list);
+    }
+
+    let created = 0, updated = 0, skippedPaid = 0, skippedEmpty = 0, failed = 0, membersConsidered = 0;
+    const now = new Date();
+
+    for (const m of members as any[]) {
+      const base = Number(m.salary_amount) || 0;
+      const active = String(m.status || "").toLowerCase() === "active";
+      if (!active || base <= 0) continue;
+      membersConsidered += 1;
+      try {
+        const rows = attByMember.get(m.id) || [];
+        const summary = summarizeMonthAttendance(rows, month, now, m.joining_date, m.exit_date);
+
+        const existingList = await safeList(
+          sb.from("team_salary_bills")
+            .select("id, status, advance_deducted, other_deductions")
+            .eq("organization_id", ORG_ID).eq("team_member_id", m.id).eq("month", month),
+        );
+        const existing = (existingList as any[])[0];
+
+        if (existing?.status === "paid") { skippedPaid += 1; continue; }
+        if (!existing && summary.recordedDays === 0) { skippedEmpty += 1; continue; }
+
+        const present_days = capPresentDays(summary.presentUnits, wd);
+        const advance_deducted = Number(existing?.advance_deducted ?? 0);
+        const other_deductions = Number(existing?.other_deductions ?? 0);
+        const { earned_salary, net_payable } = computePaySlipAmounts({
+          base_salary: base, working_days: wd, present_days, advance_deducted, other_deductions,
+        });
+        const notes = `Auto from attendance (${summary.recordedDays} days, ${summary.absentDays} absent)`;
+
+        if (existing?.id) {
+          const { error } = await sb.from("team_salary_bills")
+            .update({ working_days: wd, present_days, base_salary: base, advance_deducted, other_deductions, earned_salary, net_payable, notes })
+            .eq("id", existing.id).neq("status", "paid");
+          if (error) throw error;
+          updated += 1;
+        } else {
+          const { error } = await sb.from("team_salary_bills")
+            .insert({ organization_id: ORG_ID, team_member_id: m.id, month, working_days: wd, present_days, base_salary: base, advance_deducted, other_deductions, earned_salary, net_payable, notes, status: "draft" });
+          if (error) throw error;
+          created += 1;
+        }
+      } catch { failed += 1; }
+    }
+
+    return { month, created, updated, skippedPaid, skippedEmpty, failed, membersConsidered };
+  },
+});
+
 // ─── TEAM ATTENDANCE ─────────────────────────────────────────────────
-// NOTE: web also recomputes draft salary bills on attendance change
-// (onTeamAttendanceChanged) — not ported here yet.
+// Draft-bill generation is ported (see generateSalaryBills above); it is
+// batch/manual (not auto-triggered on each attendance change like web's
+// onTeamAttendanceChanged). The attendance_logs external-app sync and the
+// salary→Expense sync remain web-only.
 export const listTeamAttendance = action({
   args: {},
   returns: v.any(),
