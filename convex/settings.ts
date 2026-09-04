@@ -6,7 +6,7 @@ import {
   getSupabase, ORG_ID, safeList, insertRow, updateRow, deleteRow,
 } from "./lib/supabaseAdmin";
 import {
-  summarizeMonthAttendance, capPresentDays, computePaySlipAmounts,
+  summarizeMonthAttendance, capPresentDays,
   payrollMonthRange, DEFAULT_SALARY_WORKING_DAYS,
 } from "../lib/payroll";
 
@@ -217,27 +217,27 @@ export const generateSalaryBills = action({
         if (existingStatus === "approved") { skippedApproved += 1; continue; }
         if (!existing && summary.recordedDays === 0) { skippedEmpty += 1; continue; }
 
+        // Write ONLY the inputs — earned_salary/net_payable are DB-computed
+        // (generated columns / trigger). Writing them is rejected by Postgres,
+        // and web parity never writes them either.
         const present_days = capPresentDays(summary.presentUnits, wd);
         const advance_deducted = Number(existing?.advance_deducted ?? 0);
         const other_deductions = Number(existing?.other_deductions ?? 0);
-        const { earned_salary, net_payable } = computePaySlipAmounts({
-          base_salary: base, working_days: wd, present_days, advance_deducted, other_deductions,
-        });
         const notes = `Auto from attendance (${summary.recordedDays} days, ${summary.absentDays} absent)`;
 
         if (existing?.id) {
           const { error } = await sb.from("team_salary_bills")
-            .update({ working_days: wd, present_days, base_salary: base, advance_deducted, other_deductions, earned_salary, net_payable, notes })
+            .update({ working_days: wd, present_days, base_salary: base, advance_deducted, other_deductions, notes })
             .eq("id", existing.id).eq("organization_id", ORG_ID).neq("status", "paid");
           if (error) throw error;
           updated += 1;
         } else {
           const { error } = await sb.from("team_salary_bills")
-            .insert({ organization_id: ORG_ID, team_member_id: m.id, month, working_days: wd, present_days, base_salary: base, advance_deducted, other_deductions, earned_salary, net_payable, notes, status: "draft" });
+            .insert({ organization_id: ORG_ID, team_member_id: m.id, month, working_days: wd, present_days, base_salary: base, advance_deducted, other_deductions, notes, status: "draft" });
           if (error) throw error;
           created += 1;
         }
-      } catch { failed += 1; }
+      } catch (e) { failed += 1; console.warn("[generateSalaryBills] member", m.id, (e as any)?.message || e); }
     }
 
     return { month, created, updated, skippedPaid, skippedApproved, skippedEmpty, failed, membersConsidered };
