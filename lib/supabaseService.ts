@@ -336,6 +336,16 @@ export async function fetchOutstandingRecipients() {
   return client.action((api as any).accounting.fetchOutstandingRecipients, {});
 }
 
+export async function listExpenseCategories() {
+  return client.action((api as any).settings.listExpenseCategories, {});
+}
+export async function saveExpenseCategory(args: { id?: string; key?: string; label: string; isActive?: boolean }) {
+  return client.action((api as any).settings.saveExpenseCategory, args);
+}
+export async function deleteExpenseCategory(id: string) {
+  return client.action((api as any).settings.deleteExpenseCategory, { id });
+}
+
 export async function getPendingDues() {
   return client.action(api.accounting.getPendingDues, {});
 }

@@ -98,6 +98,7 @@ const TABS = [
   { key: 'exit_process',    label: 'Pre-Exit Process',   icon: 'log-out-outline'       },
   { key: 'auto_approval',   label: 'Auto-Approval',      icon: 'flash-outline'         },
   { key: 'maintenance',     label: 'Maintenance Items',  icon: 'construct-outline'     },
+  { key: 'expense_categories', label: 'Expense Categories', icon: 'pricetags-outline'   },
 ];
 
 // ─── Small reusable components ────────────────────────────────────────────────
@@ -206,6 +207,12 @@ export default function SettingsScreen() {
   const [maintOpen,    setMaintOpen]    = useState(false);
   const [maintForm,    setMaintForm]    = useState({ name: '', unit: '', description: '' });
 
+  // ── Expense Categories tab ────────────────────────────────────────────────
+  const [expCats,    setExpCats]    = useState<any[]>([]);
+  const [expCatOpen, setExpCatOpen] = useState(false);
+  const [expCatForm, setExpCatForm] = useState<{ id: string | null; label: string }>({ id: null, label: '' });
+  const [expBusy,    setExpBusy]    = useState(false);
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const call = useCallback(async (action: string, args: any = {}) => {
     return convexClient.action((convexApi as any).settings[action], args);
@@ -309,6 +316,10 @@ export default function SettingsScreen() {
       if (tab === 'maintenance') {
         const data = await call('listMaintenanceItems').catch(() => []);
         setMaintItems(data || []);
+      }
+      if (tab === 'expense_categories') {
+        const data = await call('listExpenseCategories').catch(() => []);
+        setExpCats(data || []);
       }
     } catch (e) {
       console.error(`[Settings] loadTab(${tab}) error:`, e);
@@ -965,6 +976,46 @@ export default function SettingsScreen() {
     </ScrollView>
   );
 
+  const toggleExpCat = async (cat: any) => {
+    try { await call('saveExpenseCategory', { id: cat.id, label: cat.label, isActive: cat.is_active === false }); loadTab('expense_categories'); }
+    catch (e: any) { Alert.alert('Error', e.message); }
+  };
+
+  const renderExpenseCategories = () => (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+      <TouchableOpacity onPress={() => { setExpCatForm({ id: null, label: '' }); setExpCatOpen(true); }}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, padding: 11, marginBottom: 14 }}>
+        <Ionicons name="add" size={16} color="#fff" />
+        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add Category</Text>
+      </TouchableOpacity>
+      {expCats.length === 0 ? (
+        <Card><Text style={{ color: colors.textTertiary, textAlign: 'center', paddingVertical: 20 }}>No expense categories defined</Text></Card>
+      ) : expCats.map((cat: any) => (
+        <Card key={cat.id} style={{ marginBottom: 8, opacity: cat.is_active === false ? 0.55 : 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>{cat.label}</Text>
+              <Text style={{ fontSize: 11, color: colors.textTertiary }}>{cat.key}{cat.is_active === false ? ' · inactive' : ''}</Text>
+            </View>
+            <Switch value={cat.is_active !== false} onValueChange={() => toggleExpCat(cat)} />
+            <TouchableOpacity onPress={() => { setExpCatForm({ id: cat.id, label: cat.label }); setExpCatOpen(true); }}>
+              <Ionicons name="create-outline" size={18} color="#2563EB" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => Alert.alert('Delete Category', `Delete "${cat.label}"? If any expense uses it the delete will fail — toggle it inactive instead.`, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: async () => {
+                try { await call('deleteExpenseCategory', { id: cat.id }); loadTab('expense_categories'); }
+                catch (e: any) { Alert.alert('Cannot delete', e.message || 'This category is in use. Toggle it inactive instead.'); }
+              }},
+            ])}>
+              <Ionicons name="trash-outline" size={18} color="#DC2626" />
+            </TouchableOpacity>
+          </View>
+        </Card>
+      ))}
+    </ScrollView>
+  );
+
   // ─── TAB CONTENT ROUTER ───────────────────────────────────────────────────
   const renderContent = () => {
     if (loading && ['permissions', 'roles', 'rules'].includes(activeTab)) {
@@ -981,6 +1032,7 @@ export default function SettingsScreen() {
       case 'exit_process':  return renderExitProcess();
       case 'auto_approval': return renderAutoApproval();
       case 'maintenance':   return renderMaintenance();
+      case 'expense_categories': return renderExpenseCategories();
       default: return null;
     }
   };
@@ -1298,6 +1350,31 @@ export default function SettingsScreen() {
                     Alert.alert('Added', 'Maintenance item added.');
                   } catch (e: any) { Alert.alert('Error', e.message); }
                   setLoading(false);
+                }} />
+              </View>
+            </SafeAreaView>
+          </GlassBackground>
+        </Modal>
+
+        {/* Expense Category add/edit */}
+        <Modal visible={expCatOpen} animationType="slide" presentationStyle="pageSheet">
+          <GlassBackground>
+            <SafeAreaView style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>{expCatForm.id ? 'Edit Category' : 'Add Category'}</Text>
+                <TouchableOpacity onPress={() => setExpCatOpen(false)}><Ionicons name="close-circle" size={26} color={colors.textTertiary} /></TouchableOpacity>
+              </View>
+              <View style={{ padding: 20 }}>
+                <TInput label="Display Label *" value={expCatForm.label} onChangeText={(v: string) => setExpCatForm(f => ({ ...f, label: v }))} placeholder="e.g. Utilities" />
+                {!expCatForm.id && <Text style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 10 }}>A key is auto-generated from the label (e.g. “Utilities” → utilities).</Text>}
+                <SaveBtn label={expCatForm.id ? 'Save' : 'Add Category'} loading={expBusy} onPress={async () => {
+                  if (!expCatForm.label.trim()) { Alert.alert('Required', 'Enter a display label.'); return; }
+                  setExpBusy(true);
+                  try {
+                    await call('saveExpenseCategory', { id: expCatForm.id || undefined, label: expCatForm.label.trim() });
+                    setExpCatOpen(false); setExpCatForm({ id: null, label: '' }); loadTab('expense_categories');
+                  } catch (e: any) { Alert.alert('Error', e.message); }
+                  setExpBusy(false);
                 }} />
               </View>
             </SafeAreaView>

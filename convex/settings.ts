@@ -889,3 +889,53 @@ export const deleteBankAccount = action({
     return { success: true };
   },
 });
+// ─── EXPENSE CATEGORIES (Settings CRUD, web parity) ──────────────────────────
+export const listExpenseCategories = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    return safeList(
+      sb.from("expense_categories")
+        .select("id, key, label, is_active, sort_order")
+        .eq("organization_id", ORG_ID)
+        .order("sort_order", { ascending: true }),
+    );
+  },
+});
+
+export const saveExpenseCategory = action({
+  args: { id: v.optional(v.string()), key: v.optional(v.string()), label: v.string(), isActive: v.optional(v.boolean()) },
+  returns: v.any(),
+  handler: async (_ctx, { id, key, label, isActive }) => {
+    const sb = getSupabase();
+    const trimmed = (label || "").trim();
+    if (!trimmed) throw new Error("Display label is required.");
+    if (id) {
+      const patch: any = { label: trimmed };
+      if (isActive !== undefined) patch.is_active = isActive;
+      const { data, error } = await sb.from("expense_categories")
+        .update(patch).eq("id", id).eq("organization_id", ORG_ID).select();
+      if (error) throw new Error(error.message);
+      return data?.[0];
+    }
+    // New: derive a lower_snake key from the label unless one is supplied.
+    const k = (key && key.trim() ? key : trimmed).toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+    if (!k) throw new Error("Category key is required.");
+    const { data, error } = await sb.from("expense_categories")
+      .insert({ organization_id: ORG_ID, key: k, label: trimmed, sort_order: 0, is_active: true }).select();
+    if (error) throw new Error(error.message);
+    return data?.[0];
+  },
+});
+
+export const deleteExpenseCategory = action({
+  args: { id: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { id }) => {
+    const sb = getSupabase();
+    const { error } = await sb.from("expense_categories").delete().eq("id", id).eq("organization_id", ORG_ID);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
