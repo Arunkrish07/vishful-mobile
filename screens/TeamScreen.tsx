@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { generateAndSharePayslip } from '../lib/payslipPdf';
+import { recentPayrollMonths, payrollMonthKey, payrollPeriodLabel } from '../lib/payroll';
 import {
   teamKpis, computeMemberRows, orgRollup, daySnapshot, needsAttention,
   calendarHeat, heatDominant, summarizeWorkHours, memberMonthRows,
@@ -86,6 +87,9 @@ export default function TeamScreen() {
   const [salaryBusy, setSalaryBusy] = useState<string | null>(null);
   const [payslipBusy, setPayslipBusy] = useState<string | null>(null);
   const [orgName, setOrgName] = useState('Vishful Spaces LLP');
+  const [salaryMonth, setSalaryMonth] = useState<string>(() => payrollMonthKey(new Date()));
+  const [generating, setGenerating] = useState(false);
+  const salaryMonthOptions = useMemo(() => recentPayrollMonths(6), []);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -206,6 +210,27 @@ export default function TeamScreen() {
       if (mounted.current) setPayslipBusy(null);
     }
   }, [orgName]);
+
+  const handleGenerateSalary = useCallback(async () => {
+    setGenerating(true);
+    try {
+      const r: any = await sb.generateSalaryBills(salaryMonth);
+      await loadSalary();
+      const parts = [
+        `Created ${r?.created ?? 0}`,
+        `updated ${r?.updated ?? 0}`,
+        (r?.skippedPaid ?? 0) > 0 ? `${r.skippedPaid} already paid` : null,
+        (r?.failed ?? 0) > 0 ? `${r.failed} failed` : null,
+      ].filter(Boolean).join(', ');
+      Alert.alert('Salary drafts', (r?.membersConsidered ?? 0) === 0
+        ? 'No active members with a salary set for this period.'
+        : `${parts}.`);
+    } catch (e: any) {
+      Alert.alert('Salary drafts', e?.message || 'Could not generate salary bills. Please try again.');
+    } finally {
+      if (mounted.current) setGenerating(false);
+    }
+  }, [salaryMonth, loadSalary]);
 
   const handleSalaryStatus = useCallback(async (bill: any, status: string) => {
     setSalaryBusy(bill.id);
@@ -713,10 +738,31 @@ export default function TeamScreen() {
           )}
 
           {activeTab === 'salary' && (
-            salaryLoading ? (
+            <>
+            <View style={{ marginBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {salaryMonthOptions.map((mo) => {
+                    const active = salaryMonth === mo;
+                    return (
+                      <TouchableOpacity key={mo} onPress={() => setSalaryMonth(mo)}
+                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : '#F1F3F9' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{payrollPeriodLabel(mo)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+              <TouchableOpacity disabled={generating} onPress={handleGenerateSalary}
+                style={{ backgroundColor: '#0F172A', borderRadius: 12, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: generating ? 0.6 : 1 }}>
+                {generating ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles-outline" size={16} color="#fff" />}
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{generating ? 'Generating…' : 'Generate drafts from attendance'}</Text>
+              </TouchableOpacity>
+            </View>
+            {salaryLoading ? (
               <ActivityIndicator color="#2563EB" style={{ marginTop: 30 }} />
             ) : salaryBills.length === 0 ? (
-              <EmptyState icon="receipt-outline" title="No salary bills" subtitle="Pay slips are generated from attendance on the web app; they appear here to approve and mark paid." />
+              <EmptyState icon="receipt-outline" title="No salary bills" subtitle="Pick a pay period and tap “Generate drafts from attendance” to create pay-slips, then approve and mark paid." />
             ) : (
               salaryBills.map(b => {
                 const m = (members || []).find((x: any) => x.id === b.team_member_id);
@@ -770,7 +816,8 @@ export default function TeamScreen() {
                   </View>
                 );
               })
-            )
+            )}
+            </>
           )}
 
           {activeTab === 'attendance' && (
