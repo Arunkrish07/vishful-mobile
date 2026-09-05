@@ -45,6 +45,11 @@ export function SearchField({ value, onChangeText, placeholder }: any) {
       <Ionicons name="search-outline" size={16} color={LC.muted} />
       <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={LC.muted}
         style={{ flex: 1, marginLeft: 8, fontSize: 14, color: LC.ink }} />
+      {value ? (
+        <Pressable onPress={() => onChangeText('')} hitSlop={8}>
+          <Ionicons name="close-circle" size={16} color={LC.muted} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

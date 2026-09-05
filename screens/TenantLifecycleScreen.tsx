@@ -3489,124 +3489,6 @@ export default function TenantLifecycleScreen() {
           </Field>
           <ActionBtn title="Process Switch" onPress={doSwitch} loading={saving} disabled={!swForm.allotmentId || !swForm.newBedId} />
         </BottomSheet>
-
-        {/* ── Tenant Statement (opened from a switch row's "View") ── */}
-        <BottomSheet visible={!!stmtCtx} onClose={() => setStmtCtx(null)} title={`Tenant Statement — ${stmtCtx?.tenantName || ''}`}>
-          {stmtCtx ? (() => {
-            const typeLabel = (t: string) => t === 'booking' ? 'Booking' : t === 'onboarding' ? 'Onboarding' : t === 'additional_payment' ? 'Payment' : t === 'settlement' ? 'Settlement' : t === 'rent' ? 'Rent' : (t || 'Payment');
-            const pays = stmtReceipts;
-            const settles = pays.filter((r: any) => r.receiptType === 'settlement');
-
-            // Charges & Payments ledger: invoices = debits, receipts = credits, running balance.
-            const invEntries = stmtInvoices.map((i: any) => ({
-              date: i.billingMonth || '', sortKey: (i.billingMonth || '9999-99') + '-15',
-              category: 'Invoice', desc: i.invoiceNumber || 'Invoice',
-              debit: Number(i.totalAmount) || 0, credit: 0,
-            }));
-            const payEntries = pays.map((r: any) => ({
-              date: r.paymentDate || '', sortKey: r.paymentDate || '9999-99-99',
-              category: 'Payment', desc: `${typeLabel(r.receiptType)}${r.paymentMode ? ' · ' + r.paymentMode : ''}`,
-              debit: 0, credit: Number(r.amountPaid) || 0,
-            }));
-            const ledger = [...invEntries, ...payEntries].sort((a: any, b: any) => String(a.sortKey).localeCompare(String(b.sortKey)));
-            let running = 0;
-            ledger.forEach((e: any) => { running += e.debit - e.credit; e.balance = running; });
-
-            const totalCharged = invEntries.reduce((n: number, e: any) => n + e.debit, 0);
-            const totalPaid = payEntries.reduce((n: number, e: any) => n + e.credit, 0);
-            const totalSettled = settles.reduce((n: number, r: any) => n + r.amountPaid, 0);
-            const balanceDue = totalCharged - totalPaid;
-            const allot = allotments.find((a: any) => a.id === stmtCtx.allotmentId) || allotments.find((a: any) => a.tenant_id === stmtCtx.tenantId);
-            const deposit = Number(allot?.deposit_paid) || 0;
-
-            const TABS3: { k: 'ledger' | 'deposit' | 'summary'; label: string }[] = [
-              { k: 'ledger',  label: 'Charges & Payments' },
-              { k: 'deposit', label: 'Deposit Ledger' },
-              { k: 'summary', label: 'Summary' },
-            ];
-
-            return (
-              <View>
-                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
-                  {TABS3.map(t => (
-                    <TouchableOpacity key={t.k} onPress={() => setStmtTab(t.k)}
-                      style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, backgroundColor: stmtTab === t.k ? '#2563EB' : 'rgba(37,99,235,0.08)' }}>
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: stmtTab === t.k ? '#fff' : '#2563EB', textAlign: 'center' }}>{t.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {stmtLoading ? <EmptyCard message="Loading…" /> : (
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-                    {stmtTab === 'ledger' && (
-                      ledger.length === 0 ? <EmptyCard message="No charges or payments" /> :
-                      ledger.map((e: any, idx: number) => (
-                        <Card key={idx}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <View style={{ flex: 1, marginRight: 8 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <View style={{ backgroundColor: e.category === 'Invoice' ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.1)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: e.category === 'Invoice' ? '#DC2626' : '#16A34A' }}>{e.category}</Text>
-                                </View>
-                                <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{e.date || '—'}</Text>
-                              </View>
-                              <Text style={{ fontSize: fontSize.xs, color: '#556274', marginTop: 3 }} numberOfLines={1}>{e.desc}</Text>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                              {e.debit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#DC2626' }}>₹{fmtAmt(e.debit)}</Text> : null}
-                              {e.credit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#16A34A' }}>−₹{fmtAmt(e.credit)}</Text> : null}
-                              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Bal ₹{fmtAmt(e.balance)}</Text>
-                            </View>
-                          </View>
-                        </Card>
-                      ))
-                    )}
-
-                    {stmtTab === 'deposit' && (
-                      <Card>
-                        <Row label="Deposit Collected" value={`₹${fmtAmt(deposit)}`} />
-                        {depEdit.editing ? (
-                          <View style={{ marginVertical: 8 }}>
-                            <Field label="Deposit Collected (₹)"><TextF value={depEdit.value} onChange={(v: string) => setDepEdit({ editing: true, value: v })} keyboardType="numeric" /></Field>
-                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                              <ActionBtn title="Save" small onPress={() => doSaveDeposit(allot, depEdit.value)} loading={saving} />
-                              <ActionBtn title="Cancel" small onPress={() => setDepEdit({ editing: false, value: '' })} />
-                            </View>
-                          </View>
-                        ) : (
-                          <TouchableOpacity onPress={() => setDepEdit({ editing: true, value: String(deposit) })}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, marginBottom: 6 }}>
-                            <Ionicons name="pencil-outline" size={14} color="#2563EB" />
-                            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#2563EB' }}>Edit Deposit</Text>
-                          </TouchableOpacity>
-                        )}
-                        {settles.length === 0 ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginVertical: 4 }}>No settlement entries.</Text> :
-                          settles.map((r: any) => (
-                            <Row key={r._id} label={`Settled · ${fmtDate(r.paymentDate)}`} value={`−₹${fmtAmt(r.amountPaid)}`} valueColor="#DC2626" />
-                          ))}
-                        <Row label="Net Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} valueColor="#16A34A" />
-                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 8 }}>
-                          Editing updates the deposit held on the allotment. Full per-entry ledger edit needs the pending backend deploy.
-                        </Text>
-                      </Card>
-                    )}
-
-                    {stmtTab === 'summary' && (
-                      <Card>
-                        <Row label="Total Charged" value={`₹${fmtAmt(totalCharged)}`} valueColor="#DC2626" />
-                        <Row label="Total Paid" value={`₹${fmtAmt(totalPaid)}`} valueColor="#16A34A" />
-                        <Row label="Balance Due" value={`₹${fmtAmt(balanceDue)}`} valueColor={balanceDue > 0 ? '#DC2626' : '#16A34A'} />
-                        <Row label="Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} />
-                        <Row label="Invoices" value={`${stmtInvoices.length}`} />
-                        <Row label="Payments" value={`${pays.length}`} />
-                      </Card>
-                    )}
-                  </ScrollView>
-                )}
-              </View>
-            );
-          })() : null}
-        </BottomSheet>
       </ScrollView>
     );
   }
@@ -4706,6 +4588,124 @@ export default function TenantLifecycleScreen() {
             ? (tabContent[activeTab] || renderBedFocusDetail)()
             : renderBedFocusDetail()}
         </ScrollView>
+
+        {/* ── Tenant Statement (opened from a switch row's "View", or Exit/Refunds "Statement") ── */}
+        <BottomSheet visible={!!stmtCtx} onClose={() => setStmtCtx(null)} title={`Tenant Statement — ${stmtCtx?.tenantName || ''}`}>
+          {stmtCtx ? (() => {
+            const typeLabel = (t: string) => t === 'booking' ? 'Booking' : t === 'onboarding' ? 'Onboarding' : t === 'additional_payment' ? 'Payment' : t === 'settlement' ? 'Settlement' : t === 'rent' ? 'Rent' : (t || 'Payment');
+            const pays = stmtReceipts;
+            const settles = pays.filter((r: any) => r.receiptType === 'settlement');
+
+            // Charges & Payments ledger: invoices = debits, receipts = credits, running balance.
+            const invEntries = stmtInvoices.map((i: any) => ({
+              date: i.billingMonth || '', sortKey: (i.billingMonth || '9999-99') + '-15',
+              category: 'Invoice', desc: i.invoiceNumber || 'Invoice',
+              debit: Number(i.totalAmount) || 0, credit: 0,
+            }));
+            const payEntries = pays.map((r: any) => ({
+              date: r.paymentDate || '', sortKey: r.paymentDate || '9999-99-99',
+              category: 'Payment', desc: `${typeLabel(r.receiptType)}${r.paymentMode ? ' · ' + r.paymentMode : ''}`,
+              debit: 0, credit: Number(r.amountPaid) || 0,
+            }));
+            const ledger = [...invEntries, ...payEntries].sort((a: any, b: any) => String(a.sortKey).localeCompare(String(b.sortKey)));
+            let running = 0;
+            ledger.forEach((e: any) => { running += e.debit - e.credit; e.balance = running; });
+
+            const totalCharged = invEntries.reduce((n: number, e: any) => n + e.debit, 0);
+            const totalPaid = payEntries.reduce((n: number, e: any) => n + e.credit, 0);
+            const totalSettled = settles.reduce((n: number, r: any) => n + r.amountPaid, 0);
+            const balanceDue = totalCharged - totalPaid;
+            const allot = allotments.find((a: any) => a.id === stmtCtx.allotmentId) || allotments.find((a: any) => a.tenant_id === stmtCtx.tenantId);
+            const deposit = Number(allot?.deposit_paid) || 0;
+
+            const TABS3: { k: 'ledger' | 'deposit' | 'summary'; label: string }[] = [
+              { k: 'ledger',  label: 'Charges & Payments' },
+              { k: 'deposit', label: 'Deposit Ledger' },
+              { k: 'summary', label: 'Summary' },
+            ];
+
+            return (
+              <View>
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                  {TABS3.map(t => (
+                    <TouchableOpacity key={t.k} onPress={() => setStmtTab(t.k)}
+                      style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, backgroundColor: stmtTab === t.k ? '#2563EB' : 'rgba(37,99,235,0.08)' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: stmtTab === t.k ? '#fff' : '#2563EB', textAlign: 'center' }}>{t.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {stmtLoading ? <EmptyCard message="Loading…" /> : (
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+                    {stmtTab === 'ledger' && (
+                      ledger.length === 0 ? <EmptyCard message="No charges or payments" /> :
+                      ledger.map((e: any, idx: number) => (
+                        <Card key={idx}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ backgroundColor: e.category === 'Invoice' ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.1)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: e.category === 'Invoice' ? '#DC2626' : '#16A34A' }}>{e.category}</Text>
+                                </View>
+                                <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{e.date || '—'}</Text>
+                              </View>
+                              <Text style={{ fontSize: fontSize.xs, color: '#556274', marginTop: 3 }} numberOfLines={1}>{e.desc}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              {e.debit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#DC2626' }}>₹{fmtAmt(e.debit)}</Text> : null}
+                              {e.credit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#16A34A' }}>−₹{fmtAmt(e.credit)}</Text> : null}
+                              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Bal ₹{fmtAmt(e.balance)}</Text>
+                            </View>
+                          </View>
+                        </Card>
+                      ))
+                    )}
+
+                    {stmtTab === 'deposit' && (
+                      <Card>
+                        <Row label="Deposit Collected" value={`₹${fmtAmt(deposit)}`} />
+                        {depEdit.editing ? (
+                          <View style={{ marginVertical: 8 }}>
+                            <Field label="Deposit Collected (₹)"><TextF value={depEdit.value} onChange={(v: string) => setDepEdit({ editing: true, value: v })} keyboardType="numeric" /></Field>
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                              <ActionBtn title="Save" small onPress={() => doSaveDeposit(allot, depEdit.value)} loading={saving} />
+                              <ActionBtn title="Cancel" small onPress={() => setDepEdit({ editing: false, value: '' })} />
+                            </View>
+                          </View>
+                        ) : (
+                          <TouchableOpacity onPress={() => setDepEdit({ editing: true, value: String(deposit) })}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, marginBottom: 6 }}>
+                            <Ionicons name="pencil-outline" size={14} color="#2563EB" />
+                            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#2563EB' }}>Edit Deposit</Text>
+                          </TouchableOpacity>
+                        )}
+                        {settles.length === 0 ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginVertical: 4 }}>No settlement entries.</Text> :
+                          settles.map((r: any) => (
+                            <Row key={r._id} label={`Settled · ${fmtDate(r.paymentDate)}`} value={`−₹${fmtAmt(r.amountPaid)}`} valueColor="#DC2626" />
+                          ))}
+                        <Row label="Net Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} valueColor="#16A34A" />
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 8 }}>
+                          Editing updates the deposit held on the allotment. Full per-entry ledger edit needs the pending backend deploy.
+                        </Text>
+                      </Card>
+                    )}
+
+                    {stmtTab === 'summary' && (
+                      <Card>
+                        <Row label="Total Charged" value={`₹${fmtAmt(totalCharged)}`} valueColor="#DC2626" />
+                        <Row label="Total Paid" value={`₹${fmtAmt(totalPaid)}`} valueColor="#16A34A" />
+                        <Row label="Balance Due" value={`₹${fmtAmt(balanceDue)}`} valueColor={balanceDue > 0 ? '#DC2626' : '#16A34A'} />
+                        <Row label="Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} />
+                        <Row label="Invoices" value={`${stmtInvoices.length}`} />
+                        <Row label="Payments" value={`${pays.length}`} />
+                      </Card>
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            );
+          })() : null}
+        </BottomSheet>
       </SafeAreaView>
     </View>
   );
