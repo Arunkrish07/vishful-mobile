@@ -27,7 +27,7 @@ import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { client, api } from '../lib/convexApi';
 import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
-import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField, AvatarInitial } from '../components/lifecycle';
+import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField, AvatarInitial, KpiTile } from '../components/lifecycle';
 import { StatusBadge } from '../components/lifecycle/StatusBadge';
 import * as sb from '../lib/supabaseService';
 // (registration PDF helpers are defined inline below — no separate module)
@@ -772,6 +772,7 @@ export default function TenantLifecycleScreen() {
   const [switchOpen,        setSwitchOpen]        = useState(false);
   const [noticeOpen,        setNoticeOpen]        = useState(false);
   const [exitOpen,          setExitOpen]          = useState(false);
+  const [exitSubTab,        setExitSubTab]        = useState<'notice' | 'history'>('notice');
 
   // ── Voice Notice state ──
   const [voiceNoticeOpen,   setVoiceNoticeOpen]   = useState(false);
@@ -3836,71 +3837,141 @@ export default function TenantLifecycleScreen() {
 
     const inspectDone = eForm.inspectFurniture && eForm.inspectBed && eForm.inspectWalls && eForm.inspectBathroom;
     const filtered = filterBySearch(exits, ['tenantName', 'tenants.full_name'], ts('exit'));
+    const filteredNotice = filterBySearch(onNotice, ['tenants.full_name', 'apartments.apartment_code'], ts('exit'));
+
+    // KPI tiles — estimated refund due + upcoming-exit counts across tenants currently on notice.
+    // Estimated refund reuses the Process-Exit preview formula (advance − pending rent − under-1yr
+    // exit fee); damage/EB/key-loss are left out since those are only known after the actual
+    // room inspection at exit time, so this is a best-effort estimate, not the final figure.
+    const kpiNow = new Date();
+    const kpiIn7 = new Date(kpiNow); kpiIn7.setDate(kpiIn7.getDate() + 7);
+    const kpiIn30 = new Date(kpiNow); kpiIn30.setDate(kpiIn30.getDate() + 30);
+    let kpiRefundDue = 0, kpiWeek = 0, kpiMonth = 0;
+    onNotice.forEach((a: any) => {
+      const advance = a.deposit_paid || 0;
+      const pendRent = a.balance_due || 0;
+      let exitFee = 0;
+      if (a.estimated_exit_date && a.onboarding_date) {
+        const stayDays = Math.floor((new Date(a.estimated_exit_date).getTime() - new Date(a.onboarding_date).getTime()) / 86400000);
+        if (stayDays < 365) exitFee = config.exit_fee_under_1yr || 2250;
+      }
+      kpiRefundDue += Math.max(0, advance - pendRent - exitFee);
+      if (a.estimated_exit_date) {
+        const ed = new Date(a.estimated_exit_date);
+        if (ed <= kpiIn7) kpiWeek++;
+        else if (ed <= kpiIn30) kpiMonth++;
+      }
+    });
 
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* On notice — ready for exit */}
-        {onNotice.length > 0 && <>
-          <SectionTitle title={`Tenants on Notice (${onNotice.length})`} />
-          {onNotice.map((a: any) => (
-            <Card key={a.id} style={{ borderColor: '#EA580C', borderWidth: 1 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
-                  <Row label="Est. Exit" value={fmtDate(a.estimated_exit_date)} valueColor="#EA580C" />
-                  <Row label="Advance" value={`₹${fmtAmt(a.deposit_paid)}`} />
-                </View>
-                <ActionBtn title="Exit" small variant="danger" icon="log-out-outline" onPress={() => {
-                  setEForm({ ...blankExit, allotmentId: a.id, tenantId: a.tenant_id, bedId: a.bed_id, exitDate: a.estimated_exit_date || today(), hasNotice: true });
-                  setExitOpen(true);
-                }} />
-              </View>
-            </Card>
-          ))}
-        </>}
+        {/* Sub-tab pills */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <Pressable onPress={() => setExitSubTab('notice')}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999,
+              backgroundColor: exitSubTab === 'notice' ? '#6D5EF6' : '#EEF0F4' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: exitSubTab === 'notice' ? '#fff' : '#334155' }}>
+              Tenants on Notice ({onNotice.length})
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => setExitSubTab('history')}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999,
+              backgroundColor: exitSubTab === 'history' ? '#6D5EF6' : '#EEF0F4' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: exitSubTab === 'history' ? '#fff' : '#334155' }}>
+              Exit History ({exits.length})
+            </Text>
+          </Pressable>
+        </View>
 
-        {/* Pre-exit tasks (created via createExitTask, listed from listExitTasks) */}
-        {exitTasks.length > 0 && <>
-          <SectionTitle title={`Pre-Exit Tasks (${exitTasks.length})`} />
-          {exitTasks.map((t: any) => (
-            <Card key={t.id || t._id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{t.tenants?.full_name || t.task || 'Pre-exit task'}</Text>
-                  <Row label="Target Exit" value={fmtDate(t.exit_date)} valueColor="#EA580C" />
-                  <Row label="Assignee" value={t.assigned_to || 'Unassigned'} />
-                </View>
-                <StatusPill status={t.status || 'pending'} />
-              </View>
-            </Card>
-          ))}
-        </>}
+        {/* KPI tiles */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <KpiTile label="EST. REFUND DUE" value={`₹${fmtAmt(kpiRefundDue)}`} valueColor="#16A34A" />
+          <KpiTile label="1 WEEK" value={String(kpiWeek)} valueColor="#16A34A" />
+          <KpiTile label="1 MONTH" value={String(kpiMonth)} valueColor="#16A34A" />
+        </View>
 
-        <SectionTitle title={`Exit History (${exits.length})`} />
-        <SearchBar tab="exit" placeholder="Search tenant…" />
-        {filtered.length === 0 ? <EmptyCard message="No exits yet" /> :
-          filtered.map((e: any) => (
-            <Card key={e._id || e.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Exit: {fmtDate(e.exitDate || e.exit_date)}</Text>
-                  <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
-                  <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
-                  <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#16A34A" />
-                  <StatusPill status={e.refundStatus || e.refund_status || 'none'} />
-                </View>
-                <TouchableOpacity onPress={() => {
-                  setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
-                  setEditExitOpen(true);
-                }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
-                  <Ionicons name="pencil-outline" size={16} color="#2563EB" />
-                </TouchableOpacity>
-              </View>
-            </Card>
-          ))
-        }
+        <SearchField value={ts('exit')} onChangeText={(v: string) => setTs('exit', v)} placeholder="Search tenant…" />
+
+        {exitSubTab === 'notice' ? (
+          <>
+            {filteredNotice.length === 0 ? <EmptyCard message="No tenants on notice" /> :
+              filteredNotice.map((a: any) => (
+                <LifecycleCard key={a.id}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                      <AvatarInitial name={a.tenants?.full_name} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{a.beds?.bed_code} · {a.apartments?.apartment_code}</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>
+                          Est. exit {fmtDate(a.estimated_exit_date)} · Bal ₹{fmtAmt(a.balance_due)} · Adv ₹{fmtAmt(a.deposit_paid)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontWeight: '800', fontSize: fontSize.sm, color: '#DC2626' }}>₹{fmtAmt(a.balance_due)}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <OutlineButton title="Statement" icon="document-text-outline" tone="success" small
+                      onPress={() => openStatement({ tenantId: a.tenant_id, tenantName: a.tenants?.full_name, allotmentId: a.id })} />
+                    <OutlineButton title="Process Exit" icon="log-out-outline" tone="danger" small onPress={() => {
+                      setEForm({ ...blankExit, allotmentId: a.id, tenantId: a.tenant_id, bedId: a.bed_id, exitDate: a.estimated_exit_date || today(), hasNotice: true });
+                      setExitOpen(true);
+                    }} />
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => doCreatePreExitTask(a)}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(234,88,12,0.08)', borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(234,88,12,0.25)' }}
+                  >
+                    <Ionicons name="clipboard-outline" size={15} color="#EA580C" />
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#EA580C' }}>Create Pre-Exit Task</Text>
+                  </TouchableOpacity>
+                </LifecycleCard>
+              ))
+            }
+
+            {/* Pre-exit tasks (created via createExitTask, listed from listExitTasks) */}
+            {exitTasks.length > 0 && <>
+              <SectionTitle title={`Pre-Exit Tasks (${exitTasks.length})`} />
+              {exitTasks.map((t: any) => (
+                <Card key={t.id || t._id}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{t.tenants?.full_name || t.task || 'Pre-exit task'}</Text>
+                      <Row label="Target Exit" value={fmtDate(t.exit_date)} valueColor="#EA580C" />
+                      <Row label="Assignee" value={t.assigned_to || 'Unassigned'} />
+                    </View>
+                    <StatusPill status={t.status || 'pending'} />
+                  </View>
+                </Card>
+              ))}
+            </>}
+          </>
+        ) : (
+          <>
+            {filtered.length === 0 ? <EmptyCard message="No exits yet" /> :
+              filtered.map((e: any) => (
+                <LifecycleCard key={e._id || e.id}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Exit: {fmtDate(e.exitDate || e.exit_date)}</Text>
+                      <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
+                      <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
+                      <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#16A34A" />
+                      <StatusPill status={e.refundStatus || e.refund_status || 'none'} />
+                    </View>
+                    <TouchableOpacity onPress={() => {
+                      setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
+                      setEditExitOpen(true);
+                    }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
+                      <Ionicons name="pencil-outline" size={16} color="#2563EB" />
+                    </TouchableOpacity>
+                  </View>
+                </LifecycleCard>
+              ))
+            }
+          </>
+        )}
 
         {/* Process Exit sheet */}
         <BottomSheet visible={exitOpen} onClose={() => setExitOpen(false)} title="Process Exit">
