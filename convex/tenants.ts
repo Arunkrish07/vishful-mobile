@@ -607,6 +607,63 @@ export const processSwitchFull = action({
   },
 });
 
+// ─── COMPLETE / CANCEL A SCHEDULED (FUTURE) SWITCH ───────────────────────────
+
+export const completeSwitch = action({
+  args: { switchId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { switchId }) => {
+    const sb = getSupabase();
+    const { data: sw } = await sb.from("room_switches").select("*")
+      .eq("id", switchId).eq("organization_id", ORG_ID).single();
+    if (!sw || sw.status !== "scheduled") return { success: false, error: "not scheduled" };
+
+    await sb.from("tenant_allotments").update({
+      bed_id: sw.new_bed_id, apartment_id: sw.new_apartment_id || undefined,
+      staying_status: "Staying", notice_date: null, estimated_exit_date: null,
+    } as any).eq("id", sw.allotment_id).eq("organization_id", ORG_ID);
+    await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", sw.old_bed_id);
+    await sb.from("beds").update({ bed_lifecycle_status: "occupied" } as any).eq("id", sw.new_bed_id);
+
+    // post the stored (pre-computed) EB invoice on the OLD bed — same threshold as processSwitchFull
+    if ((sw.eb_charges || 0) > 1) {
+      await insertRow("invoices", {
+        tenant_id: sw.tenant_id, allotment_id: sw.allotment_id, bed_id: sw.old_bed_id,
+        invoice_type: "regular", electricity_amount: sw.eb_charges, total_amount: sw.eb_charges,
+        reference_type: "room_switch",
+      });
+    }
+
+    await sb.from("room_switches").update({
+      status: "completed", completed_at: new Date().toISOString(),
+    } as any).eq("id", switchId).eq("organization_id", ORG_ID);
+
+    return { success: true };
+  },
+});
+
+export const cancelSwitch = action({
+  args: { switchId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { switchId }) => {
+    const sb = getSupabase();
+    const { data: sw } = await sb.from("room_switches").select("*")
+      .eq("id", switchId).eq("organization_id", ORG_ID).single();
+    if (!sw || sw.status !== "scheduled") return { success: false, error: "not scheduled" };
+
+    await sb.from("tenant_allotments").update({
+      staying_status: "Staying", notice_date: null, estimated_exit_date: null,
+    } as any).eq("id", sw.allotment_id).eq("organization_id", ORG_ID);
+    await sb.from("beds").update({ bed_lifecycle_status: "occupied" } as any).eq("id", sw.old_bed_id);
+    await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", sw.new_bed_id);
+
+    await sb.from("room_switches").update({ status: "cancelled" } as any)
+      .eq("id", switchId).eq("organization_id", ORG_ID);
+
+    return { success: true };
+  },
+});
+
 // ─── NOTICE ───────────────────────────────────────────────────────────────────
 
 export const createNoticeFull = action({
@@ -1116,6 +1173,10 @@ export const listRoomSwitches = action({
       switchType: s.switch_type || "immediate",
       switchDate: s.switch_date,
       rentDifference: Number(s.rent_difference) || 0,
+      ebCharges: Number(s.eb_charges) || 0,
+      depositDifference: Number(s.deposit_difference) || 0,
+      status: s.status || "completed",
+      notes: s.notes || "",
       adjustmentType: s.adjustment_type || "none",
       createdAt: s.created_at,
     }));
