@@ -3634,43 +3634,45 @@ export default function TenantLifecycleScreen() {
               <Ionicons name="mic-outline" size={16} color="#EA580C" />
               <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#EA580C' }}>Voice</Text>
             </TouchableOpacity>
-            <ActionBtn title="Record Notice" icon="notifications-outline" small onPress={() => setNoticeOpen(true)} />
+            <PrimaryButton title="Record Notice" icon="notifications-outline" small onPress={() => setNoticeOpen(true)} />
           </View>
         </View>
-        <SearchBar tab="notices" placeholder="Search by tenant name..." />
+        <SearchField value={ts('notices')} onChangeText={(v: string) => setTs('notices', v)} placeholder="Search by tenant name..." />
         {filtered.length === 0 ? <EmptyCard message="No tenants on notice" /> :
           filtered.map((a: any) => {
             const noticeRecord = notices.find((n: any) => n.allotment_id === a.id);
             return (
-              <Card key={a.id}>
+              <LifecycleCard key={a.id}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
-                    <Row label="Notice Date" value={fmtDate(a.notice_date)} valueColor="#EA580C" />
-                    <Row label="Est. Exit" value={fmtDate(a.estimated_exit_date)} valueColor="#DC2626" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <AvatarInitial name={a.tenants?.full_name} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                        <StatusBadge kind="onNotice" />
+                      </View>
+                      <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 3 }}>{a.beds?.bed_code} · {a.apartments?.apartment_code}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: '#EA580C', marginTop: 2 }}>Notice Date {fmtDate(a.notice_date)}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: '#DC2626', marginTop: 2 }}>Est. exit {fmtDate(a.estimated_exit_date)}</Text>
+                    </View>
                   </View>
-                  <View style={{ gap: 6 }}>
-                    <TouchableOpacity onPress={() => {
-                      setEditNoticeForm({ noticeId: noticeRecord?.id || '', allotmentId: a.id, bedId: a.bed_id, tenantId: a.tenant_id, noticeDate: a.notice_date || '', exitDate: a.estimated_exit_date || '', notes: noticeRecord?.notes || '' });
-                      setEditNoticeOpen(true);
-                    }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#2563EB" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => doDeleteNotice(noticeRecord || { id: '', allotment_id: a.id, bed_id: a.bed_id, tenant_id: a.tenant_id })}
-                      style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="close-outline" size={16} color="#DC2626" />
-                    </TouchableOpacity>
-                  </View>
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>₹{fmtAmt(a.monthly_rental)}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <OutlineButton title="Edit" icon="pencil-outline" small onPress={() => {
+                    setEditNoticeForm({ noticeId: noticeRecord?.id || '', allotmentId: a.id, bedId: a.bed_id, tenantId: a.tenant_id, noticeDate: a.notice_date || '', exitDate: a.estimated_exit_date || '', notes: noticeRecord?.notes || '' });
+                    setEditNoticeOpen(true);
+                  }} />
+                  <OutlineButton title="Delete" icon="trash-outline" tone="danger" small onPress={() => doDeleteNotice(noticeRecord || { id: '', allotment_id: a.id, bed_id: a.bed_id, tenant_id: a.tenant_id })} />
                 </View>
                 <TouchableOpacity
                   onPress={() => doCreatePreExitTask(a)}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, backgroundColor: 'rgba(234,88,12,0.08)', borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(234,88,12,0.25)' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(234,88,12,0.08)', borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(234,88,12,0.25)' }}
                 >
                   <Ionicons name="clipboard-outline" size={15} color="#EA580C" />
                   <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#EA580C' }}>Create Pre-Exit Task</Text>
                 </TouchableOpacity>
-              </Card>
+              </LifecycleCard>
             );
           })
         }
