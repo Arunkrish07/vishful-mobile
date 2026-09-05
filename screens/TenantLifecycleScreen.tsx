@@ -1975,17 +1975,13 @@ export default function TenantLifecycleScreen() {
     };
 
     return (
-      <View style={{
-        backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#EEF1F6',
-        padding: 13, marginBottom: 10,
-        shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
-      }}>
+      <LifecycleCard style={{ borderRadius: 18, borderWidth: 1, borderColor: '#EEF1F6', padding: 13, marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }}>Bed Status</Text>
             <Text style={{ fontSize: 11, color: VBRAND.ink500, marginTop: 1 }}>vs previous month</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => Alert.alert('Intelligence', 'Occupancy intelligence coming soon.')}
@@ -1997,16 +1993,13 @@ export default function TenantLifecycleScreen() {
             >
               <Text style={{ fontSize: 11, fontWeight: '700', color: VBRAND.ink700 }}>Intelligence</Text>
             </TouchableOpacity>
-            <View style={{
-              height: 24, paddingHorizontal: 10, borderRadius: 999,
-              backgroundColor: VBRAND.purpleSoft, alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep }}>Total {totalLive}</Text>
-            </View>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purpleDeep, textDecorationLine: 'underline' }}>
+              Total {totalLive}
+            </Text>
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10, alignItems: 'stretch' }}>
           <View style={{
             width: 56, height: 56, borderRadius: 28,
             borderWidth: 5, borderColor: VBRAND.occ,
@@ -2014,26 +2007,26 @@ export default function TenantLifecycleScreen() {
           }}>
             <Text style={{ fontSize: 13, fontWeight: '800', color: VBRAND.ink900 }}>{totalLive}</Text>
           </View>
-          <View style={{ flex: 1, gap: 8 }}>
+          <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
             <View style={{
-              backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
+              flex: 1, backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
               borderColor: VBRAND.softLine, padding: 9,
             }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+              <Text style={{ fontSize: 9, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }} numberOfLines={1}>
                 Current occupancy
               </Text>
-              <Text style={{ fontSize: 19, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
-              <Text style={{ fontSize: 10, color: VBRAND.ink500 }}>(Occupied + Notice) / Total</Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
+              <Text style={{ fontSize: 9, color: VBRAND.ink500 }} numberOfLines={1}>(Occupied + Notice) / Total</Text>
             </View>
             <View style={{
-              backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
+              flex: 1, backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
               borderColor: VBRAND.softLine, padding: 9,
             }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+              <Text style={{ fontSize: 9, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }} numberOfLines={1}>
                 Month occupancy
               </Text>
-              <Text style={{ fontSize: 19, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
-              <Text style={{ fontSize: 10, color: VBRAND.ink500 }}>{bedCounts.occupied + bedCounts.notice}/{totalLive} beds live</Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
+              <Text style={{ fontSize: 9, color: VBRAND.ink500 }} numberOfLines={1}>{bedCounts.occupied + bedCounts.notice}/{totalLive} beds live</Text>
             </View>
           </View>
         </View>
@@ -2056,7 +2049,7 @@ export default function TenantLifecycleScreen() {
                 }}
               >
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.color, marginBottom: 4 }} />
-                <Text style={{ fontSize: 14, fontWeight: '800', color: VBRAND.ink900 }}>{val}</Text>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: VBRAND.ink900 }}>{val}</Text>
                 <Text style={{ fontSize: 9, fontWeight: '700', color: VBRAND.ink600, textAlign: 'center' }} numberOfLines={1}>
                   {t.label}
                 </Text>
@@ -2064,21 +2057,21 @@ export default function TenantLifecycleScreen() {
             );
           })}
         </View>
-      </View>
+      </LifecycleCard>
     );
   }
 
   function renderBedFocusDetail() {
     if (!bedFocus) {
       return (
-        <View style={{
+        <LifecycleCard style={{
           backgroundColor: VBRAND.surfaceSoft, borderRadius: 14, borderWidth: 1, borderColor: VBRAND.line,
-          padding: 24, alignItems: 'center', marginTop: 4,
+          padding: 24, alignItems: 'center', marginTop: 4, marginBottom: 0,
         }}>
           <Text style={{ fontSize: 13, color: VBRAND.ink500, textAlign: 'center', fontWeight: '600' }}>
-            Pick a Bed Status tile or a Lifecycle module to see details.
+            Pick a Bed Status tile to see the tenants behind it.
           </Text>
-        </View>
+        </LifecycleCard>
       );
     }
 
@@ -2111,7 +2104,7 @@ export default function TenantLifecycleScreen() {
             sub={`${code} · Onboarded ${fmtDate(a.onboarding_date || a.start_date)} · Rent ₹${fmtAmt(a.monthly_rent || getBedRate(a.bed_id))}`}
             amount={`₹${fmtAmt(a.advance_amount || a.deposit_amount)}`}
             amountOk
-            right={<Ionicons name="chevron-forward" size={16} color={VBRAND.ink400} />}
+            right={<Ionicons name="pencil-outline" size={16} color={VBRAND.ink400} />}
           />
         );
       });
@@ -2132,6 +2125,7 @@ export default function TenantLifecycleScreen() {
             pill="On Notice"
             sub={`${code} · ${fmtDate(a.notice_date)} → ${fmtDate(a.exit_date || a.expected_exit_date)}`}
             amount={`₹${fmtAmt(a.monthly_rent || getBedRate(a.bed_id))}`}
+            right={<Ionicons name="pencil-outline" size={16} color={VBRAND.ink400} />}
           />
         );
       });
@@ -2153,6 +2147,7 @@ export default function TenantLifecycleScreen() {
             pill={isNew ? 'New' : undefined}
             sub={`${code} · Booked ${fmtDate(a.booking_date || a.created_at)} · Move-in ${fmtDate(a.expected_move_in || a.start_date)}`}
             amount={`₹${fmtAmt(a.booking_amount || a.advance_amount || config.booking_fee)}`}
+            right={<Ionicons name="pencil-outline" size={16} color={VBRAND.ink400} />}
           />
         );
       });
@@ -2185,9 +2180,9 @@ export default function TenantLifecycleScreen() {
               : 0;
 
     return (
-      <View style={{
+      <LifecycleCard style={{
         backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: VBRAND.cardBorder,
-        padding: 12, marginTop: 2,
+        padding: 12, marginTop: 2, marginBottom: 0,
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: VBRAND.ink900 }}>
@@ -2223,7 +2218,7 @@ export default function TenantLifecycleScreen() {
           )}
         </View>
         {rows}
-      </View>
+      </LifecycleCard>
     );
   }
 
