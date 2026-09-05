@@ -497,45 +497,110 @@ export const addLifecyclePayment = action({
 
 // ─── ROOM SWITCH ──────────────────────────────────────────────────────────────
 
+// Sum of each tenant's occupied days in `apartmentId` during the month of prevMonth.
+async function getTotalTenantDaysInMonth(sb: any, apartmentId: string, prevMonth: Date): Promise<number> {
+  const y = prevMonth.getFullYear(), m = prevMonth.getMonth();
+  const monthStart = new Date(y, m, 1);
+  const monthEnd = new Date(y, m + 1, 0); // last day of month
+  const daysInMonth = monthEnd.getDate();
+  const { data: allots } = await sb.from("tenant_allotments")
+    .select("onboarding_date, actual_exit_date, staying_status")
+    .eq("apartment_id", apartmentId).eq("organization_id", ORG_ID);
+  if (!allots || allots.length === 0) return daysInMonth;
+  let total = 0;
+  for (const a of allots) {
+    const onb = a.onboarding_date ? new Date(a.onboarding_date) : monthStart;
+    const ext = a.actual_exit_date ? new Date(a.actual_exit_date) : monthEnd;
+    const start = onb > monthStart ? onb : monthStart;
+    const end = ext < monthEnd ? ext : monthEnd;
+    const days = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+    if (days > 0) total += days;
+  }
+  return total > 0 ? total : daysInMonth;
+}
+
 export const processSwitchFull = action({
   args: { data: v.any() },
   returns: v.any(),
   handler: async (_ctx, { data }) => {
     const sb = getSupabase();
-
     const oldRate = data.oldRate || 0;
     const newRate = data.newRate || 0;
     const rentDiff = newRate - oldRate;
     const today = new Date().toISOString().split("T")[0];
+    const switchType: "immediate" | "future" = data.switchType === "future" ? "future" : "immediate";
+    const switchDateStr = data.switchDate || today;
+    const effectiveDateStr = switchType === "future" ? (data.effectiveDate || switchDateStr) : switchDateStr;
 
-    // Insert room switch record
+    // --- fetch old allotment (for onboarding_date + old apartment) ---
+    const { data: allotRow } = await sb.from("tenant_allotments")
+      .select("id, apartment_id, onboarding_date, deposit_paid")
+      .eq("id", data.allotmentId).eq("organization_id", ORG_ID).single();
+    const oldAptId = allotRow?.apartment_id || data.oldApartmentId;
+
+    // --- EB proration for the OLD room (web parity) ---
+    let ebCharges = 0;
+    const switchDate = new Date(switchDateStr);
+    const prevMonth = new Date(switchDate.getFullYear(), switchDate.getMonth() - 1, 1);
+    const mmmYy = prevMonth.toLocaleString("en-US", { month: "short", year: "2-digit" }).replace(" ", "-"); // e.g. Aug-26
+    const yyyyMm = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+    const { data: ebRows } = await sb.from("electricity_readings")
+      .select("reading_start, reading_end, unit_cost, billing_month")
+      .eq("apartment_id", oldAptId);
+    const ebReading = (ebRows || []).find((r: any) => r.billing_month === mmmYy || r.billing_month === yyyyMm);
+    if (ebReading) {
+      const totalUnits = Number(ebReading.reading_end) - Number(ebReading.reading_start);
+      const totalBill = totalUnits * Number(ebReading.unit_cost);
+      const totalTenantDays = await getTotalTenantDaysInMonth(sb, oldAptId, prevMonth);
+      const perDay = totalTenantDays > 0 ? totalBill / totalTenantDays : 0;
+      const onb = allotRow?.onboarding_date ? new Date(allotRow.onboarding_date) : switchDate;
+      const daysUsed = Math.max(1, Math.floor((switchDate.getTime() - onb.getTime()) / 86400000));
+      ebCharges = Math.ceil(perDay * daysUsed);
+    }
+
+    // --- deposit difference (advance_ratio default 1.5) ---
+    const depositDifference = Math.round((newRate - oldRate) * 1.5);
+
+    const status = switchType === "immediate" ? "completed" : "scheduled";
+
+    // --- insert room_switches ---
     await insertRow("room_switches", {
-      tenant_id: data.tenantId,
-      allotment_id: data.allotmentId,
-      old_bed_id: data.oldBedId,
-      new_bed_id: data.newBedId,
-      switch_type: "immediate",
-      switch_date: data.switchDate || today,
-      effective_date: data.switchDate || today,
-      rent_difference: rentDiff,
+      tenant_id: data.tenantId, allotment_id: data.allotmentId,
+      old_bed_id: data.oldBedId, new_bed_id: data.newBedId,
+      old_apartment_id: oldAptId, new_apartment_id: data.newApartmentId || null,
+      switch_type: switchType, switch_date: switchDateStr, effective_date: effectiveDateStr,
+      rent_difference: rentDiff, deposit_difference: depositDifference, eb_charges: ebCharges,
       adjustment_type: rentDiff > 0 ? "tenant_pays" : rentDiff < 0 ? "credit_tenant" : "none",
+      status, notes: data.notes || null,
+      completed_at: status === "completed" ? new Date().toISOString() : null,
     });
 
-    // Update allotment
-    const apt = data.newApartmentId;
-    const prop = data.newPropertyId;
-    await sb.from("tenant_allotments").update({
-      bed_id: data.newBedId,
-      apartment_id: apt || undefined,
-      property_id: prop || undefined,
-      monthly_rental: newRate,
-    } as any).eq("id", data.allotmentId).eq("organization_id", ORG_ID);
+    if (switchType === "immediate") {
+      // move tenant now
+      await sb.from("tenant_allotments").update({
+        bed_id: data.newBedId, apartment_id: data.newApartmentId || undefined,
+        property_id: data.newPropertyId || undefined, monthly_rental: newRate,
+      } as any).eq("id", data.allotmentId).eq("organization_id", ORG_ID);
+      await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", data.oldBedId);
+      await sb.from("beds").update({ bed_lifecycle_status: "occupied" } as any).eq("id", data.newBedId);
+      // post the actual-EB invoice on the OLD bed
+      if (ebCharges > 0) {
+        await insertRow("invoices", {
+          tenant_id: data.tenantId, allotment_id: data.allotmentId, bed_id: data.oldBedId,
+          invoice_type: "regular", electricity_amount: ebCharges, total_amount: ebCharges,
+          billing_month: yyyyMm, reference_type: "room_switch",
+        });
+      }
+    } else {
+      // scheduled: old room On-Notice, new bed Booked; financials deferred to completeSwitch
+      await sb.from("tenant_allotments").update({
+        staying_status: "On-Notice", notice_date: today, estimated_exit_date: effectiveDateStr,
+      } as any).eq("id", data.allotmentId).eq("organization_id", ORG_ID);
+      await sb.from("beds").update({ bed_lifecycle_status: "notice" } as any).eq("id", data.oldBedId);
+      await sb.from("beds").update({ bed_lifecycle_status: "booked" } as any).eq("id", data.newBedId);
+    }
 
-    // Update bed statuses
-    await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", data.oldBedId);
-    await sb.from("beds").update({ bed_lifecycle_status: "occupied" } as any).eq("id", data.newBedId);
-
-    return { success: true };
+    return { success: true, ebCharges, depositDifference, status };
   },
 });
 
