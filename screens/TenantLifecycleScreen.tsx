@@ -27,7 +27,7 @@ import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { client, api } from '../lib/convexApi';
 import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
-import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine } from '../components/lifecycle';
+import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField } from '../components/lifecycle';
 import { StatusBadge } from '../components/lifecycle/StatusBadge';
 import * as sb from '../lib/supabaseService';
 // (registration PDF helpers are defined inline below — no separate module)
@@ -802,10 +802,12 @@ export default function TenantLifecycleScreen() {
   const [absenceForm, setAbsenceForm] = useState<any>(blankAbsence);
 
   // ── bed map ──
-  const [mapFilter,  setMapFilter]  = useState<string | null>(null);
-  const [mapSearch,  setMapSearch]  = useState('');
-  const [mapSortBy,  setMapSortBy]  = useState<'apartment' | 'gender'>('apartment');
-  const [bedDetail,  setBedDetail]  = useState<any>(null);
+  const [mapFilter,   setMapFilter]   = useState<string | null>(null);
+  const [mapSearch,   setMapSearch]   = useState('');
+  const [mapSortBy,   setMapSortBy]   = useState<'apartment' | 'gender'>('apartment');
+  const [bedDetail,   setBedDetail]   = useState<any>(null);
+  const [mapMenuOpen, setMapMenuOpen] = useState(false);
+  const [expandedApt, setExpandedApt] = useState<string | null>(null);
 
   // ── derived: is any overlay open? ────────────────────────────────────────────
   // Re-evaluated on every render so it's always current
@@ -2234,20 +2236,27 @@ export default function TenantLifecycleScreen() {
 
   function renderBedMap() {
     const STATUS_FILTERS = [
-      { key: null,            label: 'All',           color: '#2563EB' },
-      { key: 'occupied',      label: 'Occupied',      color: '#16A34A' },
-      { key: 'vacant',        label: 'Vacant',        color: '#DC2626' },
-      { key: 'notice',        label: 'Notice',        color: '#EA580C' },
-      { key: 'booked',        label: 'Booked',        color: '#1D4ED8' },
-      { key: 'notice-booked', label: 'Notice-Booked', color: '#2563EB' },
-    ];
+      { key: null,       label: 'All',      color: '#6D5EF6' },
+      { key: 'occupied', label: 'Occupied', color: '#16A34A' },
+      { key: 'vacant',   label: 'Vacant',   color: '#E11D48' },
+      { key: 'notice',   label: 'Notice',   color: '#D97706' },
+      { key: 'booked',   label: 'Booked',   color: '#2563EB' },
+    ] as const;
 
     const BED_STATUS_COLORS: Record<string, { bg: string; border: string; textColor: string; dot: string }> = {
       occupied:        { bg: '#DCFCE7', border: '#16A34A', textColor: '#15803D', dot: '#16A34A' },
-      vacant:          { bg: '#FEE2E2', border: '#DC2626', textColor: '#B91C1C', dot: '#DC2626' },
-      notice:          { bg: '#FFEDD5', border: '#EA580C', textColor: '#C2410C', dot: '#EA580C' },
-      booked:          { bg: '#EEF3FF', border: '#1D4ED8', textColor: '#1D4ED8', dot: '#1D4ED8' },
-      'notice-booked': { bg: '#EDE9FE', border: '#2563EB', textColor: '#2563EB', dot: '#2563EB' },
+      vacant:          { bg: '#FFE4E6', border: '#E11D48', textColor: '#BE123C', dot: '#E11D48' },
+      notice:          { bg: '#FEF3C7', border: '#D97706', textColor: '#92400E', dot: '#D97706' },
+      booked:          { bg: '#DBEAFE', border: '#2563EB', textColor: '#1D4ED8', dot: '#2563EB' },
+      'notice-booked': { bg: '#EDE9FE', border: '#7C3AED', textColor: '#6D28D9', dot: '#7C3AED' },
+    };
+
+    // A bed's status can satisfy more than one chip (e.g. "notice-booked" counts under both Notice and Booked)
+    const filterMatches = (status: string, key: string | null) => {
+      if (!key) return true;
+      if (key === 'booked') return status === 'booked' || status === 'notice-booked';
+      if (key === 'notice') return status === 'notice' || status === 'notice-booked';
+      return status === key;
     };
 
     // ── summary counts ────────────────────────────────────────────────────────
@@ -2257,13 +2266,18 @@ export default function TenantLifecycleScreen() {
       acc[s] = (acc[s] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    const occupancyPct = totalBeds > 0 ? Math.round((((countByStatus['occupied'] || 0) + (countByStatus['notice'] || 0) + (countByStatus['notice-booked'] || 0)) / totalBeds) * 100) : 0;
+    const chipCounts: Record<string, number> = {
+      occupied: countByStatus['occupied'] || 0,
+      vacant:   countByStatus['vacant']   || 0,
+      notice:   (countByStatus['notice'] || 0) + (countByStatus['notice-booked'] || 0),
+      booked:   (countByStatus['booked'] || 0) + (countByStatus['notice-booked'] || 0),
+    };
 
     // ── group by property → apartment ─────────────────────────────────────────
     const grouped: Record<string, { property: any; apartments: Record<string, { apartment: any; beds: any[] }> }> = {};
     liveBeds.forEach((bed: any) => {
       const status = getBedStatusFromAllotments(bed.id);
-      if (mapFilter && status !== mapFilter) return;
+      if (!filterMatches(status, mapFilter)) return;
       const apt = aptById[bed.apartment_id];
       if (!apt) return;
       if (mapSearch) {
@@ -2279,157 +2293,90 @@ export default function TenantLifecycleScreen() {
       grouped[propId].apartments[apt.id].beds.push({ ...bed, _status: status, _apt: apt });
     });
 
+    const exportBedMapCsv = async () => {
+      try {
+        if (liveBeds.length === 0) { Alert.alert('No Data', 'No beds to export.'); return; }
+        const header = ['Property', 'Apartment', 'Bed Code', 'Bed Type', 'Toilet', 'Status', 'Rate (₹/mo)', 'Tenant', 'Phone'].join(',');
+        const rows = liveBeds.map((bed: any) => {
+          const apt  = aptById[bed.apartment_id]  || {};
+          const prop = propById[apt.property_id]  || {};
+          const status = getBedStatusFromAllotments(bed.id);
+          const rate = getBedRate(bed.id);
+          const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
+          const esc = (v: string) => `"${String(v || '').replace(/"/g, '""')}"`;
+          return [
+            esc(prop.property_name || '—'),
+            esc(apt.apartment_code  || '—'),
+            esc(bed.bed_code        || '—'),
+            esc(bed.bed_type        || '—'),
+            esc(bed.toilet_type     || '—'),
+            esc(status),
+            String(rate),
+            esc(allot?.tenants?.full_name || '—'),
+            esc(allot?.tenants?.phone     || '—'),
+          ].join(',');
+        });
+        const csvContent = [header, ...rows].join('\n');
+        const filename = `beds-${new Date().toISOString().split('T')[0]}.csv`;
+        const FileSystem = await import('expo-file-system/legacy') as any;
+        const fileUri = FileSystem.cacheDirectory + filename;
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
+        const Sharing = await import('expo-sharing') as any;
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'text/csv',
+            dialogTitle: 'Export Bed Map',
+            UTI: 'public.comma-separated-values-text',
+          });
+        } else {
+          Alert.alert('Sharing not available', 'Cannot share files on this device.');
+        }
+      } catch (e: any) {
+        Alert.alert('Export failed', e?.message || 'Could not export bed map.');
+      }
+    };
+
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* ── Occupancy summary bar ─────────────────────────────────────────── */}
-        <Card style={{ marginBottom: 10, padding: 12 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#0F172A' }}>Occupancy</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#2563EB' }}>{occupancyPct}%  ({countByStatus['occupied'] || 0}/{totalBeds})</Text>
-              {/* ── CSV export for bed map ─────────────────────────────────── */}
-              <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    if (liveBeds.length === 0) { Alert.alert('No Data', 'No beds to export.'); return; }
-                    const header = ['Property', 'Apartment', 'Bed Code', 'Bed Type', 'Toilet', 'Status', 'Rate (₹/mo)', 'Tenant', 'Phone'].join(',');
-                    const rows = liveBeds.map((bed: any) => {
-                      const apt  = aptById[bed.apartment_id]  || {};
-                      const prop = propById[apt.property_id]  || {};
-                      const status = getBedStatusFromAllotments(bed.id);
-                      const rate = getBedRate(bed.id);
-                      const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
-                      const esc = (v: string) => `"${String(v || '').replace(/"/g, '""')}"`;
-                      return [
-                        esc(prop.property_name || '—'),
-                        esc(apt.apartment_code  || '—'),
-                        esc(bed.bed_code        || '—'),
-                        esc(bed.bed_type        || '—'),
-                        esc(bed.toilet_type     || '—'),
-                        esc(status),
-                        String(rate),
-                        esc(allot?.tenants?.full_name || '—'),
-                        esc(allot?.tenants?.phone     || '—'),
-                      ].join(',');
-                    });
-                    const csvContent = [header, ...rows].join('\n');
-                    const filename = `beds-${new Date().toISOString().split('T')[0]}.csv`;
-                    const FileSystem = await import('expo-file-system/legacy') as any;
-                    const fileUri = FileSystem.cacheDirectory + filename;
-                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
-                    const Sharing = await import('expo-sharing') as any;
-                    const canShare = await Sharing.isAvailableAsync();
-                    if (canShare) {
-                      await Sharing.shareAsync(fileUri, {
-                        mimeType: 'text/csv',
-                        dialogTitle: 'Export Bed Map',
-                        UTI: 'public.comma-separated-values-text',
-                      });
-                    } else {
-                      Alert.alert('Sharing not available', 'Cannot share files on this device.');
-                    }
-                  } catch (e: any) {
-                    Alert.alert('Export failed', e?.message || 'Could not export bed map.');
-                  }
-                }}
-                style={{
-                  width: 30, height: 30, borderRadius: 99,
-                  backgroundColor: 'rgba(37,99,235,0.10)',
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="download-outline" size={16} color="#2563EB" />
-              </TouchableOpacity>
-            </View>
+        {/* ── Top row: search + sort + menu ─────────────────────────────────── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <View style={{ flex: 1 }}>
+            <SearchField value={mapSearch} onChangeText={setMapSearch} placeholder="Search tenant" />
           </View>
-          {/* Progress bar */}
-          <View style={{ height: 6, backgroundColor: '#EFF6FF', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
-            <View style={{ height: 6, width: `${occupancyPct}%` as any, backgroundColor: '#2563EB', borderRadius: 99 }} />
-          </View>
-          {/* Stat pills */}
-          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Occupied',  count: countByStatus['occupied']      || 0, color: '#16A34A', bg: '#DCFCE7' },
-              { label: 'Vacant',    count: countByStatus['vacant']        || 0, color: '#DC2626', bg: '#FEE2E2' },
-              { label: 'Booked',    count: (countByStatus['booked'] || 0) + (countByStatus['notice-booked'] || 0), color: '#1D4ED8', bg: '#EEF3FF' },
-              { label: 'Notice',    count: (countByStatus['notice'] || 0) + (countByStatus['notice-booked'] || 0), color: '#EA580C', bg: '#FFEDD5' },
-            ].map(s => (
-              <View key={s.label} style={{ backgroundColor: s.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 7, height: 7, borderRadius: 99, backgroundColor: s.color }} />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: s.color }}>{s.count} {s.label}</Text>
-              </View>
-            ))}
-          </View>
-        </Card>
-
-        {/* ── Search ───────────────────────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(229,231,235,0.9)', paddingHorizontal: 12, height: 42, marginBottom: 10 }}>
-          <Ionicons name="search-outline" size={16} color="#64748B" />
-          <TextInput value={mapSearch} onChangeText={setMapSearch} placeholder="Search tenant or bed…" placeholderTextColor="#64748B" style={{ flex: 1, marginLeft: 8, fontSize: fontSize.sm, color: '#0F172A' }} />
-          {mapSearch.length > 0 && (
-            <TouchableOpacity onPress={() => setMapSearch('')}>
-              <Ionicons name="close-circle" size={16} color="#64748B" />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={() => setMapSortBy(mapSortBy === 'apartment' ? 'gender' : 'apartment')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, marginBottom: 12, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#F1F3F6' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
+              Sort: {mapSortBy === 'apartment' ? 'Apartment' : 'Gender'}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="#64748B" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setMapMenuOpen(true)}
+            style={{ width: 40, height: 40, marginBottom: 12, borderRadius: 10, backgroundColor: '#F1F3F6', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="ellipsis-horizontal" size={18} color="#334155" />
+          </TouchableOpacity>
         </View>
 
         {/* ── Status filter chips ───────────────────────────────────────────── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', gap: 7 }}>
-            {STATUS_FILTERS.map(f => (
-              <TouchableOpacity key={String(f.key)} onPress={() => setMapFilter(f.key)}
-                style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1.5,
-                  borderColor: f.color, backgroundColor: mapFilter === f.key ? f.color : 'rgba(255,255,255,0.7)' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: mapFilter === f.key ? '#fff' : f.color }}>
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* ── Legend ───────────────────────────────────────────────────────── */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-          <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 2 }}>
-            {[
-              { label: 'Occupied', dot: '#16A34A' },
-              { label: 'Vacant',   dot: '#DC2626' },
-              { label: 'Notice',   dot: '#EA580C' },
-              { label: 'Booked',   dot: '#1D4ED8' },
-              { label: 'N+Book',   dot: '#2563EB' },
-            ].map(l => (
-              <View key={l.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: l.dot }} />
-                <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>{l.label}</Text>
-              </View>
-            ))}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 10, color: '#64748B' }}>  S=Single D=Double T=Triple  A=Attached C=Common</Text>
-            </View>
-          </View>
-        </ScrollView>
-
-        {/* ── Sort toggle: Apartment / Gender ──────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }}>SORT</Text>
-          <View style={{ flexDirection: 'row', backgroundColor: 'rgba(237,233,245,0.7)', borderRadius: 99, padding: 3 }}>
-            {([
-              { key: 'apartment', label: 'Apartment', icon: 'business-outline' },
-              { key: 'gender',    label: 'Gender',    icon: 'people-outline' },
-            ] as const).map(opt => {
-              const active = mapSortBy === opt.key;
+            {STATUS_FILTERS.map(f => {
+              const active = mapFilter === f.key;
               return (
-                <TouchableOpacity key={opt.key} onPress={() => setMapSortBy(opt.key)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99,
-                    backgroundColor: active ? '#2563EB' : 'transparent' }}>
-                  <Ionicons name={opt.icon as any} size={12} color={active ? '#fff' : '#2563EB'} />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>{opt.label}</Text>
+                <TouchableOpacity key={String(f.key)} onPress={() => setMapFilter(f.key)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, borderWidth: 1.5,
+                    borderColor: f.color, backgroundColor: active ? f.color : 'rgba(255,255,255,0.7)' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : f.color }}>
+                    {f.label}{f.key ? ` ${chipCounts[f.key as string] || 0}` : ''}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-        </View>
+        </ScrollView>
 
         {/* ── Gender legend (shown when sorting by gender) ─────────────────── */}
         {mapSortBy === 'gender' && (
@@ -2437,7 +2384,7 @@ export default function TenantLifecycleScreen() {
             {[
               { label: '♂ Male',   accent: '#1D4ED8', bg: '#BBDEFB' },
               { label: '♀ Female', accent: '#C2185B', bg: '#FCE4EC' },
-              { label: '⚥ Mixed',  accent: '#2563EB', bg: '#EFF6FF' },
+              { label: '⚥ Mixed',  accent: '#6D5EF6', bg: '#EEF2FF' },
             ].map(g => (
               <View key={g.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: g.bg, borderWidth: 1.5, borderColor: `${g.accent}55` }} />
@@ -2447,23 +2394,23 @@ export default function TenantLifecycleScreen() {
           </View>
         )}
 
-        {/* ── Property → Apartment → Bed grid ──────────────────────────────── */}
+        {/* ── Property → Apartment cards ────────────────────────────────────── */}
         {Object.entries(grouped).map(([propId, propGroup]) => (
           <View key={propId} style={{ marginBottom: 14 }}>
 
             {/* Property header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(37,99,235,0.12)' }} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EFF6FF', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4 }}>
-                <Ionicons name="business-outline" size={11} color="#2563EB" />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#2563EB', letterSpacing: 0.5 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(109,94,246,0.15)' }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EEF2FF', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4 }}>
+                <Ionicons name="business-outline" size={11} color="#6D5EF6" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#6D5EF6', letterSpacing: 0.5 }}>
                   {propGroup.property?.property_name || 'Property'}
                 </Text>
               </View>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(37,99,235,0.12)' }} />
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(109,94,246,0.15)' }} />
             </View>
 
-            {/* Apartments */}
+            {/* Apartment cards */}
             {Object.entries(propGroup.apartments)
               .sort(([,a]: any, [,b]: any) => {
                 if (mapSortBy === 'gender') {
@@ -2478,99 +2425,77 @@ export default function TenantLifecycleScreen() {
                 const gender = (aptGroup.apartment?.gender_allowed || '').toLowerCase();
                 const isMale = gender === 'male';
                 const isFemale = gender === 'female';
-                const aptAccent = isMale ? '#1D4ED8' : isFemale ? '#C2185B' : '#2563EB';
-                const aptBg = isMale ? '#F0F7FF' : isFemale ? '#FFF0F5' : '#F8FAFC';
-                const aptHeaderBg = isMale ? '#BBDEFB' : isFemale ? '#FCE4EC' : '#EFF6FF';
+                const genderLabel = isMale ? 'Male' : isFemale ? 'Female' : 'Mixed';
+                const genderAccent = isMale ? '#1D4ED8' : isFemale ? '#C2185B' : '#6D5EF6';
 
                 const aptBedCount = aptGroup.beds.length;
-                const aptOccupied = aptGroup.beds.filter((b: any) => b._status === 'occupied').length;
-                const aptVacant = aptGroup.beds.filter((b: any) => b._status === 'vacant').length;
+                const aptOccupied = aptGroup.beds.filter((b: any) => b._status === 'occupied' || b._status === 'notice' || b._status === 'notice-booked').length;
+                const aptOccupancyPct = aptBedCount > 0 ? Math.round((aptOccupied / aptBedCount) * 100) : 0;
+                const expanded = expandedApt === aptId;
+                const sortedBeds = aptGroup.beds.slice().sort((a: any, b: any) => (a.bed_code || '').localeCompare(b.bed_code || ''));
 
                 return (
-                  <View key={aptId} style={{ marginBottom: 8, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: `${aptAccent}22`, backgroundColor: aptBg,
-                    shadowColor: aptAccent, shadowOpacity: 0.07, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+                  <TouchableOpacity
+                    key={aptId}
+                    activeOpacity={0.85}
+                    onPress={() => setExpandedApt(expanded ? null : aptId)}
+                    style={{ marginBottom: 8, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(15,23,42,0.06)', backgroundColor: '#fff',
+                      shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1, padding: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
 
-                    {/* Apartment header row */}
-                    <View style={{ backgroundColor: aptHeaderBg, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: `${aptAccent}18`, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: `${aptAccent}33` }}>
-                          <Text style={{ fontSize: 12, fontWeight: '900', color: aptAccent }}>{aptGroup.apartment?.apartment_code || '?'}</Text>
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
-                            {aptGroup.apartment?.apartment_code || 'Unknown Apt'}
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Text style={{ fontSize: 9, color: aptAccent, fontWeight: '700' }}>
-                              {isMale ? '♂ Male' : isFemale ? '♀ Female' : '⚥ Mixed'}
-                            </Text>
-                            <Text style={{ fontSize: 9, color: '#64748B' }}>· {aptBedCount} beds</Text>
-                          </View>
-                        </View>
+                      {/* Left column: apartment info */}
+                      <View style={{ width: 92 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>
+                          {aptGroup.apartment?.apartment_code || '?'}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: genderAccent, marginTop: 2 }}>{genderLabel}</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{aptOccupied} / {aptBedCount} Beds</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A', marginTop: 2 }}>{aptOccupancyPct}% Occupied</Text>
                       </View>
-                      {/* Mini occupancy */}
-                      <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                        <View style={{ flexDirection: 'row', gap: 5 }}>
-                          <View style={{ backgroundColor: '#DCFCE7', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#16A34A' }}>{aptOccupied} occ</Text>
-                          </View>
-                          <View style={{ backgroundColor: '#FEE2E2', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#DC2626' }}>{aptVacant} vac</Text>
-                          </View>
+
+                      {/* Right: horizontal bed-tile strip */}
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1, marginLeft: 8 }}>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          {sortedBeds.map((bed: any) => {
+                            const sc = BED_STATUS_COLORS[bed._status] || BED_STATUS_COLORS.vacant;
+                            const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
+                            const firstName = allot?.tenants?.full_name?.split(' ')[0] || '';
+                            return (
+                              <TouchableOpacity
+                                key={bed.id}
+                                onPress={() => setBedDetail({ ...bed, allotment: allot, status: bed._status, _apt: aptGroup.apartment })}
+                                style={{ width: 74, borderRadius: 10, backgroundColor: sc.bg, padding: 8, alignItems: 'flex-start' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '900', color: sc.textColor }}>{bed.bed_code}</Text>
+                                {firstName
+                                  ? <Text style={{ fontSize: 9, fontWeight: '700', color: sc.textColor, marginTop: 2 }} numberOfLines={1}>{firstName}</Text>
+                                  : <Text style={{ fontSize: 9, color: sc.textColor, opacity: 0.7, marginTop: 2 }}>{bed._status === 'notice' ? 'Notice' : bed._status === 'booked' || bed._status === 'notice-booked' ? 'Booked' : 'Vacant'}</Text>}
+                              </TouchableOpacity>
+                            );
+                          })}
                         </View>
-                        {/* Mini bar */}
-                        <View style={{ width: 60, height: 4, backgroundColor: '#EFF6FF', borderRadius: 99, overflow: 'hidden' }}>
-                          <View style={{ height: 4, width: aptBedCount > 0 ? `${Math.round((aptOccupied / aptBedCount) * 100)}%` as any : '0%', backgroundColor: aptAccent, borderRadius: 99 }} />
-                        </View>
-                      </View>
+                      </ScrollView>
+
+                      {/* Trailing chevron */}
+                      <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#94A3B8" style={{ marginLeft: 6 }} />
                     </View>
 
-                    {/* Beds grid */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 }}>
-                      {aptGroup.beds
-                        .sort((a: any, b: any) => (a.bed_code || '').localeCompare(b.bed_code || ''))
-                        .map((bed: any) => {
+                    {/* Expanded detail: bed type / toilet / rate, tap to expand via chevron */}
+                    {expanded && (
+                      <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {sortedBeds.map((bed: any) => {
                           const sc = BED_STATUS_COLORS[bed._status] || BED_STATUS_COLORS.vacant;
-                          const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
-                          const firstName = allot?.tenants?.full_name?.split(' ')[0] || '';
-                          const bedTypeShort = ({ Single: 'S', Double: 'D', Triple: 'T', Executive: 'E', Quad: 'Q' } as any)[bed.bed_type] || bed.bed_type?.charAt(0) || '?';
-                          const toiletShort = (bed.toilet_type || '').toLowerCase() === 'attached' ? 'A' : 'C';
                           const rate = getBedRate(bed.id);
                           return (
-                            <TouchableOpacity
-                              key={bed.id}
-                              onPress={() => setBedDetail({ ...bed, allotment: allot, status: bed._status, _apt: aptGroup.apartment })}
-                              style={{
-                                width: 70, borderRadius: 11, borderWidth: 1.5, borderColor: sc.border,
-                                backgroundColor: sc.bg, padding: 8, alignItems: 'flex-start',
-                                shadowColor: sc.border, shadowOpacity: 0.15, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1,
-                              }}>
-                              {/* Status dot */}
-                              <View style={{ position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: 99, backgroundColor: sc.dot }} />
-                              {/* Bed code */}
-                              <Text style={{ fontSize: 11, fontWeight: '900', color: sc.textColor, marginBottom: 2 }}>{bed.bed_code}</Text>
-                              {/* Type + toilet badge */}
-                              <View style={{ flexDirection: 'row', gap: 3, marginBottom: 3 }}>
-                                <View style={{ backgroundColor: `${sc.border}22`, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 8, fontWeight: '700', color: sc.textColor }}>{bedTypeShort}</Text>
-                                </View>
-                                <View style={{ backgroundColor: toiletShort === 'A' ? '#DCFCE7' : '#FFEDD5', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 8, fontWeight: '700', color: toiletShort === 'A' ? '#16A34A' : '#EA580C' }}>{toiletShort}</Text>
-                                </View>
-                              </View>
-                              {/* Rate */}
-                              {rate > 0 && (
-                                <Text style={{ fontSize: 8, color: '#2563EB', fontWeight: '700' }}>₹{fmtAmt(rate)}</Text>
-                              )}
-                              {/* Tenant name */}
-                              {firstName
-                                ? <Text style={{ fontSize: 9, fontWeight: '700', color: sc.textColor, marginTop: 2 }} numberOfLines={1}>{firstName}</Text>
-                                : <Text style={{ fontSize: 9, color: '#94A3B8', marginTop: 2 }}>Empty</Text>}
-                            </TouchableOpacity>
+                            <View key={bed.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F8FAFC', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                              <View style={{ width: 7, height: 7, borderRadius: 99, backgroundColor: sc.dot }} />
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#334155' }}>{bed.bed_code} · {bed.bed_type || '—'} · {bed.toilet_type || '—'}</Text>
+                              {rate > 0 && <Text style={{ fontSize: 10, color: '#64748B' }}>₹{fmtAmt(rate)}</Text>}
+                            </View>
                           );
                         })}
-                    </View>
-                  </View>
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 );
               })}
           </View>
@@ -2582,11 +2507,30 @@ export default function TenantLifecycleScreen() {
             <Text style={{ color: '#64748B', fontSize: fontSize.sm, marginTop: 10, fontWeight: '600' }}>No beds match your filters</Text>
             {(mapFilter || mapSearch) && (
               <TouchableOpacity onPress={() => { setMapFilter(null); setMapSearch(''); }}
-                style={{ marginTop: 10, backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 }}>
-                <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '700' }}>Clear filters</Text>
+                style={{ marginTop: 10, backgroundColor: '#EEF2FF', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 }}>
+                <Text style={{ fontSize: 12, color: '#6D5EF6', fontWeight: '700' }}>Clear filters</Text>
               </TouchableOpacity>
             )}
           </Card>
+        )}
+
+        {/* ── "…" menu ──────────────────────────────────────────────────────── */}
+        {mapMenuOpen && (
+          <Modal visible transparent animationType="fade" onRequestClose={() => setMapMenuOpen(false)}>
+            <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)' }} activeOpacity={1} onPress={() => setMapMenuOpen(false)}>
+              <View style={{ position: 'absolute', top: 100, right: 16, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 6, minWidth: 190,
+                shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
+                <TouchableOpacity onPress={() => { setMapMenuOpen(false); exportBedMapCsv(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+                  <Ionicons name="download-outline" size={16} color="#334155" />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>Export CSV</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setMapMenuOpen(false); setMapFilter(null); setMapSearch(''); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+                  <Ionicons name="refresh-outline" size={16} color="#334155" />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>Clear filters</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
         )}
 
         {/* ── Bed detail bottom-sheet modal ──────────────────────────────────── */}
