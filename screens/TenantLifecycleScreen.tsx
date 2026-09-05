@@ -4102,6 +4102,15 @@ export default function TenantLifecycleScreen() {
     const filtered = filterBySearch(pendingRefunds, ['tenantName', 'tenants.full_name'], ts('refunds'));
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <SectionTitle title="Refund Tracking" />
+          <TouchableOpacity
+            onPress={() => Alert.alert('Download PDF', 'Refund report PDF export is not available yet.')}
+          >
+            <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: fontSize.sm }}>Download PDF</Text>
+          </TouchableOpacity>
+        </View>
+
         {overdueRefunds.length > 0 && (
           <Card style={{ borderColor: '#DC2626', borderWidth: 1.5, backgroundColor: '#FEE2E2', marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -4112,42 +4121,69 @@ export default function TenantLifecycleScreen() {
             </View>
           </Card>
         )}
-        <SectionTitle title="Refund Tracking" />
-        <SearchBar tab="refunds" placeholder="Search by tenant name..." />
+
+        <SearchField value={ts('refunds')} onChangeText={(v: string) => setTs('refunds', v)} placeholder="Search by tenant name..." />
+
         {filtered.length === 0 ? <EmptyCard message="No pending refunds 🎉" /> :
           filtered.map((e: any) => {
             const daysSince = daysBetween(e.exitDate || e.exit_date || '');
             const isOverdue = daysSince > (config.refund_deadline_days || 5);
+            // Preserve existing sign convention: backend clamps refund_due at >= 0
+            // today, but this keeps the UI correct if a negative ("tenant owes")
+            // value is ever produced upstream — no new math introduced here.
+            const refundAmt = Number(e.refundDue ?? e.refund_due ?? 0);
+            const tenantOwes = refundAmt < 0;
+            const tenantName = e.tenantName || e.tenants?.full_name;
+            const code = e.tenant_allotments?.apartments?.apartment_code || e.apartments?.apartment_code || '';
+            const phone = e.tenantPhone || e.tenants?.phone || '';
             return (
-              <Card key={e._id || e.id} style={isOverdue ? { borderColor: '#DC2626', borderWidth: 1.5 } : {}}>
+              <LifecycleCard key={e._id || e.id} style={isOverdue ? { borderColor: '#DC2626', borderWidth: 1.5 } : {}}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
-                      {isOverdue && <Ionicons name="warning" size={14} color="#DC2626" />}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <AvatarInitial name={tenantName} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{tenantName}</Text>
+                        <StatusBadge kind="pending" />
+                        {isOverdue && <Ionicons name="warning" size={14} color="#DC2626" />}
+                      </View>
+                      {!!(code || phone) && (
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                          {[code, phone].filter(Boolean).join(' · ')}
+                        </Text>
+                      )}
+                      <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>
+                        Exit {fmtDate(e.exitDate || e.exit_date)} · Held ₹{fmtAmt(e.advanceHeld || e.advance_held)} · Ded ₹{fmtAmt(e.totalDeductions || e.total_deductions)} · {daysSince} days
+                      </Text>
                     </View>
-                    <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Exit: {fmtDate(e.exitDate || e.exit_date)} · {daysSince}d ago</Text>
-                    <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
-                    <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
-                    <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#16A34A" />
                   </View>
-                  <View style={{ gap: 6 }}>
-                    <TouchableOpacity onPress={() => {
-                      setEditRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, advanceHeld: e.advanceHeld || e.advance_held || 0, pendingRent: String(e.pendingRent || e.pending_rent || 0), ebCharges: String(e.ebCharges || e.eb_charges || 0), exitCharges: String(e.exitCharges || e.exit_charges || 0), damageCharges: String(e.damageCharges || e.damage_charges || 0), keyLossFee: String(e.keyLossFee || e.key_loss_fee || 0) });
-                      setEditRefundOpen(true);
-                    }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#2563EB" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => {
-                      setCompleteRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, tenantId: e.tenantId || e.tenant_id, tenantName: e.tenantName || e.tenants?.full_name || '', refundDue: e.refundDue || e.refund_due || 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
-                      setRefundProof(null); setRefundProofAmount(null);
-                      setCompleteRefundOpen(true);
-                    }} style={{ backgroundColor: '#DCFCE7', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="checkmark-circle-outline" size={16} color="#16A34A" />
-                    </TouchableOpacity>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontWeight: '800', fontSize: fontSize.sm, color: tenantOwes ? '#DC2626' : '#16A34A' }}>
+                      ₹{fmtAmt(Math.abs(refundAmt))}
+                    </Text>
+                    {tenantOwes && <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '600' }}>(Tenant Owes)</Text>}
                   </View>
                 </View>
-              </Card>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <OutlineButton title="Edit" icon="pencil-outline" small onPress={() => {
+                    setEditRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, advanceHeld: e.advanceHeld || e.advance_held || 0, pendingRent: String(e.pendingRent || e.pending_rent || 0), ebCharges: String(e.ebCharges || e.eb_charges || 0), exitCharges: String(e.exitCharges || e.exit_charges || 0), damageCharges: String(e.damageCharges || e.damage_charges || 0), keyLossFee: String(e.keyLossFee || e.key_loss_fee || 0) });
+                    setEditRefundOpen(true);
+                  }} />
+                  {tenantOwes ? (
+                    <OutlineButton title="Collect" icon="cash-outline" tone="success" small onPress={() => {
+                      Alert.alert('Collect from Tenant', `Tenant owes ₹${fmtAmt(Math.abs(refundAmt))}. Collecting dues from an exit is not implemented as a separate flow yet — use Edit to adjust deductions.`);
+                    }} />
+                  ) : (
+                    <PrimaryButton title="Complete" icon="checkmark-circle-outline" small onPress={() => {
+                      setCompleteRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, tenantId: e.tenantId || e.tenant_id, tenantName: tenantName || '', refundDue: e.refundDue || e.refund_due || 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
+                      setRefundProof(null); setRefundProofAmount(null);
+                      setCompleteRefundOpen(true);
+                    }} />
+                  )}
+                  <OutlineButton title="Statement" icon="document-text-outline" tone="success" small
+                    onPress={() => openStatement({ tenantId: e.tenantId || e.tenant_id, tenantName, allotmentId: e.allotmentId || e.allotment_id })} />
+                </View>
+              </LifecycleCard>
             );
           })
         }
