@@ -4401,24 +4401,21 @@ export default function TenantLifecycleScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* Header row */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <SectionTitle title="Not in Property" />
-          <ActionBtn title="Add Absence" icon="add-circle-outline" small onPress={() => {
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <SectionTitle title="Not in Property (Absence Records)" />
+          <PrimaryButton title="Add Absence" icon="add-circle-outline" small onPress={() => {
             setAbsenceEditId(null);
             setAbsenceForm(blankAbsence);
             setAbsenceOpen(true);
           }} />
         </View>
 
-        {/* Info banner */}
-        <View style={{ backgroundColor: VBRAND.purpleSoft, borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-          <Ionicons name="information-circle-outline" size={16} color={VBRAND.purpleDeep} style={{ marginTop: 1 }} />
-          <Text style={{ flex: 1, fontSize: fontSize.xs, color: VBRAND.ink600, lineHeight: 18 }}>
-            Absences over 30 days excluded from electricity billing.
-          </Text>
-        </View>
+        {/* Subtitle */}
+        <Text style={{ fontSize: fontSize.xs, color: VBRAND.ink600, marginBottom: 12, lineHeight: 18 }}>
+          Record tenant absences exceeding 30 days to exclude them from electricity billing.
+        </Text>
 
-        <SearchBar tab="absent" placeholder="Search by tenant name…" />
+        <SearchField value={ts('absent')} onChangeText={(v: string) => setTs('absent', v)} placeholder="Search by tenant name…" />
 
         {filtered.length === 0 ? (
           <EmptyCard message="No absence records found" />
@@ -4438,48 +4435,53 @@ export default function TenantLifecycleScreen() {
             const aptBed = allot
               ? `${allot.apartments?.apartment_code || '?'}-${allot.beds?.bed_code || '?'}`
               : '—';
+            const tenantName = r.tenants?.full_name || '—';
 
             return (
-              <Card key={r.id}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>
-                      {r.tenants?.full_name || '—'}
+              <LifecycleCard key={r.id}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                  <AvatarInitial name={tenantName} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '700', fontSize: 14, color: VBRAND.ink900 }} numberOfLines={1}>
+                      {tenantName}
                     </Text>
-                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginBottom: 4 }}>{aptBed}</Text>
-                    <Row label="From"     value={fmtDate(r.from_date)} />
-                    <Row label="To"       value={fmtDate(r.to_date)} />
-                    <Row label="Duration" value={`${duration} day${duration !== 1 ? 's' : ''}`} valueColor="#2563EB" />
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }}>{aptBed}</Text>
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 4 }}>
+                      {fmtDate(r.from_date)} → {fmtDate(r.to_date)} · {duration} day{duration !== 1 ? 's' : ''}
+                    </Text>
                     {r.reason ? (
-                      <Row label="Reason" value={r.reason} />
+                      <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }} numberOfLines={2}>
+                        Reason: {r.reason}
+                      </Text>
                     ) : null}
                   </View>
-                  <View style={{ gap: 6, marginLeft: 10 }}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setAbsenceEditId(r.id);
-                        setAbsenceForm({
-                          allotmentId: r.allotment_id || '',
-                          tenantId: r.tenant_id,
-                          fromDate: r.from_date,
-                          toDate: r.to_date,
-                          reason: r.reason || '',
-                        });
-                        setAbsenceOpen(true);
-                      }}
-                      style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}
-                    >
-                      <Ionicons name="pencil-outline" size={16} color="#2563EB" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => doDeleteAbsence(r.id)}
-                      style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 8 }}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                    </TouchableOpacity>
-                  </View>
                 </View>
-              </Card>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <OutlineButton
+                    title="Edit"
+                    icon="pencil-outline"
+                    small
+                    onPress={() => {
+                      setAbsenceEditId(r.id);
+                      setAbsenceForm({
+                        allotmentId: r.allotment_id || '',
+                        tenantId: r.tenant_id,
+                        fromDate: r.from_date,
+                        toDate: r.to_date,
+                        reason: r.reason || '',
+                      });
+                      setAbsenceOpen(true);
+                    }}
+                  />
+                  <OutlineButton
+                    title="Delete"
+                    icon="trash-outline"
+                    tone="danger"
+                    small
+                    onPress={() => doDeleteAbsence(r.id)}
+                  />
+                </View>
+              </LifecycleCard>
             );
           })
         )}
