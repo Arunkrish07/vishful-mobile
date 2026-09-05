@@ -1,8 +1,8 @@
 /**
  * TenantLifecycleScreen.tsx
  * Full lifecycle: Booking → Onboarding → Stay → Notice → Exit
- * Tabs: Visual Map | Booking | Onboarding | Switching | Notices | Exit | Refunds | Not in Property
- * Bed Status KPI is always visible (web parity — not a separate Dashboard tab).
+ * Tabs: Overview | Visual Map | Booking | Onboarding | Switching | Notices | Exit | Refunds | Not in Property | Excel Upload
+ * Bed Status KPI lives under the Overview tab (default tab).
  *
  * ► Data layer : Convex actions → Supabase (existing tables/columns only)
  * ► No direct DB access in this file
@@ -12,7 +12,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
   TextInput, Alert, ActivityIndicator, FlatList, RefreshControl,
-  Dimensions, KeyboardAvoidingView, Platform, Image, Animated,
+  Dimensions, KeyboardAvoidingView, Platform, Image, Animated, Pressable,
 } from 'react-native';
 import { CONVEX_SITE_URL } from '../lib/config';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
@@ -347,16 +347,18 @@ const getStatus = (s: string) =>
 
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
-/** Web Lifecycle modules (`ol`) — exact order/labels. Bed Status is not a tab. */
+/** Web Lifecycle modules (`ol`) — exact order/labels. Overview (Bed Status) leads, Excel Upload trails. */
 const TABS = [
-  { key: 'map',      label: 'Visual Map',     icon: 'map-outline'             },
-  { key: 'booking',  label: 'Booking',        icon: 'calendar-outline'        },
-  { key: 'onboard',  label: 'Onboarding',     icon: 'person-add-outline'      },
-  { key: 'switch',   label: 'Switching',      icon: 'swap-horizontal-outline' },
-  { key: 'notices',  label: 'Notices',        icon: 'notifications-outline'   },
-  { key: 'exit',     label: 'Exit',           icon: 'log-out-outline'         },
-  { key: 'refunds',  label: 'Refunds',        icon: 'wallet-outline'          },
-  { key: 'absent',   label: 'Not in Property', icon: 'home-outline'           },
+  { key: 'overview', label: 'Overview',        icon: 'grid-outline'            },
+  { key: 'map',      label: 'Visual Map',      icon: 'map-outline'             },
+  { key: 'booking',  label: 'Booking',         icon: 'calendar-outline'        },
+  { key: 'onboard',  label: 'Onboarding',      icon: 'person-add-outline'      },
+  { key: 'switch',   label: 'Switching',       icon: 'swap-horizontal-outline' },
+  { key: 'notices',  label: 'Notices',         icon: 'notifications-outline'   },
+  { key: 'exit',     label: 'Exit',            icon: 'log-out-outline'         },
+  { key: 'refunds',  label: 'Refunds',         icon: 'wallet-outline'          },
+  { key: 'absent',   label: 'Not in Property', icon: 'home-outline'            },
+  { key: 'excel',    label: 'Excel Upload',    icon: 'document-outline'        },
 ];
 
 const BED_FOCUS_TILES = [
@@ -728,7 +730,7 @@ export default function TenantLifecycleScreen() {
   const mounted = useMountedRef();
   const navigation = useNavigation() as any;
 
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('overview');
   const [bedFocus, setBedFocus] = useState<string | null>('occupied');
   const [bedFocusSearch, setBedFocusSearch] = useState('');
   const [loading, setLoading]     = useState(true);
@@ -899,7 +901,7 @@ export default function TenantLifecycleScreen() {
     if (uri) {
       try {
         const IM: any = await import('expo-image-manipulator');
-        const FS: any = await import('expo-file-system');
+        const FS: any = await import('expo-file-system/legacy');
         const manip = await IM.manipulateAsync(uri, [{ resize: { width: 1400 } }], { compress: 0.7, format: IM.SaveFormat.JPEG });
         const encoded = await FS.readAsStringAsync(manip.uri, { encoding: 'base64' });
         if (encoded) b64 = encoded;
@@ -1628,7 +1630,7 @@ export default function TenantLifecycleScreen() {
       const uri = noticeRecorder.uri;
       if (!uri) { setNoticeVoiceErr('No audio captured. Please try again.'); setNoticeRecState('error'); return; }
 
-      const FileSystem = await import('expo-file-system') as any;
+      const FileSystem = await import('expo-file-system/legacy') as any;
       const audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const resp = await fetch(TRANSCRIBE_URL, {
         method: 'POST',
@@ -1926,7 +1928,7 @@ export default function TenantLifecycleScreen() {
 
   function selectBedFocus(key: string) {
     setBedFocus(key);
-    setActiveTab(null);
+    setActiveTab('overview');
     setBedFocusSearch('');
   }
 
@@ -2015,7 +2017,7 @@ export default function TenantLifecycleScreen() {
 
         <View style={{ flexDirection: 'row', gap: 5 }}>
           {BED_FOCUS_TILES.map((t) => {
-            const on = bedFocus === t.key && !activeTab;
+            const on = bedFocus === t.key && activeTab === 'overview';
             const val = counts[t.key] ?? 0;
             return (
               <TouchableOpacity
@@ -2293,7 +2295,7 @@ export default function TenantLifecycleScreen() {
                     });
                     const csvContent = [header, ...rows].join('\n');
                     const filename = `beds-${new Date().toISOString().split('T')[0]}.csv`;
-                    const FileSystem = await import('expo-file-system') as any;
+                    const FileSystem = await import('expo-file-system/legacy') as any;
                     const fileUri = FileSystem.cacheDirectory + filename;
                     await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
                     const Sharing = await import('expo-sharing') as any;
@@ -4440,6 +4442,12 @@ export default function TenantLifecycleScreen() {
   // ─── TAB RENDERER ─────────────────────────────────────────────────────────
 
   const tabContent: Record<string, () => React.JSX.Element> = {
+    overview:  () => (
+      <>
+        {renderBedStatusCard()}
+        {renderBedFocusDetail()}
+      </>
+    ),
     map:       renderBedMap,
     booking:   renderBooking,
     onboard:   renderOnboarding,
@@ -4512,7 +4520,7 @@ export default function TenantLifecycleScreen() {
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
-                    if (!activeTab) setBedFocusSearch(prev => prev);
+                    if (activeTab === 'overview') setBedFocusSearch(prev => prev);
                     Alert.alert('Search', 'Use the search field in the detail panel or module below.');
                   }}
                   style={{
@@ -4539,64 +4547,32 @@ export default function TenantLifecycleScreen() {
           )}
         </View>
 
-        {/* Module icon tabs — web life-tabs-icons */}
+        {/* Module icon tabs — web life-tabs-icons (pill strip: active = solid purple, inactive = light gray) */}
         {!anySheetOpen && (
           <View>
-            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-              {renderBedStatusCard()}
-            </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={{ marginBottom: 4 }}
               contentContainerStyle={{
-                gap: 8, paddingVertical: 4, paddingHorizontal: 16,
+                paddingVertical: 4, paddingHorizontal: 16,
               }}
             >
               {TABS.map(tab => {
                 const active = activeTab === tab.key;
                 return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    onPress={() => selectModule(tab.key)}
-                    activeOpacity={0.85}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', gap: 6,
-                      paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
-                      backgroundColor: active ? '#2563EB' : '#F1F3F9',
+                  <Pressable key={tab.key} onPress={() => {
+                      if (tab.key === 'excel') { Alert.alert('Excel Upload', 'Excel upload opened'); return; }
+                      setActiveTab(tab.key);
                     }}
-                  >
-                    <Ionicons
-                      name={tab.icon as any}
-                      size={15}
-                      color={active ? '#FFFFFF' : VBRAND.ink600}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 12.5, fontWeight: active ? '800' : '600',
-                        color: active ? '#FFFFFF' : VBRAND.ink600,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8,
+                      borderRadius: 999, marginRight: 8,
+                      backgroundColor: active ? '#6D5EF6' : '#EEF0F4' }}>
+                    <Ionicons name={tab.icon as any} size={15} color={active ? '#fff' : '#334155'} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : '#334155' }}>{tab.label}</Text>
+                  </Pressable>
                 );
               })}
-              <TouchableOpacity
-                onPress={() => Alert.alert('Excel Upload', 'Excel upload opened')}
-                activeOpacity={0.85}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 6,
-                  paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
-                  backgroundColor: '#F1F3F9',
-                }}
-              >
-                <Ionicons name="document-attach-outline" size={15} color={VBRAND.ink600} />
-                <Text style={{ fontSize: 12.5, fontWeight: '600', color: VBRAND.ink600 }}>
-                  Excel Upload
-                </Text>
-              </TouchableOpacity>
             </ScrollView>
           </View>
         )}
