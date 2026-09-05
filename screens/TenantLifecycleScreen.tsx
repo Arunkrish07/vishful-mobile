@@ -27,7 +27,7 @@ import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { client, api } from '../lib/convexApi';
 import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
-import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField } from '../components/lifecycle';
+import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField, AvatarInitial } from '../components/lifecycle';
 import { StatusBadge } from '../components/lifecycle/StatusBadge';
 import * as sb from '../lib/supabaseService';
 // (registration PDF helpers are defined inline below — no separate module)
@@ -2708,29 +2708,30 @@ export default function TenantLifecycleScreen() {
     ];
     const filtered = filterBySearch(bookedAllotments, ['tenants.full_name', 'apartments.apartment_code'], ts('booking'));
     const openBookingFor = (tenantId: string) => { setBForm({ ...bForm, tenantId }); setBookingOpen(true); };
-    const BookBtn = ({ onPress }: { onPress: () => void }) => (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-        style={{ backgroundColor: VBRAND.purpleSoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 }}>
-        <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purpleDeep }}>Book</Text>
-      </TouchableOpacity>
-    );
+    const returningFiltered = filterBySearch(returningTenants, ['full_name', 'phone'], ts('returning'));
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ── Section 1: New Tenants (KYC ✓) ──────────────────────────────── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <SectionTitle title={`New Tenants (KYC ✓)`} />
-          <ActionBtn title="New Booking" icon="add-circle-outline" small onPress={() => setBookingOpen(true)} />
+          <PrimaryButton title="New Booking" icon="add-circle-outline" small onPress={() => setBookingOpen(true)} />
         </View>
         {eligibleTenants.length === 0
           ? <EmptyCard message="No new tenants with completed KYC" />
           : eligibleTenants.map((t: any) => (
-              <LifeTenantCard
-                key={t.id}
-                name={t.full_name || '—'}
-                sub={t.phone}
-                pill="New"
-                right={<BookBtn onPress={() => openBookingFor(t.id)} />}
-              />
+              <LifecycleCard key={t.id}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <AvatarInitial name={t.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }} numberOfLines={1}>{t.full_name || '—'}</Text>
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }} numberOfLines={1}>{t.phone}</Text>
+                    <View style={{ marginTop: 6 }}>
+                      <StatusBadge kind="completed" label="✓ Completed" />
+                    </View>
+                  </View>
+                  <PrimaryButton title="Book" small onPress={() => openBookingFor(t.id)} />
+                </View>
+              </LifecycleCard>
             ))
         }
 
@@ -2739,16 +2740,32 @@ export default function TenantLifecycleScreen() {
           <Ionicons name="refresh-outline" size={15} color={VBRAND.ink600} />
           <Text style={{ fontSize: 13, fontWeight: '700', color: VBRAND.ink600 }}>Returning Tenants (Previously Exited)</Text>
         </View>
-        {returningTenants.length === 0
-          ? <Text style={{ fontSize: 12, color: VBRAND.ink500, paddingVertical: 8, paddingLeft: 2 }}>No returning tenants</Text>
-          : returningTenants.map((t: any) => (
-              <LifeTenantCard
-                key={t.id}
-                name={t.full_name || '—'}
-                sub={t.phone}
-                pill={typeof t.tenant_rating === 'number' ? `★ ${t.tenant_rating.toFixed(1)}` : undefined}
-                right={<BookBtn onPress={() => openBookingFor(t.id)} />}
-              />
+        <SearchField value={ts('returning')} onChangeText={(v: string) => setTs('returning', v)} placeholder="Search by name or phone…" />
+        <Text style={{ fontSize: 11, color: VBRAND.ink500, marginTop: -6, marginBottom: 10 }}>
+          Search from {returningTenants.length} previously exited tenants.
+        </Text>
+        {returningFiltered.length === 0
+          ? <Text style={{ fontSize: 12, color: VBRAND.ink500, paddingVertical: 8, paddingLeft: 2 }}>
+              {returningTenants.length === 0 ? 'No returning tenants' : 'No matches'}
+            </Text>
+          : returningFiltered.map((t: any) => (
+              <LifecycleCard key={t.id}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <AvatarInitial name={t.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }} numberOfLines={1}>{t.full_name || '—'}</Text>
+                      {typeof t.tenant_rating === 'number' && (
+                        <View style={{ backgroundColor: VBRAND.purpleSoft, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.purpleDeep }}>★ {t.tenant_rating.toFixed(1)}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }} numberOfLines={1}>{t.phone}</Text>
+                  </View>
+                  <PrimaryButton title="Book" small onPress={() => openBookingFor(t.id)} />
+                </View>
+              </LifecycleCard>
             ))
         }
 
@@ -2759,19 +2776,22 @@ export default function TenantLifecycleScreen() {
         <SearchBar tab="booking" placeholder="Search tenant, bed…" />
         {filtered.length === 0 ? <EmptyCard message="No booked tenants" /> :
           filtered.map((a: any) => (
-            <Card key={a.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#2563EB', fontWeight: '600' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+            <LifecycleCard key={a.id}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <AvatarInitial name={a.tenants?.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', fontWeight: '600' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+                  </View>
                 </View>
                 <TouchableOpacity onPress={() => { setCancelId(a.id); setCancelOpen(true); }}
                   style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 8 }}>
                   <Ionicons name="close-circle-outline" size={18} color="#DC2626" />
                 </TouchableOpacity>
               </View>
-            </Card>
+            </LifecycleCard>
           ))
         }
 
