@@ -27,6 +27,8 @@ import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { client, api } from '../lib/convexApi';
 import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
+import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine } from '../components/lifecycle';
+import { StatusBadge } from '../components/lifecycle/StatusBadge';
 import * as sb from '../lib/supabaseService';
 // (registration PDF helpers are defined inline below — no separate module)
 
@@ -1617,6 +1619,19 @@ export default function TenantLifecycleScreen() {
     const rate = getBedRate(a.bed_id);
     setSwForm({ ...blankSwitch, allotmentId: a.id, tenantId: s.tenantId, oldBedId: a.bed_id, oldRate: rate, switchDate: today() });
     setSwitchOpen(true);
+  }
+
+  async function doCompleteSwitch(s: any) {
+    try { setSaving(true);
+      await client.action((api as any).tenants.completeSwitch, { switchId: s._id });
+      Alert.alert('Success', 'Switch completed'); fetchAll();
+    } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
+  }
+  async function doCancelSwitch(s: any) {
+    try { setSaving(true);
+      await client.action((api as any).tenants.cancelSwitch, { switchId: s._id });
+      Alert.alert('Cancelled', 'Switch cancelled'); fetchAll();
+    } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
   }
 
   // ── Voice Notice helpers ─────────────────────────────────────────────────
@@ -3434,32 +3449,47 @@ export default function TenantLifecycleScreen() {
         </View>
         <SearchBar tab="switch" placeholder="Search by tenant name..." />
         {filtered.length === 0 ? <EmptyCard message="No room switches" /> :
-          filtered.map((s: any) => (
-            <Card key={s._id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontWeight: '700', fontSize: fontSize.sm, flex: 1 }}>{s.tenantName}</Text>
-                <View style={{ backgroundColor: '#DCFCE7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#16A34A' }}>Completed</Text>
+          filtered.map((s: any) => {
+            const badgeKind = s.status === 'completed' ? 'completed' : s.status === 'scheduled' ? 'scheduled' : 'cancelled';
+            const knownStatus = s.status === 'completed' || s.status === 'scheduled' || s.status === 'cancelled';
+            const badgeLabel = knownStatus ? undefined : (s.status || 'Unknown');
+            const typeLabel = s.switchType === 'future' ? 'Future' : 'Immediate';
+            return (
+              <LifecycleCard key={s._id}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, flex: 1 }}>{s.tenantName}</Text>
+                  <StatusBadge kind={badgeKind as any} label={badgeLabel} />
                 </View>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                <Text style={{ fontSize: fontSize.xs, color: '#556274' }}>{bedLoc(s.oldBedId)}</Text>
-                <Ionicons name="arrow-forward" size={12} color="#64748B" />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#0F172A' }}>{bedLoc(s.newBedId)}</Text>
-              </View>
-              <View style={{ marginTop: 8 }}>
-                <Row label="Type" value={s.switchType === 'immediate' ? 'Immediate' : (s.switchType || '—')} />
-                <Row label="Switch Date" value={fmtDate(s.switchDate)} />
-                <Row label="Rent Diff" value={`${s.rentDifference > 0 ? '+' : ''}₹${fmtAmt(s.rentDifference)}`} valueColor={s.rentDifference > 0 ? '#DC2626' : '#16A34A'} />
-                <Row label="EB" value="—" />
-                <Row label="Deposit Diff" value="—" />
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <ActionBtn title="View" icon="eye-outline" small onPress={() => openStatement(s)} />
-                <ActionBtn title="Reswitch" icon="swap-horizontal-outline" small onPress={() => doReswitch(s)} />
-              </View>
-            </Card>
-          ))
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: fontSize.xs, color: '#556274' }}>{bedLoc(s.oldBedId)}</Text>
+                  <Ionicons name="arrow-forward" size={12} color="#64748B" />
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#0F172A' }}>{bedLoc(s.newBedId)}</Text>
+                </View>
+                <InfoLine parts={[
+                  { text: typeLabel },
+                  { text: fmtDate(s.switchDate) },
+                  { text: `Rent ${s.rentDifference > 0 ? '+' : ''}₹${fmtAmt(s.rentDifference)}`, color: s.rentDifference > 0 ? '#DC2626' : '#16A34A', bold: true },
+                  { text: `EB ₹${fmtAmt(s.ebCharges)}` },
+                  { text: `Deposit ${s.depositDifference > 0 ? '+' : ''}₹${fmtAmt(s.depositDifference)}`, color: s.depositDifference < 0 ? '#16A34A' : undefined },
+                ]} />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  {s.status === 'scheduled' ? (
+                    <>
+                      <PrimaryButton title="Complete" icon="checkmark-outline" small loading={saving} onPress={() => doCompleteSwitch(s)} />
+                      <OutlineButton title="Cancel" icon="close-circle-outline" tone="danger" small onPress={() => doCancelSwitch(s)} />
+                    </>
+                  ) : s.status === 'completed' ? (
+                    <>
+                      <OutlineButton title="View" icon="eye-outline" small onPress={() => openStatement(s)} />
+                      <OutlineButton title="Reswitch" icon="swap-horizontal-outline" tone="danger" small onPress={() => doReswitch(s)} />
+                    </>
+                  ) : (
+                    <OutlineButton title="View" icon="eye-outline" small onPress={() => openStatement(s)} />
+                  )}
+                </View>
+              </LifecycleCard>
+            );
+          })
         }
 
         <BottomSheet visible={switchOpen} onClose={() => setSwitchOpen(false)} title="Room Switch">
