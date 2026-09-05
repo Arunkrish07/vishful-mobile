@@ -2923,29 +2923,29 @@ export default function TenantLifecycleScreen() {
         <SearchBar tab="onboard" placeholder="Search tenant…" />
         {filtered.length === 0 ? <EmptyCard message="No pending onboardings" /> :
           filtered.map((a: any) => (
-            <Card key={a.id}>
+            <LifecycleCard key={a.id}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · Planned: {fmtDate(a.onboarding_date)}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#2563EB' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <AvatarInitial name={a.tenants?.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{a.apartments?.apartment_code} · {a.beds?.bed_code}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>Booked {fmtDate(a.booking_date || a.created_at)} · Planned {fmtDate(a.onboarding_date)}</Text>
+                  </View>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                  {/* Cancel booking — reuses existing cancelOpen/doCancelBooking flow */}
-                  <TouchableOpacity
-                    onPress={() => { setCancelId(a.id); setCancelOpen(true); }}
-                    style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 8 }}
-                  >
-                    <Ionicons name="close-circle-outline" size={18} color="#DC2626" />
-                  </TouchableOpacity>
-                  <ActionBtn title="Onboard" small onPress={() => {
-                    const d = a.onboarding_date || today();
-                    setOForm({ allotmentId: a.id, date: d, bedId: a.bed_id, payMode: '', refNo: '', paidAmount: depositDefault(a.id, d, a.bed_id), bankAccountId: '', ccCharges: '' });
-                    setOnboardOpen(true);
-                  }} />
-                </View>
+                <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
               </View>
-            </Card>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                {/* Onboard — opens the same onboarding BottomSheet/oForm flow as before */}
+                <PrimaryButton title="Onboard" icon="person-add-outline" small onPress={() => {
+                  const d = a.onboarding_date || today();
+                  setOForm({ allotmentId: a.id, date: d, bedId: a.bed_id, payMode: '', refNo: '', paidAmount: depositDefault(a.id, d, a.bed_id), bankAccountId: '', ccCharges: '' });
+                  setOnboardOpen(true);
+                }} />
+                {/* Cancel booking — reuses existing cancelOpen/doCancelBooking flow */}
+                <OutlineButton title="Cancel" icon="close-circle-outline" tone="danger" small onPress={() => { setCancelId(a.id); setCancelOpen(true); }} />
+              </View>
+            </LifecycleCard>
           ))
         }
 
