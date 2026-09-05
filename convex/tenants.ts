@@ -522,6 +522,109 @@ async function getTotalTenantDaysInMonth(sb: any, apartmentId: string, prevMonth
   return total > 0 ? total : daysInMonth;
 }
 
+// Deposit difference on a room switch (ported from web computeExistingDepositAmount +
+// computeSwitchDepositDifference, advance_ratio default 1.5).
+async function computeSwitchDepositDiff(sb: any, allotmentId: string, oldRate: number, newRate: number, cutoffStr: string): Promise<number> {
+  const advanceRatio = 1.5;
+  const baseDeposit = Math.round(oldRate * advanceRatio);
+  const cutoff = (cutoffStr || "").slice(0, 10);
+  const onOrBefore = (d?: string | null) => !d || String(d).slice(0, 10) <= cutoff;
+  const [addInvRes, depAdjRes] = await Promise.all([
+    sb.from("invoices").select("total_amount, invoice_date, due_date, created_at")
+      .eq("allotment_id", allotmentId).eq("invoice_type", "additional_deposit"),
+    sb.from("tenant_adjustments").select("amount, adjustment_type, adjustment_date, created_at")
+      .eq("allotment_id", allotmentId).eq("category", "Deposit Adjustment"),
+  ]);
+  const addDepTotal = (addInvRes.data || [])
+    .filter((i: any) => onOrBefore(i.invoice_date || i.due_date || i.created_at))
+    .reduce((s: number, i: any) => s + Number(i.total_amount || 0), 0);
+  const depAdjTotal = (depAdjRes.data || [])
+    .filter((a: any) => onOrBefore(a.adjustment_date || a.created_at))
+    .reduce((s: number, a: any) => s + (a.adjustment_type === "credit_note" ? -1 : 1) * Number(a.amount || 0), 0);
+  const existingDeposit = baseDeposit + addDepTotal + depAdjTotal;
+  if (newRate > oldRate) return Math.round((newRate - oldRate) * advanceRatio);
+  if (newRate < oldRate) return Math.round(newRate * advanceRatio - existingDeposit);
+  return 0;
+}
+
+// Posts the rent-proration invoice/credit-note and the deposit invoice/credit-note for a
+// room switch (ported verbatim from web processSwitch/completeSwitch financial blocks).
+// `depositDiff` is precomputed by computeSwitchDepositDiff.
+async function postSwitchFinancials(sb: any, p: {
+  tenantId: string; allotmentId: string; bedId: string;
+  apartmentId: string | null; propertyId: string | null;
+  oldRate: number; newRate: number;
+  switchDateStr: string; effectiveDateStr: string;
+  onboardingDate: string | null; switchId: string; depositDiff: number;
+}): Promise<void> {
+  const sd = new Date(p.switchDateStr);
+  const daysInMonth = new Date(sd.getFullYear(), sd.getMonth() + 1, 0).getDate();
+  const currentMonth = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, "0")}`;
+
+  // --- Rent proration ---
+  const onbSame = !!p.onboardingDate && String(p.onboardingDate).slice(0, 10) === String(p.switchDateStr).slice(0, 10);
+  const chargeDays = onbSame ? 1 : daysInMonth - sd.getDate() + 1;
+  const switchRentAmount = onbSame
+    ? (p.oldRate / daysInMonth) * chargeDays
+    : ((p.newRate - p.oldRate) / daysInMonth) * chargeDays;
+  if (Math.abs(switchRentAmount) > 1) {
+    if (onbSame || switchRentAmount > 0) {
+      const inv = await insertRow("invoices", {
+        tenant_id: p.tenantId, allotment_id: p.allotmentId,
+        property_id: p.propertyId || undefined, apartment_id: p.apartmentId || undefined,
+        bed_id: p.bedId, invoice_type: "regular", billing_month: currentMonth,
+        rent_amount: Math.ceil(switchRentAmount), total_amount: Math.ceil(switchRentAmount),
+        balance: Math.ceil(switchRentAmount), invoice_date: p.effectiveDateStr, due_date: p.effectiveDateStr,
+        status: "pending", reference_type: "room_switch", reference_id: p.switchId,
+      });
+      if (inv && inv.id) {
+        await insertRow("invoice_line_items", {
+          invoice_id: inv.id, line_type: "rent", amount: Math.ceil(switchRentAmount),
+          description: onbSame
+            ? `Switch-day Rent — Old room rate for ${chargeDays} day`
+            : `Rent Adjustment — Room upgrade for ${chargeDays} days`,
+          metadata: {
+            bed_rate: onbSame ? p.oldRate : p.newRate, effective_rate: onbSame ? p.oldRate : p.newRate,
+            discount: 0, premium: 0, stay_days: chargeDays, total_days_in_month: daysInMonth,
+            per_day_rent: chargeDays > 0 ? switchRentAmount / chargeDays : 0,
+            old_rent: p.oldRate, new_rent: p.newRate, remaining_days: chargeDays, days_in_month: daysInMonth,
+          },
+        });
+      }
+    } else {
+      await insertRow("tenant_adjustments", {
+        tenant_id: p.tenantId, allotment_id: p.allotmentId, adjustment_type: "credit_note",
+        amount: Math.abs(Math.ceil(switchRentAmount)),
+        reason: `Rental Credit — Room downgrade for ${chargeDays} remaining days`,
+        billing_month: currentMonth, property_id: p.propertyId || undefined,
+        apartment_id: p.apartmentId || undefined, bed_id: p.bedId, adjustment_date: p.effectiveDateStr,
+        reference_type: "room_switch", reference_id: p.switchId, created_by: null,
+      });
+    }
+  }
+
+  // --- Deposit difference (depositDiff precomputed by computeSwitchDepositDiff) ---
+  if (Math.abs(p.depositDiff) > 1) {
+    if (p.depositDiff > 0) {
+      await insertRow("invoices", {
+        tenant_id: p.tenantId, allotment_id: p.allotmentId, property_id: p.propertyId || undefined,
+        apartment_id: p.apartmentId || undefined, bed_id: p.bedId, invoice_type: "additional_deposit",
+        billing_month: currentMonth, total_amount: Math.ceil(p.depositDiff), balance: Math.ceil(p.depositDiff),
+        invoice_date: p.effectiveDateStr, due_date: p.effectiveDateStr, status: "pending",
+        reference_type: "room_switch", reference_id: p.switchId,
+      });
+    } else {
+      await insertRow("tenant_adjustments", {
+        tenant_id: p.tenantId, allotment_id: p.allotmentId, adjustment_type: "credit_note",
+        amount: Math.abs(Math.ceil(p.depositDiff)), reason: `Deposit returned — Room Switch downgrade`,
+        category: "Deposit Adjustment", billing_month: currentMonth, property_id: p.propertyId || undefined,
+        apartment_id: p.apartmentId || undefined, bed_id: p.bedId, adjustment_date: p.effectiveDateStr,
+        reference_type: "room_switch", reference_id: p.switchId, created_by: null,
+      });
+    }
+  }
+}
+
 export const processSwitchFull = action({
   args: { data: v.any() },
   returns: v.any(),
@@ -562,21 +665,23 @@ export const processSwitchFull = action({
     }
 
     // --- deposit difference (advance_ratio default 1.5) ---
-    const depositDifference = Math.round((newRate - oldRate) * 1.5);
+    const depositDifference = await computeSwitchDepositDiff(sb, data.allotmentId, oldRate, newRate, effectiveDateStr);
 
     const status = switchType === "immediate" ? "completed" : "scheduled";
 
     // --- insert room_switches ---
-    await insertRow("room_switches", {
+    const swRow = await insertRow("room_switches", {
       tenant_id: data.tenantId, allotment_id: data.allotmentId,
       old_bed_id: data.oldBedId, new_bed_id: data.newBedId,
       old_apartment_id: oldAptId, new_apartment_id: data.newApartmentId || null,
       switch_type: switchType, switch_date: switchDateStr, effective_date: effectiveDateStr,
       rent_difference: rentDiff, deposit_difference: depositDifference, eb_charges: ebCharges,
+      old_rent: oldRate, new_rent: newRate, new_property_id: data.newPropertyId || null,
       adjustment_type: rentDiff > 0 ? "tenant_pays" : rentDiff < 0 ? "credit_tenant" : "none",
       status, notes: data.notes || null,
       completed_at: status === "completed" ? new Date().toISOString() : null,
     });
+    const switchId = swRow.id;
 
     if (switchType === "immediate") {
       // move tenant now
@@ -594,6 +699,13 @@ export const processSwitchFull = action({
           billing_month: yyyyMm, reference_type: "room_switch",
         });
       }
+      // rent-proration + deposit-difference invoices/credits (web parity)
+      await postSwitchFinancials(sb, {
+        tenantId: data.tenantId, allotmentId: data.allotmentId, bedId: data.newBedId,
+        apartmentId: data.newApartmentId || oldAptId || null, propertyId: data.newPropertyId || null,
+        oldRate, newRate, switchDateStr, effectiveDateStr,
+        onboardingDate: allotRow?.onboarding_date || null, switchId, depositDiff: depositDifference,
+      });
     } else {
       // scheduled: old room On-Notice, new bed Booked; financials deferred to completeSwitch
       await sb.from("tenant_allotments").update({
@@ -618,8 +730,19 @@ export const completeSwitch = action({
       .eq("id", switchId).eq("organization_id", ORG_ID).single();
     if (!sw || sw.status !== "scheduled") return { success: false, error: "not scheduled" };
 
+    // old allotment's onboarding_date (needed by postSwitchFinancials for the same-day-onboarding case)
+    const { data: allotRow2 } = await sb.from("tenant_allotments").select("onboarding_date")
+      .eq("id", sw.allotment_id).eq("organization_id", ORG_ID).single();
+    const oldRate = Number(sw.old_rent || 0);
+    const newRate = Number(sw.new_rent || 0);
+    const effDate = sw.effective_date || sw.switch_date;
+    // recompute deposit diff at completion time (web parity: existing-deposit inputs may have
+    // changed since the switch was scheduled)
+    const depositDiff = await computeSwitchDepositDiff(sb, sw.allotment_id, oldRate, newRate, effDate);
+
     await sb.from("tenant_allotments").update({
       bed_id: sw.new_bed_id, apartment_id: sw.new_apartment_id || undefined,
+      property_id: sw.new_property_id || undefined, monthly_rental: newRate,
       staying_status: "Staying", notice_date: null, estimated_exit_date: null,
     } as any).eq("id", sw.allotment_id).eq("organization_id", ORG_ID);
     await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", sw.old_bed_id);
@@ -638,8 +761,16 @@ export const completeSwitch = action({
       });
     }
 
+    // rent-proration + deposit-difference invoices/credits (web parity)
+    await postSwitchFinancials(sb, {
+      tenantId: sw.tenant_id, allotmentId: sw.allotment_id, bedId: sw.new_bed_id,
+      apartmentId: sw.new_apartment_id || null, propertyId: sw.new_property_id || null,
+      oldRate, newRate, switchDateStr: sw.switch_date, effectiveDateStr: effDate,
+      onboardingDate: allotRow2?.onboarding_date || null, switchId, depositDiff,
+    });
+
     await sb.from("room_switches").update({
-      status: "completed", completed_at: new Date().toISOString(),
+      status: "completed", completed_at: new Date().toISOString(), deposit_difference: depositDiff,
     } as any).eq("id", switchId).eq("organization_id", ORG_ID);
 
     return { success: true };
