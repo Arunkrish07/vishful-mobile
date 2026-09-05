@@ -506,10 +506,13 @@ async function getTotalTenantDaysInMonth(sb: any, apartmentId: string, prevMonth
   const { data: allots } = await sb.from("tenant_allotments")
     .select("onboarding_date, actual_exit_date, staying_status")
     .eq("apartment_id", apartmentId).eq("organization_id", ORG_ID);
-  if (!allots || allots.length === 0) return daysInMonth;
+  const eligible = (allots || []).filter((a: any) =>
+    !!a.onboarding_date && ["Staying", "On-Notice", "Exited", "Booked"].includes(a.staying_status)
+  );
+  if (eligible.length === 0) return daysInMonth;
   let total = 0;
-  for (const a of allots) {
-    const onb = a.onboarding_date ? new Date(a.onboarding_date) : monthStart;
+  for (const a of eligible) {
+    const onb = new Date(a.onboarding_date);
     const ext = a.actual_exit_date ? new Date(a.actual_exit_date) : monthEnd;
     const start = onb > monthStart ? onb : monthStart;
     const end = ext < monthEnd ? ext : monthEnd;
@@ -534,7 +537,7 @@ export const processSwitchFull = action({
 
     // --- fetch old allotment (for onboarding_date + old apartment) ---
     const { data: allotRow } = await sb.from("tenant_allotments")
-      .select("id, apartment_id, onboarding_date, deposit_paid")
+      .select("id, apartment_id, onboarding_date")
       .eq("id", data.allotmentId).eq("organization_id", ORG_ID).single();
     const oldAptId = allotRow?.apartment_id || data.oldApartmentId;
 
@@ -584,7 +587,7 @@ export const processSwitchFull = action({
       await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", data.oldBedId);
       await sb.from("beds").update({ bed_lifecycle_status: "occupied" } as any).eq("id", data.newBedId);
       // post the actual-EB invoice on the OLD bed
-      if (ebCharges > 0) {
+      if (ebCharges > 1) {
         await insertRow("invoices", {
           tenant_id: data.tenantId, allotment_id: data.allotmentId, bed_id: data.oldBedId,
           invoice_type: "regular", electricity_amount: ebCharges, total_amount: ebCharges,
