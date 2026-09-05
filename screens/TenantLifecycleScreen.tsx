@@ -810,12 +810,17 @@ export default function TenantLifecycleScreen() {
   const [mapMenuOpen, setMapMenuOpen] = useState(false);
   const [expandedApt, setExpandedApt] = useState<string | null>(null);
 
+  // Tenant statement modal (opened from a switch row's "View"). Declared here (rather than
+  // alongside the other stmt* state below) so `anySheetOpen`/`closeActiveSheet` below can
+  // reference it without a temporal-dead-zone error.
+  const [stmtCtx, setStmtCtx] = useState<any>(null);
+
   // ── derived: is any overlay open? ────────────────────────────────────────────
   // Re-evaluated on every render so it's always current
   const anySheetOpen =
     bookingOpen || cancelOpen || onboardOpen || addPayOpen || editOccOpen ||
     switchOpen || noticeOpen || voiceNoticeOpen || editNoticeOpen || exitOpen || editExitOpen ||
-    editRefundOpen || completeRefundOpen || absenceOpen || !!bedDetail;
+    editRefundOpen || completeRefundOpen || absenceOpen || !!bedDetail || !!stmtCtx;
 
   // Close whichever sheet is currently open
   const closeActiveSheet = useCallback(() => {
@@ -834,9 +839,10 @@ export default function TenantLifecycleScreen() {
     if (editRefundOpen)      { setEditRefundOpen(false); return; }
     if (completeRefundOpen)  { setCompleteRefundOpen(false); return; }
     if (absenceOpen)         { setAbsenceOpen(false); return; }
+    if (stmtCtx)             { setStmtCtx(null); return; }
   }, [bedDetail, bookingOpen, cancelOpen, onboardOpen, addPayOpen, editOccOpen,
       switchOpen, noticeOpen, editNoticeOpen, exitOpen, editExitOpen,
-      editRefundOpen, completeRefundOpen, absenceOpen]);
+      editRefundOpen, completeRefundOpen, absenceOpen, stmtCtx]);
 
   // Lock drawer swipe & block browser/hardware back when any sheet is open
   useEffect(() => {
@@ -1034,8 +1040,6 @@ export default function TenantLifecycleScreen() {
     switchType: 'immediate', switchDate: today(), effectiveDate: '', notes: '',
     oldRate: 0, newRate: 0, newAptId: '', newPropId: '' };
   const [swForm, setSwForm] = useState<any>(blankSwitch);
-  // Tenant statement modal (opened from a switch row's "View").
-  const [stmtCtx, setStmtCtx]         = useState<any>(null);
   const [stmtTab, setStmtTab]         = useState<'ledger' | 'deposit' | 'summary'>('ledger');
   const [stmtInvoices, setStmtInvoices] = useState<any[]>([]);
   const [stmtReceipts, setStmtReceipts] = useState<any[]>([]);
@@ -1624,17 +1628,27 @@ export default function TenantLifecycleScreen() {
     setSwitchOpen(true);
   }
 
-  async function doCompleteSwitch(s: any) {
-    try { setSaving(true);
-      await client.action((api as any).tenants.completeSwitch, { switchId: s._id });
-      Alert.alert('Success', 'Switch completed'); fetchAll();
-    } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
+  function doCompleteSwitch(s: any) {
+    Alert.alert('Complete Switch', 'Finalize this scheduled switch now? The tenant moves to the new bed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Complete', style: 'default', onPress: async () => {
+        try { setSaving(true);
+          await client.action((api as any).tenants.completeSwitch, { switchId: s._id });
+          Alert.alert('Success', 'Switch completed'); fetchAll();
+        } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
+      }},
+    ]);
   }
-  async function doCancelSwitch(s: any) {
-    try { setSaving(true);
-      await client.action((api as any).tenants.cancelSwitch, { switchId: s._id });
-      Alert.alert('Cancelled', 'Switch cancelled'); fetchAll();
-    } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
+  function doCancelSwitch(s: any) {
+    Alert.alert('Cancel Switch', 'Revert this scheduled switch? The tenant stays in their current room and the booked bed is freed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Cancel Switch', style: 'destructive', onPress: async () => {
+        try { setSaving(true);
+          await client.action((api as any).tenants.cancelSwitch, { switchId: s._id });
+          Alert.alert('Cancelled', 'Switch cancelled'); fetchAll();
+        } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
+      }},
+    ]);
   }
 
   // ── Voice Notice helpers ─────────────────────────────────────────────────
@@ -3428,9 +3442,9 @@ export default function TenantLifecycleScreen() {
                 <InfoLine parts={[
                   { text: typeLabel },
                   { text: fmtDate(s.switchDate) },
-                  { text: `Rent ${s.rentDifference > 0 ? '+' : ''}₹${fmtAmt(s.rentDifference)}`, color: s.rentDifference > 0 ? '#DC2626' : '#16A34A', bold: true },
+                  { text: `Rent ${s.rentDifference < 0 ? '-' : s.rentDifference > 0 ? '+' : ''}₹${fmtAmt(Math.abs(s.rentDifference))}`, color: s.rentDifference > 0 ? '#DC2626' : '#16A34A', bold: true },
                   { text: `EB ₹${fmtAmt(s.ebCharges)}` },
-                  { text: `Deposit ${s.depositDifference > 0 ? '+' : ''}₹${fmtAmt(s.depositDifference)}`, color: s.depositDifference < 0 ? '#16A34A' : undefined },
+                  { text: `Deposit ${s.depositDifference < 0 ? '-' : s.depositDifference > 0 ? '+' : ''}₹${fmtAmt(Math.abs(s.depositDifference))}`, color: s.depositDifference < 0 ? '#16A34A' : undefined },
                 ]} />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                   {s.status === 'scheduled' ? (

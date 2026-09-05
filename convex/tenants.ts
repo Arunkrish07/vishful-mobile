@@ -627,10 +627,14 @@ export const completeSwitch = action({
 
     // post the stored (pre-computed) EB invoice on the OLD bed — same threshold as processSwitchFull
     if ((sw.eb_charges || 0) > 1) {
+      // billing_month = previous calendar month of the switch date, same as processSwitchFull
+      const swSwitchDate = new Date(sw.switch_date);
+      const swPrevMonth = new Date(swSwitchDate.getFullYear(), swSwitchDate.getMonth() - 1, 1);
+      const swYyyyMm = `${swPrevMonth.getFullYear()}-${String(swPrevMonth.getMonth() + 1).padStart(2, "0")}`;
       await insertRow("invoices", {
         tenant_id: sw.tenant_id, allotment_id: sw.allotment_id, bed_id: sw.old_bed_id,
         invoice_type: "regular", electricity_amount: sw.eb_charges, total_amount: sw.eb_charges,
-        reference_type: "room_switch",
+        billing_month: swYyyyMm, reference_type: "room_switch",
       });
     }
 
