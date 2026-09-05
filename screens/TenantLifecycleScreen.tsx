@@ -1025,7 +1025,9 @@ export default function TenantLifecycleScreen() {
     ]);
   }, [openProofGallery, openProofCamera]);
 
-  const blankSwitch = { allotmentId: '', tenantId: '', oldBedId: '', newBedId: '', switchDate: today(), oldRate: 0, newRate: 0, newAptId: '', newPropId: '' };
+  const blankSwitch = { allotmentId: '', tenantId: '', oldBedId: '', newBedId: '',
+    switchType: 'immediate', switchDate: today(), effectiveDate: '', notes: '',
+    oldRate: 0, newRate: 0, newAptId: '', newPropId: '' };
   const [swForm, setSwForm] = useState<any>(blankSwitch);
   // Tenant statement modal (opened from a switch row's "View").
   const [stmtCtx, setStmtCtx]         = useState<any>(null);
@@ -1535,6 +1537,9 @@ export default function TenantLifecycleScreen() {
           oldRate: swForm.oldRate, newRate: swForm.newRate,
           newApartmentId: swForm.newAptId, newPropertyId: swForm.newPropId,
           switchDate: swForm.switchDate || today(),
+          switchType: swForm.switchType,
+          effectiveDate: swForm.effectiveDate || swForm.switchDate,
+          notes: swForm.notes,
         },
       });
       Alert.alert('Success', 'Room switch processed!'); setSwitchOpen(false); setSwForm({ ...blankSwitch }); fetchAll();
@@ -3465,6 +3470,14 @@ export default function TenantLifecycleScreen() {
               setSwForm({ ...swForm, allotmentId: v, tenantId: a?.tenant_id || '', oldBedId: a?.bed_id || '', newBedId: '', oldRate: rate });
             }} />
           </Field>
+          <Field label="Switch Type">
+            <SelectF options={[{ label: 'Immediate', value: 'immediate' }, { label: 'Future', value: 'future' }]}
+              value={swForm.switchType} onChange={v => setSwForm({ ...swForm, switchType: v })} />
+          </Field>
+          <Field label="Switch Date"><DateF value={swForm.switchDate} onChange={v => setSwForm({ ...swForm, switchDate: v, effectiveDate: v })} /></Field>
+          {swForm.switchType === 'future' && (
+            <Field label="Effective Date"><DateF value={swForm.effectiveDate || swForm.switchDate} onChange={v => setSwForm({ ...swForm, effectiveDate: v })} /></Field>
+          )}
           <Field label="New Bed *">
             <SelectF options={switchBedOpts} value={swForm.newBedId} onChange={v => {
               const b = bedById[v];
@@ -3480,7 +3493,10 @@ export default function TenantLifecycleScreen() {
               <Row label="Difference" value={`${swForm.newRate - swForm.oldRate > 0 ? '+' : ''}₹${fmtAmt(swForm.newRate - swForm.oldRate)}`} valueColor={swForm.newRate > swForm.oldRate ? '#DC2626' : '#16A34A'} />
             </Card>
           )}
-          <Field label="Switch Date"><DateF value={swForm.switchDate} onChange={v => setSwForm({ ...swForm, switchDate: v })} /></Field>
+          <Field label="Notes">
+            <TextInput value={swForm.notes} onChangeText={v => setSwForm({ ...swForm, notes: v })} placeholder="Notes"
+              multiline style={{ borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 10, minHeight: 70, textAlignVertical: 'top' }} />
+          </Field>
           <ActionBtn title="Process Switch" onPress={doSwitch} loading={saving} disabled={!swForm.allotmentId || !swForm.newBedId} />
         </BottomSheet>
 
