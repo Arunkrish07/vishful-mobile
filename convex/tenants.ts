@@ -765,7 +765,7 @@ export const completeSwitch = action({
     await postSwitchFinancials(sb, {
       tenantId: sw.tenant_id, allotmentId: sw.allotment_id, bedId: sw.new_bed_id,
       apartmentId: sw.new_apartment_id || null, propertyId: sw.new_property_id || null,
-      oldRate, newRate, switchDateStr: sw.switch_date, effectiveDateStr: effDate,
+      oldRate, newRate, switchDateStr: effDate, effectiveDateStr: effDate,
       onboardingDate: allotRow2?.onboarding_date || null, switchId, depositDiff,
     });
 
