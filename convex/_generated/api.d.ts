@@ -14,6 +14,7 @@ import type * as aiAssistant from "../aiAssistant.js";
 import type * as anouncements from "../anouncements.js";
 import type * as assets from "../assets.js";
 import type * as auditlogs from "../auditlogs.js";
+import type * as billing from "../billing.js";
 import type * as dashboard from "../dashboard.js";
 import type * as dateutils from "../dateutils.js";
 import type * as debugSchema from "../debugSchema.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   anouncements: typeof anouncements;
   assets: typeof assets;
   auditlogs: typeof auditlogs;
+  billing: typeof billing;
   dashboard: typeof dashboard;
   dateutils: typeof dateutils;
   debugSchema: typeof debugSchema;

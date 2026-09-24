@@ -459,8 +459,8 @@ export async function getEBAnalytics(propertyId?: string) {
 // TICKETS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export async function fetchTickets(role: string, userId?: string, phone?: string) {
-  return client.action(api.tickets.listTickets, { role, userId, phone });
+export async function fetchTickets(role: string, userId?: string, tenantId?: string) {
+  return client.action(api.tickets.listTickets, { role, userId, tenantId });
 }
 
 export async function createTicket(args: any) {

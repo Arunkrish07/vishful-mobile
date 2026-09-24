@@ -50,6 +50,8 @@ export default function LoginScreen() {
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const resendTimer = useRef<any>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const otpRef = useRef<TextInput>(null);
   const { login } = useAuth();
 
   const RESEND_SECONDS = 30;
@@ -75,12 +77,25 @@ export default function LoginScreen() {
       Animated.timing(slideUp, { toValue: 0, duration: 480, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
   };
-  useEffect(() => { playEnter(); }, [step]);
+  useEffect(() => {
+    if (step === 'splash') playEnter();
+  }, [step]);
 
   // Loading splash → auto-advance to the phone/OTP entry (no "tap to continue").
   useEffect(() => {
     if (step !== 'splash') return;
     const t = setTimeout(() => setStep('phone'), 1800);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  // Open the keyboard after the phone/OTP screen is laid out. Immediate focus
+  // on Android often fails (IME not ready); a short delay is reliable.
+  useEffect(() => {
+    if (step !== 'phone' && step !== 'otp') return;
+    const t = setTimeout(() => {
+      if (step === 'phone') phoneRef.current?.focus();
+      else otpRef.current?.focus();
+    }, 400);
     return () => clearTimeout(t);
   }, [step]);
 
@@ -256,18 +271,16 @@ export default function LoginScreen() {
 
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
-          // Android: rely on native adjustResize. Setting behavior="height" here
-          // fights the OS resize and makes the soft keyboard flicker open→closed.
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
         >
           <ScrollView
             contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
               <View style={styles.loginMark}>
                 <Image
                   source={require('../assets/vishful-logo-DPK24n8p.webp')}
@@ -294,9 +307,13 @@ export default function LoginScreen() {
                 {step === 'phone' && (
                   <>
                     <Text style={styles.fieldLabel}>Mobile number</Text>
-                    <View style={[styles.phoneField, phoneFocused && styles.phoneFieldActive]}>
+                    <Pressable
+                      onPressIn={() => phoneRef.current?.focus()}
+                      style={[styles.phoneField, phoneFocused && styles.phoneFieldActive]}
+                    >
                       <Text style={styles.phonePrefix}>+91</Text>
                       <TextInput
+                        ref={phoneRef}
                         style={styles.phoneInput}
                         value={phone}
                         onFocus={() => setPhoneFocused(true)}
@@ -309,14 +326,20 @@ export default function LoginScreen() {
                         placeholder="98765 43210"
                         placeholderTextColor={C.placeholder}
                         keyboardType="phone-pad"
+                        inputMode="numeric"
                         maxLength={10}
+                        showSoftInputOnFocus
+                        autoCorrect={false}
+                        autoComplete="tel"
+                        textContentType="telephoneNumber"
                         selectionColor={C.accent}
                         cursorColor={C.accent}
+                        underlineColorAndroid="transparent"
                       />
                       <Text style={[styles.phoneCount, phone.length === 10 && styles.phoneCountSet]}>
                         {phone.length}/10
                       </Text>
-                    </View>
+                    </Pressable>
 
                     {error ? (
                       <View style={styles.errorBox}>
@@ -349,9 +372,10 @@ export default function LoginScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    <View style={{ position: 'relative' }}>
-                      <View style={styles.otpRow}>{renderOtpCells()}</View>
+                    <Pressable onPressIn={() => otpRef.current?.focus()} style={{ position: 'relative' }}>
+                      <View style={styles.otpRow} pointerEvents="none">{renderOtpCells()}</View>
                       <TextInput
+                        ref={otpRef}
                         style={styles.otpHidden}
                         value={otp}
                         onChangeText={(t: string) => {
@@ -360,12 +384,14 @@ export default function LoginScreen() {
                           setShowSignupPrompt(false);
                         }}
                         keyboardType="number-pad"
+                        inputMode="numeric"
                         maxLength={6}
-                        autoFocus
+                        showSoftInputOnFocus
                         caretHidden
                         selectionColor={C.accent}
+                        underlineColorAndroid="transparent"
                       />
-                    </View>
+                    </Pressable>
 
                     {error ? (
                       <View style={styles.errorBox}>
@@ -397,7 +423,6 @@ export default function LoginScreen() {
               <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.privacyBtn}>
                 <Text style={styles.privacyText}>Privacy Policy</Text>
               </TouchableOpacity>
-            </Animated.View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

@@ -540,7 +540,14 @@ function TenantNavigator() {
 // and a profile accessible via its own stack — no double-tab needed.
 function AuthNavigator() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        // Native-stack keyboard handling fights Android IME and can close the
+        // keypad right after the login number field focuses.
+        keyboardHandlingEnabled: false,
+      }}
+    >
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
     </AuthStack.Navigator>

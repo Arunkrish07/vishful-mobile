@@ -44,3 +44,7 @@ yarn-error.*
 .agents/
 .claude/
 skills-lock.json
+
+# local build backups / scratch artifacts (not part of the app build)
+package.json.*.bak
+expo-go-qr.png

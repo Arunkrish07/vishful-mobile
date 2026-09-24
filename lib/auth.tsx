@@ -7,6 +7,7 @@ interface TenantLocation {
   found: true;
   tenantId: string;
   tenantName: string;
+  allotmentId: string;  // returned by getTenantLocation; used for notices/tickets
   unitNumber: string;
   floor: string;
   buildingName: string;

@@ -16,8 +16,10 @@ export interface Ticket {
   property_id?: string | null;
   apartment_id?: string | null;
   bed_id?: string | null;
+  bed_code?: string | null;  // enriched by convex/tickets.ts from bed_id → beds.bed_code
   issue_type_id: string;
   issue_type?: string | null;
+  issue_type_name?: string | null;  // enriched by convex/tickets.ts from issue_type_id → issue_types.name
   issue_subtype?: string | null;
   description?: string | null;
   priority: string;

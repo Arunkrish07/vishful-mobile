@@ -326,7 +326,7 @@ export function LoadingScreen() {
       <Text style={{ fontSize: 12, color: 'rgba(226,232,240,0.58)', letterSpacing: 2.4, marginTop: 8, fontWeight: '600', textTransform: 'uppercase' }}>
         Stay · Belong · Succeed
       </Text>
-      <ActivityIndicator size="small" color="#6366F1" style={{ marginTop: 28 }} />
+      <ActivityIndicator size="small" color="#2563EB" style={{ marginTop: 28 }} />
       <Text style={{ fontSize: 12, color: 'rgba(203,213,225,0.45)', marginTop: 24 }}>Property OS</Text>
     </View>
   );
@@ -442,9 +442,9 @@ export function DateField({
     setOpen(false);
   };
 
-  const purple = '#6366F1';
-  const ink = colors?.text || '#1E1230';
-  const muted = colors?.textSecondary || '#9B8BAE';
+  const purple = '#2563EB';
+  const ink = colors?.text || '#0F172A';
+  const muted = colors?.textSecondary || '#64748B';
 
   return (
     <>
@@ -453,9 +453,9 @@ export function DateField({
         activeOpacity={0.7}
         style={{
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          borderWidth: 1, borderColor: 'rgba(123,47,190,0.25)', borderRadius: 12,
+          borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12,
           paddingHorizontal: 14, paddingVertical: 12,
-          backgroundColor: disabled ? 'rgba(240,234,224,0.4)' : 'rgba(255,255,255,0.6)',
+          backgroundColor: disabled ? '#F8FAFC' : '#FFFFFF',
         }}
       >
         <Text style={{ fontSize: fontSize.sm, color: selected ? ink : muted }}>
@@ -468,7 +468,7 @@ export function DateField({
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => setOpen(false)}
-          style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 }}
         >
           <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{
             width: '100%', maxWidth: 360, backgroundColor: '#fff', borderRadius: 18, padding: 16,
@@ -578,7 +578,7 @@ export function PageHeader({
   return (
     <View style={[{
       flexDirection: 'row', alignItems: 'center', gap: 10,
-      paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
+      paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, minHeight: 58,
       backgroundColor: 'rgba(255,255,255,0.96)',
       borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8EDF5',
     }, style]}>
@@ -596,7 +596,7 @@ export function PageHeader({
         </TouchableOpacity>
       ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: WEB.ink, letterSpacing: -0.4 }} numberOfLines={1}>
+        <Text style={{ fontSize: 23, fontWeight: '800', color: WEB.ink, letterSpacing: -0.5 }} numberOfLines={1}>
           {title}
         </Text>
         {!!subtitle && (
