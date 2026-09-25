@@ -562,13 +562,15 @@ async function postSwitchFinancials(sb: any, p: {
   const currentMonth = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, "0")}`;
 
   // --- Rent proration ---
+  // Same-day switch (switch date == onboarding date): the old room is billed ₹0 — the
+  // onboarding proration already covers the day, so no extra old-room charge is posted.
   const onbSame = !!p.onboardingDate && String(p.onboardingDate).slice(0, 10) === String(p.switchDateStr).slice(0, 10);
-  const chargeDays = onbSame ? 1 : daysInMonth - sd.getDate() + 1;
+  const chargeDays = onbSame ? 0 : daysInMonth - sd.getDate() + 1;
   const switchRentAmount = onbSame
-    ? (p.oldRate / daysInMonth) * chargeDays
+    ? 0
     : ((p.newRate - p.oldRate) / daysInMonth) * chargeDays;
   if (Math.abs(switchRentAmount) > 1) {
-    if (onbSame || switchRentAmount > 0) {
+    if (switchRentAmount > 0) {
       const inv = await insertRow("invoices", {
         tenant_id: p.tenantId, allotment_id: p.allotmentId,
         property_id: p.propertyId || undefined, apartment_id: p.apartmentId || undefined,
@@ -580,11 +582,9 @@ async function postSwitchFinancials(sb: any, p: {
       if (inv && inv.id) {
         await insertRow("invoice_line_items", {
           invoice_id: inv.id, line_type: "rent", amount: Math.ceil(switchRentAmount),
-          description: onbSame
-            ? `Switch-day Rent — Old room rate for ${chargeDays} day`
-            : `Rent Adjustment — Room upgrade for ${chargeDays} days`,
+          description: `Rent Adjustment — Room upgrade for ${chargeDays} days`,
           metadata: {
-            bed_rate: onbSame ? p.oldRate : p.newRate, effective_rate: onbSame ? p.oldRate : p.newRate,
+            bed_rate: p.newRate, effective_rate: p.newRate,
             discount: 0, premium: 0, stay_days: chargeDays, total_days_in_month: daysInMonth,
             per_day_rent: chargeDays > 0 ? switchRentAmount / chargeDays : 0,
             old_rent: p.oldRate, new_rent: p.newRate, remaining_days: chargeDays, days_in_month: daysInMonth,
@@ -705,14 +705,11 @@ export const processSwitchFull = action({
       } as any).eq("id", data.allotmentId).eq("organization_id", ORG_ID);
       await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", data.oldBedId);
       await sb.from("beds").update({ bed_lifecycle_status: "occupied" } as any).eq("id", data.newBedId);
-      // post the actual-EB invoice on the OLD bed
-      if (ebCharges > 1) {
-        await insertRow("invoices", {
-          tenant_id: data.tenantId, allotment_id: data.allotmentId, bed_id: data.oldBedId,
-          invoice_type: "regular", electricity_amount: ebCharges, total_amount: ebCharges,
-          billing_month: yyyyMm, reference_type: "room_switch",
-        });
-      }
+      // NOTE: do NOT post an arrears-EB invoice here. The previous month's EB is
+      // already billed by the monthly billing cycle for the tenant's (then-old)
+      // apartment; re-posting it on switch double-charged that month's EB (confirmed
+      // via ledger audit — Aug EB appeared both on the monthly invoice and the switch).
+      // eb_charges stays on the room_switches row for reference only. (was: insert invoice with electricity_amount=ebCharges, billing_month=yyyyMm)
       // rent-proration + deposit-difference invoices/credits (web parity)
       await postSwitchFinancials(sb, {
         tenantId: data.tenantId, allotmentId: data.allotmentId, bedId: data.newBedId,
@@ -762,18 +759,9 @@ export const completeSwitch = action({
     await sb.from("beds").update({ bed_lifecycle_status: "vacant" } as any).eq("id", sw.old_bed_id);
     await sb.from("beds").update({ bed_lifecycle_status: "occupied" } as any).eq("id", sw.new_bed_id);
 
-    // post the stored (pre-computed) EB invoice on the OLD bed — same threshold as processSwitchFull
-    if ((sw.eb_charges || 0) > 1) {
-      // billing_month = previous calendar month of the switch date, same as processSwitchFull
-      const swSwitchDate = new Date(sw.switch_date);
-      const swPrevMonth = new Date(swSwitchDate.getFullYear(), swSwitchDate.getMonth() - 1, 1);
-      const swYyyyMm = `${swPrevMonth.getFullYear()}-${String(swPrevMonth.getMonth() + 1).padStart(2, "0")}`;
-      await insertRow("invoices", {
-        tenant_id: sw.tenant_id, allotment_id: sw.allotment_id, bed_id: sw.old_bed_id,
-        invoice_type: "regular", electricity_amount: sw.eb_charges, total_amount: sw.eb_charges,
-        billing_month: swYyyyMm, reference_type: "room_switch",
-      });
-    }
+    // NOTE: do NOT post the arrears-EB invoice on completion either — the monthly
+    // billing cycle already bills the previous month's EB for the old apartment;
+    // posting it here double-charged that month's EB (see processSwitchFull).
 
     // rent-proration + deposit-difference invoices/credits (web parity)
     await postSwitchFinancials(sb, {
