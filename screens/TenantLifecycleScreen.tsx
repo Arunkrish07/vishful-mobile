@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Linking,
   TextInput, Alert, ActivityIndicator, FlatList, RefreshControl,
   Dimensions, KeyboardAvoidingView, Platform, Image, Animated, Pressable,
 } from 'react-native';
@@ -293,7 +293,7 @@ async function shareRegistrationPdf(uri: string): Promise<void> {
 
 // ═══ end inlined Registration PDF module ═══
 
-const { width: SW } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
 // ─── Vishful brand palette (web screen-life tokens) ─────────────────────────
 const VBRAND = {
@@ -807,6 +807,35 @@ export default function TenantLifecycleScreen() {
   const [mapSearch,   setMapSearch]   = useState('');
   const [mapSortBy,   setMapSortBy]   = useState<'apartment' | 'gender'>('apartment');
   const [bedDetail,   setBedDetail]   = useState<any>(null);
+  // Per-month paid/pending for the tapped tenant in the visual-map bed sheet.
+  const [bedPay, setBedPay] = useState<{ loading: boolean; months: { month: string; paid: boolean; balance: number }[] }>({ loading: false, months: [] });
+  useEffect(() => {
+    const tid = bedDetail?.allotment?.tenant_id;
+    if (!tid) { setBedPay({ loading: false, months: [] }); return; }
+    let alive = true;
+    setBedPay({ loading: true, months: [] });
+    (async () => {
+      try {
+        const inv = await client.action((api as any).accounting.listInvoices, { tenantId: tid });
+        if (!alive) return;
+        const byMonth = new Map<string, number>();
+        (inv || []).forEach((i: any) => {
+          const m = i.billingMonth || i.billing_month;
+          if (!m) return;
+          const bal = Number(i.outstanding ?? i.balance ?? 0) || 0;
+          byMonth.set(m, (byMonth.get(m) || 0) + bal);
+        });
+        const months = [...byMonth.entries()]
+          .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+          .slice(0, 6)
+          .map(([month, balance]) => ({ month, balance, paid: balance <= 0 }));
+        setBedPay({ loading: false, months });
+      } catch {
+        if (alive) setBedPay({ loading: false, months: [] });
+      }
+    })();
+    return () => { alive = false; };
+  }, [bedDetail?.allotment?.tenant_id]);
   const [mapMenuOpen, setMapMenuOpen] = useState(false);
   const [expandedApt, setExpandedApt] = useState<string | null>(null);
 
@@ -2563,12 +2592,25 @@ export default function TenantLifecycleScreen() {
             .sort((a: any, b: any) => b.from_date.localeCompare(a.from_date))
             .slice(0, 3);
 
+          // Full tenant row (email/company/document URLs) — data.tenants holds select(*),
+          // richer than the allotment's nested tenants(...) join.
+          const _allot = bedDetail.allotment;
+          const _t = _allot ? (tenants.find((x: any) => x.id === _allot.tenant_id) || _allot.tenants || {}) : {};
+          const _docs = [
+            { label: 'Photo', url: _t.photo_url },
+            { label: 'Aadhaar', url: _t.aadhar_image_url || (String(_t.id_proof_type || '').toLowerCase() === 'aadhaar' ? _t.id_proof_url : null) },
+            { label: 'Company ID', url: _t.id_card_url },
+          ].filter((d: any) => !!d.url);
+          const openDoc = (url: string) => { Linking.openURL(url).catch(() => {}); };
+
           return (
             <Modal visible transparent animationType="slide" onRequestClose={() => setBedDetail(null)}>
-              <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
-                activeOpacity={1} onPress={() => setBedDetail(null)}>
-                <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-                  <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32, overflow: 'hidden' }}>
+              <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                {/* Scrim BEHIND the sheet (absolute) so it never swallows the sheet's
+                    scroll gesture — the old wrapping TouchableOpacity blocked scrolling. */}
+                <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }}
+                  activeOpacity={1} onPress={() => setBedDetail(null)} />
+                  <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32, overflow: 'hidden', maxHeight: SH * 0.9 }}>
 
                     {/* Handle bar */}
                     <View style={{ alignItems: 'center', paddingTop: 12, marginBottom: 4 }}>
@@ -2600,7 +2642,7 @@ export default function TenantLifecycleScreen() {
                       </View>
                     </View>
 
-                    <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                    <ScrollView style={{ maxHeight: SH * 0.74 }} showsVerticalScrollIndicator={true}>
                       <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 12 }}>
 
                         {/* Bed specs */}
@@ -2669,24 +2711,72 @@ export default function TenantLifecycleScreen() {
                             <SectionTitle title="Current Tenant" />
                             <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#EFF6FF' }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <View style={{ width: 42, height: 42, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Ionicons name="person-outline" size={20} color="#2563EB" />
+                                <View style={{ width: 42, height: 42, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                  {_t.photo_url
+                                    ? <Image source={{ uri: _t.photo_url }} style={{ width: 42, height: 42 }} />
+                                    : <Ionicons name="person-outline" size={20} color="#2563EB" />}
                                 </View>
-                                <View>
-                                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>{bedDetail.allotment.tenants?.full_name || '—'}</Text>
-                                  <Text style={{ fontSize: 12, color: '#64748B' }}>{bedDetail.allotment.tenants?.phone || '—'}</Text>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>{_t.full_name || _allot.tenants?.full_name || '—'}</Text>
+                                  <Text style={{ fontSize: 12, color: '#64748B' }}>{_t.phone || _allot.tenants?.phone || '—'}</Text>
                                 </View>
                               </View>
                               <Divider />
-                              <Row label="Move-in Date" value={fmtDate(bedDetail.allotment.onboarding_date)} />
-                              <Row label="Monthly Rent" value={`₹${fmtAmt(bedDetail.allotment.monthly_rental)}/mo`} />
-                              <Row label="Deposit Paid" value={`₹${fmtAmt(bedDetail.allotment.deposit_paid)}`} />
-                              {bedDetail.allotment.discount > 0 && <Row label="Discount" value={`₹${fmtAmt(bedDetail.allotment.discount)}/mo`} valueColor="#EA580C" />}
-                              {bedDetail.status === 'notice' && <Row label="Est. Exit" value={fmtDate(bedDetail.allotment.estimated_exit_date)} valueColor="#EA580C" />}
+                              <Row label="Email" value={_t.email || '—'} />
+                              <Row label="Company" value={_t.company_name || '—'} />
+                              <Divider />
+                              <Row label="Move-in Date" value={fmtDate(_allot.onboarding_date)} />
+                              <Row label="Current Rent" value={`₹${fmtAmt(_allot.monthly_rental)}/mo`} />
+                              <Row label="Advance" value={`₹${fmtAmt(_allot.deposit_paid || 0)}`} />
+                              <Row label="Discount" value={`₹${fmtAmt(_allot.discount || 0)}/mo`} valueColor={(_allot.discount || 0) > 0 ? '#EA580C' : undefined} />
+                              <Row label="Premium" value={`₹${fmtAmt(_allot.premium || 0)}/mo`} valueColor={(_allot.premium || 0) > 0 ? '#2563EB' : undefined} />
+                              {bedDetail.status === 'notice' && <Row label="Est. Exit" value={fmtDate(_allot.estimated_exit_date)} valueColor="#EA580C" />}
                               {bedDetail.status === 'notice' && (
                                 <View style={{ marginTop: 8, backgroundColor: '#FFEDD5', borderRadius: 8, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                   <Ionicons name="warning-outline" size={14} color="#EA580C" />
                                   <Text style={{ fontSize: 11, color: '#EA580C', fontWeight: '600' }}>Tenant has served notice</Text>
+                                </View>
+                              )}
+                            </View>
+
+                            {/* Monthly payments — paid vs pending per billing month */}
+                            <View style={{ marginTop: 12 }}>
+                              <SectionTitle title="Monthly Payments" />
+                              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#EFF6FF' }}>
+                                {bedPay.loading ? (
+                                  <View style={{ padding: 14, alignItems: 'center' }}><Text style={{ fontSize: 12, color: '#64748B' }}>Loading…</Text></View>
+                                ) : bedPay.months.length === 0 ? (
+                                  <View style={{ padding: 14, alignItems: 'center' }}><Text style={{ fontSize: 12, color: '#64748B' }}>No invoices yet</Text></View>
+                                ) : bedPay.months.map((m, i) => (
+                                  <View key={m.month} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: '#EFF6FF' }}>
+                                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>{m.month}</Text>
+                                    <View style={{ backgroundColor: m.paid ? '#DCFCE7' : '#FEE2E2', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                      <Text style={{ fontSize: 11, fontWeight: '800', color: m.paid ? '#16A34A' : '#DC2626' }}>
+                                        {m.paid ? 'Paid' : `Pending ₹${fmtAmt(m.balance)}`}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+
+                            {/* Documents */}
+                            <View style={{ marginTop: 12 }}>
+                              <SectionTitle title="Documents" />
+                              {_docs.length === 0 ? (
+                                <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#EFF6FF' }}>
+                                  <Text style={{ fontSize: 12, color: '#64748B' }}>No documents uploaded</Text>
+                                </View>
+                              ) : (
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                                  {_docs.map((d: any) => (
+                                    <TouchableOpacity key={d.label} onPress={() => openDoc(d.url)}
+                                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', borderRadius: 10, borderWidth: 1, borderColor: '#DBEAFE', paddingHorizontal: 12, paddingVertical: 10 }}>
+                                      <Ionicons name="document-text-outline" size={16} color="#2563EB" />
+                                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{d.label}</Text>
+                                      <Ionicons name="open-outline" size={13} color="#2563EB" />
+                                    </TouchableOpacity>
+                                  ))}
                                 </View>
                               )}
                             </View>
@@ -2704,8 +2794,7 @@ export default function TenantLifecycleScreen() {
                       </View>
                     </ScrollView>
                   </View>
-                </TouchableOpacity>
-              </TouchableOpacity>
+              </View>
             </Modal>
           );
         })()}
