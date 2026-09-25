@@ -420,7 +420,7 @@ export const processOnboardingFull = action({
       await insertRow("tenant_adjustments", {
         tenant_id: allot.tenant_id,
         allotment_id: data.allotmentId,
-        type: "debit_note",
+        adjustment_type: "debit_note",
         category: "cc_charges",
         reason: "CC Charges",
         amount: Math.ceil(ccChargesOnboard),
@@ -475,7 +475,7 @@ export const addLifecyclePayment = action({
       await insertRow("tenant_adjustments", {
         tenant_id: allot.tenant_id,
         allotment_id: data.allotmentId,
-        type: "debit_note",
+        adjustment_type: "debit_note",
         category: "cc_charges",
         reason: "CC Charges",
         amount: Math.ceil(ccChargesPayment),
@@ -659,8 +659,17 @@ export const processSwitchFull = action({
       const totalBill = totalUnits * Number(ebReading.unit_cost);
       const totalTenantDays = await getTotalTenantDaysInMonth(sb, oldAptId, prevMonth);
       const perDay = totalTenantDays > 0 ? totalBill / totalTenantDays : 0;
-      const onb = allotRow?.onboarding_date ? new Date(allotRow.onboarding_date) : switchDate;
-      const daysUsed = Math.max(1, Math.floor((switchDate.getTime() - onb.getTime()) / 86400000));
+      // This tenant's OCCUPIED DAYS within the arrears (previous) month — this must match
+      // the per-day denominator (all tenants' days in prevMonth). The old code used
+      // (switchDate − onboardingDate), i.e. the ENTIRE tenancy span since onboarding, which
+      // massively overcharged any tenant who had stayed longer than a month.
+      const prevMonthStart = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+      const prevMonthEnd = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0);
+      const onb = allotRow?.onboarding_date ? new Date(allotRow.onboarding_date) : prevMonthStart;
+      const start = onb > prevMonthStart ? onb : prevMonthStart;
+      const daysUsed = start > prevMonthEnd
+        ? 0
+        : Math.max(1, Math.floor((prevMonthEnd.getTime() - start.getTime()) / 86400000) + 1);
       ebCharges = Math.ceil(perDay * daysUsed);
     }
 
@@ -672,6 +681,11 @@ export const processSwitchFull = action({
     // --- insert room_switches ---
     const swRow = await insertRow("room_switches", {
       tenant_id: data.tenantId, allotment_id: data.allotmentId,
+      // The allotment the tenant is switching OUT of. The billing engine reads this
+      // (billing.ts → switchedOutAllotmentIds) to suppress the ₹2,250 exit charge and
+      // estimated-EB it would otherwise apply while a scheduled switch sits On-Notice.
+      // Previously never written, so that suppression guard was permanently empty.
+      old_allotment_id: data.allotmentId,
       old_bed_id: data.oldBedId, new_bed_id: data.newBedId,
       old_apartment_id: oldAptId, new_apartment_id: data.newApartmentId || null,
       switch_type: switchType, switch_date: switchDateStr, effective_date: effectiveDateStr,

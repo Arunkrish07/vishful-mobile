@@ -1043,6 +1043,7 @@ export default function TenantLifecycleScreen() {
   const [stmtTab, setStmtTab]         = useState<'ledger' | 'deposit' | 'summary'>('ledger');
   const [stmtInvoices, setStmtInvoices] = useState<any[]>([]);
   const [stmtReceipts, setStmtReceipts] = useState<any[]>([]);
+  const [stmtAdjustments, setStmtAdjustments] = useState<any[]>([]);
   const [stmtLoading, setStmtLoading] = useState(false);
   const [depEdit, setDepEdit]         = useState<{ editing: boolean; value: string }>({ editing: false, value: '' });
 
@@ -1562,15 +1563,20 @@ export default function TenantLifecycleScreen() {
     setStmtTab('ledger');
     setStmtInvoices([]);
     setStmtReceipts([]);
+    setStmtAdjustments([]);
     setStmtLoading(true);
     try {
       // Invoices = charges (debits). listReceipts = ALL payments incl. monthly rent
       // (the lifecycle receipts list is filtered and misses rent → wrong credits).
-      const [inv, rec] = await Promise.all([
+      // Adjustments = credit/debit notes (room-switch rent credits, deposit-return
+      // credits, CC debit notes) which were previously invisible in this modal.
+      const [inv, rec, adj] = await Promise.all([
         client.action((api as any).accounting.listInvoices, { tenantId: s.tenantId }),
         client.action((api as any).accounting.listReceipts, {}).catch(() => []),
+        client.action((api as any).accounting.listAdjustments, {}).catch(() => []),
       ]);
       setStmtInvoices(inv || []);
+      setStmtAdjustments((adj || []).filter((a: any) => a.tenant_id === s.tenantId));
       setStmtReceipts((rec || [])
         .filter((r: any) => r.tenant_id === s.tenantId)
         .map((r: any) => ({
@@ -1582,7 +1588,7 @@ export default function TenantLifecycleScreen() {
           paymentDate: r.payment_date || (r.created_at || '').split('T')[0] || '',
           receiptType: r.receipt_type || '',
         })));
-    } catch { setStmtInvoices([]); setStmtReceipts([]); }
+    } catch { setStmtInvoices([]); setStmtReceipts([]); setStmtAdjustments([]); }
     setStmtLoading(false);
   }
 
@@ -4621,12 +4627,25 @@ export default function TenantLifecycleScreen() {
               category: 'Payment', desc: `${typeLabel(r.receiptType)}${r.paymentMode ? ' · ' + r.paymentMode : ''}`,
               debit: 0, credit: Number(r.amountPaid) || 0,
             }));
-            const ledger = [...invEntries, ...payEntries].sort((a: any, b: any) => String(a.sortKey).localeCompare(String(b.sortKey)));
+            // Adjustments: credit_note = credit (e.g. room-switch/deposit-return credit),
+            // debit_note = debit (e.g. CC charges). Previously omitted → credits invisible.
+            const adjEntries = (stmtAdjustments || []).map((a: any) => {
+              const amt = Number(a.amount) || 0;
+              const isCredit = a.adjustment_type === 'credit_note';
+              const date = (a.adjustment_date || '').slice(0, 10);
+              return {
+                date, sortKey: (date || '9999-99-99'),
+                category: isCredit ? 'Credit' : 'Adjustment',
+                desc: a.reason || a.category || (isCredit ? 'Credit note' : 'Debit note'),
+                debit: isCredit ? 0 : amt, credit: isCredit ? amt : 0,
+              };
+            });
+            const ledger = [...invEntries, ...payEntries, ...adjEntries].sort((a: any, b: any) => String(a.sortKey).localeCompare(String(b.sortKey)));
             let running = 0;
             ledger.forEach((e: any) => { running += e.debit - e.credit; e.balance = running; });
 
-            const totalCharged = invEntries.reduce((n: number, e: any) => n + e.debit, 0);
-            const totalPaid = payEntries.reduce((n: number, e: any) => n + e.credit, 0);
+            const totalCharged = ledger.reduce((n: number, e: any) => n + e.debit, 0);
+            const totalPaid = ledger.reduce((n: number, e: any) => n + e.credit, 0);
             const totalSettled = settles.reduce((n: number, r: any) => n + r.amountPaid, 0);
             const balanceDue = totalCharged - totalPaid;
             const allot = allotments.find((a: any) => a.id === stmtCtx.allotmentId) || allotments.find((a: any) => a.tenant_id === stmtCtx.tenantId);
@@ -4658,8 +4677,8 @@ export default function TenantLifecycleScreen() {
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <View style={{ flex: 1, marginRight: 8 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <View style={{ backgroundColor: e.category === 'Invoice' ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.1)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: e.category === 'Invoice' ? '#DC2626' : '#16A34A' }}>{e.category}</Text>
+                                <View style={{ backgroundColor: e.debit > 0 ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.1)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: e.debit > 0 ? '#DC2626' : '#16A34A' }}>{e.category}</Text>
                                 </View>
                                 <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{e.date || '—'}</Text>
                               </View>
