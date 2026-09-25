@@ -15,6 +15,7 @@ import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, borderRadius } from '../lib/theme';
 import { GlassBackground } from '../components/shared';
+import DeleteAccountButton from '../components/DeleteAccountButton';
 import { client as convexClient, api as convexApi } from '../lib/convexApi';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as sb from '../lib/supabaseService';
@@ -1146,6 +1147,9 @@ export default function SettingsScreen() {
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Sign out</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Delete account — submits a deletion request (Google Play data-safety requirement) */}
+          <DeleteAccountButton style={{ marginTop: 10 }} />
         </View>
 
         {/* ── Assign Role Modal ─────────────────────────────────────────────── */}

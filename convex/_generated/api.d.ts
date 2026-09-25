@@ -9,6 +9,7 @@
  */
 
 import type * as Availabilityrecommender from "../Availabilityrecommender.js";
+import type * as account from "../account.js";
 import type * as accounting from "../accounting.js";
 import type * as aiAssistant from "../aiAssistant.js";
 import type * as anouncements from "../anouncements.js";
@@ -50,6 +51,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   Availabilityrecommender: typeof Availabilityrecommender;
+  account: typeof account;
   accounting: typeof accounting;
   aiAssistant: typeof aiAssistant;
   anouncements: typeof anouncements;

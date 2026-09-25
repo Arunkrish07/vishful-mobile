@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, glass, borderRadius } from '../lib/theme';
 import { GlassBackground, Badge } from '../components/shared';
+import DeleteAccountButton from '../components/DeleteAccountButton';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchTickets, Ticket, STATUS_CONFIG } from '../services/ticketService';
 
@@ -154,6 +155,8 @@ export default function TechnicianProfileScreen() {
             <Ionicons name="log-out-outline" size={20} color="#DC2626" />
             <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#DC2626' }}>Logout</Text>
           </TouchableOpacity>
+
+          <DeleteAccountButton style={{ marginTop: spacing.md }} />
         </ScrollView>
       </SafeAreaView>
     </GlassBackground>

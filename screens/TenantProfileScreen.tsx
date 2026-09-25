@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Ima
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
+import DeleteAccountButton from '../components/DeleteAccountButton';
 import { spacing } from '../lib/theme';
 import { Button, GlassBackground } from '../components/shared';
 import { useNavigation } from '@react-navigation/native';
@@ -301,6 +302,7 @@ export default function TenantProfileScreen() {
                   variant="danger"
                   icon="log-out-outline"
                 />
+                <DeleteAccountButton style={{ marginTop: 12 }} />
               </View>
             </>
           )}

@@ -73,6 +73,23 @@ export async function getSession(token: string): Promise<{
   }
 }
 
+// Submit an in-app account-deletion request (non-destructive). The backend verifies
+// the token server-side and records the request as an audit_logs entry for the team.
+export async function requestAccountDeletion(
+  token: string,
+  reason?: string,
+): Promise<{ success: boolean; message?: string }> {
+  if (!token || typeof token !== 'string' || token.trim().length === 0) {
+    return { success: false, message: 'Your session has expired. Please sign in again.' };
+  }
+  try {
+    return await client.action((api as any).account.requestAccountDeletion, { token, reason });
+  } catch (e: any) {
+    console.warn('[supabaseService] requestAccountDeletion error:', e?.message);
+    return { success: false, message: 'Could not submit your request. Please try again.' };
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
