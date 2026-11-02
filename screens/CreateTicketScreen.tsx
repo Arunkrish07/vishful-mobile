@@ -703,7 +703,7 @@ export default function CreateTicketScreen({ navigation }: any) {
                         colors={colors}
                         icon="list-outline"
                         allowDeselect
-                        selectedId={selectedSubType?.id}
+                        selectedId={undefined}
                       />
                     )}
                   </View>
@@ -862,7 +862,7 @@ export default function CreateTicketScreen({ navigation }: any) {
                               colors={colors}
                               icon="list-outline"
                               allowDeselect
-                              selectedId={selectedSubType?.id}
+                              selectedId={undefined}
                             />
                           )
                         ) : (

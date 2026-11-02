@@ -715,7 +715,7 @@ export default function DashboardScreen() {
         : { period: apiPeriod.period };
 
       const [data, tickets, ext, hero, dues, punc, disc] = await Promise.all([
-        sb.getDashboardData(),
+        sb.getDashboardData().catch((e) => { console.log('[DASH] getStats failed:', e?.name, '|', e?.message, '|', String(e)); return EMPTY_DASHBOARD; }),
         fetchTickets('admin').catch(() => []),
         client.action(api.dashboard.getExtendedStats, extArgs).catch(() => EMPTY_EXTENDED),
         getHeroMonthly().catch(() => null),
@@ -764,11 +764,11 @@ export default function DashboardScreen() {
   const needsAtt: any[] = extended?.needsAttention ?? [];
   const tenantPay = extended?.tenantPayments ?? { paidOnOrBefore7th: 0, starCustomers: [] };
 
-  const ps = extended?.propertyStatus ?? null;
+  const ps = (extended as any)?.propertyStatus ?? null;
   const totalBedsLive = ps?.total ?? stats.liveBeds ?? 0;
   const occupiedBedsV = ps?.occupied ?? stats.occupiedBeds ?? 0;
-  const noticeBedsV = ps?.notice ?? stats.noticeBeds ?? 0;
-  const bookedBedsV = ps?.booked ?? stats.bookedBeds ?? 0;
+  const noticeBedsV = ps?.notice ?? (stats as any).noticeBeds ?? 0;
+  const bookedBedsV = ps?.booked ?? (stats as any).bookedBeds ?? 0;
   const vacantBedsV = ps?.vacant ?? Math.max(0, totalBedsLive - occupiedBedsV - noticeBedsV - bookedBedsV);
   const occupancyPct = ps?.occupancyPct != null
     ? Math.round(Number(ps.occupancyPct))
@@ -780,7 +780,7 @@ export default function DashboardScreen() {
   // Pure occupied fill (excludes on-notice) — the innermost donut ring.
   const occupiedFillPct = Math.round((occupiedBedsV / Math.max(1, totalBedsLive)) * 100);
 
-  const depositsHeldV = fin.depositCollections ?? heroMonthly?.depositsHeld ?? 0;
+  const depositsHeldV = (fin as any).depositCollections ?? heroMonthly?.depositsHeld ?? 0;
   const pendingDuesV = (fin.pendingAmount ?? 0) > 0
     ? fin.pendingAmount
     : (duesTotals?.receivables ?? 0);

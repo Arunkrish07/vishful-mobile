@@ -2,7 +2,7 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { getSupabase, ORG_ID, safeList, insertRow } from "./lib/supabaseAdmin";
+import { getSupabase, ORG_ID, safeList, insertRow, fetchAllPages } from "./lib/supabaseAdmin";
 import { selectOutstandingRecipients, hasUsablePhone } from "../lib/outstandingReminders";
 
 
@@ -1281,5 +1281,57 @@ export const fetchOutstandingRecipients = action({
     const recipients = selectOutstandingRecipients(dues as any, tenantNames, tenantsMissingPhone);
     // Attach the phone number (for the UI's WhatsApp/dialer deep link).
     return recipients.map((r) => ({ ...r, phone: tenantPhones.get(r.tenant_id) || null }));
+  },
+});
+
+// ─── ADVANCE (tenant deposit) COLLECTED BY FINANCIAL YEAR (read-only) ─────────
+// Sums `tenant_allotments.deposit_paid` bucketed by the Indian financial year
+// (Apr–Mar) of each allotment's `onboarding_date`. Read-only; no writes.
+function fyLabelFromDate(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10); // 1–12
+  const startYear = month >= 4 ? year : year - 1;
+  const endYY = String((startYear + 1) % 100).padStart(2, "0");
+  return `${startYear}-${endYY}`;
+}
+
+export const getAdvanceByFinancialYear = action({
+  args: { fy: v.optional(v.string()) },
+  returns: v.any(),
+  handler: async (_ctx, { fy }) => {
+    const sb = getSupabase();
+    const rows: any[] = await fetchAllPages((from, to) =>
+      sb
+        .from("tenant_allotments")
+        .select("id, deposit_paid, onboarding_date, staying_status")
+        .eq("organization_id", ORG_ID)
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
+
+    const byFy: Record<string, { fy: string; total: number; count: number; missingDate: number }> = {};
+    let noDate = 0;
+    for (const r of rows) {
+      const label = fyLabelFromDate(r.onboarding_date);
+      const amt = parseFloat(r.deposit_paid ?? 0) || 0;
+      if (!label) { noDate += 1; continue; }
+      if (!byFy[label]) byFy[label] = { fy: label, total: 0, count: 0, missingDate: 0 };
+      byFy[label].total += amt;
+      byFy[label].count += 1;
+    }
+
+    const years = Object.values(byFy).sort((a, b) => b.fy.localeCompare(a.fy));
+    const requested = fy ? byFy[fy] ?? { fy, total: 0, count: 0, missingDate: 0 } : null;
+
+    return {
+      requestedFy: fy ?? null,
+      requested,
+      totalAllotments: rows.length,
+      allotmentsWithoutOnboardingDate: noDate,
+      years,
+    };
   },
 });

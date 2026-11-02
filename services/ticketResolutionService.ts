@@ -120,7 +120,7 @@ export async function saveResolution(args: {
     vendorNameManual: args.form.vendor_name_manual || undefined,
     items: args.form.items,
     paymentDate: args.form.payment_date || undefined,
-    proofUrl: args.form.proof_of_purchase_url || undefined,
+    proofOfPurchaseUrl: args.form.proof_of_purchase_url || undefined,
   });
 
   return result?.resolutionId || args.existingResolutionId || args.ticketId;

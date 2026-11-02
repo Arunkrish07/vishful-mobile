@@ -156,8 +156,9 @@ export default function TenantProfileScreen() {
   }, [user?.phone, user?.userId]);
 
   useEffect(() => {
-    const cleanup = loadProfileData();
-    return cleanup;
+    // loadProfileData is async; its returned Promise cannot serve as a React
+    // cleanup, so fire-and-forget rather than returning it.
+    void loadProfileData();
   }, [loadProfileData]);
 
   const stayStatus = accommodation?.stayingStatus;

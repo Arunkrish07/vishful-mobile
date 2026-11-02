@@ -64,7 +64,7 @@ export default function AnnouncementsScreen() {
   const [showAdd,  setShowAdd]  = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [selected, setSelected] = useState<Announcement | null>(null);
-  const [form, setForm]         = useState({ ...EMPTY_FORM });
+  const [form, setForm]         = useState<{ title: string; content: string; priority: 'normal' | 'important' | 'urgent'; image_url: string }>({ ...EMPTY_FORM });
   const setF = (k: keyof typeof EMPTY_FORM) => (v: string) => setForm(p => ({ ...p, [k]: v }));
 
   // ── Load ──

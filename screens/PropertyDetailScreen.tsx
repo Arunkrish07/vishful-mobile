@@ -2348,7 +2348,7 @@ export default function PropertyDetailScreen({ route, navigation }: any) {
                       data={kycUrl}
                       style={{ width: 220, height: 220 }}
                       padding={10}
-                      pieceSize={7}
+                      {...({ pieceSize: 7 } as any)}
                       color="#0F172A"
                       outerEyesOptions={{ topLeft: { borderRadius: 12 }, topRight: { borderRadius: 12 }, bottomLeft: { borderRadius: 12 } }}
                       innerEyesOptions={{ borderRadius: 6 }}

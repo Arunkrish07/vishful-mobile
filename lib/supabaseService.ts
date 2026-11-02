@@ -152,7 +152,7 @@ export async function listBeds(args: { apartmentId?: string; propertyId?: string
   return client.action(api.properties.listBeds, args);
 }
 
-export async function createBed(args: { propertyId: string; apartmentId: string; type: string; toiletType: string; monthlyRent: number; status: string }) {
+export async function createBed(args: { propertyId: string; apartmentId: string; type: string; toiletType: string; monthlyRent: number; status: string; unitNumber?: string }) {
   return client.action(api.properties.createBed, args);
 }
 

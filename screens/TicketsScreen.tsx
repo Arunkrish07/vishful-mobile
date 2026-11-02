@@ -618,13 +618,13 @@ function AdminRaiseTicketModal({
                           ) : (
                             <RaiseTicketDropdown
                               placeholder="Select issue details"
-                              value={selectedSubType?.name || null}
+                              value={null}
                               items={subTypes}
                               labelKey="name"
-                              onSelect={(st: IssueSubType) => setSelectedSubType(selectedSubType?.id === st.id ? null : st)}
+                              onSelect={(st: IssueSubType) => setSelectedSubType(st)}
                               colors={colors}
                               icon="list-outline"
-                              selectedId={selectedSubType?.id}
+                              selectedId={undefined}
                             />
                           )
                         ) : (
@@ -1125,7 +1125,7 @@ export default function TicketsScreen({ navigation }: any) {
 
         {/* ── Header (page-header) ─────────────────────────────────── */}
         <PageHeader
-          title={screenTitle === 'Tickets' ? 'Maintenance Tickets' : screenTitle}
+          title={screenTitle}
           subtitle="Track and manage maintenance requests"
           onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
           right={
@@ -1620,7 +1620,7 @@ export default function TicketsScreen({ navigation }: any) {
                     const propDist: Record<string,number> = {};
                     tickets.forEach(t => {
                       const k = t.issue_type||'Unknown';  issueDist[k]=(issueDist[k]||0)+1;
-                      const p = t.property_name||'Unknown'; propDist[p]=(propDist[p]||0)+1;
+                      const p = (t as any).properties?.property_name || 'Unknown'; propDist[p]=(propDist[p]||0)+1;
                     });
                     const open    = tickets.filter(t=>!['completed','closed'].includes(t.status)).length;
                     const breached= tickets.filter(t=>t.sla_deadline&&new Date(t.sla_deadline)<new Date()&&!['completed','closed'].includes(t.status)).length;

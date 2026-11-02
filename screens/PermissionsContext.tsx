@@ -17,8 +17,8 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import { useAuth } from './auth';
-import * as sb from './supabaseService';
+import { useAuth } from '../lib/auth';
+import * as sb from '../lib/supabaseService';
 
 // Module names must match the MODULES array in SettingsScreen & the drawer screen names in App.tsx
 export type AppModule =

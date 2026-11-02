@@ -177,9 +177,9 @@ export function Button({ title, onPress, variant = 'primary', loading, icon, dis
   );
 }
 
-export function Input({ label, value, onChangeText, placeholder, keyboardType, multiline, secureTextEntry, icon, autoCapitalize }: {
+export function Input({ label, value, onChangeText, placeholder, keyboardType, multiline, secureTextEntry, icon, autoCapitalize, maxLength }: {
   label?: string; value: string; onChangeText: (t: string) => void; placeholder?: string;
-  keyboardType?: any; multiline?: boolean; secureTextEntry?: boolean; icon?: string; autoCapitalize?: any;
+  keyboardType?: any; multiline?: boolean; secureTextEntry?: boolean; icon?: string; autoCapitalize?: any; maxLength?: number;
 }) {
   const { colors } = useTheme();
   return (
@@ -210,6 +210,7 @@ export function Input({ label, value, onChangeText, placeholder, keyboardType, m
           multiline={multiline}
           secureTextEntry={secureTextEntry}
           autoCapitalize={autoCapitalize}
+          maxLength={maxLength}
         />
       </View>
     </View>

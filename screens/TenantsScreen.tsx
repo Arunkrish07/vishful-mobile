@@ -73,7 +73,6 @@ const EMPTY_FORM = {
   // Legacy fields kept for backward compat
   name: '', permanentAddress: '', idProof: '',
   companyAddress: '', ebBillAmount: '', onboardingDate: '',
-  emergencyContactPhone: '',  // alias kept for old handleAdd
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

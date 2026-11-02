@@ -303,7 +303,7 @@ function UrgentTicketRow({ ticket, onPress }: { ticket: Ticket; onPress: () => v
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <Pill label={statusCfg.label} color={statusCfg.color} bg={statusCfg.bg} />
-        <SlaBadge deadline={ticket.sla_deadline} status={ticket.status} />
+        <SlaBadge deadline={ticket.sla_deadline ?? null} status={ticket.status} />
       </View>
     </TouchableOpacity>
   );
@@ -586,7 +586,7 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
           <View style={{ backgroundColor: priorityCfg.bg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
             <Text style={{ fontSize: 10, fontWeight: '700', color: priorityCfg.color }}>{priorityCfg.label}</Text>
           </View>
-          <SlaBadge deadline={ticket.sla_deadline} status={ticket.status} />
+          <SlaBadge deadline={ticket.sla_deadline ?? null} status={ticket.status} />
         </View>
       </View>
     </TouchableOpacity>

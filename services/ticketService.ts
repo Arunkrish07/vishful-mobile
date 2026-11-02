@@ -561,6 +561,9 @@ export async function classifyIssue(description: string, issueTypes: any[]): Pro
 export async function extractPaymentProof(imageBase64: string): Promise<{
   amount: number | null; payment_date: string | null;
   bank_name: string | null; transaction_reference: string | null;
+  // Optional diagnostics the backend may attach (e.g. when OCR is unavailable
+  // and the user must enter the amount manually).
+  _requireManualAmount?: boolean; _message?: string; _source?: string;
 }> {
   try {
     return await client.action((api as any).tickets.extractPaymentProof, { imageBase64 });

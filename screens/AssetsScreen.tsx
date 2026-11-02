@@ -1505,7 +1505,7 @@ export default function AssetsScreen() {
 
   const loadSecondary = useCallback(async () => {
     const [rAlloc, rProps, rApts, rBeds, rBrands, rForecasts] = await allSettled([
-      sb.listAllocations(), sb.listProperties(), sb.listApartments(), sb.listBeds(), sb.listBrands(), sb.listForecasts(),
+      sb.listAllocations(), sb.listProperties(), sb.listApartments(), sb.listBeds({}), sb.listBrands(), sb.listForecasts(),
     ]);
     if (!mountedRef.current) return;
     const v = (r: any, fb: any) => r.status === 'fulfilled' ? (r.value ?? fb) : fb;
