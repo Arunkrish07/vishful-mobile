@@ -132,7 +132,7 @@ export default function TeamScreen() {
       sb.listOrgTickets().catch(() => []),
     ]).then(([m, p, a, d, t]: any) => {
       if (!mounted.current) return;
-      setMembers(m ?? []);
+      setMembers((m ?? []).filter((x: any) => String(x?.status || '').toLowerCase() === 'active'));
       setPayments(p ?? []);
       setAttendance(a ?? []);
       setDepartments(Array.isArray(d) ? d : []);
@@ -154,7 +154,7 @@ export default function TeamScreen() {
         sb.listOrgTickets().catch(() => []),
       ]);
       if (mounted.current) {
-        setMembers(m ?? []); setPayments(p ?? []); setAttendance(a ?? []);
+        setMembers((m ?? []).filter((x: any) => String(x?.status || '').toLowerCase() === 'active')); setPayments(p ?? []); setAttendance(a ?? []);
         setDepartments(Array.isArray(d) ? d : []);
         setTickets(Array.isArray(t) ? t : []);
       }

@@ -130,11 +130,11 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
         if (!authUser) { setProfileLoading(false); return; }
 
         // Try tenants table by user_id
-        let { data } = await supabase
+        let data: any = (await supabase
           .from('tenants')
           .select('id, full_name, phone, property_id, apartment_id, bed_id, organization_id, properties(name), apartments(apartment_number)')
           .eq('user_id', authUser.id)
-          .maybeSingle();
+          .maybeSingle()).data;
 
         // Fallback: match by phone
         if (!data && authUser.phone) {

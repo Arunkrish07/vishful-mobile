@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
-import { client as convexClient, api as convexApi } from '../lib/convexApi';
+import { supabase } from '../lib/supabase';
 
 // ─── Reference palette (mobile theme, aligned to the vercel reference) ─────────
 const C = {
@@ -157,14 +157,10 @@ export default function FloatingAIAssistant({ raised }: { raised?: boolean }) {
     setMessages(newHistory);
     setBusy(true);
     try {
-      const res = await convexClient.action(
-        (convexApi as any).aiAssistant.askAssistant,
-        {
-          question: q,
-          history: newHistory.slice(-6).map(m => ({ role: m.role, content: m.content })),
-        }
-      );
-      setMessages(prev => [...prev, { role: 'assistant', content: res.answer || 'No response.' }]);
+      const { data: res } = await supabase.functions.invoke('ask_assistant', {
+        body: { question: q, history: newHistory.slice(-6).map(m => ({ role: m.role, content: m.content })) },
+      });
+      setMessages(prev => [...prev, { role: 'assistant', content: (res as any)?.answer || 'No response.' }]);
     } catch (e: any) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${e.message || 'Could not reach AI.'}` }]);
     }

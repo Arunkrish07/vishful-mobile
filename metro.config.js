@@ -8,9 +8,15 @@ const config = getDefaultConfig(__dirname);
 // package trees ~78MB), which crash Metro's watcher (ENOENT on transient paths)
 // and are never part of the app bundle. Matches both `/` and `\` separators.
 const excludeAgents = /[\\/]\.agents[\\/]/;
+// Exclude the `supabase/` directory. It holds Deno edge functions + Supabase
+// CLI config/state (`supabase/.temp/`), none of which is part of the RN bundle.
+// On OneDrive these files are cloud placeholders (reparse points) that make
+// Node's readlink throw EINVAL, crashing Metro's file-map crawler.
+const excludeSupabase = /[\\/]supabase[\\/]/;
 const existing = config.resolver.blockList;
+const extra = [excludeAgents, excludeSupabase];
 config.resolver.blockList = existing
-  ? (Array.isArray(existing) ? [...existing, excludeAgents] : [existing, excludeAgents])
-  : excludeAgents;
+  ? (Array.isArray(existing) ? [...existing, ...extra] : [existing, ...extra])
+  : extra;
 
 module.exports = config;
