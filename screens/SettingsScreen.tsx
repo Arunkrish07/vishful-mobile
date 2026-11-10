@@ -9,13 +9,16 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Modal, Switch, StyleSheet, Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, borderRadius } from '../lib/theme';
 import { GlassBackground } from '../components/shared';
+import DeleteAccountButton from '../components/DeleteAccountButton';
 import { client as convexClient, api as convexApi } from '../lib/convexApi';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as sb from '../lib/supabaseService';
 
 // ─── NAV REGISTRY (mirrors web navigation-registry.ts) ───────────────────────
 const NAV_REGISTRY = [
@@ -96,6 +99,7 @@ const TABS = [
   { key: 'exit_process',    label: 'Pre-Exit Process',   icon: 'log-out-outline'       },
   { key: 'auto_approval',   label: 'Auto-Approval',      icon: 'flash-outline'         },
   { key: 'maintenance',     label: 'Maintenance Items',  icon: 'construct-outline'     },
+  { key: 'expense_categories', label: 'Expense Categories', icon: 'pricetags-outline'   },
 ];
 
 // ─── Small reusable components ────────────────────────────────────────────────
@@ -106,7 +110,7 @@ const TInput = ({ label, value, onChangeText, placeholder, keyboardType, multili
   <View style={{ marginBottom: 12 }}>
     {label ? <SL text={label} /> : null}
     <TextInput
-      style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, fontSize: 14, color: colors.text, minHeight: multiline ? 72 : undefined, textAlignVertical: multiline ? 'top' : undefined }}
+      style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 12, padding: 10, fontSize: 14, color: colors.text, minHeight: multiline ? 72 : undefined, textAlignVertical: multiline ? 'top' : undefined }}
       value={value} onChangeText={onChangeText} placeholder={placeholder}
       placeholderTextColor={colors.textTertiary} keyboardType={keyboardType}
       multiline={multiline} autoCapitalize={autoCapitalize}
@@ -114,7 +118,7 @@ const TInput = ({ label, value, onChangeText, placeholder, keyboardType, multili
   </View>
 );
 const Card = ({ children, style }: any) => (
-  <View style={[{ backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 12 }, style]}>{children}</View>
+  <View style={[{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', marginBottom: 12, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 }, style]}>{children}</View>
 );
 const SaveBtn = ({ onPress, loading, label = 'Save Changes' }: any) => (
   <TouchableOpacity onPress={onPress} disabled={loading}
@@ -138,8 +142,10 @@ export default function SettingsScreen() {
     );
   };
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('organization');
   const [loading, setLoading] = useState(false);
+  const [orgStats, setOrgStats] = useState<{ properties: number; beds: number; team: number } | null>(null);
 
   // ── Organization tab ──────────────────────────────────────────────────────
   const [orgForm, setOrgForm] = useState({
@@ -201,6 +207,12 @@ export default function SettingsScreen() {
   const [maintItems,   setMaintItems]   = useState<any[]>([]);
   const [maintOpen,    setMaintOpen]    = useState(false);
   const [maintForm,    setMaintForm]    = useState({ name: '', unit: '', description: '' });
+
+  // ── Expense Categories tab ────────────────────────────────────────────────
+  const [expCats,    setExpCats]    = useState<any[]>([]);
+  const [expCatOpen, setExpCatOpen] = useState(false);
+  const [expCatForm, setExpCatForm] = useState<{ id: string | null; label: string }>({ id: null, label: '' });
+  const [expBusy,    setExpBusy]    = useState(false);
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const call = useCallback(async (action: string, args: any = {}) => {
@@ -306,6 +318,10 @@ export default function SettingsScreen() {
         const data = await call('listMaintenanceItems').catch(() => []);
         setMaintItems(data || []);
       }
+      if (tab === 'expense_categories') {
+        const data = await call('listExpenseCategories').catch(() => []);
+        setExpCats(data || []);
+      }
     } catch (e) {
       console.error(`[Settings] loadTab(${tab}) error:`, e);
     }
@@ -313,6 +329,24 @@ export default function SettingsScreen() {
   }, [call, callConvex]);
 
   useEffect(() => { loadTab(activeTab); }, [activeTab]);
+
+  // Real workspace counts for the plan card (properties · beds · team members).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [dash, team] = await Promise.all([
+        sb.getDashboardData().catch(() => null),
+        call('getTeamMembers').catch(() => []),
+      ]);
+      if (cancelled) return;
+      setOrgStats({
+        properties: Number((dash as any)?.totalProperties ?? 0),
+        beds: Number((dash as any)?.totalBeds ?? (dash as any)?.liveBeds ?? 0),
+        team: Array.isArray(team) ? team.length : 0,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [call]);
 
   // ─── Enriched members for Role tab ────────────────────────────────────────
   const enrichedMembers = useMemo(() => {
@@ -477,7 +511,7 @@ export default function SettingsScreen() {
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
       {/* Search + Add button */}
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10 }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 10 }}>
           <Ionicons name="search-outline" size={16} color={colors.textTertiary} style={{ marginRight: 6 }} />
           <TextInput style={{ flex: 1, fontSize: 14, color: colors.text, paddingVertical: 9 }} value={roleSearch} onChangeText={setRoleSearch} placeholder="Search team members…" placeholderTextColor={colors.textTertiary} />
         </View>
@@ -538,7 +572,7 @@ export default function SettingsScreen() {
                 const active = selectedRole === role;
                 return (
                   <TouchableOpacity key={role} onPress={() => setSelectedRole(role)}
-                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#2563EB') : '#F1F5F9', borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#2563EB') : colors.border }}>
+                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#2563EB') : '#F1F5F9', borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#2563EB') : '#EEF1F6' }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{ROLE_LABELS[role]}</Text>
                   </TouchableOpacity>
                 );
@@ -596,7 +630,7 @@ export default function SettingsScreen() {
                         return (
                           <TouchableOpacity key={key} onPress={() => handleCrudToggle(mod.module, key, !checked)}
                             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: checked ? '#2563EB' : colors.border, backgroundColor: checked ? '#2563EB' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                            <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: checked ? '#2563EB' : '#EEF1F6', backgroundColor: checked ? '#2563EB' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                               {checked && <Ionicons name="checkmark" size={10} color="#fff" />}
                             </View>
                             <Text style={{ fontSize: 11, color: colors.textSecondary }}>{label}</Text>
@@ -614,7 +648,7 @@ export default function SettingsScreen() {
                         const tabPerm = getTabPerm(mod.module, tab.key) as any;
                         const isVisible = tabPerm ? tabPerm.is_visible : true;
                         return (
-                          <View key={tab.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                          <View key={tab.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#EEF1F6' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                               <Ionicons name={isVisible ? 'eye-outline' : 'eye-off-outline'} size={14} color={isVisible ? '#2563EB' : '#DC2626'} />
                               <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{tab.label}</Text>
@@ -704,7 +738,7 @@ export default function SettingsScreen() {
       )}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {bedTypes.map((bt: any) => (
-          <View key={bt.id} style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border, minWidth: 120, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <View key={bt.id} style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', minWidth: 120, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <View>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>{bt.name}</Text>
               <Text style={{ fontSize: 10, color: colors.textTertiary }}>Order: {bt.sort_order}</Text>
@@ -813,7 +847,7 @@ export default function SettingsScreen() {
               const active = exitForm.exit_task_assignee_1 === uid;
               return (
                 <TouchableOpacity key={m.id} onPress={() => setExitForm(f => ({ ...f, exit_task_assignee_1: uid }))}
-                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: active ? '#2563EB' : colors.border }}>
+                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: active ? '#2563EB' : '#EEF1F6' }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{name}</Text>
                 </TouchableOpacity>
               );
@@ -825,7 +859,7 @@ export default function SettingsScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity onPress={() => setExitForm(f => ({ ...f, exit_task_assignee_2: '' }))}
-              style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: !exitForm.exit_task_assignee_2 ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: !exitForm.exit_task_assignee_2 ? '#2563EB' : colors.border }}>
+              style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: !exitForm.exit_task_assignee_2 ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: !exitForm.exit_task_assignee_2 ? '#2563EB' : '#EEF1F6' }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: !exitForm.exit_task_assignee_2 ? '#fff' : colors.textSecondary }}>None</Text>
             </TouchableOpacity>
             {exitMembers.map((m: any) => {
@@ -834,7 +868,7 @@ export default function SettingsScreen() {
               const active = exitForm.exit_task_assignee_2 === uid;
               return (
                 <TouchableOpacity key={m.id} onPress={() => setExitForm(f => ({ ...f, exit_task_assignee_2: uid }))}
-                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: active ? '#2563EB' : colors.border }}>
+                  style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: active ? '#2563EB' : '#EEF1F6' }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{name}</Text>
                 </TouchableOpacity>
               );
@@ -871,7 +905,7 @@ export default function SettingsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           {[500, 1000, 1500, 2000].map(p => (
             <TouchableOpacity key={p} onPress={() => setAutoForm(f => ({ ...f, ticket_auto_approve_threshold: String(p) }))}
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_auto_approve_threshold === String(p) ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_auto_approve_threshold === String(p) ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: '#EEF1F6' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: autoForm.ticket_auto_approve_threshold === String(p) ? '#fff' : colors.textSecondary }}>₹{p.toLocaleString('en-IN')}</Text>
             </TouchableOpacity>
           ))}
@@ -883,7 +917,7 @@ export default function SettingsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
           {[14, 30, 60, 90].map(p => (
             <TouchableOpacity key={p} onPress={() => setAutoForm(f => ({ ...f, ticket_repeat_check_days: String(p) }))}
-              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_repeat_check_days === String(p) ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: colors.border }}>
+              style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: autoForm.ticket_repeat_check_days === String(p) ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: '#EEF1F6' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: autoForm.ticket_repeat_check_days === String(p) ? '#fff' : colors.textSecondary }}>{p}d</Text>
             </TouchableOpacity>
           ))}
@@ -943,6 +977,46 @@ export default function SettingsScreen() {
     </ScrollView>
   );
 
+  const toggleExpCat = async (cat: any) => {
+    try { await call('saveExpenseCategory', { id: cat.id, label: cat.label, isActive: cat.is_active === false }); loadTab('expense_categories'); }
+    catch (e: any) { Alert.alert('Error', e.message); }
+  };
+
+  const renderExpenseCategories = () => (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+      <TouchableOpacity onPress={() => { setExpCatForm({ id: null, label: '' }); setExpCatOpen(true); }}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2563EB', borderRadius: 10, padding: 11, marginBottom: 14 }}>
+        <Ionicons name="add" size={16} color="#fff" />
+        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Add Category</Text>
+      </TouchableOpacity>
+      {expCats.length === 0 ? (
+        <Card><Text style={{ color: colors.textTertiary, textAlign: 'center', paddingVertical: 20 }}>No expense categories defined</Text></Card>
+      ) : expCats.map((cat: any) => (
+        <Card key={cat.id} style={{ marginBottom: 8, opacity: cat.is_active === false ? 0.55 : 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>{cat.label}</Text>
+              <Text style={{ fontSize: 11, color: colors.textTertiary }}>{cat.key}{cat.is_active === false ? ' · inactive' : ''}</Text>
+            </View>
+            <Switch value={cat.is_active !== false} onValueChange={() => toggleExpCat(cat)} />
+            <TouchableOpacity onPress={() => { setExpCatForm({ id: cat.id, label: cat.label }); setExpCatOpen(true); }}>
+              <Ionicons name="create-outline" size={18} color="#2563EB" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => Alert.alert('Delete Category', `Delete "${cat.label}"? If any expense uses it the delete will fail — toggle it inactive instead.`, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: async () => {
+                try { await call('deleteExpenseCategory', { id: cat.id }); loadTab('expense_categories'); }
+                catch (e: any) { Alert.alert('Cannot delete', e.message || 'This category is in use. Toggle it inactive instead.'); }
+              }},
+            ])}>
+              <Ionicons name="trash-outline" size={18} color="#DC2626" />
+            </TouchableOpacity>
+          </View>
+        </Card>
+      ))}
+    </ScrollView>
+  );
+
   // ─── TAB CONTENT ROUTER ───────────────────────────────────────────────────
   const renderContent = () => {
     if (loading && ['permissions', 'roles', 'rules'].includes(activeTab)) {
@@ -959,48 +1033,90 @@ export default function SettingsScreen() {
       case 'exit_process':  return renderExitProcess();
       case 'auto_approval': return renderAutoApproval();
       case 'maintenance':   return renderMaintenance();
+      case 'expense_categories': return renderExpenseCategories();
       default: return null;
     }
   };
+
+  // ── Account identity + sign-out footer (reference-parity) ──────────────────
+  const acctName = user?.userName?.trim() || 'Account';
+  const acctInitials = acctName.split(/\s+/).map((p: string) => p[0]).join('').slice(0, 2).toUpperCase() || 'A';
+  const acctRoleLabel = ROLE_LABELS[user?.role || ''] || 'Admin Account';
+  const acctOrgSub = orgForm.organization_name?.trim() || '';
+  const acctPhone = user?.phone
+    ? (user.phone.startsWith('+') ? user.phone : `+91 ${user.phone}`)
+    : '';
+  // Clear both the floating nav rail and the AI FAB (56px @ bottom:28 → top ~84).
+  const railClearance = 96 + Math.max(insets.bottom, 10);
 
   return (
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
           <View style={{ width: 38, height: 28, overflow: 'hidden', alignItems: 'center', marginRight: 10 }}>
             <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Settings</Text>
-            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Profile, appearance, access, org defaults</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 2 }}>Profile, appearance, access, org defaults</Text>
           </View>
-          <TouchableOpacity
-            onPress={confirmSignOut}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(220,38,38,0.08)', borderWidth: 1, borderColor: 'rgba(220,38,38,0.22)' }}
+        </View>
+
+        {/* Account identity card (reference parity) */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#EEF1F6', padding: 14, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+            <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#4F46E5', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>{acctInitials}</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>{acctName}</Text>
+              {acctOrgSub ? (
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }} numberOfLines={1}>{acctOrgSub}</Text>
+              ) : null}
+              <View style={{ alignSelf: 'flex-start', marginTop: 6, backgroundColor: '#EEF0FF', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#4F46E5' }}>{acctRoleLabel}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Plan / workspace usage card (reference parity) — real counts */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          <LinearGradient
+            colors={['#2563EB', '#4F46E5'] as const}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
           >
-            <Ionicons name="log-out-outline" size={16} color="#DC2626" />
-            <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>Sign out</Text>
-          </TouchableOpacity>
+            <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF' }}>Growth Plan</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.82)', marginTop: 3 }} numberOfLines={2}>
+                {orgStats
+                  ? `${orgStats.beds} bed${orgStats.beds === 1 ? '' : 's'} · ${orgStats.properties} propert${orgStats.properties === 1 ? 'y' : 'ies'} · ${orgStats.team} team member${orgStats.team === 1 ? '' : 's'}`
+                  : 'Loading usage…'}
+              </Text>
+            </View>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 }}>GROWTH</Text>
+            </View>
+          </LinearGradient>
         </View>
 
         {/* Tab bar (horizontal scroll) */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}
+          style={{ flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}
           contentContainerStyle={{ flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'center' }}
         >
           {TABS.map(tab => {
             const active = activeTab === tab.key;
             return (
               <TouchableOpacity key={tab.key} onPress={() => setActiveTab(tab.key)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: active ? '#2563EB' : 'rgba(37,99,235,0.06)', borderWidth: 1, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.15)' }}>
-                <Ionicons name={tab.icon as any} size={14} color={active ? '#fff' : '#2563EB'} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>{tab.label}</Text>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: active ? '#2563EB' : '#F1F3F9', borderWidth: 1, borderColor: active ? '#2563EB' : '#F1F3F9' }}>
+                <Ionicons name={tab.icon as any} size={14} color={active ? '#fff' : '#64748B'} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{tab.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -1008,6 +1124,33 @@ export default function SettingsScreen() {
 
         {/* Content */}
         <View style={{ flex: 1 }}>{renderContent()}</View>
+
+        {/* Signed-in / Sign out footer (reference parity) — lifted above the floating nav */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: railClearance, borderTopWidth: 1, borderTopColor: '#EEF1F6', backgroundColor: '#FFFFFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.3 }}>Signed in</Text>
+              {acctPhone ? (
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 2 }} numberOfLines={1}>{acctPhone}</Text>
+              ) : (
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 2 }} numberOfLines={1}>{acctName}</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              onPress={confirmSignOut}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', backgroundColor: '#FFFFFF', paddingHorizontal: 14, paddingVertical: 9 }}
+            >
+              <Ionicons name="log-out-outline" size={16} color="#0F172A" />
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Delete account — submits a deletion request (Google Play data-safety requirement) */}
+          <DeleteAccountButton style={{ marginTop: 10 }} />
+        </View>
 
         {/* ── Assign Role Modal ─────────────────────────────────────────────── */}
         <Modal visible={assignOpen} animationType="slide" presentationStyle="pageSheet">
@@ -1019,13 +1162,13 @@ export default function SettingsScreen() {
               </View>
               <ScrollView style={{ padding: 20 }}>
                 <SL text="Team Member" />
-                <ScrollView style={{ maxHeight: 200, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface, marginBottom: 14 }}>
+                <ScrollView style={{ maxHeight: 200, borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 10, backgroundColor: colors.surface, marginBottom: 14 }}>
                   {teamMembers.map((m: any, idx: number) => {
                     const name = `${m.first_name || ''} ${m.last_name || ''}`.trim();
                     const active = assignMember === m.id;
                     return (
                       <TouchableOpacity key={m.id} onPress={() => setAssignMember(m.id)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: colors.border, backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
                         <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#2563EB' : colors.textTertiary} />
                         <Text style={{ fontSize: 14, color: colors.text }}>{name}</Text>
                       </TouchableOpacity>
@@ -1038,7 +1181,7 @@ export default function SettingsScreen() {
                     const active = assignRole === role;
                     return (
                       <TouchableOpacity key={role} onPress={() => setAssignRole(role)}
-                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#2563EB') : colors.surface, borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#2563EB') : colors.border }}>
+                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? (ROLE_COLORS[role] || '#2563EB') : colors.surface, borderWidth: 1, borderColor: active ? (ROLE_COLORS[role] || '#2563EB') : '#EEF1F6' }}>
                         <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{ROLE_LABELS[role]}</Text>
                       </TouchableOpacity>
                     );
@@ -1075,7 +1218,7 @@ export default function SettingsScreen() {
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                   {[{ key: 'issue_type', label: 'Issue-specific' }, { key: 'apartment', label: 'Apartment-based' }].map(rt => (
                     <TouchableOpacity key={rt.key} onPress={() => setRuleForm(f => ({ ...f, rule_type: rt.key }))}
-                      style={{ flex: 1, padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: ruleForm.rule_type === rt.key ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: ruleForm.rule_type === rt.key ? '#2563EB' : colors.border }}>
+                      style={{ flex: 1, padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: ruleForm.rule_type === rt.key ? '#2563EB' : colors.surface, borderWidth: 1, borderColor: ruleForm.rule_type === rt.key ? '#2563EB' : '#EEF1F6' }}>
                       <Text style={{ fontSize: 12, fontWeight: '700', color: ruleForm.rule_type === rt.key ? '#fff' : colors.textSecondary }}>{rt.label}</Text>
                     </TouchableOpacity>
                   ))}
@@ -1083,12 +1226,12 @@ export default function SettingsScreen() {
                 {ruleForm.rule_type === 'issue_type' && (
                   <>
                     <SL text="Issue Type" />
-                    <ScrollView style={{ maxHeight: 150, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface, marginBottom: 14 }}>
+                    <ScrollView style={{ maxHeight: 150, borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 10, backgroundColor: colors.surface, marginBottom: 14 }}>
                       {issueTypes.map((it: any, idx: number) => {
                         const active = ruleForm.issue_type_id === it.id;
                         return (
                           <TouchableOpacity key={it.id} onPress={() => setRuleForm(f => ({ ...f, issue_type_id: it.id }))}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: colors.border, backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
                             <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#2563EB' : colors.textTertiary} />
                             <Text style={{ fontSize: 13, color: colors.text }}>{it.name}</Text>
                           </TouchableOpacity>
@@ -1101,13 +1244,13 @@ export default function SettingsScreen() {
                   <TInput label="Apartment Code" value={ruleForm.apartment_code} onChangeText={(v: string) => setRuleForm(f => ({ ...f, apartment_code: v }))} placeholder="e.g. A-101" />
                 )}
                 <SL text="Assign To" />
-                <ScrollView style={{ maxHeight: 150, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surface, marginBottom: 14 }}>
+                <ScrollView style={{ maxHeight: 150, borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 10, backgroundColor: colors.surface, marginBottom: 14 }}>
                   {teamMembers.map((m: any, idx: number) => {
                     const name = `${m.first_name || ''} ${m.last_name || ''}`.trim();
                     const active = ruleForm.assigned_employee_id === m.id;
                     return (
                       <TouchableOpacity key={m.id} onPress={() => setRuleForm(f => ({ ...f, assigned_employee_id: m.id }))}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: colors.border, backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#EEF1F6', backgroundColor: active ? '#EFF6FF' : 'transparent' }}>
                         <Ionicons name={active ? 'checkmark-circle' : 'radio-button-off-outline'} size={16} color={active ? '#2563EB' : colors.textTertiary} />
                         <Text style={{ fontSize: 13, color: colors.text }}>{name}</Text>
                       </TouchableOpacity>
@@ -1217,12 +1360,37 @@ export default function SettingsScreen() {
           </GlassBackground>
         </Modal>
 
+        {/* Expense Category add/edit */}
+        <Modal visible={expCatOpen} animationType="slide" presentationStyle="pageSheet">
+          <GlassBackground>
+            <SafeAreaView style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: colors.text }}>{expCatForm.id ? 'Edit Category' : 'Add Category'}</Text>
+                <TouchableOpacity onPress={() => setExpCatOpen(false)}><Ionicons name="close-circle" size={26} color={colors.textTertiary} /></TouchableOpacity>
+              </View>
+              <View style={{ padding: 20 }}>
+                <TInput label="Display Label *" value={expCatForm.label} onChangeText={(v: string) => setExpCatForm(f => ({ ...f, label: v }))} placeholder="e.g. Utilities" />
+                {!expCatForm.id && <Text style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 10 }}>A key is auto-generated from the label (e.g. “Utilities” → utilities).</Text>}
+                <SaveBtn label={expCatForm.id ? 'Save' : 'Add Category'} loading={expBusy} onPress={async () => {
+                  if (!expCatForm.label.trim()) { Alert.alert('Required', 'Enter a display label.'); return; }
+                  setExpBusy(true);
+                  try {
+                    await call('saveExpenseCategory', { id: expCatForm.id || undefined, label: expCatForm.label.trim() });
+                    setExpCatOpen(false); setExpCatForm({ id: null, label: '' }); loadTab('expense_categories');
+                  } catch (e: any) { Alert.alert('Error', e.message); }
+                  setExpBusy(false);
+                }} />
+              </View>
+            </SafeAreaView>
+          </GlassBackground>
+        </Modal>
+
       </SafeAreaView>
     </GlassBackground>
   );
 }
 
 const S = StyleSheet.create({
-  cardTitle: { fontSize: 14, fontWeight: '800', color: '#111827', marginBottom: 10 },
-  permCard: { backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 8, overflow: 'hidden' },
+  cardTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A', marginBottom: 10 },
+  permCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#EEF1F6', marginBottom: 8, overflow: 'hidden' },
 });

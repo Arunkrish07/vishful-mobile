@@ -16,8 +16,10 @@ export interface Ticket {
   property_id?: string | null;
   apartment_id?: string | null;
   bed_id?: string | null;
+  bed_code?: string | null;  // enriched by convex/tickets.ts from bed_id → beds.bed_code
   issue_type_id: string;
   issue_type?: string | null;
+  issue_type_name?: string | null;  // enriched by convex/tickets.ts from issue_type_id → issue_types.name
   issue_subtype?: string | null;
   description?: string | null;
   priority: string;
@@ -111,7 +113,7 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
   open:                    { label: "Open",              color: "#7B6B90", bg: "#F3F0F9", icon: "radio-button-off-outline" },
   assigned:                { label: "Assigned",          color: "#2563EB", bg: "#DBEAFE", icon: "person-outline" },
   in_progress:             { label: "In Progress",       color: "#D97706", bg: "#FEF3C7", icon: "construct-outline" },
-  waiting_for_parts:       { label: "Waiting Parts",     color: "#7C3AED", bg: "#EDE9FE", icon: "cube-outline" },
+  waiting_for_parts:       { label: "Waiting Parts",     color: "#2563EB", bg: "#EFF6FF", icon: "cube-outline" },
   waiting_for_cost_approval:{ label: "Awaiting Approval", color: "#DC2626", bg: "#FEE2E2", icon: "timer-outline" },
   completed:               { label: "Completed",         color: "#16A34A", bg: "#DCFCE7", icon: "checkmark-circle-outline" },
   pending_tenant_approval: { label: "Pending Approval",  color: "#EA580C", bg: "#FFEDD5", icon: "hourglass-outline" },
@@ -348,6 +350,21 @@ export async function fetchIssueTypes(): Promise<IssueType[]> {
   }
 }
 
+export async function fetchAssetTypesLite(): Promise<{ id: string; name: string }[]> {
+  try { return await client.action((api as any).tickets.listAssetTypesLite, {}); }
+  catch { return []; }
+}
+
+export async function updateIssueType(args: {
+  issueTypeId: string; name?: string; icon?: string; priority?: string; slaHours?: number; assetTypeIds?: string[];
+}): Promise<any> {
+  return client.action((api as any).tickets.updateIssueType, args);
+}
+
+export async function deleteIssueType(issueTypeId: string): Promise<any> {
+  return client.action((api as any).tickets.deleteIssueType, { issueTypeId });
+}
+
 export async function fetchIssueSubTypes(issueTypeId: string): Promise<IssueSubType[]> {
   try {
     return await client.action(api.tickets.getIssueSubTypes, { issueTypeId });
@@ -544,6 +561,9 @@ export async function classifyIssue(description: string, issueTypes: any[]): Pro
 export async function extractPaymentProof(imageBase64: string): Promise<{
   amount: number | null; payment_date: string | null;
   bank_name: string | null; transaction_reference: string | null;
+  // Optional diagnostics the backend may attach (e.g. when OCR is unavailable
+  // and the user must enter the amount manually).
+  _requireManualAmount?: boolean; _message?: string; _source?: string;
 }> {
   try {
     return await client.action((api as any).tickets.extractPaymentProof, { imageBase64 });

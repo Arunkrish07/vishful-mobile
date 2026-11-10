@@ -9,11 +9,13 @@
  */
 
 import type * as Availabilityrecommender from "../Availabilityrecommender.js";
+import type * as account from "../account.js";
 import type * as accounting from "../accounting.js";
 import type * as aiAssistant from "../aiAssistant.js";
 import type * as anouncements from "../anouncements.js";
 import type * as assets from "../assets.js";
 import type * as auditlogs from "../auditlogs.js";
+import type * as billing from "../billing.js";
 import type * as dashboard from "../dashboard.js";
 import type * as dateutils from "../dateutils.js";
 import type * as debugSchema from "../debugSchema.js";
@@ -49,11 +51,13 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   Availabilityrecommender: typeof Availabilityrecommender;
+  account: typeof account;
   accounting: typeof accounting;
   aiAssistant: typeof aiAssistant;
   anouncements: typeof anouncements;
   assets: typeof assets;
   auditlogs: typeof auditlogs;
+  billing: typeof billing;
   dashboard: typeof dashboard;
   dateutils: typeof dateutils;
   debugSchema: typeof debugSchema;

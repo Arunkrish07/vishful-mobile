@@ -39,6 +39,28 @@ export async function safeList<T = any[]>(
   return (data ?? []) as T;
 }
 
+// Supabase PostgREST caps every query at 1000 rows by default. When a query must
+// return the COMPLETE set (e.g. computing totals over full history), page through
+// PAGE_SIZE-row windows until a short page. Pass a builder that applies .range():
+//   await fetchAllPages((from, to) => sb.from("t").select("*").range(from, to))
+const PAGE_SIZE = 1000;
+export async function fetchAllPages<T = any>(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+    if (error) { console.warn("[supabase fetchAllPages]", error.message); break; }
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 export async function safeFetch<T>(
   promise: PromiseLike<{ data: T | null; error: any }>
 ): Promise<T> {

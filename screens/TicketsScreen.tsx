@@ -17,30 +17,30 @@ import { glass, spacing, borderRadius, fontSize } from '../lib/theme';
 
 // Blue / slate design tokens (web chrome)
 const VBRAND = {
-  purple: '#2563EB', purpleDeep: '#1D4ED8', orange: '#4F46E5',
-  ink900: '#111827', ink700: '#374151', ink600: '#6B7280', ink500: '#6B7280', ink400: '#9CA3AF',
-  panel: '#FFFFFF', panelBorder: '#E5E7EB',
-  surface: '#FFFFFF', divider: '#E5E7EB', soft: '#EFF6FF',
+  purple: '#2563EB', purpleDeep: '#1D4ED8', orange: '#2563EB',
+  ink900: '#0F172A', ink700: '#374151', ink600: '#64748B', ink500: '#64748B', ink400: '#94A3B8',
+  panel: '#FFFFFF', panelBorder: '#EEF1F6',
+  surface: '#FFFFFF', divider: '#EEF1F6', soft: '#F8FAFC',
 };
 
 // Unified card surface for the redesigned UI
 const vCard = {
   backgroundColor: '#FFFFFF',
-  borderRadius: 14,
+  borderRadius: 16,
   padding: 16,
   borderWidth: 1,
-  borderColor: '#E5E7EB',
+  borderColor: '#EEF1F6',
   shadowColor: '#0F172A',
-  shadowOpacity: 0.04,
-  shadowRadius: 8,
-  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
 } as const;
 
 const vInput = {
-  backgroundColor: '#FFFFFF',
-  borderRadius: 14,
+  backgroundColor: '#F8FAFC',
+  borderRadius: 12,
   borderWidth: 1,
-  borderColor: '#E5E7EB',
+  borderColor: '#EEF1F6',
 } as const;
 import {
   fetchTickets, createTicket, Ticket, STATUS_CONFIG, PRIORITY_CONFIG,
@@ -394,7 +394,7 @@ function AdminRaiseTicketModal({
                 style={{
                   width: 40, height: 40, borderRadius: 12,
                   backgroundColor: '#FFFFFF',
-                  borderWidth: 0.5, borderColor: '#E5E7EB',
+                  borderWidth: 0.5, borderColor: '#EEF1F6',
                   alignItems: 'center', justifyContent: 'center', marginRight: 12,
                   shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
                 }}
@@ -410,7 +410,7 @@ function AdminRaiseTicketModal({
                 {[!!selectedProperty, !!description.trim(), !!selectedIssueType].map((done, i) => (
                   <View key={i} style={{
                     width: done ? 18 : 6, height: 6, borderRadius: 3,
-                    backgroundColor: done ? VBRAND.purple : '#EEF2FF',
+                    backgroundColor: done ? VBRAND.purple : '#EFF6FF',
                   }} />
                 ))}
               </View>
@@ -418,7 +418,7 @@ function AdminRaiseTicketModal({
 
             {loading ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
                   <ActivityIndicator size="large" color={VBRAND.purple} />
                 </View>
                 <Text style={{ fontSize: 13, color: VBRAND.ink500, fontWeight: '600' }}>Loading…</Text>
@@ -546,7 +546,7 @@ function AdminRaiseTicketModal({
                       </View>
                       <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>Issue Type *</Text>
                       {selectedIssueType && (
-                        <View style={{ backgroundColor: '#EEF2FF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                        <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
                           <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>AUTO-DETECTED</Text>
                         </View>
                       )}
@@ -554,12 +554,12 @@ function AdminRaiseTicketModal({
 
                     {selectedIssueType ? (
                       /* Auto-selected result — tap X to change manually */
-                      <View style={{ backgroundColor: '#EEF2FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                      <View style={{ backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                         <Ionicons name="sparkles" size={18} color="#2563EB" />
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#2563EB' }}>{selectedIssueType.name}</Text>
                           {selectedIssueType.sla_hours != null && (
-                            <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h · Default priority: {selectedIssueType.priority}</Text>
+                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>SLA: {selectedIssueType.sla_hours}h · Default priority: {selectedIssueType.priority}</Text>
                           )}
                         </View>
                         <TouchableOpacity
@@ -573,7 +573,7 @@ function AdminRaiseTicketModal({
                           }}
                           style={{ padding: 6 }}
                         >
-                          <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                          <Ionicons name="close-circle" size={20} color="#94A3B8" />
                         </TouchableOpacity>
                       </View>
                     ) : (
@@ -605,26 +605,26 @@ function AdminRaiseTicketModal({
                           </View>
                         ) : subTypes.length > 0 ? (
                           selectedSubType ? (
-                            <View style={{ backgroundColor: '#EEF2FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                            <View style={{ backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                               <Ionicons name="sparkles" size={16} color="#2563EB" />
                               <View style={{ flex: 1 }}>
                                 <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB', letterSpacing: 0.5 }}>AUTO-DETECTED</Text>
                                 <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2563EB' }}>{selectedSubType.name}</Text>
                               </View>
                               <TouchableOpacity onPress={() => setSelectedSubType(null)} style={{ padding: 4 }}>
-                                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                                <Ionicons name="close-circle" size={18} color="#94A3B8" />
                               </TouchableOpacity>
                             </View>
                           ) : (
                             <RaiseTicketDropdown
                               placeholder="Select issue details"
-                              value={selectedSubType?.name || null}
+                              value={null}
                               items={subTypes}
                               labelKey="name"
-                              onSelect={(st: IssueSubType) => setSelectedSubType(selectedSubType?.id === st.id ? null : st)}
+                              onSelect={(st: IssueSubType) => setSelectedSubType(st)}
                               colors={colors}
                               icon="list-outline"
-                              selectedId={selectedSubType?.id}
+                              selectedId={undefined}
                             />
                           )
                         ) : (
@@ -648,7 +648,7 @@ function AdminRaiseTicketModal({
                           style={{
                             flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
                             backgroundColor: priority === p.value ? p.color : '#FFFFFF',
-                            borderWidth: 1, borderColor: priority === p.value ? p.color : '#EEF2FF',
+                            borderWidth: 1, borderColor: priority === p.value ? p.color : '#EFF6FF',
                             shadowColor: priority === p.value ? p.color : 'transparent',
                             shadowOpacity: priority === p.value ? 0.25 : 0,
                             shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
@@ -703,8 +703,8 @@ function AdminRaiseTicketModal({
                         style={{
                           flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                           gap: 8, paddingVertical: 12, borderRadius: 12,
-                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#E5E7EB',
-                          backgroundColor: '#EEF2FF',
+                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#EEF1F6',
+                          backgroundColor: '#EFF6FF',
                         }}
                       >
                         <Ionicons name="camera-outline" size={16} color={VBRAND.purple} />
@@ -716,8 +716,8 @@ function AdminRaiseTicketModal({
                         style={{
                           flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                           gap: 8, paddingVertical: 12, borderRadius: 12,
-                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#E5E7EB',
-                          backgroundColor: '#EEF2FF',
+                          borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#EEF1F6',
+                          backgroundColor: '#EFF6FF',
                         }}
                       >
                         <Ionicons name="image-outline" size={16} color={VBRAND.purple} />
@@ -731,9 +731,9 @@ function AdminRaiseTicketModal({
                 {/* Auto-assign info */}
                 {selectedProperty && selectedIssueType && (
                   <View style={{
-                    backgroundColor: '#EEF2FF', borderRadius: 14,
+                    backgroundColor: '#EFF6FF', borderRadius: 16,
                     padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10,
-                    borderWidth: 0.5, borderColor: '#E5E7EB',
+                    borderWidth: 0.5, borderColor: '#EEF1F6',
                   }}>
                     <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
                       <Ionicons name="flash" size={16} color={VBRAND.purple} />
@@ -758,7 +758,7 @@ function AdminRaiseTicketModal({
                   }}
                 >
                   <LinearGradient
-                    colors={canSubmit ? [VBRAND.purpleDeep, VBRAND.purple] : ['#9CA3AF', '#6B7280']}
+                    colors={canSubmit ? [VBRAND.purpleDeep, VBRAND.purple] : ['#94A3B8', '#64748B']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={{ paddingVertical: 17, alignItems: 'center', justifyContent: 'center' }}
                   >
@@ -823,8 +823,8 @@ function RaiseTicketDropdown({
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: 14, paddingVertical: 14,
           borderRadius: 12, borderWidth: 1,
-          borderColor: value ? '#2563EB' : '#EEF2FF',
-          backgroundColor: value ? '#EEF2FF' : '#fff',
+          borderColor: value ? '#2563EB' : '#EFF6FF',
+          backgroundColor: value ? '#EFF6FF' : '#fff',
           marginBottom: 12, gap: 10,
           opacity: disabled ? 0.45 : 1,
         }}
@@ -832,7 +832,7 @@ function RaiseTicketDropdown({
         {icon && (
           <View style={{
             width: 28, height: 28, borderRadius: 8,
-            backgroundColor: value ? '#EEF2FF' : '#EEF2FF',
+            backgroundColor: value ? '#EFF6FF' : '#EFF6FF',
             alignItems: 'center', justifyContent: 'center',
           }}>
             <Ionicons name={icon as any} size={15} color={value ? VBRAND.purple : VBRAND.ink400} />
@@ -853,7 +853,7 @@ function RaiseTicketDropdown({
           <TouchableOpacity activeOpacity={1}>
             <View style={{
               backgroundColor: '#fff',
-              borderRadius: 14, maxHeight: 440,
+              borderRadius: 16, maxHeight: 440,
               overflow: 'hidden',
               shadowColor: VBRAND.purpleDeep,
               shadowOpacity: 0.3, shadowRadius: 28, shadowOffset: { width: 0, height: 12 }, elevation: 14,
@@ -861,12 +861,12 @@ function RaiseTicketDropdown({
               <View style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                 paddingHorizontal: 18, paddingVertical: 16,
-                borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
+                borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6',
               }}>
                 <Text style={{ fontSize: 15, fontWeight: '800', color: VBRAND.ink900, letterSpacing: -0.2 }}>{placeholder}</Text>
                 <TouchableOpacity
                   onPress={() => setOpen(false)}
-                  style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <Ionicons name="close" size={18} color={VBRAND.ink600} />
                 </TouchableOpacity>
@@ -883,8 +883,8 @@ function RaiseTicketDropdown({
                       style={{
                         flexDirection: 'row', alignItems: 'center',
                         paddingHorizontal: 18, paddingVertical: 15,
-                        borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
-                        backgroundColor: isSelected ? '#EEF2FF' : 'transparent',
+                        borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6',
+                        backgroundColor: isSelected ? '#EFF6FF' : 'transparent',
                       }}
                     >
                       <Text style={{ flex: 1, fontSize: 14, fontWeight: isSelected ? '700' : '500', color: isSelected ? VBRAND.purpleDeep : VBRAND.ink900, letterSpacing: -0.1 }}>
@@ -915,7 +915,7 @@ function StepHeader({ step, title, done, doneLabel }: { step: number; title: str
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
       <View style={{
         width: 28, height: 28, borderRadius: 9,
-        backgroundColor: done ? VBRAND.purple : '#EEF2FF',
+        backgroundColor: done ? VBRAND.purple : '#EFF6FF',
         alignItems: 'center', justifyContent: 'center',
         shadowColor: done ? VBRAND.purple : 'transparent',
         shadowOpacity: done ? 0.3 : 0,
@@ -962,6 +962,14 @@ export default function TicketsScreen({ navigation }: any) {
   // Extra data for admin tabs
   const [issueTypes,     setIssueTypes]    = useState<IssueType[]>([]);
   const [issueTypesLoaded, setIssueTypesLoaded] = useState(false);
+  // Category (issue-type) edit modal
+  const [assetTypesLite, setAssetTypesLite] = useState<{ id: string; name: string }[]>([]);
+  const [editCat, setEditCat]     = useState<any | null>(null);
+  const [catName, setCatName]     = useState('');
+  const [catPriority, setCatPriority] = useState('medium');
+  const [catSla, setCatSla]       = useState('');
+  const [catAssetIds, setCatAssetIds] = useState<string[]>([]);
+  const [savingCat, setSavingCat] = useState(false);
   const [regularRules,   setRegularRules]  = useState<any[]>([]);
   const [regularLoading, setRegularLoading] = useState(false);
   const [aiAnalysis,     setAiAnalysis]    = useState<string | null>(null);
@@ -996,6 +1004,57 @@ export default function TicketsScreen({ navigation }: any) {
       setIssueTypes(types);
     } catch {} finally { setIssueTypesLoaded(true); }
   }, [issueTypes.length]);
+
+  // Always-refetch (loadIssueTypes short-circuits once loaded) — used after edit/delete.
+  const refreshCategories = useCallback(async () => {
+    try { setIssueTypes(await fetchIssueTypes()); } catch {}
+  }, []);
+
+  const openEditCat = async (it: any) => {
+    setEditCat(it);
+    setCatName(it.name || '');
+    setCatPriority(it.priority || 'medium');
+    setCatSla(it.sla_hours != null ? String(it.sla_hours) : '');
+    setCatAssetIds((it.issue_type_asset_types || []).map((l: any) => l.asset_type_id));
+    if (assetTypesLite.length === 0) {
+      try {
+        const { fetchAssetTypesLite } = await import('../services/ticketService');
+        setAssetTypesLite(await fetchAssetTypesLite());
+      } catch {}
+    }
+  };
+
+  const saveCat = async () => {
+    if (!editCat || !catName.trim()) return;
+    setSavingCat(true);
+    try {
+      const { updateIssueType } = await import('../services/ticketService');
+      await updateIssueType({
+        issueTypeId: editCat.id, name: catName.trim(), priority: catPriority,
+        slaHours: catSla ? Number(catSla) : undefined, assetTypeIds: catAssetIds,
+      });
+      setEditCat(null);
+      await refreshCategories();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to save category');
+    } finally { setSavingCat(false); }
+  };
+
+  const confirmDeleteCat = (it: any) => {
+    const doDelete = async () => {
+      try {
+        const { deleteIssueType } = await import('../services/ticketService');
+        await deleteIssueType(it.id);
+        await refreshCategories();
+      } catch (e: any) { Alert.alert('Error', e?.message || 'Failed to delete category'); }
+    };
+    // react-native-web's Alert.alert ignores button onPress → branch to window.confirm.
+    if (Platform.OS === 'web') { if (typeof window !== 'undefined' && window.confirm(`Delete category "${it.name}"?`)) doDelete(); }
+    else Alert.alert('Delete category', `Delete "${it.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: doDelete },
+    ]);
+  };
 
   // Load regular maintenance rules for the Regular tab
   const loadRegularRules = useCallback(async () => {
@@ -1066,7 +1125,7 @@ export default function TicketsScreen({ navigation }: any) {
 
         {/* ── Header (page-header) ─────────────────────────────────── */}
         <PageHeader
-          title={screenTitle === 'Tickets' ? 'Maintenance Tickets' : screenTitle}
+          title={screenTitle}
           subtitle="Track and manage maintenance requests"
           onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
           right={
@@ -1109,7 +1168,7 @@ export default function TicketsScreen({ navigation }: any) {
                     });
                     const csvContent = [header, ...rows].join('\n');
                     const filename = `tickets-${new Date().toISOString().split('T')[0]}.csv`;
-                    const FileSystem = await import('expo-file-system') as any;
+                    const FileSystem = await import('expo-file-system/legacy') as any;
                     const fileUri = FileSystem.cacheDirectory + filename;
                     await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
                     const Sharing = await import('expo-sharing') as any;
@@ -1130,7 +1189,7 @@ export default function TicketsScreen({ navigation }: any) {
                 style={{
                   width: 40, height: 40, borderRadius: 12,
                   backgroundColor: '#FFFFFF',
-                  borderWidth: 1, borderColor: '#E5E7EB',
+                  borderWidth: 1, borderColor: '#EEF1F6',
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
@@ -1166,9 +1225,9 @@ export default function TicketsScreen({ navigation }: any) {
                       flexDirection: 'row', alignItems: 'center', gap: 6,
                       paddingHorizontal: 14, paddingVertical: 9,
                       borderRadius: 999,
-                      backgroundColor: active ? '#2563EB' : '#FFFFFF',
+                      backgroundColor: active ? '#2563EB' : '#F1F3F9',
                       borderWidth: 1,
-                      borderColor: active ? '#2563EB' : '#E5E7EB',
+                      borderColor: active ? '#2563EB' : '#F1F3F9',
                     }}
                   >
                     <Ionicons name={tab.icon as any} size={13} color={active ? '#fff' : VBRAND.ink600} />
@@ -1287,7 +1346,7 @@ export default function TicketsScreen({ navigation }: any) {
         {(!isAdmin || mainTab === 'list') && (
           loading ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
                 <ActivityIndicator size="large" color={VBRAND.purple} />
               </View>
               <Text style={{ fontSize: 13, color: VBRAND.ink500, fontWeight: '600' }}>Loading tickets…</Text>
@@ -1303,7 +1362,7 @@ export default function TicketsScreen({ navigation }: any) {
                   <View style={{
                     width: 80, height: 80, borderRadius: 24,
                     backgroundColor: '#FFFFFF',
-                    borderWidth: 1, borderColor: '#E5E7EB',
+                    borderWidth: 1, borderColor: '#EEF1F6',
                     alignItems: 'center', justifyContent: 'center', marginBottom: 12,
                     shadowColor: VBRAND.purpleDeep, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
                   }}>
@@ -1361,13 +1420,13 @@ export default function TicketsScreen({ navigation }: any) {
                   { label: 'SLA Breach',  value: slaBreached.length, color: STAT_COLORS.breached },
                 ].map(s => (
                   <View key={s.label} style={{
-                    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14,
+                    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16,
                     padding: 14, alignItems: 'center',
-                    borderWidth: 1, borderColor: '#E5E7EB',
+                    borderWidth: 1, borderColor: '#EEF1F6',
                     shadowColor: s.color, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2,
                   }}>
                     <Text style={{ fontSize: 26, fontWeight: '900', color: s.color }}>{s.value}</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#6B7280', marginTop: 2 }}>{s.label}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#64748B', marginTop: 2 }}>{s.label}</Text>
                   </View>
                 ))}
               </View>
@@ -1380,20 +1439,20 @@ export default function TicketsScreen({ navigation }: any) {
                   { label: 'Resolve Rate',  value: `${resolveRate}%`, color: STAT_COLORS.closed },
                 ].map(s => (
                   <View key={s.label} style={{
-                    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14,
+                    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16,
                     padding: 14, alignItems: 'center',
-                    borderWidth: 1, borderColor: '#E5E7EB',
+                    borderWidth: 1, borderColor: '#EEF1F6',
                     shadowColor: s.color, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2,
                   }}>
                     <Text style={{ fontSize: 22, fontWeight: '900', color: s.color }}>{s.value}</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#6B7280', marginTop: 2 }}>{s.label}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#64748B', marginTop: 2 }}>{s.label}</Text>
                   </View>
                 ))}
               </View>
 
               {/* Priority breakdown */}
-              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Open by Priority</Text>
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#EEF1F6' }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>Open by Priority</Text>
                 {[{v:'critical',l:'Critical',c:'#7C2D12'},{v:'high',l:'High',c:'#DC2626'},{v:'medium',l:'Medium',c:'#D97706'},{v:'low',l:'Low',c:'#16A34A'}].map(p => {
                   const cnt = priCount[p.v]||0;
                   const pct = open.length > 0 ? (cnt/open.length)*100 : 0;
@@ -1403,7 +1462,7 @@ export default function TicketsScreen({ navigation }: any) {
                         <Text style={{ fontSize:12, fontWeight:'700', color: p.c }}>{p.l}</Text>
                         <Text style={{ fontSize:12, fontWeight:'700', color: p.c }}>{cnt}</Text>
                       </View>
-                      <View style={{ height:6, backgroundColor:'#EDE9F5', borderRadius:99, overflow:'hidden' }}>
+                      <View style={{ height:6, backgroundColor:'#EEF3FF', borderRadius:99, overflow:'hidden' }}>
                         <View style={{ height:6, width:`${pct}%` as any, backgroundColor: p.c, borderRadius:99 }} />
                       </View>
                     </View>
@@ -1412,18 +1471,18 @@ export default function TicketsScreen({ navigation }: any) {
               </View>
 
               {/* Top issues */}
-              <View style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB' }}>
-                <Text style={{ fontSize:13, fontWeight:'800', color:'#111827', marginBottom:12 }}>Top Issue Types</Text>
+              <View style={{ backgroundColor:'#FFFFFF', borderRadius:16, padding:16, borderWidth:1, borderColor:'#EEF1F6' }}>
+                <Text style={{ fontSize:13, fontWeight:'800', color:'#0F172A', marginBottom:12 }}>Top Issue Types</Text>
                 {topIssues.length === 0
-                  ? <Text style={{ fontSize:12, color:'#9CA3AF' }}>No data yet</Text>
+                  ? <Text style={{ fontSize:12, color:'#94A3B8' }}>No data yet</Text>
                   : topIssues.map(([name, cnt], i) => (
                     <View key={name} style={{ flexDirection:'row', alignItems:'center', gap:10, marginBottom:8 }}>
-                      <View style={{ width:22, height:22, borderRadius:11, backgroundColor:'#EDE9F5', alignItems:'center', justifyContent:'center' }}>
-                        <Text style={{ fontSize:10, fontWeight:'800', color:'#2563EB' }}>{i+1}</Text>
+                      <View style={{ width:22, height:22, borderRadius:11, backgroundColor:'#EEF3FF', alignItems:'center', justifyContent:'center' }}>
+                        <Text style={{ fontSize:10, fontWeight:'800', color:'#1D4ED8' }}>{i+1}</Text>
                       </View>
-                      <Text style={{ flex:1, fontSize:12, fontWeight:'600', color:'#111827' }} numberOfLines={1}>{name}</Text>
-                      <View style={{ backgroundColor:'#EDE9F5', borderRadius:99, paddingHorizontal:8, paddingVertical:3 }}>
-                        <Text style={{ fontSize:11, fontWeight:'800', color:'#2563EB' }}>{cnt}</Text>
+                      <Text style={{ flex:1, fontSize:12, fontWeight:'600', color:'#0F172A' }} numberOfLines={1}>{name}</Text>
+                      <View style={{ backgroundColor:'#EEF3FF', borderRadius:99, paddingHorizontal:8, paddingVertical:3 }}>
+                        <Text style={{ fontSize:11, fontWeight:'800', color:'#1D4ED8' }}>{cnt}</Text>
                       </View>
                     </View>
                   ))
@@ -1439,9 +1498,9 @@ export default function TicketsScreen({ navigation }: any) {
             refreshControl={<RefreshControl refreshing={regularLoading} onRefresh={loadRegularRules} colors={['#2563EB']} />}
           >
             {/* Info banner */}
-            <View style={{ backgroundColor:'#EDE9F5', borderRadius:14, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8 }}>
-              <Ionicons name="information-circle-outline" size={16} color="#2563EB" style={{ marginTop:1 }} />
-              <Text style={{ flex:1, fontSize:12, color:'#6B7280', lineHeight:18 }}>
+            <View style={{ backgroundColor:'#EEF3FF', borderRadius:16, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8 }}>
+              <Ionicons name="information-circle-outline" size={16} color="#1D4ED8" style={{ marginTop:1 }} />
+              <Text style={{ flex:1, fontSize:12, color:'#64748B', lineHeight:18 }}>
                 Regular maintenance rules schedule recurring tickets automatically. Configure them in the web app Settings → Maintenance Rules.
               </Text>
             </View>
@@ -1453,21 +1512,21 @@ export default function TicketsScreen({ navigation }: any) {
             ) : regularRules.length === 0 ? (
               <View style={{ alignItems:'center', paddingVertical:60 }}>
                 <Ionicons name="refresh-circle-outline" size={48} color="#C4B5A0" />
-                <Text style={{ fontSize:16, fontWeight:'700', color:'#111827', marginTop:14 }}>No Rules Configured</Text>
-                <Text style={{ fontSize:13, color:'#9CA3AF', marginTop:4, textAlign:'center' }}>
+                <Text style={{ fontSize:16, fontWeight:'700', color:'#0F172A', marginTop:14 }}>No Rules Configured</Text>
+                <Text style={{ fontSize:13, color:'#94A3B8', marginTop:4, textAlign:'center' }}>
                   Add regular maintenance rules in the web app to auto-schedule recurring tickets.
                 </Text>
               </View>
             ) : regularRules.map((r: any) => (
-              <View key={r.id} style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB' }}>
+              <View key={r.id} style={{ backgroundColor:'#FFFFFF', borderRadius:16, padding:16, borderWidth:1, borderColor:'#EEF1F6' }}>
                 <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start' }}>
                   <View style={{ flex:1 }}>
-                    <Text style={{ fontSize:14, fontWeight:'800', color:'#111827' }}>{r.name || r.title || '—'}</Text>
-                    {r.frequency && <Text style={{ fontSize:12, color:'#9CA3AF', marginTop:2 }}>{r.frequency}</Text>}
+                    <Text style={{ fontSize:14, fontWeight:'800', color:'#0F172A' }}>{r.name || r.title || '—'}</Text>
+                    {r.frequency && <Text style={{ fontSize:12, color:'#94A3B8', marginTop:2 }}>{r.frequency}</Text>}
                     {r.issue_type && <Text style={{ fontSize:12, color:'#2563EB', marginTop:2 }}>{r.issue_type}</Text>}
                   </View>
                   <View style={{ backgroundColor: r.is_active !== false ? '#DCFCE7' : '#F3F4F6', borderRadius:99, paddingHorizontal:10, paddingVertical:4 }}>
-                    <Text style={{ fontSize:11, fontWeight:'700', color: r.is_active !== false ? '#16A34A' : '#6B7280' }}>
+                    <Text style={{ fontSize:11, fontWeight:'700', color: r.is_active !== false ? '#16A34A' : '#64748B' }}>
                       {r.is_active !== false ? 'Active' : 'Paused'}
                     </Text>
                   </View>
@@ -1480,10 +1539,10 @@ export default function TicketsScreen({ navigation }: any) {
         {/* ── TICKET CATEGORIES TAB ─────────────────────────────────────── */}
         {isAdmin && mainTab === 'categories' && (
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 12 }}>
-            <View style={{ backgroundColor:'#EDE9F5', borderRadius:14, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8, marginBottom:4 }}>
-              <Ionicons name="pricetags-outline" size={16} color="#2563EB" style={{ marginTop:1 }} />
-              <Text style={{ flex:1, fontSize:12, color:'#6B7280', lineHeight:18 }}>
-                Ticket categories (issue types) and their sub-types. Manage them in the web app Settings → Ticket Categories.
+            <View style={{ backgroundColor:'#EEF3FF', borderRadius:16, padding:12, flexDirection:'row', alignItems:'flex-start', gap:8, marginBottom:4 }}>
+              <Ionicons name="pricetags-outline" size={16} color="#1D4ED8" style={{ marginTop:1 }} />
+              <Text style={{ flex:1, fontSize:12, color:'#64748B', lineHeight:18 }}>
+                Edit a category's name, priority, SLA or linked asset types below. Creating new categories and sub-types is done in the web app.
               </Text>
             </View>
 
@@ -1497,12 +1556,19 @@ export default function TicketsScreen({ navigation }: any) {
                 <Text style={{ fontSize:13, color:'#7A6A8E', textAlign:'center' }}>No ticket categories configured.{'\n'}Add them in the web app Settings → Ticket Categories.</Text>
               </View>
             ) : issueTypes.map((it: any) => (
-              <View key={it.id} style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:14, borderWidth:1, borderColor:'#E5E7EB' }}>
+              <View key={it.id} style={{ backgroundColor:'#FFFFFF', borderRadius:16, padding:14, borderWidth:1, borderColor:'#EEF1F6' }}>
                 <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center' }}>
                   <View style={{ flex:1 }}>
-                    <Text style={{ fontSize:14, fontWeight:'800', color:'#111827' }}>{it.name}</Text>
-                    {it.description && (
-                      <Text style={{ fontSize:12, color:'#9CA3AF', marginTop:2 }} numberOfLines={2}>{it.description}</Text>
+                    <Text style={{ fontSize:14, fontWeight:'800', color:'#0F172A' }}>{it.name}</Text>
+                    {Array.isArray(it.issue_type_asset_types) && it.issue_type_asset_types.length > 0 && (
+                      <View style={{ flexDirection:'row', flexWrap:'wrap', gap:6, marginTop:6 }}>
+                        {it.issue_type_asset_types.map((lnk: any) => (
+                          <View key={lnk.asset_type_id} style={{ flexDirection:'row', alignItems:'center', gap:3, backgroundColor:'#EEF3FF', borderRadius:99, paddingHorizontal:8, paddingVertical:3 }}>
+                            <Ionicons name="link-outline" size={10} color="#2563EB" />
+                            <Text style={{ fontSize:10, fontWeight:'600', color:'#2563EB' }}>{lnk.asset_types?.name || 'Asset'}</Text>
+                          </View>
+                        ))}
+                      </View>
                     )}
                   </View>
                   <View style={{ alignItems:'flex-end', gap:4 }}>
@@ -1519,6 +1585,16 @@ export default function TicketsScreen({ navigation }: any) {
                     )}
                   </View>
                 </View>
+                <View style={{ flexDirection:'row', gap:8, marginTop:12, justifyContent:'flex-end' }}>
+                  <TouchableOpacity onPress={() => openEditCat(it)} style={{ flexDirection:'row', alignItems:'center', gap:4, backgroundColor:'#EEF3FF', borderRadius:10, paddingHorizontal:12, paddingVertical:7 }}>
+                    <Ionicons name="create-outline" size={14} color="#2563EB" />
+                    <Text style={{ fontSize:12, fontWeight:'700', color:'#2563EB' }}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => confirmDeleteCat(it)} style={{ flexDirection:'row', alignItems:'center', gap:4, backgroundColor:'#FEF2F2', borderRadius:10, paddingHorizontal:12, paddingVertical:7 }}>
+                    <Ionicons name="trash-outline" size={14} color="#DC2626" />
+                    <Text style={{ fontSize:12, fontWeight:'700', color:'#DC2626' }}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </ScrollView>
@@ -1528,10 +1604,10 @@ export default function TicketsScreen({ navigation }: any) {
         {isAdmin && mainTab === 'ai' && (
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: 14 }}>
             {/* Header card */}
-            <View style={{ backgroundColor:'#EEF2FF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB', alignItems:'center', gap:8 }}>
+            <View style={{ backgroundColor:'#EFF6FF', borderRadius:16, padding:16, borderWidth:1, borderColor:'#EEF1F6', alignItems:'center', gap:8 }}>
               <Ionicons name="sparkles" size={32} color="#2563EB" />
-              <Text style={{ fontSize:16, fontWeight:'800', color:'#111827', textAlign:'center' }}>AI Ticket Insights</Text>
-              <Text style={{ fontSize:12, color:'#6B7280', textAlign:'center', lineHeight:18 }}>
+              <Text style={{ fontSize:16, fontWeight:'800', color:'#0F172A', textAlign:'center' }}>AI Ticket Insights</Text>
+              <Text style={{ fontSize:12, color:'#64748B', textAlign:'center', lineHeight:18 }}>
                 Analyse patterns across {tickets.length} tickets to find top issues, predict maintenance needs, and surface actionable insights.
               </Text>
               <TouchableOpacity
@@ -1544,7 +1620,7 @@ export default function TicketsScreen({ navigation }: any) {
                     const propDist: Record<string,number> = {};
                     tickets.forEach(t => {
                       const k = t.issue_type||'Unknown';  issueDist[k]=(issueDist[k]||0)+1;
-                      const p = t.property_name||'Unknown'; propDist[p]=(propDist[p]||0)+1;
+                      const p = (t as any).properties?.property_name || 'Unknown'; propDist[p]=(propDist[p]||0)+1;
                     });
                     const open    = tickets.filter(t=>!['completed','closed'].includes(t.status)).length;
                     const breached= tickets.filter(t=>t.sla_deadline&&new Date(t.sla_deadline)<new Date()&&!['completed','closed'].includes(t.status)).length;
@@ -1585,23 +1661,23 @@ export default function TicketsScreen({ navigation }: any) {
 
             {/* Analysis result */}
             {aiAnalysis && (
-              <View style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:16, borderWidth:1, borderColor:'#E5E7EB' }}>
+              <View style={{ backgroundColor:'#FFFFFF', borderRadius:16, padding:16, borderWidth:1, borderColor:'#EEF1F6' }}>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:6, marginBottom:12 }}>
                   <Ionicons name="bulb-outline" size={16} color="#2563EB" />
-                  <Text style={{ fontSize:13, fontWeight:'800', color:'#111827' }}>Insights</Text>
+                  <Text style={{ fontSize:13, fontWeight:'800', color:'#0F172A' }}>Insights</Text>
                 </View>
                 {aiAnalysis.split('\n').filter(l=>l.trim()).map((line, i) => (
                   <View key={i} style={{ flexDirection:'row', alignItems:'flex-start', gap:8, marginBottom:10 }}>
                     <View style={{ width:6, height:6, borderRadius:3, backgroundColor:'#2563EB', marginTop:6 }} />
-                    <Text style={{ flex:1, fontSize:13, color:'#111827', lineHeight:20 }}>{line.replace(/^[\d•\-\*\.]+\s*/,'')}</Text>
+                    <Text style={{ flex:1, fontSize:13, color:'#0F172A', lineHeight:20 }}>{line.replace(/^[\d•\-\*\.]+\s*/,'')}</Text>
                   </View>
                 ))}
               </View>
             )}
 
             {/* Quick stats for context */}
-            <View style={{ backgroundColor:'#FFFFFF', borderRadius:14, padding:14, borderWidth:1, borderColor:'#E5E7EB' }}>
-              <Text style={{ fontSize:12, fontWeight:'800', color:'#9CA3AF', letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Data Summary</Text>
+            <View style={{ backgroundColor:'#FFFFFF', borderRadius:16, padding:14, borderWidth:1, borderColor:'#EEF1F6' }}>
+              <Text style={{ fontSize:12, fontWeight:'800', color:'#94A3B8', letterSpacing:1, textTransform:'uppercase', marginBottom:10 }}>Data Summary</Text>
               {[
                 { label:'Total tickets analysed', value: tickets.length },
                 { label:'Open tickets',            value: tickets.filter(t=>!['completed','closed'].includes(t.status)).length },
@@ -1609,7 +1685,7 @@ export default function TicketsScreen({ navigation }: any) {
                 { label:'Unique issue types',      value: new Set(tickets.map(t=>t.issue_type)).size },
               ].map(s => (
                 <View key={s.label} style={{ flexDirection:'row', justifyContent:'space-between', paddingVertical:6, borderBottomWidth:1, borderBottomColor:'rgba(0,0,0,0.06)' }}>
-                  <Text style={{ fontSize:12, color:'#6B7280' }}>{s.label}</Text>
+                  <Text style={{ fontSize:12, color:'#64748B' }}>{s.label}</Text>
                   <Text style={{ fontSize:12, fontWeight:'800', color:'#2563EB' }}>{s.value}</Text>
                 </View>
               ))}
@@ -1627,14 +1703,65 @@ export default function TicketsScreen({ navigation }: any) {
           user={user}
         />
 
+        {/* ── Category Edit Modal ───────────────────────────────────────── */}
+        <Modal visible={!!editCat} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditCat(null)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', padding:16, borderBottomWidth:1, borderBottomColor:'#E2E8F0' }}>
+              <Text style={{ fontSize:16, fontWeight:'800', color:'#0F172A' }}>Edit Category</Text>
+              <TouchableOpacity onPress={() => setEditCat(null)}><Ionicons name="close" size={24} color="#64748B" /></TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding:16, gap:18 }}>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>NAME</Text>
+                <TextInput value={catName} onChangeText={setCatName} placeholder="Category name" style={{ backgroundColor:'#fff', borderWidth:1, borderColor:'#E2E8F0', borderRadius:10, padding:12, fontSize:14, color:'#0F172A' }} />
+              </View>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>PRIORITY</Text>
+                <View style={{ flexDirection:'row', gap:8, flexWrap:'wrap' }}>
+                  {['low','medium','high','critical'].map(p => (
+                    <TouchableOpacity key={p} onPress={() => setCatPriority(p)} style={{ paddingHorizontal:14, paddingVertical:8, borderRadius:10, backgroundColor: catPriority===p ? '#2563EB' : '#EEF1F6' }}>
+                      <Text style={{ fontSize:12, fontWeight:'700', color: catPriority===p ? '#fff' : '#64748B' }}>{p.toUpperCase()}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>SLA HOURS</Text>
+                <TextInput value={catSla} onChangeText={setCatSla} keyboardType="number-pad" placeholder="e.g. 24" style={{ backgroundColor:'#fff', borderWidth:1, borderColor:'#E2E8F0', borderRadius:10, padding:12, fontSize:14, color:'#0F172A' }} />
+              </View>
+              <View>
+                <Text style={{ fontSize:12, fontWeight:'700', color:'#64748B', marginBottom:6 }}>LINKED ASSET TYPES</Text>
+                <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8 }}>
+                  {assetTypesLite.length === 0 ? (
+                    <Text style={{ fontSize:12, color:'#94A3B8' }}>Loading…</Text>
+                  ) : assetTypesLite.map(at => {
+                    const on = catAssetIds.includes(at.id);
+                    return (
+                      <TouchableOpacity key={at.id} onPress={() => setCatAssetIds(on ? catAssetIds.filter(x=>x!==at.id) : [...catAssetIds, at.id])} style={{ flexDirection:'row', alignItems:'center', gap:4, paddingHorizontal:10, paddingVertical:7, borderRadius:99, backgroundColor: on ? '#EEF3FF' : '#F1F5F9', borderWidth:1, borderColor: on ? '#2563EB' : 'transparent' }}>
+                        {on && <Ionicons name="checkmark" size={12} color="#2563EB" />}
+                        <Text style={{ fontSize:12, fontWeight:'600', color: on ? '#2563EB' : '#64748B' }}>{at.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </ScrollView>
+            <View style={{ padding:16, borderTopWidth:1, borderTopColor:'#E2E8F0' }}>
+              <TouchableOpacity onPress={saveCat} disabled={savingCat || !catName.trim()} style={{ backgroundColor: (savingCat || !catName.trim()) ? '#93C5FD' : '#2563EB', borderRadius:12, padding:14, alignItems:'center' }}>
+                <Text style={{ color:'#fff', fontSize:15, fontWeight:'800' }}>{savingCat ? 'Saving…' : 'Save Changes'}</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </Modal>
+
         {/* ── Admin Approval Modal ──────────────────────────────────────── */}
         <Modal visible={showApprovalModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowApprovalModal(false)}>
           <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E0D5EA' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
               <TouchableOpacity onPress={() => setShowApprovalModal(false)} style={{ marginRight: 12 }}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color="#0F172A" />
               </TouchableOpacity>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#111827', flex: 1 }}>Review Completion</Text>
+              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A', flex: 1 }}>Review Completion</Text>
             </View>
             <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: 16 }}>
               {approvalTicket && (
@@ -1642,10 +1769,10 @@ export default function TicketsScreen({ navigation }: any) {
                   {/* Ticket summary */}
                   <View style={{ backgroundColor: '#FCE7F3', borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#BE185D' }}>
                     <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#BE185D', marginBottom: 6 }}>TICKET SUMMARY</Text>
-                    <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#111827' }}>{approvalTicket.ticket_number}</Text>
+                    <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#0F172A' }}>{approvalTicket.ticket_number}</Text>
                     <Text style={{ fontSize: fontSize.sm, color: '#4B5563', marginTop: 4 }}>{approvalTicket.issue_type} {approvalTicket.issue_subtype ? `· ${approvalTicket.issue_subtype}` : ''}</Text>
                     {approvalTicket.description && (
-                      <Text style={{ fontSize: fontSize.sm, color: '#9CA3AF', marginTop: 4 }}>{approvalTicket.description}</Text>
+                      <Text style={{ fontSize: fontSize.sm, color: '#94A3B8', marginTop: 4 }}>{approvalTicket.description}</Text>
                     )}
                     {approvalTicket.tenant_name && (
                       <Text style={{ fontSize: fontSize.xs, color: '#9D174D', marginTop: 6, fontWeight: '600' }}>
@@ -1663,11 +1790,11 @@ export default function TicketsScreen({ navigation }: any) {
                     <TextInput
                       style={{
                         backgroundColor: '#fff', borderRadius: borderRadius.md,
-                        padding: spacing.md, fontSize: fontSize.md, color: '#111827',
+                        padding: spacing.md, fontSize: fontSize.md, color: '#0F172A',
                         borderWidth: 1, borderColor: '#DC2626', minHeight: 80, textAlignVertical: 'top',
                       }}
                       placeholder="Reason for rejection..."
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor="#94A3B8"
                       value={rejectReason}
                       onChangeText={setRejectReason}
                       multiline
@@ -1740,7 +1867,7 @@ export default function TicketsScreen({ navigation }: any) {
                       onPress={() => { setShowRejectInput(false); setRejectReason(''); }}
                       style={{ paddingVertical: 12, alignItems: 'center' }}
                     >
-                      <Text style={{ color: '#6B7280', fontWeight: '700', fontSize: fontSize.sm }}>← Back</Text>
+                      <Text style={{ color: '#64748B', fontWeight: '700', fontSize: fontSize.sm }}>← Back</Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -1771,15 +1898,15 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
       style={[
         {
           backgroundColor: '#FFFFFF',
-          borderRadius: 14,
+          borderRadius: 16,
           padding: 14,
           marginBottom: 0,
           borderWidth: 1,
-          borderColor: '#E5E7EB',
+          borderColor: '#EEF1F6',
           shadowColor: '#0F172A',
-          shadowOpacity: 0.04,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
         },
         needsAction && {
           borderWidth: 1.5,
@@ -1854,7 +1981,7 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
       </View>
 
       {/* Bottom row */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 0.5, borderTopColor: '#E5E7EB' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 0.5, borderTopColor: '#EEF1F6' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ paddingHorizontal: 9, paddingVertical: 3.5, borderRadius: 999, backgroundColor: priorityCfg.bg }}>
             <Text style={{ fontSize: 10, fontWeight: '800', color: priorityCfg.color, letterSpacing: 0.3 }}>

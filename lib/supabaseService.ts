@@ -73,6 +73,23 @@ export async function getSession(token: string): Promise<{
   }
 }
 
+// Submit an in-app account-deletion request (non-destructive). The backend verifies
+// the token server-side and records the request as an audit_logs entry for the team.
+export async function requestAccountDeletion(
+  token: string,
+  reason?: string,
+): Promise<{ success: boolean; message?: string }> {
+  if (!token || typeof token !== 'string' || token.trim().length === 0) {
+    return { success: false, message: 'Your session has expired. Please sign in again.' };
+  }
+  try {
+    return await client.action((api as any).account.requestAccountDeletion, { token, reason });
+  } catch (e: any) {
+    console.warn('[supabaseService] requestAccountDeletion error:', e?.message);
+    return { success: false, message: 'Could not submit your request. Please try again.' };
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -135,7 +152,7 @@ export async function listBeds(args: { apartmentId?: string; propertyId?: string
   return client.action(api.properties.listBeds, args);
 }
 
-export async function createBed(args: { propertyId: string; apartmentId: string; type: string; toiletType: string; monthlyRent: number; status: string }) {
+export async function createBed(args: { propertyId: string; apartmentId: string; type: string; toiletType: string; monthlyRent: number; status: string; unitNumber?: string }) {
   return client.action(api.properties.createBed, args);
 }
 
@@ -332,6 +349,52 @@ export async function recordPayment(args: any) {
   return client.action(api.accounting.recordPayment, { data: args });
 }
 
+export async function fetchOutstandingRecipients() {
+  return client.action((api as any).accounting.fetchOutstandingRecipients, {});
+}
+
+export async function getInvoiceDetail(invoiceId: string) {
+  return client.action((api as any).accounting.getInvoiceDetail, { invoiceId });
+}
+export async function listAdjustments() {
+  return client.action((api as any).accounting.listAdjustments, {});
+}
+export async function getDepositSettlements() {
+  return client.action((api as any).accounting.getDepositSettlements, {});
+}
+export async function getExitReconciliationWorklist() {
+  return client.action((api as any).accounting.getExitReconciliationWorklist, {});
+}
+export async function getGstFiledWorkings() {
+  return client.action((api as any).accounting.getGstFiledWorkings, {});
+}
+export async function getTenantLedger(args: { allotmentId?: string; tenantId?: string }) {
+  return client.action((api as any).accounting.getTenantLedger, args);
+}
+export async function getTrialBalance(from: string, to: string) {
+  return client.action((api as any).accounting.getTrialBalance, { from, to });
+}
+export async function getProfitability(fyStartYear?: number) {
+  return client.action((api as any).accounting.getProfitability, { fyStartYear });
+}
+
+export async function previewBills(month: string, propertyId?: string) {
+  return client.action((api as any).billing.previewBills, { month, propertyId });
+}
+export async function generateBills(month: string, propertyId?: string, allotmentIds?: string[]) {
+  return client.action((api as any).billing.generateBills, { month, propertyId, allotmentIds });
+}
+
+export async function listExpenseCategories() {
+  return client.action((api as any).settings.listExpenseCategories, {});
+}
+export async function saveExpenseCategory(args: { id?: string; key?: string; label: string; isActive?: boolean }) {
+  return client.action((api as any).settings.saveExpenseCategory, args);
+}
+export async function deleteExpenseCategory(id: string) {
+  return client.action((api as any).settings.deleteExpenseCategory, { id });
+}
+
 export async function getPendingDues() {
   return client.action(api.accounting.getPendingDues, {});
 }
@@ -385,6 +448,26 @@ export async function scanMeterReading(imageUrl: string): Promise<{
   return client.action((api as any).electricity.scanMeterReading, { imageUrl });
 }
 
+// Upload a meter photo to the shared `documents/meter-photos` bucket (the same path
+// the web app uses) via the working owners.uploadDocument action, and return its
+// public URL. Replaces the old uploadTicketPhoto path, which went through the no-op
+// supabase storage stub and always returned null.
+export async function uploadMeterPhoto(base64?: string | null): Promise<string | null> {
+  if (!base64) return null;
+  try {
+    const res: any = await client.action((api as any).owners.uploadDocument, {
+      base64,
+      fileName: `meter_${Date.now()}.jpg`,
+      folder: "meter-photos",
+      contentType: "image/jpeg",
+    });
+    return res?.url || null;
+  } catch (e) {
+    console.warn("[uploadMeterPhoto]", (e as any)?.message);
+    return null;
+  }
+}
+
 export async function getEBAnalytics(propertyId?: string) {
   return client.action((api as any).electricity.getEBAnalytics, { propertyId });
 }
@@ -393,8 +476,8 @@ export async function getEBAnalytics(propertyId?: string) {
 // TICKETS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export async function fetchTickets(role: string, userId?: string, phone?: string) {
-  return client.action(api.tickets.listTickets, { role, userId, phone });
+export async function fetchTickets(role: string, userId?: string, tenantId?: string) {
+  return client.action(api.tickets.listTickets, { role, userId, tenantId });
 }
 
 export async function createTicket(args: any) {
@@ -472,6 +555,10 @@ export async function deleteTeamPayment(id: string) {
 
 export async function listTeamAttendance() {
   return client.action(api.settings.listTeamAttendance, {});
+}
+
+export async function generateSalaryBills(month: string, workingDays?: number) {
+  return client.action((api as any).settings.generateSalaryBills, { month, workingDays });
 }
 
 export async function createTeamAttendance(data: any) {

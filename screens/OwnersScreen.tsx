@@ -101,7 +101,7 @@ const ContractBadge = ({ type }: { type: string }) => (
 
 const Chip = ({ label }: { label: string }) => (
   <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-    <Text style={{ fontSize: 10, fontWeight: '700', color: '#4338CA' }}>{label}</Text>
+    <Text style={{ fontSize: 10, fontWeight: '700', color: '#1D4ED8' }}>{label}</Text>
   </View>
 );
 
@@ -115,7 +115,7 @@ const FInput = ({ label, value, onChange, placeholder, keyboardType, multiline }
     {label ? <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 5 }}>{label}</Text> : null}
     <TextInput
       style={{
-        backgroundColor: colors.surface, borderWidth: 1.5, borderColor: '#E5E7EB',
+        backgroundColor: colors.surface, borderWidth: 1.5, borderColor: '#EEF1F6',
         borderRadius: 10, padding: 11, fontSize: 14, color: colors.text,
         minHeight: multiline ? 80 : undefined, textAlignVertical: multiline ? 'top' : 'center',
       }}
@@ -184,9 +184,9 @@ function SearchablePicker({ label, value, onChange, options, placeholder, disabl
               <TouchableOpacity onPress={() => setOpen(false)}><Ionicons name="close-circle" size={28} color={colors.textTertiary} /></TouchableOpacity>
             </View>
             <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, height: 42 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12, height: 42 }}>
                 <Ionicons name="search-outline" size={17} color={colors.textTertiary} style={{ marginRight: 8 }} />
-                <TextInput style={{ flex: 1, fontSize: 14, color: '#111827' }} value={q} onChangeText={setQ} placeholder={`Search ${label.toLowerCase()}…`} placeholderTextColor={colors.textTertiary} autoFocus />
+                <TextInput style={{ flex: 1, fontSize: 14, color: '#0F172A' }} value={q} onChangeText={setQ} placeholder={`Search ${label.toLowerCase()}…`} placeholderTextColor={colors.textTertiary} autoFocus />
               </View>
             </View>
             <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
@@ -195,7 +195,7 @@ function SearchablePicker({ label, value, onChange, options, placeholder, disabl
               ) : filtered.map(opt => (
                 <TouchableOpacity key={opt} onPress={() => { onChange(opt); setOpen(false); }}
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 10, backgroundColor: value === opt ? '#EFF6FF' : 'transparent', marginBottom: 2 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }}>{opt}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>{opt}</Text>
                   {value === opt && <Ionicons name="checkmark-circle" size={18} color="#2563EB" />}
                 </TouchableOpacity>
               ))}
@@ -263,7 +263,7 @@ function DocUpload({ label, value, onChange, folder, isImage }: {
     <View style={{ marginBottom: 12 }}>
       <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 5 }}>{label}</Text>
       {value ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EFF6FF', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#E5E7EB' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EFF6FF', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#EEF1F6' }}>
           <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: 'rgba(37,99,235,0.12)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <Ionicons name={isImage ? 'image' : 'document-text'} size={20} color="#2563EB" />
           </View>
@@ -279,7 +279,7 @@ function DocUpload({ label, value, onChange, folder, isImage }: {
         </View>
       ) : (
         <TouchableOpacity onPress={choose} disabled={uploading}
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 13, borderWidth: 1.5, borderColor: '#E5E7EB', borderStyle: 'dashed' }}>
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 13, borderWidth: 1.5, borderColor: '#EEF1F6', borderStyle: 'dashed' }}>
           {uploading ? <ActivityIndicator size="small" color="#2563EB" /> : <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />}
           <Text style={{ fontSize: 13, fontWeight: '600', color: '#2563EB' }}>{uploading ? 'Uploading…' : `Upload ${label}`}</Text>
         </TouchableOpacity>
@@ -368,7 +368,7 @@ function OwnerFormModal({ mode, initial, onClose, onSaved }: {
                     const i = TITLE_OPTIONS.indexOf(p.title);
                     return { ...p, title: TITLE_OPTIONS[(i + 1) % TITLE_OPTIONS.length] };
                   })}
-                  style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, padding: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                  style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: '#EEF1F6', borderRadius: 10, padding: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
                 >
                   <Text style={{ fontSize: 14, color: form.title ? colors.text : colors.textTertiary }}>{form.title || '—'}</Text>
                   <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
@@ -422,7 +422,7 @@ function OwnerFormModal({ mode, initial, onClose, onSaved }: {
             <FInput label="" value={form.notes} onChange={setF('notes')} placeholder="Any notes about this owner…" multiline />
 
             <TouchableOpacity onPress={handleSave} disabled={saving}
-              style={{ backgroundColor: '#2563EB', borderRadius: 14, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 8, opacity: saving ? 0.6 : 1 }}>
+              style={{ backgroundColor: '#2563EB', borderRadius: 12, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 8, opacity: saving ? 0.6 : 1 }}>
               {saving ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />}
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>{saving ? 'Saving…' : mode === 'add' ? 'Create Owner' : 'Save Changes'}</Text>
             </TouchableOpacity>
@@ -480,7 +480,7 @@ function PaymentModal({ payment, mode, aptCode, onClose, onSaved }: {
           </View>
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
             <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, marginBottom: 16 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>{fmtMonth(payment.payment_month)}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{fmtMonth(payment.payment_month)}</Text>
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>Due {fmtDate(payment.due_date)} · {fmtAmt(Number(payment.escalated_amount))}</Text>
             </View>
 
@@ -492,8 +492,8 @@ function PaymentModal({ payment, mode, aptCode, onClose, onSaved }: {
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
                   {['pending', 'paid'].map(st => (
                     <TouchableOpacity key={st} onPress={() => setF('status')(st)}
-                      style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: form.status === st ? '#2563EB' : 'rgba(37,99,235,0.06)', borderWidth: 1.5, borderColor: form.status === st ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: form.status === st ? '#fff' : '#2563EB', textTransform: 'capitalize' }}>{st}</Text>
+                      style={{ flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: form.status === st ? '#2563EB' : '#F1F3F9' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: form.status === st ? '#fff' : '#64748B', textTransform: 'capitalize' }}>{st}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -507,8 +507,8 @@ function PaymentModal({ payment, mode, aptCode, onClose, onSaved }: {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}>
                   {PAYMENT_MODES.map(m => (
                     <TouchableOpacity key={m.key} onPress={() => setF('payment_mode')(m.key)}
-                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: form.payment_mode === m.key ? '#2563EB' : 'rgba(37,99,235,0.06)', borderWidth: 1.5, borderColor: form.payment_mode === m.key ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: form.payment_mode === m.key ? '#fff' : '#2563EB' }}>{m.label}</Text>
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: form.payment_mode === m.key ? '#2563EB' : '#F1F3F9' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: form.payment_mode === m.key ? '#fff' : '#64748B' }}>{m.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -519,7 +519,7 @@ function PaymentModal({ payment, mode, aptCode, onClose, onSaved }: {
             <FInput label="Notes" value={form.notes} onChange={setF('notes')} multiline />
 
             <TouchableOpacity onPress={handleSave} disabled={saving}
-              style={{ backgroundColor: '#16A34A', borderRadius: 14, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: saving ? 0.6 : 1 }}>
+              style={{ backgroundColor: '#16A34A', borderRadius: 12, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: saving ? 0.6 : 1 }}>
               {saving ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />}
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>{saving ? 'Saving…' : mode === 'record' ? 'Record Payment' : 'Save Payment'}</Text>
             </TouchableOpacity>
@@ -566,9 +566,9 @@ function ContractDetailModal({ contract, onClose }: { contract: any; onClose: ()
           </View>
 
           <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, height: 42 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12, height: 42 }}>
               <Ionicons name="search-outline" size={17} color={colors.textTertiary} style={{ marginRight: 8 }} />
-              <TextInput style={{ flex: 1, fontSize: 14, color: '#111827' }} value={search} onChangeText={setSearch} placeholder="Search payments by month…" placeholderTextColor={colors.textTertiary} />
+              <TextInput style={{ flex: 1, fontSize: 14, color: '#0F172A' }} value={search} onChangeText={setSearch} placeholder="Search payments by month…" placeholderTextColor={colors.textTertiary} />
             </View>
           </View>
 
@@ -580,13 +580,13 @@ function ContractDetailModal({ contract, onClose }: { contract: any; onClose: ()
               {contract.agreementUrl ? (
                 <TouchableOpacity
                   onPress={() => Linking.openURL(contract.agreementUrl).catch(() => {})}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEF1F6' }}
                 >
                   <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(37,99,235,0.12)', alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="document-text-outline" size={18} color="#2563EB" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>Agreement Copy</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>Agreement Copy</Text>
                     <Text style={{ fontSize: 11, color: colors.textSecondary }}>Tap to view document</Text>
                   </View>
                   <Ionicons name="open-outline" size={16} color="#2563EB" />
@@ -596,9 +596,9 @@ function ContractDetailModal({ contract, onClose }: { contract: any; onClose: ()
               {filtered.length === 0 ? (
                 <EmptyState title="No Payments" subtitle="No payment schedule generated for this contract" icon="cash-outline" />
               ) : filtered.map((p: any) => (
-                <View key={p.id} style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                <View key={p.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{fmtMonth(p.payment_month)}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>{fmtMonth(p.payment_month)}</Text>
                     <PaymentStatusBadge p={p} />
                   </View>
                   <View style={{ flexDirection: 'row', gap: 14, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -761,10 +761,10 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
       <GlassBackground>
         <SafeAreaView style={{ flex: 1 }}>
           {/* Header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }} numberOfLines={1}>{owner?.name || 'Owner'}</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>{owner?.name || 'Owner'}</Text>
                 <View style={{ backgroundColor: isActive ? '#DCFCE7' : '#F1F5F9', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
                   <Text style={{ fontSize: 10, fontWeight: '700', color: isActive ? '#16A34A' : '#64748B' }}>{isActive ? 'Active' : 'Inactive'}</Text>
                 </View>
@@ -785,12 +785,12 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
               {/* Action buttons */}
               <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
                 <TouchableOpacity onPress={() => setShowEditOwner(true)}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#EFF6FF', borderRadius: 10 }}>
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 12 }}>
                   <Ionicons name="pencil" size={14} color="#2563EB" />
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={toggleStatus}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: isActive ? 'rgba(220,38,38,0.08)' : 'rgba(22,163,74,0.08)', borderRadius: 10 }}>
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 12 }}>
                   <Ionicons name="power" size={14} color={isActive ? '#DC2626' : '#16A34A'} />
                   <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? '#DC2626' : '#16A34A' }}>{isActive ? 'Deactivate' : 'Activate'}</Text>
                 </TouchableOpacity>
@@ -801,7 +801,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                 {([['kyc', 'KYC'], ['contracts', `Contracts (${data.contracts?.length || 0})`], ['payments', 'Payments']] as const).map(([key, label]) => (
                   <TouchableOpacity key={key} onPress={() => setTab(key as any)}
                     style={{ flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: tab === key ? '#2563EB' : 'transparent' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: tab === key ? '#2563EB' : colors.textSecondary }}>{label}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: tab === key ? '#2563EB' : '#64748B' }}>{label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -812,7 +812,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                   {owner.photoUrl ? (
                     <View style={{ alignItems: 'center', marginBottom: 8 }}>
                       <TouchableOpacity onPress={() => Linking.openURL(owner.photoUrl).catch(() => {})}>
-                        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: '#E5E7EB' }}>
+                        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: '#EEF1F6' }}>
                           <Image source={{ uri: owner.photoUrl }} style={{ width: 80, height: 80 }} resizeMode="cover" />
                         </View>
                         <Text style={{ fontSize: 10, color: '#2563EB', textAlign: 'center', marginTop: 4, fontWeight: '600' }}>View Photo</Text>
@@ -854,7 +854,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                     <>
                       <SectionTitle title="Notes" />
                       <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12 }}>
-                        <Text style={{ fontSize: 13, color: '#111827', lineHeight: 20 }}>{owner.notes}</Text>
+                        <Text style={{ fontSize: 13, color: '#0F172A', lineHeight: 20 }}>{owner.notes}</Text>
                       </View>
                     </>
                   ) : null}
@@ -865,14 +865,13 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
               {tab === 'contracts' && (
                 <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
                   <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12, height: 40 }}>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 12, height: 40 }}>
                       <Ionicons name="search-outline" size={16} color={colors.textTertiary} style={{ marginRight: 6 }} />
-                      <TextInput style={{ flex: 1, fontSize: 13, color: '#111827' }} value={contractSearch} onChangeText={setContractSearch} placeholder="Search…" placeholderTextColor={colors.textTertiary} />
+                      <TextInput style={{ flex: 1, fontSize: 13, color: '#0F172A' }} value={contractSearch} onChangeText={setContractSearch} placeholder="Search…" placeholderTextColor={colors.textTertiary} />
                     </View>
                     <TouchableOpacity onPress={() => setShowContractForm(true)}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#2563EB', borderRadius: 10, paddingHorizontal: 12 }}>
-                      <Ionicons name="add" size={16} color="#fff" />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>Add</Text>
+                      style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563EB' }}>
+                      <Ionicons name="add" size={20} color="#fff" />
                     </TouchableOpacity>
                   </View>
 
@@ -880,7 +879,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                     <EmptyState title="No Contracts" subtitle="Add a contract for this owner" icon="document-outline" />
                   ) : filteredContracts.map((c: any) => (
                     <TouchableOpacity key={c.id} activeOpacity={0.85} onPress={() => setContractDetail(c)}
-                      style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: contractColor(c.status) + '30' }}>
+                      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: contractColor(c.status) + '30', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                           <ContractBadge type={c.contractType} />
@@ -897,7 +896,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                         </View>
                         <Text style={{ fontSize: 16, fontWeight: '900', color: '#2563EB' }}>{fmtAmt(c.monthlyRent)}/mo</Text>
                       </View>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 }}>
                         {c.propertyName || '—'}{c.apartmentCode ? ` · ${c.apartmentCode}` : ''}{c.propertyCity ? ` · ${c.propertyCity}` : ''}
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 16, marginBottom: 10 }}>
@@ -937,8 +936,8 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                       {PERIODS.map(p => (
                         <TouchableOpacity key={p.key} onPress={() => setPeriod(p.key)}
-                          style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, backgroundColor: period === p.key ? '#2563EB' : 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: period === p.key ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: period === p.key ? '#fff' : '#2563EB' }}>{p.label}</Text>
+                          style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: period === p.key ? '#2563EB' : '#F1F3F9' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: period === p.key ? '#fff' : '#64748B' }}>{p.label}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -959,12 +958,12 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
                       <TouchableOpacity onPress={exportPayments}
-                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#EFF6FF', borderRadius: 10 }}>
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 12 }}>
                         <Ionicons name="download-outline" size={14} color="#2563EB" />
                         <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>Export CSV</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={regenerate}
-                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: 'rgba(2,132,199,0.08)', borderRadius: 10 }}>
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 12 }}>
                         <Ionicons name="refresh-outline" size={14} color="#0284C7" />
                         <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284C7' }}>Regenerate</Text>
                       </TouchableOpacity>
@@ -978,10 +977,10 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                       {filteredAllPayments.length === 0 ? (
                         <EmptyState title="No Payments" subtitle="No payments in this period" icon="cash-outline" />
                       ) : filteredAllPayments.map((p: any) => (
-                        <View key={p.id} style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                        <View key={p.id} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             <View>
-                              <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{fmtMonth(p.payment_month)}</Text>
+                              <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>{fmtMonth(p.payment_month)}</Text>
                               <Text style={{ fontSize: 11, color: colors.textSecondary }}>{p.apartments?.apartment_code || '—'}</Text>
                             </View>
                             <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -1153,8 +1152,8 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
         const active = value === o.key;
         return (
           <TouchableOpacity key={o.key} onPress={() => onChange(o.key)}
-            style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, backgroundColor: active ? '#2563EB' : 'rgba(37,99,235,0.06)', borderWidth: 1.5, borderColor: active ? '#2563EB' : 'rgba(37,99,235,0.2)' }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#2563EB' }}>{o.label}</Text>
+            style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: active ? '#2563EB' : '#F1F3F9' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : '#64748B' }}>{o.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -1195,7 +1194,7 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
                 {loadingApts ? (
                   <View style={{ alignItems: 'center', padding: 16 }}><ActivityIndicator color="#2563EB" /></View>
                 ) : (
-                  <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+                  <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: '#EEF1F6', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
                     {apts.filter(a => !a.hasActiveContract).length === 0 ? (
                       <View style={{ padding: 16, alignItems: 'center' }}><Text style={{ fontSize: 12, color: colors.textTertiary }}>All apartments have active contracts</Text></View>
                     ) : apts.filter(a => !a.hasActiveContract).map((a, idx) => {
@@ -1208,7 +1207,7 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
                             {checked && <Ionicons name="checkmark" size={11} color="#fff" />}
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }}>{a.propertyName} — {a.apartmentCode}</Text>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>{a.propertyName} — {a.apartmentCode}</Text>
                             <Text style={{ fontSize: 10, color: colors.textTertiary }}>{a.status}</Text>
                           </View>
                         </TouchableOpacity>
@@ -1246,7 +1245,7 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
               <View style={{ width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: form.rent_paid_in_advance ? '#2563EB' : colors.border, backgroundColor: form.rent_paid_in_advance ? '#2563EB' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                 {form.rent_paid_in_advance && <Ionicons name="checkmark" size={12} color="#fff" />}
               </View>
-              <Text style={{ fontSize: 13, color: '#111827', fontWeight: '600' }}>Rent Paid in Advance</Text>
+              <Text style={{ fontSize: 13, color: '#0F172A', fontWeight: '600' }}>Rent Paid in Advance</Text>
             </TouchableOpacity>
 
             {ownerGst?.trim() ? (
@@ -1257,7 +1256,7 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>Rent includes GST</Text>
               </TouchableOpacity>
             ) : (
-              <View style={{ backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 10, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="information-circle-outline" size={14} color="#DC2626" />
                 <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '600' }}>GST under RCM — no GST number on owner</Text>
               </View>
@@ -1286,7 +1285,7 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
             <FInput label="" value={form.notes} onChange={setF('notes')} placeholder="Any notes about this contract…" multiline />
 
             <TouchableOpacity onPress={handleSave} disabled={saving}
-              style={{ backgroundColor: '#2563EB', borderRadius: 14, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: saving ? 0.6 : 1, marginTop: 8 }}>
+              style={{ backgroundColor: '#2563EB', borderRadius: 12, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: saving ? 0.6 : 1, marginTop: 8 }}>
               {saving ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />}
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#fff' }}>
                 {saving ? 'Saving…' : isEdit ? 'Save Contract' : `Create Contract${form.apartment_ids.length > 1 ? ` (${form.apartment_ids.length})` : ''}`}
@@ -1306,15 +1305,15 @@ function OwnerCard({ owner, onPress }: { owner: any; onPress: () => void }) {
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={S.card}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-          <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#4F46E5', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             {owner.photoUrl ? (
               <Image source={{ uri: owner.photoUrl }} style={{ width: 38, height: 38 }} resizeMode="cover" />
             ) : (
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#2563EB' }}>{(owner.name || '?')[0].toUpperCase()}</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>{(owner.name || '?')[0].toUpperCase()}</Text>
             )}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{owner.name}</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>{owner.name}</Text>
             {owner.phone ? <Text style={{ fontSize: 12, color: colors.textSecondary }}>{owner.phone}</Text> : null}
           </View>
         </View>
@@ -1330,14 +1329,14 @@ function OwnerCard({ owner, onPress }: { owner: any; onPress: () => void }) {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="home-outline" size={13} color="#2563EB" />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
                 {ac.propertyName || '—'}{ac.apartmentCode ? ` · ${ac.apartmentCode}` : ''}
               </Text>
             </View>
             <ContractBadge type={ac.contractType} />
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>{fmtAmt(ac.monthlyRent)}/mo</Text>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: '#16A34A' }}>{fmtAmt(ac.monthlyRent)}/mo</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: contractColor(ac.status) }} />
               <Text style={{ fontSize: 11, color: contractColor(ac.status), fontWeight: '600' }}>{ac.status}</Text>
@@ -1346,9 +1345,9 @@ function OwnerCard({ owner, onPress }: { owner: any; onPress: () => void }) {
           <Text style={{ fontSize: 11, color: colors.textTertiary }}>{fmtDate(ac.startDate)} → {fmtDate(ac.endDate)}</Text>
         </View>
       ) : (
-        <View style={{ backgroundColor: '#FFF8F0', borderRadius: 8, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="information-circle-outline" size={14} color="#D97706" />
-          <Text style={{ fontSize: 11, color: '#D97706' }}>No active contract</Text>
+        <View style={{ backgroundColor: '#FFEDD5', borderRadius: 8, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="information-circle-outline" size={14} color="#EA580C" />
+          <Text style={{ fontSize: 11, color: '#EA580C', fontWeight: '600' }}>No active contract</Text>
         </View>
       )}
 
@@ -1429,13 +1428,13 @@ export default function OwnersScreen() {
     <GlassBackground>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
           <View style={{ width: 38, height: 28, overflow: 'hidden', alignItems: 'center', marginRight: 10 }}>
             <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={{ width: 38, height: 44, resizeMode: 'contain' }} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>Owners</Text>
-            <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 }}>Landlord directory & contracts</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500', marginTop: 2 }}>Landlord directory & contracts</Text>
           </View>
           <IconBtnSolid
             label="Add"
@@ -1450,10 +1449,12 @@ export default function OwnersScreen() {
             { label: 'Active Contracts', value: String(withActive),         icon: 'document-outline' as const },
             { label: 'Monthly Payout',   value: fmtAmt(totalRent),          icon: 'cash-outline'     as const },
           ].map(kpi => (
-            <View key={kpi.label} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.75)', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center' }}>
-              <Ionicons name={kpi.icon} size={16} color="#2563EB" />
-              <Text style={{ fontSize: 15, fontWeight: '900', color: '#111827', marginTop: 3 }}>{kpi.value}</Text>
-              <Text style={{ fontSize: 9, color: colors.textTertiary, textAlign: 'center', marginTop: 1 }}>{kpi.label}</Text>
+            <View key={kpi.label} style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 10, borderWidth: 1, borderColor: '#EEF1F6', alignItems: 'center', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+              <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: '#EEF3FF', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name={kpi.icon} size={14} color="#2563EB" />
+              </View>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 5, letterSpacing: -0.2 }}>{kpi.value}</Text>
+              <Text style={{ fontSize: 9, color: '#94A3B8', textAlign: 'center', marginTop: 1, fontWeight: '600' }}>{kpi.label}</Text>
             </View>
           ))}
         </View>
@@ -1467,18 +1468,18 @@ export default function OwnersScreen() {
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 8 }}>
           <TouchableOpacity
             onPress={() => setShowPropPicker(true)}
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: propertyFilter !== 'all' ? '#EFF6FF' : 'rgba(255,255,255,0.7)', borderRadius: 10, borderWidth: 1, borderColor: propertyFilter !== 'all' ? '#2563EB' : 'rgba(37,99,235,0.15)', paddingHorizontal: 12, height: 38 }}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: propertyFilter !== 'all' ? '#2563EB' : '#F1F3F9', borderRadius: 999, paddingHorizontal: 12, height: 38 }}
           >
-            <Ionicons name="business-outline" size={15} color="#2563EB" />
-            <Text style={{ flex: 1, fontSize: 12, fontWeight: '600', color: propertyFilter !== 'all' ? '#2563EB' : colors.textSecondary }} numberOfLines={1}>{propFilterLabel}</Text>
-            <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+            <Ionicons name="business-outline" size={15} color={propertyFilter !== 'all' ? '#fff' : '#64748B'} />
+            <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: propertyFilter !== 'all' ? '#fff' : '#64748B' }} numberOfLines={1}>{propFilterLabel}</Text>
+            <Ionicons name="chevron-down" size={14} color={propertyFilter !== 'all' ? '#fff' : '#94A3B8'} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setUnallottedOnly(v => !v)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: unallottedOnly ? '#2563EB' : 'rgba(255,255,255,0.7)', borderRadius: 10, borderWidth: 1, borderColor: unallottedOnly ? '#2563EB' : 'rgba(37,99,235,0.15)', paddingHorizontal: 12, height: 38 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: unallottedOnly ? '#2563EB' : '#F1F3F9', borderRadius: 999, paddingHorizontal: 12, height: 38 }}
           >
-            <Ionicons name={unallottedOnly ? 'checkbox' : 'square-outline'} size={15} color={unallottedOnly ? '#fff' : '#2563EB'} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: unallottedOnly ? '#fff' : '#2563EB' }}>Unallotted</Text>
+            <Ionicons name={unallottedOnly ? 'checkbox' : 'square-outline'} size={15} color={unallottedOnly ? '#fff' : '#64748B'} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: unallottedOnly ? '#fff' : '#64748B' }}>Unallotted</Text>
           </TouchableOpacity>
         </View>
 
@@ -1513,7 +1514,7 @@ export default function OwnersScreen() {
                   onPress={() => { setPropertyFilter('all'); setShowPropPicker(false); }}
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 10, backgroundColor: propertyFilter === 'all' ? '#EFF6FF' : 'transparent', marginBottom: 4 }}
                 >
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }}>All Properties</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>All Properties</Text>
                   {propertyFilter === 'all' && <Ionicons name="checkmark-circle" size={18} color="#2563EB" />}
                 </TouchableOpacity>
                 {properties.map(p => (
@@ -1522,7 +1523,7 @@ export default function OwnersScreen() {
                     onPress={() => { setPropertyFilter(String(p.id)); setShowPropPicker(false); }}
                     style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 10, backgroundColor: String(propertyFilter) === String(p.id) ? '#EFF6FF' : 'transparent', marginBottom: 4 }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }}>{p.name}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>{p.name}</Text>
                     {String(propertyFilter) === String(p.id) && <Ionicons name="checkmark-circle" size={18} color="#2563EB" />}
                   </TouchableOpacity>
                 ))}
@@ -1537,17 +1538,18 @@ export default function OwnersScreen() {
 
 const S = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: '#EEF1F6',
+    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
   },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#EEF1F6',
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  kycRow: { flexDirection: 'row', gap: 10, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 },
+  kycRow: { flexDirection: 'row', gap: 10, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6' },
   kycLbl: { fontSize: 12, color: colors.textSecondary, width: 110 },
-  kycVal: { fontSize: 13, fontWeight: '600', color: '#111827', flex: 1 },
+  kycVal: { fontSize: 13, fontWeight: '600', color: '#0F172A', flex: 1 },
   colLbl: { fontSize: 9, color: colors.textTertiary, fontWeight: '700' },
-  colVal: { fontSize: 12, fontWeight: '600', color: '#111827' },
+  colVal: { fontSize: 12, fontWeight: '600', color: '#0F172A' },
 });

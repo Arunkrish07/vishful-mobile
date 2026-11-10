@@ -1,8 +1,8 @@
 /**
  * TenantLifecycleScreen.tsx
  * Full lifecycle: Booking → Onboarding → Stay → Notice → Exit
- * Tabs: Visual Map | Booking | Onboarding | Switching | Notices | Exit | Refunds | Not in Property
- * Bed Status KPI is always visible (web parity — not a separate Dashboard tab).
+ * Tabs: Overview | Visual Map | Booking | Onboarding | Switching | Notices | Exit | Refunds | Not in Property | Excel Upload
+ * Bed Status KPI lives under the Overview tab (default tab).
  *
  * ► Data layer : Convex actions → Supabase (existing tables/columns only)
  * ► No direct DB access in this file
@@ -10,12 +10,12 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Linking,
   TextInput, Alert, ActivityIndicator, FlatList, RefreshControl,
-  Dimensions, KeyboardAvoidingView, Platform, Image, Animated,
+  Dimensions, KeyboardAvoidingView, Platform, Image, Animated, Pressable,
 } from 'react-native';
 import { CONVEX_SITE_URL } from '../lib/config';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,6 +27,8 @@ import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { client, api } from '../lib/convexApi';
 import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
+import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField, AvatarInitial, KpiTile } from '../components/lifecycle';
+import { StatusBadge } from '../components/lifecycle/StatusBadge';
 import * as sb from '../lib/supabaseService';
 // (registration PDF helpers are defined inline below — no separate module)
 
@@ -92,8 +94,8 @@ const TERMS_OF_STAY: TermItem[] = [
   },
 ];
 
-const PURPLE = '#6366F1';
-const ORANGE = '#6366F1';
+const PURPLE = '#2563EB';
+const ORANGE = '#2563EB';
 
 const regFmtAmt = (v: number | string | undefined): string => {
   if (v === null || v === undefined || v === '') return '';
@@ -291,14 +293,14 @@ async function shareRegistrationPdf(uri: string): Promise<void> {
 
 // ═══ end inlined Registration PDF module ═══
 
-const { width: SW } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
 // ─── Vishful brand palette (web screen-life tokens) ─────────────────────────
 const VBRAND = {
-  purple: '#2563EB', purpleDeep: '#1D4ED8', purpleSoft: '#EFF6FF', orange: '#6366F1',
+  purple: '#2563EB', purpleDeep: '#1D4ED8', purpleSoft: '#EFF6FF', orange: '#2563EB',
   ink900: '#0F172A', ink700: '#334155', ink600: '#556274', ink500: '#64748B', ink400: '#94A3B8',
   surface: '#FFFFFF', surfaceSoft: '#F8FAFC',
-  cardBorder: '#E5E7EB', line: '#E2E8F0', softLine: '#EEF2F7', shadow: '#0F172A',
+  cardBorder: '#EEF1F6', line: '#E2E8F0', softLine: '#EEF2F7', shadow: '#0F172A',
   occ: '#16A34A', book: '#1856FF', note: '#D97706', vac: '#E11D48', nb: '#64748B',
 };
 
@@ -326,37 +328,39 @@ const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMont
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string; icon: string }> = {
-  occupied:        { color: '#2E7D32', bg: '#E8F5E9', label: 'Occupied',    icon: 'checkmark-circle'    },
-  vacant:          { color: '#C62828', bg: '#FFEBEE', label: 'Vacant',      icon: 'radio-button-off'    },
-  notice:          { color: '#8B6914', bg: '#FFF8E1', label: 'Notice',      icon: 'warning'             },
-  booked:          { color: '#1565C0', bg: '#E3F2FD', label: 'Booked',      icon: 'calendar'            },
-  'notice-booked': { color: '#6A1B9A', bg: '#F3E5F5', label: 'N+Booked',   icon: 'git-branch'          },
-  Staying:         { color: '#2E7D32', bg: '#E8F5E9', label: 'Staying',     icon: 'home'                },
-  'On-Notice':     { color: '#8B6914', bg: '#FFF8E1', label: 'On Notice',   icon: 'warning'             },
-  Booked:          { color: '#1565C0', bg: '#E3F2FD', label: 'Booked',      icon: 'calendar'            },
-  Exited:          { color: '#C62828', bg: '#FFEBEE', label: 'Exited',      icon: 'exit'                },
-  New:             { color: '#6366F1', bg: '#F3E5F5', label: 'New',         icon: 'person-add'          },
-  pending:         { color: '#E65100', bg: '#FFF3E0', label: 'Pending',     icon: 'time'                },
-  paid:            { color: '#2E7D32', bg: '#E8F5E9', label: 'Paid',        icon: 'checkmark-circle'    },
-  none:            { color: '#6B7280', bg: '#F0EAE0', label: 'No Refund',   icon: 'remove-circle'       },
-  completed:       { color: '#2E7D32', bg: '#E8F5E9', label: 'Completed',   icon: 'checkmark-done'      },
+  occupied:        { color: '#16A34A', bg: '#DCFCE7', label: 'Occupied',    icon: 'checkmark-circle'    },
+  vacant:          { color: '#DC2626', bg: '#FEE2E2', label: 'Vacant',      icon: 'radio-button-off'    },
+  notice:          { color: '#EA580C', bg: '#FFEDD5', label: 'Notice',      icon: 'warning'             },
+  booked:          { color: '#1D4ED8', bg: '#EEF3FF', label: 'Booked',      icon: 'calendar'            },
+  'notice-booked': { color: '#2563EB', bg: '#EDE9FE', label: 'N+Booked',   icon: 'git-branch'          },
+  Staying:         { color: '#16A34A', bg: '#DCFCE7', label: 'Staying',     icon: 'home'                },
+  'On-Notice':     { color: '#EA580C', bg: '#FFEDD5', label: 'On Notice',   icon: 'warning'             },
+  Booked:          { color: '#1D4ED8', bg: '#EEF3FF', label: 'Booked',      icon: 'calendar'            },
+  Exited:          { color: '#DC2626', bg: '#FEE2E2', label: 'Exited',      icon: 'exit'                },
+  New:             { color: '#1D4ED8', bg: '#EEF3FF', label: 'New',         icon: 'person-add'          },
+  pending:         { color: '#EA580C', bg: '#FFEDD5', label: 'Pending',     icon: 'time'                },
+  paid:            { color: '#16A34A', bg: '#DCFCE7', label: 'Paid',        icon: 'checkmark-circle'    },
+  none:            { color: '#64748B', bg: '#F1F5F9', label: 'No Refund',   icon: 'remove-circle'       },
+  completed:       { color: '#16A34A', bg: '#DCFCE7', label: 'Completed',   icon: 'checkmark-done'      },
 };
 
 const getStatus = (s: string) =>
-  STATUS_CFG[s] ?? { color: '#556274', bg: '#F0EAE0', label: s, icon: 'ellipse-outline' };
+  STATUS_CFG[s] ?? { color: '#556274', bg: '#F1F5F9', label: s, icon: 'ellipse-outline' };
 
 // ─── TABS ────────────────────────────────────────────────────────────────────
 
-/** Web Lifecycle modules (`ol`) — exact order/labels. Bed Status is not a tab. */
+/** Web Lifecycle modules (`ol`) — exact order/labels. Overview (Bed Status) leads, Excel Upload trails. */
 const TABS = [
-  { key: 'map',      label: 'Visual Map',     icon: 'map-outline'             },
-  { key: 'booking',  label: 'Booking',        icon: 'calendar-outline'        },
-  { key: 'onboard',  label: 'Onboarding',     icon: 'person-add-outline'      },
-  { key: 'switch',   label: 'Switching',      icon: 'swap-horizontal-outline' },
-  { key: 'notices',  label: 'Notices',        icon: 'notifications-outline'   },
-  { key: 'exit',     label: 'Exit',           icon: 'log-out-outline'         },
-  { key: 'refunds',  label: 'Refunds',        icon: 'wallet-outline'          },
-  { key: 'absent',   label: 'Not in Property', icon: 'home-outline'           },
+  { key: 'overview', label: 'Overview',        icon: 'grid-outline'            },
+  { key: 'map',      label: 'Visual Map',      icon: 'map-outline'             },
+  { key: 'booking',  label: 'Booking',         icon: 'calendar-outline'        },
+  { key: 'onboard',  label: 'Onboarding',      icon: 'person-add-outline'      },
+  { key: 'switch',   label: 'Switching',       icon: 'swap-horizontal-outline' },
+  { key: 'notices',  label: 'Notices',         icon: 'notifications-outline'   },
+  { key: 'exit',     label: 'Exit',            icon: 'log-out-outline'         },
+  { key: 'refunds',  label: 'Refunds',         icon: 'wallet-outline'          },
+  { key: 'absent',   label: 'Not in Property', icon: 'home-outline'            },
+  { key: 'excel',    label: 'Excel Upload',    icon: 'document-outline'        },
 ];
 
 const BED_FOCUS_TILES = [
@@ -394,11 +398,11 @@ function mapOcrPaymentMode(bankName?: string | null): string | null {
 function Card({ children, style }: { children: React.ReactNode; style?: any }) {
   return (
     <View style={[{
-      backgroundColor: VBRAND.surface, borderRadius: 14,
+      backgroundColor: VBRAND.surface, borderRadius: 16,
       borderWidth: 1, borderColor: VBRAND.cardBorder,
       padding: 12, marginBottom: 10,
-      shadowColor: VBRAND.shadow, shadowOpacity: 0.04, shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 }, elevation: 1,
+      shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 }, elevation: 1,
     }, style]}>{children}</View>
   );
 }
@@ -406,7 +410,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: any }) {
 function SectionTitle({ title }: { title: string; accent?: string }) {
   return (
     <View style={{ marginBottom: 10, marginTop: 4 }}>
-      <Text style={{ fontSize: 15, fontWeight: '700', color: VBRAND.ink900 }}>{title}</Text>
+      <Text style={{ fontSize: 17, fontWeight: '800', color: VBRAND.ink900 }}>{title}</Text>
     </View>
   );
 }
@@ -435,7 +439,7 @@ function LifeTenantCard({
       flexDirection: 'row', alignItems: 'center', gap: 9,
       backgroundColor: '#fff', borderWidth: 1, borderColor: VBRAND.softLine,
       borderRadius: 12, paddingVertical: 9, paddingHorizontal: 10, marginBottom: 6,
-      shadowColor: '#0F172A', shadowOpacity: 0.03, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+      shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
     }}>
       <LifeAvatar name={name} vacant={vacant} />
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -580,19 +584,19 @@ function BottomSheet({ visible, onClose, title, children }: {
     <Modal visible={visible} animationType="slide" transparent onRequestClose={() => { /* blocked by navigation.beforeRemove */ }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Backdrop — tap closes sheet, does NOT navigate */}
-        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)' }} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={onClose} />
         <View style={{
-          backgroundColor: '#FAF7FC', borderTopLeftRadius: 32, borderTopRightRadius: 32,
+          backgroundColor: '#F8FAFC', borderTopLeftRadius: 32, borderTopRightRadius: 32,
           maxHeight: '92%', paddingBottom: 32,
           shadowColor: VBRAND.shadow, shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: -6 },
         }}>
           {/* Drag handle */}
           <View style={{ alignItems: 'center', paddingTop: 10 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(99,102,241,0.2)' }} />
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(37,99,235,0.2)' }} />
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 22, paddingTop: 14, paddingBottom: 16,
-            borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB' }}>
+            borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6' }}>
             <Text style={{ fontSize: 18, fontWeight: '900', color: VBRAND.ink900, letterSpacing: -0.3 }}>{title}</Text>
             <TouchableOpacity
               onPress={onClose}
@@ -638,10 +642,10 @@ function TextF({ value, onChange, placeholder, keyboardType, multiline, editable
       multiline={multiline} editable={editable !== false}
       style={{
         backgroundColor: editable === false ? 'rgba(243,238,247,0.7)' : '#fff',
-        borderRadius: 14, borderWidth: 0.5, borderColor: '#E5E7EB',
+        borderRadius: 14, borderWidth: 0.5, borderColor: '#EEF1F6',
         paddingHorizontal: 14, paddingVertical: multiline ? 12 : 0,
         height: multiline ? 92 : 48, fontSize: 14, color: VBRAND.ink900, fontWeight: '500',
-        shadowColor: VBRAND.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+        shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
       }}
     />
   );
@@ -668,9 +672,9 @@ function SelectF({ options, value, onChange, placeholder }: {
     <>
       <TouchableOpacity onPress={() => setOpen(true)} activeOpacity={0.85} style={{
         backgroundColor: '#fff', borderRadius: 14, borderWidth: 0.5,
-        borderColor: '#E5E7EB', paddingHorizontal: 14, height: 48,
+        borderColor: '#EEF1F6', paddingHorizontal: 14, height: 48,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        shadowColor: VBRAND.shadow, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+        shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
       }}>
         <Text style={{ fontSize: 14, color: selected ? VBRAND.ink900 : VBRAND.ink400, flex: 1, fontWeight: selected ? '600' : '500' }} numberOfLines={1}>
           {selected ? selected.label : (placeholder || 'Select…')}
@@ -684,7 +688,7 @@ function SelectF({ options, value, onChange, placeholder }: {
         </View>
       </TouchableOpacity>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.45)', justifyContent: 'center', padding: 24 }}
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 }}
           activeOpacity={1} onPress={() => setOpen(false)}>
           <View style={{ backgroundColor: '#fff', borderRadius: 22, maxHeight: 460, overflow: 'hidden',
             shadowColor: VBRAND.shadow, shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 10 } }}>
@@ -694,7 +698,7 @@ function SelectF({ options, value, onChange, placeholder }: {
                 return (
                   <TouchableOpacity onPress={() => { onChange(item.value); setOpen(false); }}
                     style={{ paddingHorizontal: 18, paddingVertical: 14,
-                      borderBottomWidth: 0.5, borderBottomColor: '#E5E7EB',
+                      borderBottomWidth: 0.5, borderBottomColor: '#EEF1F6',
                       backgroundColor: isActive ? VBRAND.purpleSoft : '#fff',
                       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: 14, color: VBRAND.ink900,
@@ -728,7 +732,7 @@ export default function TenantLifecycleScreen() {
   const mounted = useMountedRef();
   const navigation = useNavigation() as any;
 
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('overview');
   const [bedFocus, setBedFocus] = useState<string | null>('occupied');
   const [bedFocusSearch, setBedFocusSearch] = useState('');
   const [loading, setLoading]     = useState(true);
@@ -768,6 +772,7 @@ export default function TenantLifecycleScreen() {
   const [switchOpen,        setSwitchOpen]        = useState(false);
   const [noticeOpen,        setNoticeOpen]        = useState(false);
   const [exitOpen,          setExitOpen]          = useState(false);
+  const [exitSubTab,        setExitSubTab]        = useState<'notice' | 'history'>('notice');
 
   // ── Voice Notice state ──
   const [voiceNoticeOpen,   setVoiceNoticeOpen]   = useState(false);
@@ -775,7 +780,7 @@ export default function TenantLifecycleScreen() {
   const [noticeTranscript,  setNoticeTranscript]  = useState('');
   const [noticeVoiceErr,    setNoticeVoiceErr]    = useState('');
   const [noticeSubmitting,  setNoticeSubmitting]  = useState(false);
-  const noticeRecordingRef  = useRef<Audio.Recording | null>(null);
+  const noticeRecorder      = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const noticeSilenceTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noticeMeteringInt   = useRef<ReturnType<typeof setInterval> | null>(null);
   const noticePulseScale1   = useRef(new Animated.Value(1)).current;
@@ -798,17 +803,53 @@ export default function TenantLifecycleScreen() {
   const [absenceForm, setAbsenceForm] = useState<any>(blankAbsence);
 
   // ── bed map ──
-  const [mapFilter,  setMapFilter]  = useState<string | null>(null);
-  const [mapSearch,  setMapSearch]  = useState('');
-  const [mapSortBy,  setMapSortBy]  = useState<'apartment' | 'gender'>('apartment');
-  const [bedDetail,  setBedDetail]  = useState<any>(null);
+  const [mapFilter,   setMapFilter]   = useState<string | null>(null);
+  const [mapSearch,   setMapSearch]   = useState('');
+  const [mapSortBy,   setMapSortBy]   = useState<'apartment' | 'gender'>('apartment');
+  const [bedDetail,   setBedDetail]   = useState<any>(null);
+  // Per-month paid/pending for the tapped tenant in the visual-map bed sheet.
+  const [bedPay, setBedPay] = useState<{ loading: boolean; months: { month: string; paid: boolean; balance: number }[] }>({ loading: false, months: [] });
+  useEffect(() => {
+    const tid = bedDetail?.allotment?.tenant_id;
+    if (!tid) { setBedPay({ loading: false, months: [] }); return; }
+    let alive = true;
+    setBedPay({ loading: true, months: [] });
+    (async () => {
+      try {
+        const inv = await client.action((api as any).accounting.listInvoices, { tenantId: tid });
+        if (!alive) return;
+        const byMonth = new Map<string, number>();
+        (inv || []).forEach((i: any) => {
+          const m = i.billingMonth || i.billing_month;
+          if (!m) return;
+          const bal = Number(i.outstanding ?? i.balance ?? 0) || 0;
+          byMonth.set(m, (byMonth.get(m) || 0) + bal);
+        });
+        const months = [...byMonth.entries()]
+          .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+          .slice(0, 6)
+          .map(([month, balance]) => ({ month, balance, paid: balance <= 0 }));
+        setBedPay({ loading: false, months });
+      } catch {
+        if (alive) setBedPay({ loading: false, months: [] });
+      }
+    })();
+    return () => { alive = false; };
+  }, [bedDetail?.allotment?.tenant_id]);
+  const [mapMenuOpen, setMapMenuOpen] = useState(false);
+  const [expandedApt, setExpandedApt] = useState<string | null>(null);
+
+  // Tenant statement modal (opened from a switch row's "View"). Declared here (rather than
+  // alongside the other stmt* state below) so `anySheetOpen`/`closeActiveSheet` below can
+  // reference it without a temporal-dead-zone error.
+  const [stmtCtx, setStmtCtx] = useState<any>(null);
 
   // ── derived: is any overlay open? ────────────────────────────────────────────
   // Re-evaluated on every render so it's always current
   const anySheetOpen =
     bookingOpen || cancelOpen || onboardOpen || addPayOpen || editOccOpen ||
     switchOpen || noticeOpen || voiceNoticeOpen || editNoticeOpen || exitOpen || editExitOpen ||
-    editRefundOpen || completeRefundOpen || absenceOpen || !!bedDetail;
+    editRefundOpen || completeRefundOpen || absenceOpen || !!bedDetail || !!stmtCtx;
 
   // Close whichever sheet is currently open
   const closeActiveSheet = useCallback(() => {
@@ -827,9 +868,10 @@ export default function TenantLifecycleScreen() {
     if (editRefundOpen)      { setEditRefundOpen(false); return; }
     if (completeRefundOpen)  { setCompleteRefundOpen(false); return; }
     if (absenceOpen)         { setAbsenceOpen(false); return; }
+    if (stmtCtx)             { setStmtCtx(null); return; }
   }, [bedDetail, bookingOpen, cancelOpen, onboardOpen, addPayOpen, editOccOpen,
       switchOpen, noticeOpen, editNoticeOpen, exitOpen, editExitOpen,
-      editRefundOpen, completeRefundOpen, absenceOpen]);
+      editRefundOpen, completeRefundOpen, absenceOpen, stmtCtx]);
 
   // Lock drawer swipe & block browser/hardware back when any sheet is open
   useEffect(() => {
@@ -877,16 +919,21 @@ export default function TenantLifecycleScreen() {
   // ── Payment proof state (booking + onboarding) ────────────────────────────
   const [bookingProof,   setBookingProof]   = useState<{ uri: string; base64?: string; mimeType?: string } | null>(null);
   const [onboardProof,   setOnboardProof]   = useState<{ uri: string; base64?: string; mimeType?: string } | null>(null);
+  // Refund payment proof + its OCR-scanned amount (must EXACTLY match the refund amount to allow completion).
+  const [refundProof,       setRefundProof]       = useState<{ uri: string; base64?: string; mimeType?: string } | null>(null);
+  const [refundProofAmount, setRefundProofAmount] = useState<number | null>(null);
   const [proofUploading, setProofUploading] = useState(false);
-  // OCR scan-in-progress flags for the proof tiles (booking / onboarding).
-  const [proofScanning, setProofScanning] = useState<{ booking: boolean; onboarding: boolean }>({ booking: false, onboarding: false });
+  // OCR scan-in-progress flags for the proof tiles (booking / onboarding / refund).
+  const [proofScanning, setProofScanning] = useState<{ booking: boolean; onboarding: boolean; refund: boolean }>({ booking: false, onboarding: false, refund: false });
   // Always-fresh bank-accounts snapshot so the OCR matcher (in a []-dep callback) isn't stale.
   const bankAccountsRef = useRef<any[]>([]);
   bankAccountsRef.current = bankAccounts;
+  // Fresh refund-amount snapshot for the OCR exact-match check (runProofOcr has []-deps). Assigned after completeRefundForm is declared.
+  const refundDueRef = useRef<number>(0);
 
   // Scan an uploaded payment screenshot and auto-fill amount / mode / txn ref / bank.
   // Mirrors the web TenantLifecycle handleProofSelectAndOcr + the technician flow.
-  const runProofOcr = useCallback(async (target: 'booking' | 'onboarding', base64?: string, uri?: string) => {
+  const runProofOcr = useCallback(async (target: 'booking' | 'onboarding' | 'refund', base64?: string, uri?: string) => {
     // The image picker (with allowsEditing) frequently returns NO base64 on
     // Android, and full-res screenshots can be too large — so re-encode a
     // resized JPEG from the uri to guarantee usable base64 for the OCR call.
@@ -894,7 +941,7 @@ export default function TenantLifecycleScreen() {
     if (uri) {
       try {
         const IM: any = await import('expo-image-manipulator');
-        const FS: any = await import('expo-file-system');
+        const FS: any = await import('expo-file-system/legacy');
         const manip = await IM.manipulateAsync(uri, [{ resize: { width: 1400 } }], { compress: 0.7, format: IM.SaveFormat.JPEG });
         const encoded = await FS.readAsStringAsync(manip.uri, { encoding: 'base64' });
         if (encoded) b64 = encoded;
@@ -904,18 +951,40 @@ export default function TenantLifecycleScreen() {
     setProofScanning(p => ({ ...p, [target]: true }));
     try {
       const ocr: any = await extractPaymentProof(b64);
-      if (ocr && (ocr.amount || ocr.payment_date || ocr.bank_name || ocr.transaction_reference)) {
-        const mode = mapOcrPaymentMode(ocr.bank_name);
-        // Match a saved org bank account by name (best-effort, same as technician flow).
-        let matchedBankId: string | undefined;
-        if (ocr.bank_name) {
-          const name = String(ocr.bank_name).toLowerCase();
-          const matched = bankAccountsRef.current.find((ba: any) => {
-            const bn = String(ba.bank_name || '').toLowerCase();
-            return bn && (bn.includes(name) || name.includes(bn));
-          });
-          if (matched) matchedBankId = matched.id;
+      const scanned = ocr && ocr.amount != null ? Math.round(Number(ocr.amount)) : null;
+      const mode = mapOcrPaymentMode(ocr?.bank_name);
+      // Match a saved org bank account by name (best-effort, same as technician flow).
+      let matchedBankId: string | undefined;
+      if (ocr?.bank_name) {
+        const name = String(ocr.bank_name).toLowerCase();
+        const matched = bankAccountsRef.current.find((ba: any) => {
+          const bn = String(ba.bank_name || '').toLowerCase();
+          return bn && (bn.includes(name) || name.includes(bn));
+        });
+        if (matched) matchedBankId = matched.id;
+      }
+
+      // ── Refund: the amount is FIXED (read-only). Store the scanned amount so the
+      //    UI + submit can enforce an EXACT match against the refund amount. ──────
+      if (target === 'refund') {
+        setRefundProofAmount(scanned);
+        setCompleteRefundForm((p: any) => ({
+          ...p,
+          referenceNumber: (ocr && ocr.transaction_reference) || p.referenceNumber,
+          bankAccountId:   matchedBankId || p.bankAccountId,
+        }));
+        const due = refundDueRef.current;
+        if (scanned == null) {
+          Alert.alert('Amount not readable', `Could not read the amount from this screenshot. The refund stays blocked until a clear screenshot showing ₹${due} is uploaded.`);
+        } else if (scanned === due) {
+          Alert.alert('✓ Amount verified', `Screenshot amount ₹${scanned} matches the refund amount — you can complete the refund.`);
+        } else {
+          Alert.alert('✗ Amount mismatch', `Screenshot shows ₹${scanned} but the refund amount is ₹${due}. Only a screenshot with the exact refund amount is allowed.`);
         }
+        return;
+      }
+
+      if (ocr && (ocr.amount || ocr.payment_date || ocr.bank_name || ocr.transaction_reference)) {
         if (target === 'booking') {
           setBForm((p: any) => ({
             ...p,
@@ -954,50 +1023,56 @@ export default function TenantLifecycleScreen() {
   }, []);
 
   // ── Proof picker — gallery OR camera (mirrors web UnifiedImagePicker) ──────
-  const pickProof = useCallback(async (target: 'booking' | 'onboarding') => {
-    const setFn = target === 'booking' ? setBookingProof : setOnboardProof;
+  // Gallery / camera launchers factored out so we can call them directly on web
+  // (react-native-web's Alert.alert ignores button onPress callbacks, so the
+  //  action-sheet path below never fires there → gallery would never open).
+  const openProofGallery = useCallback(async (target: 'booking' | 'onboarding' | 'refund') => {
+    const setFn = target === 'booking' ? setBookingProof : target === 'onboarding' ? setOnboardProof : setRefundProof;
+    try {
+      const ImagePicker = await import('expo-image-picker') as any;
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission Required', 'Allow photo library access to upload proof.'); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8, base64: true });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
+      runProofOcr(target, asset.base64 ?? undefined, asset.uri);
+    } catch (e: any) { Alert.alert('Error', e.message || 'Could not open gallery.'); }
+  }, [runProofOcr]);
+
+  const openProofCamera = useCallback(async (target: 'booking' | 'onboarding' | 'refund') => {
+    const setFn = target === 'booking' ? setBookingProof : target === 'onboarding' ? setOnboardProof : setRefundProof;
+    try {
+      const ImagePicker = await import('expo-image-picker') as any;
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission Required', 'Allow camera access to take a photo.'); return; }
+      const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8, base64: true });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
+      runProofOcr(target, asset.base64 ?? undefined, asset.uri);
+    } catch (e: any) { Alert.alert('Error', e.message || 'Could not open camera.'); }
+  }, [runProofOcr]);
+
+  const pickProof = useCallback(async (target: 'booking' | 'onboarding' | 'refund') => {
+    // Web: Alert.alert button callbacks don't fire on react-native-web, so open
+    // the gallery/file-picker directly instead of the (dead) action sheet.
+    if (Platform.OS === 'web') { openProofGallery(target); return; }
     Alert.alert('Upload Proof', 'Choose how to attach payment proof', [
-      {
-        text: 'Choose from Gallery',
-        onPress: async () => {
-          try {
-            const ImagePicker = await import('expo-image-picker') as any;
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') { Alert.alert('Permission Required', 'Allow photo library access to upload proof.'); return; }
-            const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8, base64: true });
-            if (result.canceled || !result.assets?.[0]) return;
-            const asset = result.assets[0];
-            setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
-            runProofOcr(target, asset.base64 ?? undefined, asset.uri);
-          } catch (e: any) { Alert.alert('Error', e.message || 'Could not open gallery.'); }
-        },
-      },
-      {
-        text: 'Take Photo',
-        onPress: async () => {
-          try {
-            const ImagePicker = await import('expo-image-picker') as any;
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') { Alert.alert('Permission Required', 'Allow camera access to take a photo.'); return; }
-            const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8, base64: true });
-            if (result.canceled || !result.assets?.[0]) return;
-            const asset = result.assets[0];
-            setFn({ uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? 'image/jpeg' });
-            runProofOcr(target, asset.base64 ?? undefined, asset.uri);
-          } catch (e: any) { Alert.alert('Error', e.message || 'Could not open camera.'); }
-        },
-      },
+      { text: 'Choose from Gallery', onPress: () => openProofGallery(target) },
+      { text: 'Take Photo', onPress: () => openProofCamera(target) },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  }, []);
+  }, [openProofGallery, openProofCamera]);
 
-  const blankSwitch = { allotmentId: '', tenantId: '', oldBedId: '', newBedId: '', switchDate: today(), oldRate: 0, newRate: 0, newAptId: '', newPropId: '' };
+  const blankSwitch = { allotmentId: '', tenantId: '', oldBedId: '', newBedId: '',
+    switchType: 'immediate', switchDate: today(), effectiveDate: '', notes: '',
+    oldRate: 0, newRate: 0, newAptId: '', newPropId: '' };
   const [swForm, setSwForm] = useState<any>(blankSwitch);
-  // Tenant statement modal (opened from a switch row's "View").
-  const [stmtCtx, setStmtCtx]         = useState<any>(null);
   const [stmtTab, setStmtTab]         = useState<'ledger' | 'deposit' | 'summary'>('ledger');
   const [stmtInvoices, setStmtInvoices] = useState<any[]>([]);
   const [stmtReceipts, setStmtReceipts] = useState<any[]>([]);
+  const [stmtAdjustments, setStmtAdjustments] = useState<any[]>([]);
   const [stmtLoading, setStmtLoading] = useState(false);
   const [depEdit, setDepEdit]         = useState<{ editing: boolean; value: string }>({ editing: false, value: '' });
 
@@ -1033,6 +1108,7 @@ export default function TenantLifecycleScreen() {
   const [editExitForm, setEditExitForm] = useState<any>({ exitId: '', allotmentId: '', exitDate: '', hasNotice: false, keyReturned: true, damageCharges: '0', notes: '' });
   const [editRefundForm, setEditRefundForm] = useState<any>({ exitId: '', allotmentId: '', advanceHeld: 0, pendingRent: '0', ebCharges: '0', exitCharges: '0', damageCharges: '0', keyLossFee: '0' });
   const [completeRefundForm, setCompleteRefundForm] = useState<any>({ exitId: '', allotmentId: '', tenantId: '', tenantName: '', refundDue: 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
+  refundDueRef.current = Math.round(Number(completeRefundForm.refundDue) || 0);
 
   // ─── FETCH ─────────────────────────────────────────────────────────────────
 
@@ -1500,6 +1576,9 @@ export default function TenantLifecycleScreen() {
           oldRate: swForm.oldRate, newRate: swForm.newRate,
           newApartmentId: swForm.newAptId, newPropertyId: swForm.newPropId,
           switchDate: swForm.switchDate || today(),
+          switchType: swForm.switchType,
+          effectiveDate: swForm.effectiveDate || swForm.switchDate,
+          notes: swForm.notes,
         },
       });
       Alert.alert('Success', 'Room switch processed!'); setSwitchOpen(false); setSwForm({ ...blankSwitch }); fetchAll();
@@ -1513,15 +1592,20 @@ export default function TenantLifecycleScreen() {
     setStmtTab('ledger');
     setStmtInvoices([]);
     setStmtReceipts([]);
+    setStmtAdjustments([]);
     setStmtLoading(true);
     try {
       // Invoices = charges (debits). listReceipts = ALL payments incl. monthly rent
       // (the lifecycle receipts list is filtered and misses rent → wrong credits).
-      const [inv, rec] = await Promise.all([
+      // Adjustments = credit/debit notes (room-switch rent credits, deposit-return
+      // credits, CC debit notes) which were previously invisible in this modal.
+      const [inv, rec, adj] = await Promise.all([
         client.action((api as any).accounting.listInvoices, { tenantId: s.tenantId }),
         client.action((api as any).accounting.listReceipts, {}).catch(() => []),
+        client.action((api as any).accounting.listAdjustments, {}).catch(() => []),
       ]);
       setStmtInvoices(inv || []);
+      setStmtAdjustments((adj || []).filter((a: any) => a.tenant_id === s.tenantId));
       setStmtReceipts((rec || [])
         .filter((r: any) => r.tenant_id === s.tenantId)
         .map((r: any) => ({
@@ -1533,7 +1617,7 @@ export default function TenantLifecycleScreen() {
           paymentDate: r.payment_date || (r.created_at || '').split('T')[0] || '',
           receiptType: r.receipt_type || '',
         })));
-    } catch { setStmtInvoices([]); setStmtReceipts([]); }
+    } catch { setStmtInvoices([]); setStmtReceipts([]); setStmtAdjustments([]); }
     setStmtLoading(false);
   }
 
@@ -1579,6 +1663,29 @@ export default function TenantLifecycleScreen() {
     setSwitchOpen(true);
   }
 
+  function doCompleteSwitch(s: any) {
+    Alert.alert('Complete Switch', 'Finalize this scheduled switch now? The tenant moves to the new bed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Complete', style: 'default', onPress: async () => {
+        try { setSaving(true);
+          await client.action((api as any).tenants.completeSwitch, { switchId: s._id });
+          Alert.alert('Success', 'Switch completed'); fetchAll();
+        } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
+      }},
+    ]);
+  }
+  function doCancelSwitch(s: any) {
+    Alert.alert('Cancel Switch', 'Revert this scheduled switch? The tenant stays in their current room and the booked bed is freed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Cancel Switch', style: 'destructive', onPress: async () => {
+        try { setSaving(true);
+          await client.action((api as any).tenants.cancelSwitch, { switchId: s._id });
+          Alert.alert('Cancelled', 'Switch cancelled'); fetchAll();
+        } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
+      }},
+    ]);
+  }
+
   // ── Voice Notice helpers ─────────────────────────────────────────────────
   const clearNoticeTimers = useCallback(() => {
     if (noticeSilenceTimer.current)  { clearTimeout(noticeSilenceTimer.current);  noticeSilenceTimer.current = null; }
@@ -1589,15 +1696,13 @@ export default function TenantLifecycleScreen() {
     clearNoticeTimers();
     try {
       setNoticeRecState('transcribing');
-      const rec = noticeRecordingRef.current;
-      if (!rec) { setNoticeRecState('idle'); return; }
-      await rec.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = rec.getURI();
-      noticeRecordingRef.current = null;
+      if (!noticeRecorder.isRecording && !noticeRecorder.uri) { setNoticeRecState('idle'); return; }
+      await noticeRecorder.stop();
+      await setAudioModeAsync({ allowsRecording: false });
+      const uri = noticeRecorder.uri;
       if (!uri) { setNoticeVoiceErr('No audio captured. Please try again.'); setNoticeRecState('error'); return; }
 
-      const FileSystem = await import('expo-file-system') as any;
+      const FileSystem = await import('expo-file-system/legacy') as any;
       const audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const resp = await fetch(TRANSCRIBE_URL, {
         method: 'POST',
@@ -1621,17 +1726,14 @@ export default function TenantLifecycleScreen() {
       setNoticeTranscript('');
       setNoticeVoiceErr('');
       setNoticeRecState('recording');
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) { setNoticeVoiceErr('Microphone permission denied.'); setNoticeRecState('error'); return; }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync({
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        isMeteringEnabled: true,
-      });
-      noticeRecordingRef.current = recording;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await noticeRecorder.prepareToRecordAsync();
+      noticeRecorder.record();
       noticeMeteringInt.current = setInterval(async () => {
         try {
-          const status = await recording.getStatusAsync();
+          const status = noticeRecorder.getStatus();
           if (!status.isRecording) return;
           const level = (status as any).metering ?? -160;
           if (level < -40) {
@@ -1671,7 +1773,7 @@ export default function TenantLifecycleScreen() {
 
   useEffect(() => () => {
     clearNoticeTimers();
-    noticeRecordingRef.current?.stopAndUnloadAsync().catch(() => {});
+    if (noticeRecorder.isRecording) noticeRecorder.stop().catch(() => {});
   }, []);
 
   async function submitVoiceNotice() {
@@ -1830,6 +1932,11 @@ export default function TenantLifecycleScreen() {
   }
 
   async function doCompleteRefund() {
+    const due = Math.round(Number(completeRefundForm.refundDue) || 0);
+    // Gate: a payment screenshot must be uploaded, scanned, and its amount must EXACTLY match the refund amount.
+    if (!refundProof) return Alert.alert('Payment proof required', `Upload the payment screenshot for this ₹${due} refund.`);
+    if (refundProofAmount == null) return Alert.alert('Amount not verified', `Could not read the amount from the screenshot. Upload a clear screenshot showing ₹${due}.`);
+    if (refundProofAmount !== due) return Alert.alert('Amount mismatch', `The screenshot shows ₹${refundProofAmount} but the refund amount is ₹${due}. Only a screenshot with the exact refund amount is allowed.`);
     if (!completeRefundForm.referenceNumber) return Alert.alert('Validation', 'Enter reference number.');
     await withSave(async () => {
       await client.action((api as any).tenants.completeRefundFull, {
@@ -1858,9 +1965,9 @@ export default function TenantLifecycleScreen() {
       <View style={{
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.78)', borderRadius: 14,
-        borderWidth: 0.5, borderColor: '#E5E7EB',
+        borderWidth: 0.5, borderColor: '#EEF1F6',
         paddingHorizontal: 14, height: 46, marginBottom: 14, gap: 10,
-        shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+        shadowColor: VBRAND.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
       }}>
         <Ionicons name="search-outline" size={18} color={VBRAND.ink400} />
         <TextInput value={ts(tab)} onChangeText={v => setTs(tab, v)} placeholder={placeholder || 'Search…'}
@@ -1880,11 +1987,11 @@ export default function TenantLifecycleScreen() {
     return (
       <TouchableOpacity onPress={() => onChange(!checked)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}>
         <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2,
-          borderColor: checked ? '#6366F1' : '#C4B5A0', backgroundColor: checked ? '#6366F1' : 'transparent',
+          borderColor: checked ? '#2563EB' : 'rgba(37,99,235,0.35)', backgroundColor: checked ? '#2563EB' : 'transparent',
           alignItems: 'center', justifyContent: 'center' }}>
           {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
         </View>
-        <Text style={{ fontSize: fontSize.sm, color: '#111827' }}>{label}</Text>
+        <Text style={{ fontSize: fontSize.sm, color: '#0F172A' }}>{label}</Text>
       </TouchableOpacity>
     );
   }
@@ -1893,7 +2000,7 @@ export default function TenantLifecycleScreen() {
 
   function selectBedFocus(key: string) {
     setBedFocus(key);
-    setActiveTab(null);
+    setActiveTab('overview');
     setBedFocusSearch('');
   }
 
@@ -1917,17 +2024,13 @@ export default function TenantLifecycleScreen() {
     };
 
     return (
-      <View style={{
-        backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: VBRAND.cardBorder,
-        padding: 11, marginBottom: 10,
-        shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
-      }}>
+      <LifecycleCard style={{ borderRadius: 18, borderWidth: 1, borderColor: '#EEF1F6', padding: 13, marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }}>Bed Status</Text>
             <Text style={{ fontSize: 11, color: VBRAND.ink500, marginTop: 1 }}>vs previous month</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => Alert.alert('Intelligence', 'Occupancy intelligence coming soon.')}
@@ -1939,50 +2042,47 @@ export default function TenantLifecycleScreen() {
             >
               <Text style={{ fontSize: 11, fontWeight: '700', color: VBRAND.ink700 }}>Intelligence</Text>
             </TouchableOpacity>
-            <View style={{
-              height: 24, paddingHorizontal: 10, borderRadius: 999,
-              backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: VBRAND.purpleDeep }}>Total {totalLive}</Text>
-            </View>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purpleDeep, textDecorationLine: 'underline' }}>
+              Total {totalLive}
+            </Text>
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10, alignItems: 'stretch' }}>
           <View style={{
             width: 56, height: 56, borderRadius: 28,
-            borderWidth: 5, borderColor: '#22C55E',
-            alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6',
+            borderWidth: 5, borderColor: VBRAND.occ,
+            alignItems: 'center', justifyContent: 'center', backgroundColor: VBRAND.surfaceSoft,
           }}>
             <Text style={{ fontSize: 13, fontWeight: '800', color: VBRAND.ink900 }}>{totalLive}</Text>
           </View>
-          <View style={{ flex: 1, gap: 8 }}>
+          <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
             <View style={{
-              backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
+              flex: 1, backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
               borderColor: VBRAND.softLine, padding: 9,
             }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+              <Text style={{ fontSize: 9, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }} numberOfLines={1}>
                 Current occupancy
               </Text>
-              <Text style={{ fontSize: 19, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
-              <Text style={{ fontSize: 10, color: VBRAND.ink500 }}>(Occupied + Notice) / Total</Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
+              <Text style={{ fontSize: 9, color: VBRAND.ink500 }} numberOfLines={1}>(Occupied + Notice) / Total</Text>
             </View>
             <View style={{
-              backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
+              flex: 1, backgroundColor: VBRAND.surfaceSoft, borderRadius: 10, borderWidth: 1,
               borderColor: VBRAND.softLine, padding: 9,
             }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+              <Text style={{ fontSize: 9, fontWeight: '700', color: VBRAND.ink600, letterSpacing: 0.4, textTransform: 'uppercase' }} numberOfLines={1}>
                 Month occupancy
               </Text>
-              <Text style={{ fontSize: 19, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
-              <Text style={{ fontSize: 10, color: VBRAND.ink500 }}>{bedCounts.occupied + bedCounts.notice}/{totalLive} beds live</Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: VBRAND.ink900, marginTop: 2 }}>{occPct}%</Text>
+              <Text style={{ fontSize: 9, color: VBRAND.ink500 }} numberOfLines={1}>{bedCounts.occupied + bedCounts.notice}/{totalLive} beds live</Text>
             </View>
           </View>
         </View>
 
         <View style={{ flexDirection: 'row', gap: 5 }}>
           {BED_FOCUS_TILES.map((t) => {
-            const on = bedFocus === t.key && !activeTab;
+            const on = bedFocus === t.key && activeTab === 'overview';
             const val = counts[t.key] ?? 0;
             return (
               <TouchableOpacity
@@ -1991,14 +2091,14 @@ export default function TenantLifecycleScreen() {
                 onPress={() => selectBedFocus(t.key)}
                 style={{
                   flex: 1, minWidth: 0,
-                  backgroundColor: on ? '#EFF6FF' : VBRAND.surfaceSoft,
+                  backgroundColor: on ? VBRAND.purpleSoft : VBRAND.surfaceSoft,
                   borderWidth: 1,
-                  borderColor: on ? '#BFDBFE' : VBRAND.softLine,
+                  borderColor: on ? '#DBEAFE' : VBRAND.softLine,
                   borderRadius: 10, paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center',
                 }}
               >
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.color, marginBottom: 4 }} />
-                <Text style={{ fontSize: 14, fontWeight: '800', color: VBRAND.ink900 }}>{val}</Text>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: VBRAND.ink900 }}>{val}</Text>
                 <Text style={{ fontSize: 9, fontWeight: '700', color: VBRAND.ink600, textAlign: 'center' }} numberOfLines={1}>
                   {t.label}
                 </Text>
@@ -2006,21 +2106,21 @@ export default function TenantLifecycleScreen() {
             );
           })}
         </View>
-      </View>
+      </LifecycleCard>
     );
   }
 
   function renderBedFocusDetail() {
     if (!bedFocus) {
       return (
-        <View style={{
+        <LifecycleCard style={{
           backgroundColor: VBRAND.surfaceSoft, borderRadius: 14, borderWidth: 1, borderColor: VBRAND.line,
-          padding: 24, alignItems: 'center', marginTop: 4,
+          padding: 24, alignItems: 'center', marginTop: 4, marginBottom: 0,
         }}>
           <Text style={{ fontSize: 13, color: VBRAND.ink500, textAlign: 'center', fontWeight: '600' }}>
-            Pick a Bed Status tile or a Lifecycle module to see details.
+            Pick a Bed Status tile to see the tenants behind it.
           </Text>
-        </View>
+        </LifecycleCard>
       );
     }
 
@@ -2053,7 +2153,7 @@ export default function TenantLifecycleScreen() {
             sub={`${code} · Onboarded ${fmtDate(a.onboarding_date || a.start_date)} · Rent ₹${fmtAmt(a.monthly_rent || getBedRate(a.bed_id))}`}
             amount={`₹${fmtAmt(a.advance_amount || a.deposit_amount)}`}
             amountOk
-            right={<Ionicons name="chevron-forward" size={16} color={VBRAND.ink400} />}
+            right={<Ionicons name="pencil-outline" size={16} color={VBRAND.ink400} />}
           />
         );
       });
@@ -2074,6 +2174,7 @@ export default function TenantLifecycleScreen() {
             pill="On Notice"
             sub={`${code} · ${fmtDate(a.notice_date)} → ${fmtDate(a.exit_date || a.expected_exit_date)}`}
             amount={`₹${fmtAmt(a.monthly_rent || getBedRate(a.bed_id))}`}
+            right={<Ionicons name="pencil-outline" size={16} color={VBRAND.ink400} />}
           />
         );
       });
@@ -2095,6 +2196,7 @@ export default function TenantLifecycleScreen() {
             pill={isNew ? 'New' : undefined}
             sub={`${code} · Booked ${fmtDate(a.booking_date || a.created_at)} · Move-in ${fmtDate(a.expected_move_in || a.start_date)}`}
             amount={`₹${fmtAmt(a.booking_amount || a.advance_amount || config.booking_fee)}`}
+            right={<Ionicons name="pencil-outline" size={16} color={VBRAND.ink400} />}
           />
         );
       });
@@ -2127,9 +2229,9 @@ export default function TenantLifecycleScreen() {
               : 0;
 
     return (
-      <View style={{
+      <LifecycleCard style={{
         backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: VBRAND.cardBorder,
-        padding: 12, marginTop: 2,
+        padding: 12, marginTop: 2, marginBottom: 0,
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: VBRAND.ink900 }}>
@@ -2165,7 +2267,7 @@ export default function TenantLifecycleScreen() {
           )}
         </View>
         {rows}
-      </View>
+      </LifecycleCard>
     );
   }
 
@@ -2179,20 +2281,27 @@ export default function TenantLifecycleScreen() {
 
   function renderBedMap() {
     const STATUS_FILTERS = [
-      { key: null,            label: 'All',           color: '#2563EB' },
-      { key: 'occupied',      label: 'Occupied',      color: '#16A34A' },
-      { key: 'vacant',        label: 'Vacant',        color: '#E11D48' },
-      { key: 'notice',        label: 'Notice',        color: '#D97706' },
-      { key: 'booked',        label: 'Booked',        color: '#1856FF' },
-      { key: 'notice-booked', label: 'Notice-Booked', color: '#7C3AED' },
-    ];
+      { key: null,       label: 'All',      color: '#6D5EF6' },
+      { key: 'occupied', label: 'Occupied', color: '#16A34A' },
+      { key: 'vacant',   label: 'Vacant',   color: '#E11D48' },
+      { key: 'notice',   label: 'Notice',   color: '#D97706' },
+      { key: 'booked',   label: 'Booked',   color: '#2563EB' },
+    ] as const;
 
     const BED_STATUS_COLORS: Record<string, { bg: string; border: string; textColor: string; dot: string }> = {
-      occupied:        { bg: '#E8F5E9', border: '#4CAF50', textColor: '#2E7D32', dot: '#4CAF50' },
-      vacant:          { bg: '#FFEBEE', border: '#EF5350', textColor: '#C62828', dot: '#EF5350' },
-      notice:          { bg: '#FFF8E1', border: '#FFC107', textColor: '#8B6914', dot: '#FFC107' },
-      booked:          { bg: '#E3F2FD', border: '#3B82F6', textColor: '#1565C0', dot: '#3B82F6' },
-      'notice-booked': { bg: '#F3E5F5', border: '#9C27B0', textColor: '#6A1B9A', dot: '#9C27B0' },
+      occupied:        { bg: '#DCFCE7', border: '#16A34A', textColor: '#15803D', dot: '#16A34A' },
+      vacant:          { bg: '#FFE4E6', border: '#E11D48', textColor: '#BE123C', dot: '#E11D48' },
+      notice:          { bg: '#FEF3C7', border: '#D97706', textColor: '#92400E', dot: '#D97706' },
+      booked:          { bg: '#DBEAFE', border: '#2563EB', textColor: '#1D4ED8', dot: '#2563EB' },
+      'notice-booked': { bg: '#EDE9FE', border: '#7C3AED', textColor: '#6D28D9', dot: '#7C3AED' },
+    };
+
+    // A bed's status can satisfy more than one chip (e.g. "notice-booked" counts under both Notice and Booked)
+    const filterMatches = (status: string, key: string | null) => {
+      if (!key) return true;
+      if (key === 'booked') return status === 'booked' || status === 'notice-booked';
+      if (key === 'notice') return status === 'notice' || status === 'notice-booked';
+      return status === key;
     };
 
     // ── summary counts ────────────────────────────────────────────────────────
@@ -2202,13 +2311,18 @@ export default function TenantLifecycleScreen() {
       acc[s] = (acc[s] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    const occupancyPct = totalBeds > 0 ? Math.round((((countByStatus['occupied'] || 0) + (countByStatus['notice'] || 0) + (countByStatus['notice-booked'] || 0)) / totalBeds) * 100) : 0;
+    const chipCounts: Record<string, number> = {
+      occupied: countByStatus['occupied'] || 0,
+      vacant:   countByStatus['vacant']   || 0,
+      notice:   (countByStatus['notice'] || 0) + (countByStatus['notice-booked'] || 0),
+      booked:   (countByStatus['booked'] || 0) + (countByStatus['notice-booked'] || 0),
+    };
 
     // ── group by property → apartment ─────────────────────────────────────────
     const grouped: Record<string, { property: any; apartments: Record<string, { apartment: any; beds: any[] }> }> = {};
     liveBeds.forEach((bed: any) => {
       const status = getBedStatusFromAllotments(bed.id);
-      if (mapFilter && status !== mapFilter) return;
+      if (!filterMatches(status, mapFilter)) return;
       const apt = aptById[bed.apartment_id];
       if (!apt) return;
       if (mapSearch) {
@@ -2224,165 +2338,98 @@ export default function TenantLifecycleScreen() {
       grouped[propId].apartments[apt.id].beds.push({ ...bed, _status: status, _apt: apt });
     });
 
+    const exportBedMapCsv = async () => {
+      try {
+        if (liveBeds.length === 0) { Alert.alert('No Data', 'No beds to export.'); return; }
+        const header = ['Property', 'Apartment', 'Bed Code', 'Bed Type', 'Toilet', 'Status', 'Rate (₹/mo)', 'Tenant', 'Phone'].join(',');
+        const rows = liveBeds.map((bed: any) => {
+          const apt  = aptById[bed.apartment_id]  || {};
+          const prop = propById[apt.property_id]  || {};
+          const status = getBedStatusFromAllotments(bed.id);
+          const rate = getBedRate(bed.id);
+          const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
+          const esc = (v: string) => `"${String(v || '').replace(/"/g, '""')}"`;
+          return [
+            esc(prop.property_name || '—'),
+            esc(apt.apartment_code  || '—'),
+            esc(bed.bed_code        || '—'),
+            esc(bed.bed_type        || '—'),
+            esc(bed.toilet_type     || '—'),
+            esc(status),
+            String(rate),
+            esc(allot?.tenants?.full_name || '—'),
+            esc(allot?.tenants?.phone     || '—'),
+          ].join(',');
+        });
+        const csvContent = [header, ...rows].join('\n');
+        const filename = `beds-${new Date().toISOString().split('T')[0]}.csv`;
+        const FileSystem = await import('expo-file-system/legacy') as any;
+        const fileUri = FileSystem.cacheDirectory + filename;
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
+        const Sharing = await import('expo-sharing') as any;
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'text/csv',
+            dialogTitle: 'Export Bed Map',
+            UTI: 'public.comma-separated-values-text',
+          });
+        } else {
+          Alert.alert('Sharing not available', 'Cannot share files on this device.');
+        }
+      } catch (e: any) {
+        Alert.alert('Export failed', e?.message || 'Could not export bed map.');
+      }
+    };
+
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* ── Occupancy summary bar ─────────────────────────────────────────── */}
-        <Card style={{ marginBottom: 10, padding: 12 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#111827' }}>Occupancy</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#6366F1' }}>{occupancyPct}%  ({countByStatus['occupied'] || 0}/{totalBeds})</Text>
-              {/* ── CSV export for bed map ─────────────────────────────────── */}
-              <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    if (liveBeds.length === 0) { Alert.alert('No Data', 'No beds to export.'); return; }
-                    const header = ['Property', 'Apartment', 'Bed Code', 'Bed Type', 'Toilet', 'Status', 'Rate (₹/mo)', 'Tenant', 'Phone'].join(',');
-                    const rows = liveBeds.map((bed: any) => {
-                      const apt  = aptById[bed.apartment_id]  || {};
-                      const prop = propById[apt.property_id]  || {};
-                      const status = getBedStatusFromAllotments(bed.id);
-                      const rate = getBedRate(bed.id);
-                      const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
-                      const esc = (v: string) => `"${String(v || '').replace(/"/g, '""')}"`;
-                      return [
-                        esc(prop.property_name || '—'),
-                        esc(apt.apartment_code  || '—'),
-                        esc(bed.bed_code        || '—'),
-                        esc(bed.bed_type        || '—'),
-                        esc(bed.toilet_type     || '—'),
-                        esc(status),
-                        String(rate),
-                        esc(allot?.tenants?.full_name || '—'),
-                        esc(allot?.tenants?.phone     || '—'),
-                      ].join(',');
-                    });
-                    const csvContent = [header, ...rows].join('\n');
-                    const filename = `beds-${new Date().toISOString().split('T')[0]}.csv`;
-                    const FileSystem = await import('expo-file-system') as any;
-                    const fileUri = FileSystem.cacheDirectory + filename;
-                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
-                    const Sharing = await import('expo-sharing') as any;
-                    const canShare = await Sharing.isAvailableAsync();
-                    if (canShare) {
-                      await Sharing.shareAsync(fileUri, {
-                        mimeType: 'text/csv',
-                        dialogTitle: 'Export Bed Map',
-                        UTI: 'public.comma-separated-values-text',
-                      });
-                    } else {
-                      Alert.alert('Sharing not available', 'Cannot share files on this device.');
-                    }
-                  } catch (e: any) {
-                    Alert.alert('Export failed', e?.message || 'Could not export bed map.');
-                  }
-                }}
-                style={{
-                  width: 30, height: 30, borderRadius: 99,
-                  backgroundColor: 'rgba(99,102,241,0.10)',
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="download-outline" size={16} color="#6366F1" />
-              </TouchableOpacity>
-            </View>
+        {/* ── Top row: search + sort + menu ─────────────────────────────────── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <View style={{ flex: 1 }}>
+            <SearchField value={mapSearch} onChangeText={setMapSearch} placeholder="Search tenant" />
           </View>
-          {/* Progress bar */}
-          <View style={{ height: 6, backgroundColor: '#EDE9F5', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
-            <View style={{ height: 6, width: `${occupancyPct}%` as any, backgroundColor: '#6366F1', borderRadius: 99 }} />
-          </View>
-          {/* Stat pills */}
-          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Occupied',  count: countByStatus['occupied']      || 0, color: '#2E7D32', bg: '#E8F5E9' },
-              { label: 'Vacant',    count: countByStatus['vacant']        || 0, color: '#C62828', bg: '#FFEBEE' },
-              { label: 'Booked',    count: (countByStatus['booked'] || 0) + (countByStatus['notice-booked'] || 0), color: '#1565C0', bg: '#E3F2FD' },
-              { label: 'Notice',    count: (countByStatus['notice'] || 0) + (countByStatus['notice-booked'] || 0), color: '#8B6914', bg: '#FFF8E1' },
-            ].map(s => (
-              <View key={s.label} style={{ backgroundColor: s.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 7, height: 7, borderRadius: 99, backgroundColor: s.color }} />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: s.color }}>{s.count} {s.label}</Text>
-              </View>
-            ))}
-          </View>
-        </Card>
-
-        {/* ── Search ───────────────────────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(229,231,235,0.9)', paddingHorizontal: 12, height: 42, marginBottom: 10 }}>
-          <Ionicons name="search-outline" size={16} color="#6B7280" />
-          <TextInput value={mapSearch} onChangeText={setMapSearch} placeholder="Search tenant or bed…" placeholderTextColor="#6B7280" style={{ flex: 1, marginLeft: 8, fontSize: fontSize.sm, color: '#111827' }} />
-          {mapSearch.length > 0 && (
-            <TouchableOpacity onPress={() => setMapSearch('')}>
-              <Ionicons name="close-circle" size={16} color="#6B7280" />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={() => setMapSortBy(mapSortBy === 'apartment' ? 'gender' : 'apartment')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, marginBottom: 12, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#F1F3F6' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
+              Sort: {mapSortBy === 'apartment' ? 'Apartment' : 'Gender'}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="#64748B" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setMapMenuOpen(true)}
+            style={{ width: 40, height: 40, marginBottom: 12, borderRadius: 10, backgroundColor: '#F1F3F6', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="ellipsis-horizontal" size={18} color="#334155" />
+          </TouchableOpacity>
         </View>
 
         {/* ── Status filter chips ───────────────────────────────────────────── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', gap: 7 }}>
-            {STATUS_FILTERS.map(f => (
-              <TouchableOpacity key={String(f.key)} onPress={() => setMapFilter(f.key)}
-                style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1.5,
-                  borderColor: f.color, backgroundColor: mapFilter === f.key ? f.color : 'rgba(255,255,255,0.7)' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: mapFilter === f.key ? '#fff' : f.color }}>
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* ── Legend ───────────────────────────────────────────────────────── */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-          <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 2 }}>
-            {[
-              { label: 'Occupied', dot: '#4CAF50' },
-              { label: 'Vacant',   dot: '#EF5350' },
-              { label: 'Notice',   dot: '#FFC107' },
-              { label: 'Booked',   dot: '#3B82F6' },
-              { label: 'N+Book',   dot: '#9C27B0' },
-            ].map(l => (
-              <View key={l.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: l.dot }} />
-                <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>{l.label}</Text>
-              </View>
-            ))}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 10, color: '#6B7280' }}>  S=Single D=Double T=Triple  A=Attached C=Common</Text>
-            </View>
-          </View>
-        </ScrollView>
-
-        {/* ── Sort toggle: Apartment / Gender ──────────────────────────────── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#6B7280' }}>SORT</Text>
-          <View style={{ flexDirection: 'row', backgroundColor: 'rgba(237,233,245,0.7)', borderRadius: 99, padding: 3 }}>
-            {([
-              { key: 'apartment', label: 'Apartment', icon: 'business-outline' },
-              { key: 'gender',    label: 'Gender',    icon: 'people-outline' },
-            ] as const).map(opt => {
-              const active = mapSortBy === opt.key;
+            {STATUS_FILTERS.map(f => {
+              const active = mapFilter === f.key;
               return (
-                <TouchableOpacity key={opt.key} onPress={() => setMapSortBy(opt.key)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99,
-                    backgroundColor: active ? '#6366F1' : 'transparent' }}>
-                  <Ionicons name={opt.icon as any} size={12} color={active ? '#fff' : '#6366F1'} />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : '#6366F1' }}>{opt.label}</Text>
+                <TouchableOpacity key={String(f.key)} onPress={() => setMapFilter(f.key)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, borderWidth: 1.5,
+                    borderColor: f.color, backgroundColor: active ? f.color : 'rgba(255,255,255,0.7)' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#fff' : f.color }}>
+                    {f.label}{f.key ? ` ${chipCounts[f.key as string] || 0}` : ''}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-        </View>
+        </ScrollView>
 
         {/* ── Gender legend (shown when sorting by gender) ─────────────────── */}
         {mapSortBy === 'gender' && (
           <View style={{ flexDirection: 'row', gap: 14, marginBottom: 10, paddingHorizontal: 2 }}>
             {[
-              { label: '♂ Male',   accent: '#1565C0', bg: '#BBDEFB' },
+              { label: '♂ Male',   accent: '#1D4ED8', bg: '#BBDEFB' },
               { label: '♀ Female', accent: '#C2185B', bg: '#FCE4EC' },
-              { label: '⚥ Mixed',  accent: '#6366F1', bg: '#EDE9F5' },
+              { label: '⚥ Mixed',  accent: '#6D5EF6', bg: '#EEF2FF' },
             ].map(g => (
               <View key={g.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: g.bg, borderWidth: 1.5, borderColor: `${g.accent}55` }} />
@@ -2392,23 +2439,23 @@ export default function TenantLifecycleScreen() {
           </View>
         )}
 
-        {/* ── Property → Apartment → Bed grid ──────────────────────────────── */}
+        {/* ── Property → Apartment cards ────────────────────────────────────── */}
         {Object.entries(grouped).map(([propId, propGroup]) => (
           <View key={propId} style={{ marginBottom: 14 }}>
 
             {/* Property header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(99,102,241,0.12)' }} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EDE9F5', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4 }}>
-                <Ionicons name="business-outline" size={11} color="#6366F1" />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#6366F1', letterSpacing: 0.5 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(109,94,246,0.15)' }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EEF2FF', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 4 }}>
+                <Ionicons name="business-outline" size={11} color="#6D5EF6" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#6D5EF6', letterSpacing: 0.5 }}>
                   {propGroup.property?.property_name || 'Property'}
                 </Text>
               </View>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(99,102,241,0.12)' }} />
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(109,94,246,0.15)' }} />
             </View>
 
-            {/* Apartments */}
+            {/* Apartment cards */}
             {Object.entries(propGroup.apartments)
               .sort(([,a]: any, [,b]: any) => {
                 if (mapSortBy === 'gender') {
@@ -2423,99 +2470,77 @@ export default function TenantLifecycleScreen() {
                 const gender = (aptGroup.apartment?.gender_allowed || '').toLowerCase();
                 const isMale = gender === 'male';
                 const isFemale = gender === 'female';
-                const aptAccent = isMale ? '#1565C0' : isFemale ? '#C2185B' : '#6366F1';
-                const aptBg = isMale ? '#F0F7FF' : isFemale ? '#FFF0F5' : '#F8F5FF';
-                const aptHeaderBg = isMale ? '#BBDEFB' : isFemale ? '#FCE4EC' : '#EDE9F5';
+                const genderLabel = isMale ? 'Male' : isFemale ? 'Female' : 'Mixed';
+                const genderAccent = isMale ? '#1D4ED8' : isFemale ? '#C2185B' : '#6D5EF6';
 
                 const aptBedCount = aptGroup.beds.length;
-                const aptOccupied = aptGroup.beds.filter((b: any) => b._status === 'occupied').length;
-                const aptVacant = aptGroup.beds.filter((b: any) => b._status === 'vacant').length;
+                const aptOccupied = aptGroup.beds.filter((b: any) => b._status === 'occupied' || b._status === 'notice' || b._status === 'notice-booked').length;
+                const aptOccupancyPct = aptBedCount > 0 ? Math.round((aptOccupied / aptBedCount) * 100) : 0;
+                const expanded = expandedApt === aptId;
+                const sortedBeds = aptGroup.beds.slice().sort((a: any, b: any) => (a.bed_code || '').localeCompare(b.bed_code || ''));
 
                 return (
-                  <View key={aptId} style={{ marginBottom: 8, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: `${aptAccent}22`, backgroundColor: aptBg,
-                    shadowColor: aptAccent, shadowOpacity: 0.07, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+                  <TouchableOpacity
+                    key={aptId}
+                    activeOpacity={0.85}
+                    onPress={() => setExpandedApt(expanded ? null : aptId)}
+                    style={{ marginBottom: 8, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(15,23,42,0.06)', backgroundColor: '#fff',
+                      shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1, padding: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
 
-                    {/* Apartment header row */}
-                    <View style={{ backgroundColor: aptHeaderBg, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: `${aptAccent}18`, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: `${aptAccent}33` }}>
-                          <Text style={{ fontSize: 12, fontWeight: '900', color: aptAccent }}>{aptGroup.apartment?.apartment_code || '?'}</Text>
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#111827' }}>
-                            {aptGroup.apartment?.apartment_code || 'Unknown Apt'}
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Text style={{ fontSize: 9, color: aptAccent, fontWeight: '700' }}>
-                              {isMale ? '♂ Male' : isFemale ? '♀ Female' : '⚥ Mixed'}
-                            </Text>
-                            <Text style={{ fontSize: 9, color: '#6B7280' }}>· {aptBedCount} beds</Text>
-                          </View>
-                        </View>
+                      {/* Left column: apartment info */}
+                      <View style={{ width: 92 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>
+                          {aptGroup.apartment?.apartment_code || '?'}
+                        </Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: genderAccent, marginTop: 2 }}>{genderLabel}</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{aptOccupied} / {aptBedCount} Beds</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A', marginTop: 2 }}>{aptOccupancyPct}% Occupied</Text>
                       </View>
-                      {/* Mini occupancy */}
-                      <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                        <View style={{ flexDirection: 'row', gap: 5 }}>
-                          <View style={{ backgroundColor: '#E8F5E9', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#2E7D32' }}>{aptOccupied} occ</Text>
-                          </View>
-                          <View style={{ backgroundColor: '#FFEBEE', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#C62828' }}>{aptVacant} vac</Text>
-                          </View>
+
+                      {/* Right: horizontal bed-tile strip */}
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1, marginLeft: 8 }}>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          {sortedBeds.map((bed: any) => {
+                            const sc = BED_STATUS_COLORS[bed._status] || BED_STATUS_COLORS.vacant;
+                            const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
+                            const firstName = allot?.tenants?.full_name?.split(' ')[0] || '';
+                            return (
+                              <TouchableOpacity
+                                key={bed.id}
+                                onPress={() => setBedDetail({ ...bed, allotment: allot, status: bed._status, _apt: aptGroup.apartment })}
+                                style={{ width: 74, borderRadius: 10, backgroundColor: sc.bg, padding: 8, alignItems: 'flex-start' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '900', color: sc.textColor }}>{bed.bed_code}</Text>
+                                {firstName
+                                  ? <Text style={{ fontSize: 9, fontWeight: '700', color: sc.textColor, marginTop: 2 }} numberOfLines={1}>{firstName}</Text>
+                                  : <Text style={{ fontSize: 9, color: sc.textColor, opacity: 0.7, marginTop: 2 }}>{bed._status === 'notice' ? 'Notice' : bed._status === 'booked' || bed._status === 'notice-booked' ? 'Booked' : 'Vacant'}</Text>}
+                              </TouchableOpacity>
+                            );
+                          })}
                         </View>
-                        {/* Mini bar */}
-                        <View style={{ width: 60, height: 4, backgroundColor: '#EDE9F5', borderRadius: 99, overflow: 'hidden' }}>
-                          <View style={{ height: 4, width: aptBedCount > 0 ? `${Math.round((aptOccupied / aptBedCount) * 100)}%` as any : '0%', backgroundColor: aptAccent, borderRadius: 99 }} />
-                        </View>
-                      </View>
+                      </ScrollView>
+
+                      {/* Trailing chevron */}
+                      <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#94A3B8" style={{ marginLeft: 6 }} />
                     </View>
 
-                    {/* Beds grid */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10, gap: 8 }}>
-                      {aptGroup.beds
-                        .sort((a: any, b: any) => (a.bed_code || '').localeCompare(b.bed_code || ''))
-                        .map((bed: any) => {
+                    {/* Expanded detail: bed type / toilet / rate, tap to expand via chevron */}
+                    {expanded && (
+                      <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {sortedBeds.map((bed: any) => {
                           const sc = BED_STATUS_COLORS[bed._status] || BED_STATUS_COLORS.vacant;
-                          const allot = allotments.find((a: any) => a.bed_id === bed.id && ['Staying','On-Notice','Booked'].includes(a.staying_status));
-                          const firstName = allot?.tenants?.full_name?.split(' ')[0] || '';
-                          const bedTypeShort = ({ Single: 'S', Double: 'D', Triple: 'T', Executive: 'E', Quad: 'Q' } as any)[bed.bed_type] || bed.bed_type?.charAt(0) || '?';
-                          const toiletShort = (bed.toilet_type || '').toLowerCase() === 'attached' ? 'A' : 'C';
                           const rate = getBedRate(bed.id);
                           return (
-                            <TouchableOpacity
-                              key={bed.id}
-                              onPress={() => setBedDetail({ ...bed, allotment: allot, status: bed._status, _apt: aptGroup.apartment })}
-                              style={{
-                                width: 70, borderRadius: 11, borderWidth: 1.5, borderColor: sc.border,
-                                backgroundColor: sc.bg, padding: 8, alignItems: 'flex-start',
-                                shadowColor: sc.border, shadowOpacity: 0.15, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1,
-                              }}>
-                              {/* Status dot */}
-                              <View style={{ position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: 99, backgroundColor: sc.dot }} />
-                              {/* Bed code */}
-                              <Text style={{ fontSize: 11, fontWeight: '900', color: sc.textColor, marginBottom: 2 }}>{bed.bed_code}</Text>
-                              {/* Type + toilet badge */}
-                              <View style={{ flexDirection: 'row', gap: 3, marginBottom: 3 }}>
-                                <View style={{ backgroundColor: `${sc.border}22`, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 8, fontWeight: '700', color: sc.textColor }}>{bedTypeShort}</Text>
-                                </View>
-                                <View style={{ backgroundColor: toiletShort === 'A' ? '#E8F5E9' : '#FFF3E0', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 8, fontWeight: '700', color: toiletShort === 'A' ? '#2E7D32' : '#E65100' }}>{toiletShort}</Text>
-                                </View>
-                              </View>
-                              {/* Rate */}
-                              {rate > 0 && (
-                                <Text style={{ fontSize: 8, color: '#6366F1', fontWeight: '700' }}>₹{fmtAmt(rate)}</Text>
-                              )}
-                              {/* Tenant name */}
-                              {firstName
-                                ? <Text style={{ fontSize: 9, fontWeight: '700', color: sc.textColor, marginTop: 2 }} numberOfLines={1}>{firstName}</Text>
-                                : <Text style={{ fontSize: 9, color: '#C4B5A0', marginTop: 2 }}>Empty</Text>}
-                            </TouchableOpacity>
+                            <View key={bed.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F8FAFC', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                              <View style={{ width: 7, height: 7, borderRadius: 99, backgroundColor: sc.dot }} />
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#334155' }}>{bed.bed_code} · {bed.bed_type || '—'} · {bed.toilet_type || '—'}</Text>
+                              {rate > 0 && <Text style={{ fontSize: 10, color: '#64748B' }}>₹{fmtAmt(rate)}</Text>}
+                            </View>
                           );
                         })}
-                    </View>
-                  </View>
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 );
               })}
           </View>
@@ -2523,15 +2548,34 @@ export default function TenantLifecycleScreen() {
 
         {Object.keys(grouped).length === 0 && (
           <Card style={{ alignItems: 'center', paddingVertical: 36 }}>
-            <Ionicons name="bed-outline" size={40} color="#C4B5A0" />
-            <Text style={{ color: '#6B7280', fontSize: fontSize.sm, marginTop: 10, fontWeight: '600' }}>No beds match your filters</Text>
+            <Ionicons name="bed-outline" size={40} color="#94A3B8" />
+            <Text style={{ color: '#64748B', fontSize: fontSize.sm, marginTop: 10, fontWeight: '600' }}>No beds match your filters</Text>
             {(mapFilter || mapSearch) && (
               <TouchableOpacity onPress={() => { setMapFilter(null); setMapSearch(''); }}
-                style={{ marginTop: 10, backgroundColor: '#EDE9F5', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 }}>
-                <Text style={{ fontSize: 12, color: '#6366F1', fontWeight: '700' }}>Clear filters</Text>
+                style={{ marginTop: 10, backgroundColor: '#EEF2FF', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 }}>
+                <Text style={{ fontSize: 12, color: '#6D5EF6', fontWeight: '700' }}>Clear filters</Text>
               </TouchableOpacity>
             )}
           </Card>
+        )}
+
+        {/* ── "…" menu ──────────────────────────────────────────────────────── */}
+        {mapMenuOpen && (
+          <Modal visible transparent animationType="fade" onRequestClose={() => setMapMenuOpen(false)}>
+            <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)' }} activeOpacity={1} onPress={() => setMapMenuOpen(false)}>
+              <View style={{ position: 'absolute', top: 100, right: 16, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 6, minWidth: 190,
+                shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
+                <TouchableOpacity onPress={() => { setMapMenuOpen(false); exportBedMapCsv(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+                  <Ionicons name="download-outline" size={16} color="#334155" />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>Export CSV</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setMapMenuOpen(false); setMapFilter(null); setMapSearch(''); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+                  <Ionicons name="refresh-outline" size={16} color="#334155" />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>Clear filters</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
         )}
 
         {/* ── Bed detail bottom-sheet modal ──────────────────────────────────── */}
@@ -2548,16 +2592,29 @@ export default function TenantLifecycleScreen() {
             .sort((a: any, b: any) => b.from_date.localeCompare(a.from_date))
             .slice(0, 3);
 
+          // Full tenant row (email/company/document URLs) — data.tenants holds select(*),
+          // richer than the allotment's nested tenants(...) join.
+          const _allot = bedDetail.allotment;
+          const _t = _allot ? (tenants.find((x: any) => x.id === _allot.tenant_id) || _allot.tenants || {}) : {};
+          const _docs = [
+            { label: 'Photo', url: _t.photo_url },
+            { label: 'Aadhaar', url: _t.aadhar_image_url || (String(_t.id_proof_type || '').toLowerCase() === 'aadhaar' ? _t.id_proof_url : null) },
+            { label: 'Company ID', url: _t.id_card_url },
+          ].filter((d: any) => !!d.url);
+          const openDoc = (url: string) => { Linking.openURL(url).catch(() => {}); };
+
           return (
             <Modal visible transparent animationType="slide" onRequestClose={() => setBedDetail(null)}>
-              <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
-                activeOpacity={1} onPress={() => setBedDetail(null)}>
-                <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-                  <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32, overflow: 'hidden' }}>
+              <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                {/* Scrim BEHIND the sheet (absolute) so it never swallows the sheet's
+                    scroll gesture — the old wrapping TouchableOpacity blocked scrolling. */}
+                <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }}
+                  activeOpacity={1} onPress={() => setBedDetail(null)} />
+                  <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32, overflow: 'hidden', maxHeight: SH * 0.9 }}>
 
                     {/* Handle bar */}
                     <View style={{ alignItems: 'center', paddingTop: 12, marginBottom: 4 }}>
-                      <View style={{ width: 40, height: 4, borderRadius: 99, backgroundColor: '#E0D8F0' }} />
+                      <View style={{ width: 40, height: 4, borderRadius: 99, backgroundColor: '#E2E8F0' }} />
                     </View>
 
                     {/* Header */}
@@ -2585,7 +2642,7 @@ export default function TenantLifecycleScreen() {
                       </View>
                     </View>
 
-                    <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                    <ScrollView style={{ maxHeight: SH * 0.74 }} showsVerticalScrollIndicator={true}>
                       <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 12 }}>
 
                         {/* Bed specs */}
@@ -2593,22 +2650,22 @@ export default function TenantLifecycleScreen() {
                           <SectionTitle title="Bed Details" />
                           <View style={{ flexDirection: 'row', gap: 10 }}>
                             {/* Bed type card */}
-                            <View style={{ flex: 1, backgroundColor: '#F8F5FF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#EDE9F5', alignItems: 'center', gap: 4 }}>
-                              <Ionicons name="bed-outline" size={22} color="#6366F1" />
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{bedTypeLabel}</Text>
-                              <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '600' }}>Bed Type</Text>
+                            <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#EFF6FF', alignItems: 'center', gap: 4 }}>
+                              <Ionicons name="bed-outline" size={22} color="#2563EB" />
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>{bedTypeLabel}</Text>
+                              <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>Bed Type</Text>
                             </View>
                             {/* Toilet type card */}
-                            <View style={{ flex: 1, backgroundColor: isAttached ? '#E8F5E9' : '#FFF3E0', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: isAttached ? '#C8E6C9' : '#FFE0B2', alignItems: 'center', gap: 4 }}>
-                              <Ionicons name={isAttached ? 'water-outline' : 'people-outline'} size={22} color={isAttached ? '#2E7D32' : '#E65100'} />
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: isAttached ? '#2E7D32' : '#E65100' }}>{toiletLabel}</Text>
-                              <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '600' }}>Toilet</Text>
+                            <View style={{ flex: 1, backgroundColor: isAttached ? '#DCFCE7' : '#FFEDD5', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: isAttached ? '#C8E6C9' : '#FFE0B2', alignItems: 'center', gap: 4 }}>
+                              <Ionicons name={isAttached ? 'water-outline' : 'people-outline'} size={22} color={isAttached ? '#16A34A' : '#EA580C'} />
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: isAttached ? '#16A34A' : '#EA580C' }}>{toiletLabel}</Text>
+                              <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>Toilet</Text>
                             </View>
                             {/* Rate card */}
-                            <View style={{ flex: 1, backgroundColor: '#EDE9F5', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#D8CCF0', alignItems: 'center', gap: 4 }}>
-                              <Ionicons name="pricetag-outline" size={22} color="#6366F1" />
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#6366F1' }}>₹{fmtAmt(rate)}</Text>
-                              <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '600' }}>/ month</Text>
+                            <View style={{ flex: 1, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#DBEAFE', alignItems: 'center', gap: 4 }}>
+                              <Ionicons name="pricetag-outline" size={22} color="#2563EB" />
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>₹{fmtAmt(rate)}</Text>
+                              <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>/ month</Text>
                             </View>
                           </View>
                         </View>
@@ -2617,27 +2674,27 @@ export default function TenantLifecycleScreen() {
                         {allRatesForBed.length > 0 && (
                           <View>
                             <SectionTitle title="Rate History" />
-                            <View style={{ backgroundColor: '#F8F5FF', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#EDE9F5' }}>
+                            <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#EFF6FF' }}>
                               {allRatesForBed.map((r: any, i: number) => {
                                 const isCurrent = r.from_date <= today() && (!r.to_date || r.to_date >= today());
                                 return (
                                   <View key={r.id || i} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                                     paddingHorizontal: 14, paddingVertical: 10,
-                                    borderTopWidth: i > 0 ? 1 : 0, borderTopColor: '#EDE9F5',
-                                    backgroundColor: isCurrent ? '#F0EBF8' : 'transparent' }}>
+                                    borderTopWidth: i > 0 ? 1 : 0, borderTopColor: '#EFF6FF',
+                                    backgroundColor: isCurrent ? '#EFF6FF' : 'transparent' }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                      {isCurrent && <View style={{ width: 6, height: 6, borderRadius: 99, backgroundColor: '#6366F1' }} />}
+                                      {isCurrent && <View style={{ width: 6, height: 6, borderRadius: 99, backgroundColor: '#2563EB' }} />}
                                       <View>
-                                        <Text style={{ fontSize: 12, fontWeight: '700', color: isCurrent ? '#6366F1' : '#111827' }}>
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: isCurrent ? '#2563EB' : '#0F172A' }}>
                                           ₹{fmtAmt(r.monthly_rate)}/mo
                                         </Text>
-                                        <Text style={{ fontSize: 10, color: '#6B7280' }}>
+                                        <Text style={{ fontSize: 10, color: '#64748B' }}>
                                           {fmtDate(r.from_date)}{r.to_date ? ` → ${fmtDate(r.to_date)}` : ' → present'}
                                         </Text>
                                       </View>
                                     </View>
                                     {isCurrent && (
-                                      <View style={{ backgroundColor: '#6366F1', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                      <View style={{ backgroundColor: '#2563EB', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
                                         <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>CURRENT</Text>
                                       </View>
                                     )}
@@ -2652,35 +2709,83 @@ export default function TenantLifecycleScreen() {
                         {bedDetail.allotment ? (
                           <View>
                             <SectionTitle title="Current Tenant" />
-                            <View style={{ backgroundColor: '#F8F5FF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#EDE9F5' }}>
+                            <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#EFF6FF' }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <View style={{ width: 42, height: 42, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Ionicons name="person-outline" size={20} color="#6366F1" />
+                                <View style={{ width: 42, height: 42, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                  {_t.photo_url
+                                    ? <Image source={{ uri: _t.photo_url }} style={{ width: 42, height: 42 }} />
+                                    : <Ionicons name="person-outline" size={20} color="#2563EB" />}
                                 </View>
-                                <View>
-                                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{bedDetail.allotment.tenants?.full_name || '—'}</Text>
-                                  <Text style={{ fontSize: 12, color: '#6B7280' }}>{bedDetail.allotment.tenants?.phone || '—'}</Text>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>{_t.full_name || _allot.tenants?.full_name || '—'}</Text>
+                                  <Text style={{ fontSize: 12, color: '#64748B' }}>{_t.phone || _allot.tenants?.phone || '—'}</Text>
                                 </View>
                               </View>
                               <Divider />
-                              <Row label="Move-in Date" value={fmtDate(bedDetail.allotment.onboarding_date)} />
-                              <Row label="Monthly Rent" value={`₹${fmtAmt(bedDetail.allotment.monthly_rental)}/mo`} />
-                              <Row label="Deposit Paid" value={`₹${fmtAmt(bedDetail.allotment.deposit_paid)}`} />
-                              {bedDetail.allotment.discount > 0 && <Row label="Discount" value={`₹${fmtAmt(bedDetail.allotment.discount)}/mo`} valueColor="#E65100" />}
-                              {bedDetail.status === 'notice' && <Row label="Est. Exit" value={fmtDate(bedDetail.allotment.estimated_exit_date)} valueColor="#E65100" />}
+                              <Row label="Email" value={_t.email || '—'} />
+                              <Row label="Company" value={_t.company_name || '—'} />
+                              <Divider />
+                              <Row label="Move-in Date" value={fmtDate(_allot.onboarding_date)} />
+                              <Row label="Current Rent" value={`₹${fmtAmt(_allot.monthly_rental)}/mo`} />
+                              <Row label="Advance" value={`₹${fmtAmt(_allot.deposit_paid || 0)}`} />
+                              <Row label="Discount" value={`₹${fmtAmt(_allot.discount || 0)}/mo`} valueColor={(_allot.discount || 0) > 0 ? '#EA580C' : undefined} />
+                              <Row label="Premium" value={`₹${fmtAmt(_allot.premium || 0)}/mo`} valueColor={(_allot.premium || 0) > 0 ? '#2563EB' : undefined} />
+                              {bedDetail.status === 'notice' && <Row label="Est. Exit" value={fmtDate(_allot.estimated_exit_date)} valueColor="#EA580C" />}
                               {bedDetail.status === 'notice' && (
-                                <View style={{ marginTop: 8, backgroundColor: '#FFF3E0', borderRadius: 8, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <Ionicons name="warning-outline" size={14} color="#E65100" />
-                                  <Text style={{ fontSize: 11, color: '#E65100', fontWeight: '600' }}>Tenant has served notice</Text>
+                                <View style={{ marginTop: 8, backgroundColor: '#FFEDD5', borderRadius: 8, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Ionicons name="warning-outline" size={14} color="#EA580C" />
+                                  <Text style={{ fontSize: 11, color: '#EA580C', fontWeight: '600' }}>Tenant has served notice</Text>
+                                </View>
+                              )}
+                            </View>
+
+                            {/* Monthly payments — paid vs pending per billing month */}
+                            <View style={{ marginTop: 12 }}>
+                              <SectionTitle title="Monthly Payments" />
+                              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#EFF6FF' }}>
+                                {bedPay.loading ? (
+                                  <View style={{ padding: 14, alignItems: 'center' }}><Text style={{ fontSize: 12, color: '#64748B' }}>Loading…</Text></View>
+                                ) : bedPay.months.length === 0 ? (
+                                  <View style={{ padding: 14, alignItems: 'center' }}><Text style={{ fontSize: 12, color: '#64748B' }}>No invoices yet</Text></View>
+                                ) : bedPay.months.map((m, i) => (
+                                  <View key={m.month} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: '#EFF6FF' }}>
+                                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>{m.month}</Text>
+                                    <View style={{ backgroundColor: m.paid ? '#DCFCE7' : '#FEE2E2', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                      <Text style={{ fontSize: 11, fontWeight: '800', color: m.paid ? '#16A34A' : '#DC2626' }}>
+                                        {m.paid ? 'Paid' : `Pending ₹${fmtAmt(m.balance)}`}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+
+                            {/* Documents */}
+                            <View style={{ marginTop: 12 }}>
+                              <SectionTitle title="Documents" />
+                              {_docs.length === 0 ? (
+                                <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#EFF6FF' }}>
+                                  <Text style={{ fontSize: 12, color: '#64748B' }}>No documents uploaded</Text>
+                                </View>
+                              ) : (
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                                  {_docs.map((d: any) => (
+                                    <TouchableOpacity key={d.label} onPress={() => openDoc(d.url)}
+                                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', borderRadius: 10, borderWidth: 1, borderColor: '#DBEAFE', paddingHorizontal: 12, paddingVertical: 10 }}>
+                                      <Ionicons name="document-text-outline" size={16} color="#2563EB" />
+                                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{d.label}</Text>
+                                      <Ionicons name="open-outline" size={13} color="#2563EB" />
+                                    </TouchableOpacity>
+                                  ))}
                                 </View>
                               )}
                             </View>
                           </View>
                         ) : (
-                          <View style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FFCDD2', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <Ionicons name="bed-outline" size={22} color="#EF5350" />
+                          <View style={{ backgroundColor: '#FEE2E2', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FFCDD2', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <Ionicons name="bed-outline" size={22} color="#DC2626" />
                             <View>
-                              <Text style={{ fontSize: 14, fontWeight: '700', color: '#C62828' }}>Bed is Vacant</Text>
+                              <Text style={{ fontSize: 14, fontWeight: '700', color: '#DC2626' }}>Bed is Vacant</Text>
                               <Text style={{ fontSize: 12, color: '#E57373' }}>Available for booking at ₹{fmtAmt(rate)}/mo</Text>
                             </View>
                           </View>
@@ -2689,8 +2794,7 @@ export default function TenantLifecycleScreen() {
                       </View>
                     </ScrollView>
                   </View>
-                </TouchableOpacity>
-              </TouchableOpacity>
+              </View>
             </Modal>
           );
         })()}
@@ -2709,29 +2813,30 @@ export default function TenantLifecycleScreen() {
     ];
     const filtered = filterBySearch(bookedAllotments, ['tenants.full_name', 'apartments.apartment_code'], ts('booking'));
     const openBookingFor = (tenantId: string) => { setBForm({ ...bForm, tenantId }); setBookingOpen(true); };
-    const BookBtn = ({ onPress }: { onPress: () => void }) => (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-        style={{ backgroundColor: VBRAND.purpleSoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 }}>
-        <Text style={{ fontSize: 12, fontWeight: '800', color: VBRAND.purpleDeep }}>Book</Text>
-      </TouchableOpacity>
-    );
+    const returningFiltered = filterBySearch(returningTenants, ['full_name', 'phone'], ts('returning'));
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ── Section 1: New Tenants (KYC ✓) ──────────────────────────────── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <SectionTitle title={`New Tenants (KYC ✓)`} />
-          <ActionBtn title="New Booking" icon="add-circle-outline" small onPress={() => setBookingOpen(true)} />
+          <PrimaryButton title="New Booking" icon="add-circle-outline" small onPress={() => setBookingOpen(true)} />
         </View>
         {eligibleTenants.length === 0
           ? <EmptyCard message="No new tenants with completed KYC" />
           : eligibleTenants.map((t: any) => (
-              <LifeTenantCard
-                key={t.id}
-                name={t.full_name || '—'}
-                sub={t.phone}
-                pill="New"
-                right={<BookBtn onPress={() => openBookingFor(t.id)} />}
-              />
+              <LifecycleCard key={t.id}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <AvatarInitial name={t.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }} numberOfLines={1}>{t.full_name || '—'}</Text>
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }} numberOfLines={1}>{t.phone}</Text>
+                    <View style={{ marginTop: 6 }}>
+                      <StatusBadge kind="completed" label="✓ Completed" />
+                    </View>
+                  </View>
+                  <PrimaryButton title="Book" small onPress={() => openBookingFor(t.id)} />
+                </View>
+              </LifecycleCard>
             ))
         }
 
@@ -2740,16 +2845,32 @@ export default function TenantLifecycleScreen() {
           <Ionicons name="refresh-outline" size={15} color={VBRAND.ink600} />
           <Text style={{ fontSize: 13, fontWeight: '700', color: VBRAND.ink600 }}>Returning Tenants (Previously Exited)</Text>
         </View>
-        {returningTenants.length === 0
-          ? <Text style={{ fontSize: 12, color: VBRAND.ink500, paddingVertical: 8, paddingLeft: 2 }}>No returning tenants</Text>
-          : returningTenants.map((t: any) => (
-              <LifeTenantCard
-                key={t.id}
-                name={t.full_name || '—'}
-                sub={t.phone}
-                pill={typeof t.tenant_rating === 'number' ? `★ ${t.tenant_rating.toFixed(1)}` : undefined}
-                right={<BookBtn onPress={() => openBookingFor(t.id)} />}
-              />
+        <SearchField value={ts('returning')} onChangeText={(v: string) => setTs('returning', v)} placeholder="Search by name or phone…" />
+        <Text style={{ fontSize: 11, color: VBRAND.ink500, marginTop: -6, marginBottom: 10 }}>
+          Search from {returningTenants.length} previously exited tenants.
+        </Text>
+        {returningFiltered.length === 0
+          ? <Text style={{ fontSize: 12, color: VBRAND.ink500, paddingVertical: 8, paddingLeft: 2 }}>
+              {returningTenants.length === 0 ? 'No returning tenants' : 'No matches'}
+            </Text>
+          : returningFiltered.map((t: any) => (
+              <LifecycleCard key={t.id}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <AvatarInitial name={t.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: VBRAND.ink900 }} numberOfLines={1}>{t.full_name || '—'}</Text>
+                      {typeof t.tenant_rating === 'number' && (
+                        <View style={{ backgroundColor: VBRAND.purpleSoft, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: VBRAND.purpleDeep }}>★ {t.tenant_rating.toFixed(1)}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }} numberOfLines={1}>{t.phone}</Text>
+                  </View>
+                  <PrimaryButton title="Book" small onPress={() => openBookingFor(t.id)} />
+                </View>
+              </LifecycleCard>
             ))
         }
 
@@ -2760,19 +2881,22 @@ export default function TenantLifecycleScreen() {
         <SearchBar tab="booking" placeholder="Search tenant, bed…" />
         {filtered.length === 0 ? <EmptyCard message="No booked tenants" /> :
           filtered.map((a: any) => (
-            <Card key={a.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 2 }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6366F1', fontWeight: '600' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+            <LifecycleCard key={a.id}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <AvatarInitial name={a.tenants?.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#2563EB', fontWeight: '600' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+                  </View>
                 </View>
                 <TouchableOpacity onPress={() => { setCancelId(a.id); setCancelOpen(true); }}
-                  style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}>
-                  <Ionicons name="close-circle-outline" size={18} color="#C62828" />
+                  style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 8 }}>
+                  <Ionicons name="close-circle-outline" size={18} color="#DC2626" />
                 </TouchableOpacity>
               </View>
-            </Card>
+            </LifecycleCard>
           ))
         }
 
@@ -2794,38 +2918,24 @@ export default function TenantLifecycleScreen() {
             <View style={{ flex: 1 }}><Field label="Discount (₹)"><TextF value={bForm.discount} onChange={v => setBForm({ ...bForm, discount: v })} keyboardType="numeric" /></Field></View>
             <View style={{ flex: 1 }}><Field label="Premium (₹)"><TextF value={bForm.premium} onChange={v => setBForm({ ...bForm, premium: v })} keyboardType="numeric" /></Field></View>
           </View>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}><Field label="Booking Amount (₹)"><TextF value={bForm.amount} onChange={v => setBForm({ ...bForm, amount: v })} keyboardType="numeric" placeholder={String(config.booking_fee || 1000)} /></Field></View>
-            <View style={{ flex: 1 }}><Field label="Payment Mode *"><SelectF options={PAY_MODES} value={bForm.paymentMode} onChange={v => setBForm({ ...bForm, paymentMode: v })} /></Field></View>
-          </View>
-          <Field label="Transaction Reference"><TextF value={bForm.refNo} onChange={v => setBForm({ ...bForm, refNo: v })} placeholder="UTR/Ref no." /></Field>
-
-          {/* ── Bank Details (mirrors web app) ─────────────────────────────── */}
-          <Field label="Bank Details">
-            {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
-              : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={bForm.bankAccountId} onChange={v => setBForm({ ...bForm, bankAccountId: v })} placeholder="Select organisation bank account" />
-            }
-          </Field>
-
-          {/* ── Payment Proof (gallery or camera) ───────────────────────────── */}
+          {/* ── Payment Proof (gallery or camera) — upload first; scan auto-fills amount / ref / bank ─── */}
           <View style={{ marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="receipt-outline" size={14} color="#6366F1" />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6366F1', letterSpacing: 1, textTransform: 'uppercase' }}>
+                <Ionicons name="receipt-outline" size={14} color="#2563EB" />
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB', letterSpacing: 1, textTransform: 'uppercase' }}>
                   Payment Proof
                 </Text>
-                <View style={{ backgroundColor: '#EDE9F5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 9, color: '#6B7280', fontWeight: '600' }}>Optional</Text>
+                <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600' }}>Optional</Text>
                 </View>
               </View>
               {proofScanning.booking && (
-                <Text style={{ fontSize: 10, color: '#6366F1', fontWeight: '700' }}>Scanning receipt…</Text>
+                <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>Scanning receipt…</Text>
               )}
               {bookingProof && !proofScanning.booking && (
                 <TouchableOpacity onPress={() => setBookingProof(null)}>
-                  <Text style={{ fontSize: fontSize.xs, color: '#C62828', fontWeight: '700' }}>Remove</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#DC2626', fontWeight: '700' }}>Remove</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -2836,8 +2946,8 @@ export default function TenantLifecycleScreen() {
                 height: bookingProof ? 160 : 80,
                 borderRadius: 14, borderWidth: 1.5,
                 borderStyle: bookingProof ? 'solid' : 'dashed',
-                borderColor: bookingProof ? '#6366F1' : '#C4B5A0',
-                backgroundColor: bookingProof ? '#F3E5F5' : '#FAF8FF',
+                borderColor: bookingProof ? '#2563EB' : '#EEF1F6',
+                backgroundColor: bookingProof ? '#EFF6FF' : 'rgba(37,99,235,0.04)',
                 alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden',
               }}
@@ -2845,7 +2955,7 @@ export default function TenantLifecycleScreen() {
               {bookingProof ? (
                 <>
                   <Image source={{ uri: bookingProof.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(99,102,241,0.75)', paddingVertical: 5, alignItems: 'center' }}>
+                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(37,99,235,0.75)', paddingVertical: 5, alignItems: 'center' }}>
                     <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
                   </View>
                 </>
@@ -2853,23 +2963,37 @@ export default function TenantLifecycleScreen() {
                 <View style={{ alignItems: 'center', gap: 6 }}>
                   <View style={{ flexDirection: 'row', gap: 16 }}>
                     <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="image-outline" size={18} color="#6366F1" />
+                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="image-outline" size={18} color="#2563EB" />
                       </View>
                       <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Gallery</Text>
                     </View>
                     <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="camera-outline" size={18} color="#6366F1" />
+                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="camera-outline" size={18} color="#2563EB" />
                       </View>
                       <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Camera</Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 10, color: '#6B7280' }}>Upload receipt / screenshot</Text>
+                  <Text style={{ fontSize: 10, color: '#64748B' }}>Upload receipt / screenshot</Text>
                 </View>
               )}
             </TouchableOpacity>
           </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}><Field label="Booking Amount (₹)"><TextF value={bForm.amount} onChange={v => setBForm({ ...bForm, amount: v })} keyboardType="numeric" placeholder={String(config.booking_fee || 1000)} /></Field></View>
+            <View style={{ flex: 1 }}><Field label="Payment Mode *"><SelectF options={PAY_MODES} value={bForm.paymentMode} onChange={v => setBForm({ ...bForm, paymentMode: v })} /></Field></View>
+          </View>
+          <Field label="Transaction Reference"><TextF value={bForm.refNo} onChange={v => setBForm({ ...bForm, refNo: v })} placeholder="UTR/Ref no." /></Field>
+
+          {/* ── Bank Details (mirrors web app) ─────────────────────────────── */}
+          <Field label="Bank Details">
+            {bankAccountOptions.length === 0
+              ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
+              : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={bForm.bankAccountId} onChange={v => setBForm({ ...bForm, bankAccountId: v })} placeholder="Select organisation bank account" />
+            }
+          </Field>
 
           <ActionBtn title="Confirm Booking" onPress={doCreateBooking} loading={saving || proofUploading} />
         </BottomSheet>
@@ -2878,7 +3002,7 @@ export default function TenantLifecycleScreen() {
         <BottomSheet visible={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancel Booking">
           <Text style={{ fontSize: fontSize.sm, color: '#556274', marginBottom: 20, lineHeight: 22 }}>
             Cancel the booking for{' '}
-            <Text style={{ fontWeight: '700', color: '#111827' }}>
+            <Text style={{ fontWeight: '700', color: '#0F172A' }}>
               {allotments.find((a: any) => a.id === cancelId)?.tenants?.full_name}
             </Text>? This will free the bed.
           </Text>
@@ -2904,40 +3028,40 @@ export default function TenantLifecycleScreen() {
         <SearchBar tab="onboard" placeholder="Search tenant…" />
         {filtered.length === 0 ? <EmptyCard message="No pending onboardings" /> :
           filtered.map((a: any) => (
-            <Card key={a.id}>
+            <LifecycleCard key={a.id}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · Planned: {fmtDate(a.onboarding_date)}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6366F1' }}>Paid: ₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <AvatarInitial name={a.tenants?.full_name} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{a.apartments?.apartment_code} · {a.beds?.bed_code}</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>Booked {fmtDate(a.booking_date || a.created_at)} · Planned {fmtDate(a.onboarding_date)}</Text>
+                  </View>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                  {/* Cancel booking — reuses existing cancelOpen/doCancelBooking flow */}
-                  <TouchableOpacity
-                    onPress={() => { setCancelId(a.id); setCancelOpen(true); }}
-                    style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}
-                  >
-                    <Ionicons name="close-circle-outline" size={18} color="#C62828" />
-                  </TouchableOpacity>
-                  <ActionBtn title="Onboard" small onPress={() => {
-                    const d = a.onboarding_date || today();
-                    setOForm({ allotmentId: a.id, date: d, bedId: a.bed_id, payMode: '', refNo: '', paidAmount: depositDefault(a.id, d, a.bed_id), bankAccountId: '', ccCharges: '' });
-                    setOnboardOpen(true);
-                  }} />
-                </View>
+                <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>₹{fmtAmt(a.paid_amount || a.deposit_paid)}</Text>
               </View>
-            </Card>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                {/* Onboard — opens the same onboarding BottomSheet/oForm flow as before */}
+                <PrimaryButton title="Onboard" icon="person-add-outline" small onPress={() => {
+                  const d = a.onboarding_date || today();
+                  setOForm({ allotmentId: a.id, date: d, bedId: a.bed_id, payMode: '', refNo: '', paidAmount: depositDefault(a.id, d, a.bed_id), bankAccountId: '', ccCharges: '' });
+                  setOnboardOpen(true);
+                }} />
+                {/* Cancel booking — reuses existing cancelOpen/doCancelBooking flow */}
+                <OutlineButton title="Cancel" icon="close-circle-outline" tone="danger" small onPress={() => { setCancelId(a.id); setCancelOpen(true); }} />
+              </View>
+            </LifecycleCard>
           ))
         }
 
         {pendingPayments.length > 0 && <>
           <SectionTitle title={`Payment Pending (${pendingPayments.length})`} />
           {pendingPayments.map((a: any) => (
-            <Card key={a.id} style={{ borderColor: '#FF7043', borderWidth: 1 }}>
+            <Card key={a.id} style={{ borderColor: '#EA580C', borderWidth: 1 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>{a.tenants?.full_name}</Text>
-                  <Row label="Balance Due" value={`₹${fmtAmt(a.balance_due)}`} valueColor="#C62828" />
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>{a.tenants?.full_name}</Text>
+                  <Row label="Balance Due" value={`₹${fmtAmt(a.balance_due)}`} valueColor="#DC2626" />
                 </View>
                 <ActionBtn title="Pay" small variant="outline" onPress={() => {
                   setAddPayForm({ allotmentId: a.id, amount: String(Math.ceil(a.balance_due || 0)), paymentMode: '', refNo: '' });
@@ -2955,17 +3079,17 @@ export default function TenantLifecycleScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · {fmtDate(a.onboarding_date)}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6366F1' }}>Rent: ₹{fmtAmt(a.monthly_rental)}/mo · Deposit: ₹{fmtAmt(a.deposit_paid)}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code} · {fmtDate(a.onboarding_date)}</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#2563EB' }}>Rent: ₹{fmtAmt(a.monthly_rental)}/mo · Deposit: ₹{fmtAmt(a.deposit_paid)}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <TouchableOpacity onPress={() => { setEditOccForm({ allotmentId: a.id, onboardingDate: a.onboarding_date || '', discount: String(a.discount || 0), premium: String(a.premium || 0), depositPaid: String(a.deposit_paid || 0) }); setEditOccOpen(true); }}
-                    style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                    <Ionicons name="pencil-outline" size={16} color="#6366F1" />
+                    style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
+                    <Ionicons name="pencil-outline" size={16} color="#2563EB" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => doUndoOnboarding(a.id)}
-                    style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}>
-                    <Ionicons name="return-up-back-outline" size={16} color="#C62828" />
+                    style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 8 }}>
+                    <Ionicons name="return-up-back-outline" size={16} color="#DC2626" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2989,7 +3113,7 @@ export default function TenantLifecycleScreen() {
           {costs && (
             <Card style={{ marginBottom: 14 }}>
               <Row label="Bed Rate" value={`₹${fmtAmt(costs.monthlyRent)}/mo`} />
-              {costs.discount > 0 && <Row label="Discount" value={`-₹${fmtAmt(costs.discount)}`} valueColor="#2E7D32" />}
+              {costs.discount > 0 && <Row label="Discount" value={`-₹${fmtAmt(costs.discount)}`} valueColor="#16A34A" />}
               <Row label="Effective Rent" value={`₹${fmtAmt(costs.effectiveRent)}/mo`} />
               <Divider />
               <Row label="Onboarding Fee" value={`₹${fmtAmt(costs.onboardingCharges)}`} />
@@ -2997,120 +3121,19 @@ export default function TenantLifecycleScreen() {
               <Row label={`Pro-rated (${costs.remainingDays}d)`} value={`₹${fmtAmt(costs.proratedRent)}`} />
               <Divider />
               <Row label="Total Due" value={`₹${fmtAmt(costs.totalDue)}`} />
-              <Row label="Already Paid" value={`-₹${fmtAmt(costs.alreadyPaid)}`} valueColor="#2E7D32" />
-              <Row label="Balance Due" value={`₹${fmtAmt(costs.balance)}`} valueColor="#C62828" />
+              <Row label="Already Paid" value={`-₹${fmtAmt(costs.alreadyPaid)}`} valueColor="#16A34A" />
+              <Row label="Balance Due" value={`₹${fmtAmt(costs.balance)}`} valueColor="#DC2626" />
             </Card>
           )}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}><Field label="Amount Paying Now"><TextF value={oForm.paidAmount} onChange={v => {
-              const ccRate = getCcChargeRate();
-              const cc = oForm.payMode === 'credit_card' ? String(Math.ceil((parseFloat(v) || 0) * ccRate)) : '';
-              setOForm({ ...oForm, paidAmount: v, ccCharges: cc });
-            }} keyboardType="numeric" placeholder={costs ? String(costs.balance) : '0'} /></Field></View>
-            <View style={{ flex: 1 }}><Field label="Payment Mode *"><SelectF options={PAY_MODES} value={oForm.payMode} onChange={v => {
-              const ccRate = getCcChargeRate();
-              const cc = v === 'credit_card' ? String(Math.ceil((parseFloat(oForm.paidAmount) || 0) * ccRate)) : '';
-              setOForm({ ...oForm, payMode: v, ccCharges: cc });
-            }} /></Field></View>
-          </View>
-          <Field label="Reference Number *"><TextF value={oForm.refNo} onChange={v => setOForm({ ...oForm, refNo: v })} /></Field>
-
-          {/* ── Bank Details (mirrors web app) ─────────────────────────────── */}
-          <Field label="Bank Details">
-            {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
-              : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={oForm.bankAccountId} onChange={v => setOForm({ ...oForm, bankAccountId: v })} placeholder="Select organisation bank account" />
-            }
-          </Field>
-
-          {/* ── Payment Proof (gallery or camera) ───────────────────────────── */}
-          <View style={{ marginBottom: 14 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="receipt-outline" size={14} color="#6366F1" />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6366F1', letterSpacing: 1, textTransform: 'uppercase' }}>
-                  Payment Proof
-                </Text>
-                <View style={{ backgroundColor: '#EDE9F5', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 9, color: '#6B7280', fontWeight: '600' }}>Optional</Text>
-                </View>
-              </View>
-              {proofScanning.onboarding && (
-                <Text style={{ fontSize: 10, color: '#6366F1', fontWeight: '700' }}>Scanning receipt…</Text>
-              )}
-              {onboardProof && !proofScanning.onboarding && (
-                <TouchableOpacity onPress={() => setOnboardProof(null)}>
-                  <Text style={{ fontSize: fontSize.xs, color: '#C62828', fontWeight: '700' }}>Remove</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <TouchableOpacity
-              onPress={() => pickProof('onboarding')}
-              style={{
-                height: onboardProof ? 160 : 80,
-                borderRadius: 14, borderWidth: 1.5,
-                borderStyle: onboardProof ? 'solid' : 'dashed',
-                borderColor: onboardProof ? '#6366F1' : '#C4B5A0',
-                backgroundColor: onboardProof ? '#F3E5F5' : '#FAF8FF',
-                alignItems: 'center', justifyContent: 'center',
-                overflow: 'hidden',
-              }}
-            >
-              {onboardProof ? (
-                <>
-                  <Image source={{ uri: onboardProof.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(99,102,241,0.75)', paddingVertical: 5, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
-                  </View>
-                </>
-              ) : (
-                <View style={{ alignItems: 'center', gap: 6 }}>
-                  <View style={{ flexDirection: 'row', gap: 16 }}>
-                    <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="image-outline" size={18} color="#6366F1" />
-                      </View>
-                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Gallery</Text>
-                    </View>
-                    <View style={{ alignItems: 'center', gap: 4 }}>
-                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EDE9F5', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="camera-outline" size={18} color="#6366F1" />
-                      </View>
-                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Camera</Text>
-                    </View>
-                  </View>
-                  <Text style={{ fontSize: 10, color: '#6B7280' }}>Upload receipt / screenshot</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* ── CC Charges (shown only when credit_card selected) ────────────── */}
-          {oForm.payMode === 'credit_card' && (
-            <View style={{ marginBottom: 14 }}>
-              <Card style={{ marginBottom: 0 }}>
-                <Row label="CC Charges" value={`₹${fmtAmt(parseFloat(oForm.ccCharges) || 0)}`} valueColor="#E65100" />
-                <Divider />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#111827' }}>Total Amount (incl. CC)</Text>
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#6366F1' }}>
-                    ₹{fmtAmt((parseFloat(oForm.paidAmount) || 0) + (parseFloat(oForm.ccCharges) || 0))}
-                  </Text>
-                </View>
-              </Card>
-            </View>
-          )}
-
-          {/* ── KYC Document Upload ─────────────────────────────────────────── */}
+          {/* ── Offline KYC Document (above payment, mirrors web app) ────────── */}
           <View style={{ marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <Ionicons name="card-outline" size={14} color="#6366F1" />
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#6366F1', letterSpacing: 1, textTransform: 'uppercase' }}>
-                KYC Documents
+              <Ionicons name="card-outline" size={14} color="#2563EB" />
+              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB', letterSpacing: 1, textTransform: 'uppercase' }}>
+                Offline KYC Document
               </Text>
-              <View style={{ backgroundColor: '#FFEBEE', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                <Text style={{ fontSize: 9, color: '#C62828', fontWeight: '700' }}>Required</Text>
+              <View style={{ backgroundColor: '#FEE2E2', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 9, color: '#DC2626', fontWeight: '700' }}>Required</Text>
               </View>
             </View>
 
@@ -3126,8 +3149,8 @@ export default function TenantLifecycleScreen() {
                       style={{
                         height: 110, borderRadius: 14, borderWidth: 1.5,
                         borderStyle: photo ? 'solid' : 'dashed',
-                        borderColor: photo ? '#6366F1' : '#C4B5A0',
-                        backgroundColor: photo ? '#F3E5F5' : '#FAF8FF',
+                        borderColor: photo ? '#2563EB' : '#EEF1F6',
+                        backgroundColor: photo ? '#EFF6FF' : 'rgba(37,99,235,0.04)',
                         alignItems: 'center', justifyContent: 'center',
                         overflow: 'hidden',
                       }}>
@@ -3140,18 +3163,18 @@ export default function TenantLifecycleScreen() {
                           />
                           {/* overlay edit hint */}
                           <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0,
-                            backgroundColor: 'rgba(99,102,241,0.7)', paddingVertical: 4, alignItems: 'center' }}>
+                            backgroundColor: 'rgba(37,99,235,0.7)', paddingVertical: 4, alignItems: 'center' }}>
                             <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
                           </View>
                         </>
                       ) : (
                         <>
-                          <View style={{ width: 40, height: 40, borderRadius: 99, backgroundColor: '#EDE9F5',
+                          <View style={{ width: 40, height: 40, borderRadius: 99, backgroundColor: '#EFF6FF',
                             alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-                            <Ionicons name="camera-outline" size={20} color="#6366F1" />
+                            <Ionicons name="camera-outline" size={20} color="#2563EB" />
                           </View>
                           <Text style={{ fontSize: 12, color: '#556274', fontWeight: '700' }}>{label}</Text>
-                          <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Tap to upload</Text>
+                          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Tap to upload</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -3161,13 +3184,13 @@ export default function TenantLifecycleScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5, justifyContent: 'center' }}>
                         {kycUploading ? (
                           <>
-                            <ActivityIndicator size={10} color="#6366F1" />
-                            <Text style={{ fontSize: 10, color: '#6366F1' }}>Uploading…</Text>
+                            <ActivityIndicator size={10} color="#2563EB" />
+                            <Text style={{ fontSize: 10, color: '#2563EB' }}>Uploading…</Text>
                           </>
                         ) : (
                           <>
-                            <Ionicons name="checkmark-circle" size={12} color="#2E7D32" />
-                            <Text style={{ fontSize: 10, color: '#2E7D32', fontWeight: '600' }}>Ready</Text>
+                            <Ionicons name="checkmark-circle" size={12} color="#16A34A" />
+                            <Text style={{ fontSize: 10, color: '#16A34A', fontWeight: '600' }}>Ready</Text>
                           </>
                         )}
                       </View>
@@ -3177,7 +3200,7 @@ export default function TenantLifecycleScreen() {
                     {photo && (
                       <TouchableOpacity
                         onPress={() => side === 'front' ? setKycFront(null) : setKycBack(null)}
-                        style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(198,40,40,0.85)',
+                        style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(220,38,38,0.85)',
                           borderRadius: 99, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
                         <Ionicons name="close" size={13} color="#fff" />
                       </TouchableOpacity>
@@ -3187,14 +3210,124 @@ export default function TenantLifecycleScreen() {
               })}
             </View>
 
-            <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 8, textAlign: 'center' }}>
+            <Text style={{ fontSize: 10, color: '#64748B', marginTop: 8, textAlign: 'center' }}>
               Upload Aadhaar / PAN / Passport front & back photos
             </Text>
           </View>
 
+          {/* ── Payment ─────────────────────────────────────────────────────── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <Ionicons name="cash-outline" size={14} color="#2563EB" />
+            <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB', letterSpacing: 1, textTransform: 'uppercase' }}>
+              Payment
+            </Text>
+          </View>
+
+          {/* ── Payment Proof (gallery or camera) — upload first; scan auto-fills amount / ref / bank ─── */}
+          <View style={{ marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="receipt-outline" size={14} color="#2563EB" />
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB', letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Payment Proof
+                </Text>
+                <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 9, color: '#64748B', fontWeight: '600' }}>Optional</Text>
+                </View>
+              </View>
+              {proofScanning.onboarding && (
+                <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>Scanning receipt…</Text>
+              )}
+              {onboardProof && !proofScanning.onboarding && (
+                <TouchableOpacity onPress={() => setOnboardProof(null)}>
+                  <Text style={{ fontSize: fontSize.xs, color: '#DC2626', fontWeight: '700' }}>Remove</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={() => pickProof('onboarding')}
+              style={{
+                height: onboardProof ? 160 : 80,
+                borderRadius: 14, borderWidth: 1.5,
+                borderStyle: onboardProof ? 'solid' : 'dashed',
+                borderColor: onboardProof ? '#2563EB' : '#EEF1F6',
+                backgroundColor: onboardProof ? '#EFF6FF' : 'rgba(37,99,235,0.04)',
+                alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              {onboardProof ? (
+                <>
+                  <Image source={{ uri: onboardProof.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(37,99,235,0.75)', paddingVertical: 5, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={{ alignItems: 'center', gap: 6 }}>
+                  <View style={{ flexDirection: 'row', gap: 16 }}>
+                    <View style={{ alignItems: 'center', gap: 4 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="image-outline" size={18} color="#2563EB" />
+                      </View>
+                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Gallery</Text>
+                    </View>
+                    <View style={{ alignItems: 'center', gap: 4 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="camera-outline" size={18} color="#2563EB" />
+                      </View>
+                      <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Camera</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 10, color: '#64748B' }}>Upload receipt / screenshot</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}><Field label="Amount Paying Now"><TextF value={oForm.paidAmount} onChange={v => {
+              const ccRate = getCcChargeRate();
+              const cc = oForm.payMode === 'credit_card' ? String(Math.ceil((parseFloat(v) || 0) * ccRate)) : '';
+              setOForm({ ...oForm, paidAmount: v, ccCharges: cc });
+            }} keyboardType="numeric" placeholder={costs ? String(costs.balance) : '0'} /></Field></View>
+            <View style={{ flex: 1 }}><Field label="Payment Mode *"><SelectF options={PAY_MODES} value={oForm.payMode} onChange={v => {
+              const ccRate = getCcChargeRate();
+              const cc = v === 'credit_card' ? String(Math.ceil((parseFloat(oForm.paidAmount) || 0) * ccRate)) : '';
+              setOForm({ ...oForm, payMode: v, ccCharges: cc });
+            }} /></Field></View>
+          </View>
+
+          <Field label="Reference Number *"><TextF value={oForm.refNo} onChange={v => setOForm({ ...oForm, refNo: v })} /></Field>
+
+          {/* ── Bank Details (mirrors web app) ─────────────────────────────── */}
+          <Field label="Bank Details">
+            {bankAccountOptions.length === 0
+              ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
+              : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={oForm.bankAccountId} onChange={v => setOForm({ ...oForm, bankAccountId: v })} placeholder="Select organisation bank account" />
+            }
+          </Field>
+
+          {/* ── CC Charges (shown only when credit_card selected) ────────────── */}
+          {oForm.payMode === 'credit_card' && (
+            <View style={{ marginBottom: 14 }}>
+              <Card style={{ marginBottom: 0 }}>
+                <Row label="CC Charges" value={`₹${fmtAmt(parseFloat(oForm.ccCharges) || 0)}`} valueColor="#EA580C" />
+                <Divider />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#0F172A' }}>Total Amount (incl. CC)</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#2563EB' }}>
+                    ₹{fmtAmt((parseFloat(oForm.paidAmount) || 0) + (parseFloat(oForm.ccCharges) || 0))}
+                  </Text>
+                </View>
+              </Card>
+            </View>
+          )}
+
           <ActionBtn title="Complete Onboarding" onPress={doOnboard} loading={saving || kycUploading || proofUploading} disabled={!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo || !kycFront || !kycBack} />
           {(!kycFront || !kycBack) && oForm.allotmentId && (
-            <Text style={{ fontSize: fontSize.xs, color: '#C62828', textAlign: 'center', marginTop: 6 }}>
+            <Text style={{ fontSize: fontSize.xs, color: '#DC2626', textAlign: 'center', marginTop: 6 }}>
               KYC front & back photos are required to complete onboarding
             </Text>
           )}
@@ -3206,15 +3339,15 @@ export default function TenantLifecycleScreen() {
             style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
               marginTop: 10, paddingVertical: 13, borderRadius: borderRadius.lg,
-              borderWidth: 1.5, borderColor: '#6366F1',
-              backgroundColor: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.08)',
+              borderWidth: 1.5, borderColor: '#2563EB',
+              backgroundColor: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 'rgba(37,99,235,0.05)' : 'rgba(37,99,235,0.08)',
               opacity: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 0.5 : 1,
             }}
           >
             {regGenerating
-              ? <ActivityIndicator size="small" color="#6366F1" />
-              : <Ionicons name="document-text-outline" size={18} color="#6366F1" />}
-            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#6366F1' }}>
+              ? <ActivityIndicator size="small" color="#2563EB" />
+              : <Ionicons name="document-text-outline" size={18} color="#2563EB" />}
+            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#2563EB' }}>
               Generate Registration PDF
             </Text>
           </TouchableOpacity>
@@ -3222,22 +3355,22 @@ export default function TenantLifecycleScreen() {
 
         {/* ── Registration PDF Preview (Terms of Stay) ───────────────────── */}
         <Modal visible={regPreviewOpen} animationType="slide" transparent onRequestClose={() => setRegPreviewOpen(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(30,18,48,0.5)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: '#FAF7FC', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' }}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: '#F8FAFC', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' }}>
               {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: '#EEF1F6' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="document-text" size={18} color="#6366F1" />
+                  <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="document-text" size={18} color="#2563EB" />
                   </View>
                   <View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>Registration Form</Text>
-                    <Text style={{ fontSize: 11, color: '#6B7280' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>Registration Form</Text>
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>
                       {regData ? [regData.firstName, regData.lastName].filter(Boolean).join(' ') : ''}
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setRegPreviewOpen(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
+                <TouchableOpacity onPress={() => setRegPreviewOpen(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="close" size={18} color="#556274" />
                 </TouchableOpacity>
               </View>
@@ -3258,35 +3391,35 @@ export default function TenantLifecycleScreen() {
                       key={t.id}
                       activeOpacity={0.8}
                       onPress={() => setRegTicks((p) => ({ ...p, [t.id]: !p[t.id] }))}
-                      style={{ flexDirection: 'row', gap: 10, backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: on ? 'rgba(22,163,74,0.4)' : 'rgba(99,102,241,0.1)' }}
+                      style={{ flexDirection: 'row', gap: 10, backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: on ? 'rgba(22,163,74,0.4)' : 'rgba(37,99,235,0.1)' }}
                     >
-                      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: on ? '#16a34a' : '#C4B5D8', backgroundColor: on ? '#16a34a' : 'transparent', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: on ? '#16a34a' : '#CBD5E1', backgroundColor: on ? '#16a34a' : 'transparent', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
                         {on && <Ionicons name="checkmark" size={14} color="#fff" />}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12.5, color: '#111827', lineHeight: 18 }}>
-                          <Text style={{ fontWeight: '800', color: '#6366F1' }}>{i + 1}. </Text>{t.text}
+                        <Text style={{ fontSize: 12.5, color: '#0F172A', lineHeight: 18 }}>
+                          <Text style={{ fontWeight: '800', color: '#2563EB' }}>{i + 1}. </Text>{t.text}
                         </Text>
                         {t.subItems?.map((s, j) => (
                           <Text key={j} style={{ fontSize: 11.5, color: '#556274', lineHeight: 16, marginTop: 3, marginLeft: 6 }}>{s}</Text>
                         ))}
-                        {t.footnote && <Text style={{ fontSize: 11.5, fontStyle: 'italic', color: '#C62828', marginTop: 3 }}>{t.footnote}</Text>}
+                        {t.footnote && <Text style={{ fontSize: 11.5, fontStyle: 'italic', color: '#DC2626', marginTop: 3 }}>{t.footnote}</Text>}
                       </View>
                     </TouchableOpacity>
                   );
                 })}
 
-                <Text style={{ fontSize: 12, fontWeight: '700', color: allTicked ? '#16a34a' : '#D97706', textAlign: 'center', marginTop: 8 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: allTicked ? '#16a34a' : '#EA580C', textAlign: 'center', marginTop: 8 }}>
                   {allTicked ? `All ${TERMS_OF_STAY.length} terms acknowledged.` : `Acknowledged ${Object.values(regTicks).filter(Boolean).length} of ${TERMS_OF_STAY.length}. Tick all to continue.`}
                 </Text>
               </ScrollView>
 
               {/* Actions */}
-              <View style={{ padding: 18, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB', gap: 10 }}>
+              <View style={{ padding: 18, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#EEF1F6', gap: 10 }}>
                 <TouchableOpacity
                   onPress={handleShareRegistration}
                   disabled={!allTicked}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: borderRadius.lg, backgroundColor: allTicked ? '#6366F1' : '#C4B5D8' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: borderRadius.lg, backgroundColor: allTicked ? '#2563EB' : '#94A3B8' }}
                 >
                   <Ionicons name="download-outline" size={18} color="#fff" />
                   <Text style={{ color: '#fff', fontSize: fontSize.md, fontWeight: '800' }}>Download / Share PDF</Text>
@@ -3300,7 +3433,7 @@ export default function TenantLifecycleScreen() {
                   {regSendingWa
                     ? <ActivityIndicator size="small" color="#25D366" />
                     : <Ionicons name="logo-whatsapp" size={18} color="#25D366" />}
-                  <Text style={{ color: '#111827', fontSize: fontSize.md, fontWeight: '800' }}>Send Registration via WhatsApp</Text>
+                  <Text style={{ color: '#0F172A', fontSize: fontSize.md, fontWeight: '800' }}>Send Registration via WhatsApp</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3324,7 +3457,7 @@ export default function TenantLifecycleScreen() {
           {/* ── Bank Details ─────────────────────────────────────────────────── */}
           <Field label="Bank Details">
             {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found.</Text>
+              ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 4 }}>No bank accounts found.</Text>
               : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={addPayForm.bankAccountId} onChange={v => setAddPayForm({ ...addPayForm, bankAccountId: v })} placeholder="Select organisation bank account" />
             }
           </Field>
@@ -3332,11 +3465,11 @@ export default function TenantLifecycleScreen() {
           {/* ── CC Charges ───────────────────────────────────────────────────── */}
           {addPayForm.paymentMode === 'credit_card' && (
             <Card style={{ marginBottom: 14 }}>
-              <Row label="CC Charges" value={`₹${fmtAmt(parseFloat(addPayForm.ccCharges) || 0)}`} valueColor="#E65100" />
+              <Row label="CC Charges" value={`₹${fmtAmt(parseFloat(addPayForm.ccCharges) || 0)}`} valueColor="#EA580C" />
               <Divider />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#111827' }}>Total Amount (incl. CC)</Text>
-                <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#6366F1' }}>
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#0F172A' }}>Total Amount (incl. CC)</Text>
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: '#2563EB' }}>
                   ₹{fmtAmt((parseFloat(addPayForm.amount) || 0) + (parseFloat(addPayForm.ccCharges) || 0))}
                 </Text>
               </View>
@@ -3385,32 +3518,47 @@ export default function TenantLifecycleScreen() {
         </View>
         <SearchBar tab="switch" placeholder="Search by tenant name..." />
         {filtered.length === 0 ? <EmptyCard message="No room switches" /> :
-          filtered.map((s: any) => (
-            <Card key={s._id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontWeight: '700', fontSize: fontSize.sm, flex: 1 }}>{s.tenantName}</Text>
-                <View style={{ backgroundColor: '#E8F5E9', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#2E7D32' }}>Completed</Text>
+          filtered.map((s: any) => {
+            const badgeKind = s.status === 'completed' ? 'completed' : s.status === 'scheduled' ? 'scheduled' : 'cancelled';
+            const knownStatus = s.status === 'completed' || s.status === 'scheduled' || s.status === 'cancelled';
+            const badgeLabel = knownStatus ? undefined : (s.status || 'Unknown');
+            const typeLabel = s.switchType === 'future' ? 'Future' : 'Immediate';
+            return (
+              <LifecycleCard key={s._id}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, flex: 1 }}>{s.tenantName}</Text>
+                  <StatusBadge kind={badgeKind as any} label={badgeLabel} />
                 </View>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                <Text style={{ fontSize: fontSize.xs, color: '#556274' }}>{bedLoc(s.oldBedId)}</Text>
-                <Ionicons name="arrow-forward" size={12} color="#6B7280" />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#111827' }}>{bedLoc(s.newBedId)}</Text>
-              </View>
-              <View style={{ marginTop: 8 }}>
-                <Row label="Type" value={s.switchType === 'immediate' ? 'Immediate' : (s.switchType || '—')} />
-                <Row label="Switch Date" value={fmtDate(s.switchDate)} />
-                <Row label="Rent Diff" value={`${s.rentDifference > 0 ? '+' : ''}₹${fmtAmt(s.rentDifference)}`} valueColor={s.rentDifference > 0 ? '#C62828' : '#2E7D32'} />
-                <Row label="EB" value="—" />
-                <Row label="Deposit Diff" value="—" />
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <ActionBtn title="View" icon="eye-outline" small onPress={() => openStatement(s)} />
-                <ActionBtn title="Reswitch" icon="swap-horizontal-outline" small onPress={() => doReswitch(s)} />
-              </View>
-            </Card>
-          ))
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: fontSize.xs, color: '#556274' }}>{bedLoc(s.oldBedId)}</Text>
+                  <Ionicons name="arrow-forward" size={12} color="#64748B" />
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#0F172A' }}>{bedLoc(s.newBedId)}</Text>
+                </View>
+                <InfoLine parts={[
+                  { text: typeLabel },
+                  { text: fmtDate(s.switchDate) },
+                  { text: `Rent ${s.rentDifference < 0 ? '-' : s.rentDifference > 0 ? '+' : ''}₹${fmtAmt(Math.abs(s.rentDifference))}`, color: s.rentDifference > 0 ? '#DC2626' : '#16A34A', bold: true },
+                  { text: `EB ₹${fmtAmt(s.ebCharges)}` },
+                  { text: `Deposit ${s.depositDifference < 0 ? '-' : s.depositDifference > 0 ? '+' : ''}₹${fmtAmt(Math.abs(s.depositDifference))}`, color: s.depositDifference < 0 ? '#16A34A' : undefined },
+                ]} />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  {s.status === 'scheduled' ? (
+                    <>
+                      <PrimaryButton title="Complete" icon="checkmark-outline" small loading={saving} onPress={() => doCompleteSwitch(s)} />
+                      <OutlineButton title="Cancel" icon="close-circle-outline" tone="danger" small onPress={() => doCancelSwitch(s)} />
+                    </>
+                  ) : s.status === 'completed' ? (
+                    <>
+                      <OutlineButton title="View" icon="eye-outline" small onPress={() => openStatement(s)} />
+                      <OutlineButton title="Reswitch" icon="swap-horizontal-outline" tone="danger" small onPress={() => doReswitch(s)} />
+                    </>
+                  ) : (
+                    <OutlineButton title="View" icon="eye-outline" small onPress={() => openStatement(s)} />
+                  )}
+                </View>
+              </LifecycleCard>
+            );
+          })
         }
 
         <BottomSheet visible={switchOpen} onClose={() => setSwitchOpen(false)} title="Room Switch">
@@ -3421,6 +3569,14 @@ export default function TenantLifecycleScreen() {
               setSwForm({ ...swForm, allotmentId: v, tenantId: a?.tenant_id || '', oldBedId: a?.bed_id || '', newBedId: '', oldRate: rate });
             }} />
           </Field>
+          <Field label="Switch Type">
+            <SelectF options={[{ label: 'Immediate', value: 'immediate' }, { label: 'Future', value: 'future' }]}
+              value={swForm.switchType} onChange={v => setSwForm({ ...swForm, switchType: v })} />
+          </Field>
+          <Field label="Switch Date"><DateF value={swForm.switchDate} onChange={v => setSwForm({ ...swForm, switchDate: v, effectiveDate: v })} /></Field>
+          {swForm.switchType === 'future' && (
+            <Field label="Effective Date"><DateF value={swForm.effectiveDate || swForm.switchDate} onChange={v => setSwForm({ ...swForm, effectiveDate: v })} /></Field>
+          )}
           <Field label="New Bed *">
             <SelectF options={switchBedOpts} value={swForm.newBedId} onChange={v => {
               const b = bedById[v];
@@ -3433,129 +3589,14 @@ export default function TenantLifecycleScreen() {
             <Card style={{ marginBottom: 14 }}>
               <Row label="Current Rent" value={`₹${fmtAmt(swForm.oldRate)}`} />
               <Row label="New Rent" value={`₹${fmtAmt(swForm.newRate)}`} />
-              <Row label="Difference" value={`${swForm.newRate - swForm.oldRate > 0 ? '+' : ''}₹${fmtAmt(swForm.newRate - swForm.oldRate)}`} valueColor={swForm.newRate > swForm.oldRate ? '#C62828' : '#2E7D32'} />
+              <Row label="Difference" value={`${swForm.newRate - swForm.oldRate > 0 ? '+' : ''}₹${fmtAmt(swForm.newRate - swForm.oldRate)}`} valueColor={swForm.newRate > swForm.oldRate ? '#DC2626' : '#16A34A'} />
             </Card>
           )}
-          <Field label="Switch Date"><DateF value={swForm.switchDate} onChange={v => setSwForm({ ...swForm, switchDate: v })} /></Field>
+          <Field label="Notes">
+            <TextInput value={swForm.notes} onChangeText={v => setSwForm({ ...swForm, notes: v })} placeholder="Notes"
+              multiline style={{ borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 10, minHeight: 70, textAlignVertical: 'top' }} />
+          </Field>
           <ActionBtn title="Process Switch" onPress={doSwitch} loading={saving} disabled={!swForm.allotmentId || !swForm.newBedId} />
-        </BottomSheet>
-
-        {/* ── Tenant Statement (opened from a switch row's "View") ── */}
-        <BottomSheet visible={!!stmtCtx} onClose={() => setStmtCtx(null)} title={`Tenant Statement — ${stmtCtx?.tenantName || ''}`}>
-          {stmtCtx ? (() => {
-            const typeLabel = (t: string) => t === 'booking' ? 'Booking' : t === 'onboarding' ? 'Onboarding' : t === 'additional_payment' ? 'Payment' : t === 'settlement' ? 'Settlement' : t === 'rent' ? 'Rent' : (t || 'Payment');
-            const pays = stmtReceipts;
-            const settles = pays.filter((r: any) => r.receiptType === 'settlement');
-
-            // Charges & Payments ledger: invoices = debits, receipts = credits, running balance.
-            const invEntries = stmtInvoices.map((i: any) => ({
-              date: i.billingMonth || '', sortKey: (i.billingMonth || '9999-99') + '-15',
-              category: 'Invoice', desc: i.invoiceNumber || 'Invoice',
-              debit: Number(i.totalAmount) || 0, credit: 0,
-            }));
-            const payEntries = pays.map((r: any) => ({
-              date: r.paymentDate || '', sortKey: r.paymentDate || '9999-99-99',
-              category: 'Payment', desc: `${typeLabel(r.receiptType)}${r.paymentMode ? ' · ' + r.paymentMode : ''}`,
-              debit: 0, credit: Number(r.amountPaid) || 0,
-            }));
-            const ledger = [...invEntries, ...payEntries].sort((a: any, b: any) => String(a.sortKey).localeCompare(String(b.sortKey)));
-            let running = 0;
-            ledger.forEach((e: any) => { running += e.debit - e.credit; e.balance = running; });
-
-            const totalCharged = invEntries.reduce((n: number, e: any) => n + e.debit, 0);
-            const totalPaid = payEntries.reduce((n: number, e: any) => n + e.credit, 0);
-            const totalSettled = settles.reduce((n: number, r: any) => n + r.amountPaid, 0);
-            const balanceDue = totalCharged - totalPaid;
-            const allot = allotments.find((a: any) => a.id === stmtCtx.allotmentId) || allotments.find((a: any) => a.tenant_id === stmtCtx.tenantId);
-            const deposit = Number(allot?.deposit_paid) || 0;
-
-            const TABS3: { k: 'ledger' | 'deposit' | 'summary'; label: string }[] = [
-              { k: 'ledger',  label: 'Charges & Payments' },
-              { k: 'deposit', label: 'Deposit Ledger' },
-              { k: 'summary', label: 'Summary' },
-            ];
-
-            return (
-              <View>
-                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
-                  {TABS3.map(t => (
-                    <TouchableOpacity key={t.k} onPress={() => setStmtTab(t.k)}
-                      style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, backgroundColor: stmtTab === t.k ? '#6366F1' : 'rgba(99,102,241,0.08)' }}>
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: stmtTab === t.k ? '#fff' : '#312E81', textAlign: 'center' }}>{t.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {stmtLoading ? <EmptyCard message="Loading…" /> : (
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-                    {stmtTab === 'ledger' && (
-                      ledger.length === 0 ? <EmptyCard message="No charges or payments" /> :
-                      ledger.map((e: any, idx: number) => (
-                        <Card key={idx}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <View style={{ flex: 1, marginRight: 8 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <View style={{ backgroundColor: e.category === 'Invoice' ? 'rgba(198,40,40,0.1)' : 'rgba(46,125,50,0.1)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: e.category === 'Invoice' ? '#C62828' : '#2E7D32' }}>{e.category}</Text>
-                                </View>
-                                <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{e.date || '—'}</Text>
-                              </View>
-                              <Text style={{ fontSize: fontSize.xs, color: '#556274', marginTop: 3 }} numberOfLines={1}>{e.desc}</Text>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                              {e.debit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#C62828' }}>₹{fmtAmt(e.debit)}</Text> : null}
-                              {e.credit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#2E7D32' }}>−₹{fmtAmt(e.credit)}</Text> : null}
-                              <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Bal ₹{fmtAmt(e.balance)}</Text>
-                            </View>
-                          </View>
-                        </Card>
-                      ))
-                    )}
-
-                    {stmtTab === 'deposit' && (
-                      <Card>
-                        <Row label="Deposit Collected" value={`₹${fmtAmt(deposit)}`} />
-                        {depEdit.editing ? (
-                          <View style={{ marginVertical: 8 }}>
-                            <Field label="Deposit Collected (₹)"><TextF value={depEdit.value} onChange={(v: string) => setDepEdit({ editing: true, value: v })} keyboardType="numeric" /></Field>
-                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                              <ActionBtn title="Save" small onPress={() => doSaveDeposit(allot, depEdit.value)} loading={saving} />
-                              <ActionBtn title="Cancel" small onPress={() => setDepEdit({ editing: false, value: '' })} />
-                            </View>
-                          </View>
-                        ) : (
-                          <TouchableOpacity onPress={() => setDepEdit({ editing: true, value: String(deposit) })}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, marginBottom: 6 }}>
-                            <Ionicons name="pencil-outline" size={14} color="#6366F1" />
-                            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#6366F1' }}>Edit Deposit</Text>
-                          </TouchableOpacity>
-                        )}
-                        {settles.length === 0 ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginVertical: 4 }}>No settlement entries.</Text> :
-                          settles.map((r: any) => (
-                            <Row key={r._id} label={`Settled · ${fmtDate(r.paymentDate)}`} value={`−₹${fmtAmt(r.amountPaid)}`} valueColor="#C62828" />
-                          ))}
-                        <Row label="Net Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} valueColor="#2E7D32" />
-                        <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 8 }}>
-                          Editing updates the deposit held on the allotment. Full per-entry ledger edit needs the pending backend deploy.
-                        </Text>
-                      </Card>
-                    )}
-
-                    {stmtTab === 'summary' && (
-                      <Card>
-                        <Row label="Total Charged" value={`₹${fmtAmt(totalCharged)}`} valueColor="#C62828" />
-                        <Row label="Total Paid" value={`₹${fmtAmt(totalPaid)}`} valueColor="#2E7D32" />
-                        <Row label="Balance Due" value={`₹${fmtAmt(balanceDue)}`} valueColor={balanceDue > 0 ? '#C62828' : '#2E7D32'} />
-                        <Row label="Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} />
-                        <Row label="Invoices" value={`${stmtInvoices.length}`} />
-                        <Row label="Payments" value={`${pays.length}`} />
-                      </Card>
-                    )}
-                  </ScrollView>
-                )}
-              </View>
-            );
-          })() : null}
         </BottomSheet>
       </ScrollView>
     );
@@ -3575,48 +3616,50 @@ export default function TenantLifecycleScreen() {
             {/* Voice Notice Button */}
             <TouchableOpacity
               onPress={() => { setNoticeRecState('idle'); setNoticeTranscript(''); setNoticeVoiceErr(''); setVoiceNoticeOpen(true); }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF3E0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#FF9800' }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFEDD5', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#EA580C' }}
             >
-              <Ionicons name="mic-outline" size={16} color="#E65100" />
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#E65100' }}>Voice</Text>
+              <Ionicons name="mic-outline" size={16} color="#EA580C" />
+              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#EA580C' }}>Voice</Text>
             </TouchableOpacity>
-            <ActionBtn title="Record Notice" icon="notifications-outline" small onPress={() => setNoticeOpen(true)} />
+            <PrimaryButton title="Record Notice" icon="notifications-outline" small onPress={() => setNoticeOpen(true)} />
           </View>
         </View>
-        <SearchBar tab="notices" placeholder="Search by tenant name..." />
+        <SearchField value={ts('notices')} onChangeText={(v: string) => setTs('notices', v)} placeholder="Search by tenant name..." />
         {filtered.length === 0 ? <EmptyCard message="No tenants on notice" /> :
           filtered.map((a: any) => {
             const noticeRecord = notices.find((n: any) => n.allotment_id === a.id);
             return (
-              <Card key={a.id}>
+              <LifecycleCard key={a.id}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
-                    <Row label="Notice Date" value={fmtDate(a.notice_date)} valueColor="#E65100" />
-                    <Row label="Est. Exit" value={fmtDate(a.estimated_exit_date)} valueColor="#C62828" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <AvatarInitial name={a.tenants?.full_name} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                        <StatusBadge kind="onNotice" />
+                      </View>
+                      <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 3 }}>{a.beds?.bed_code} · {a.apartments?.apartment_code}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: '#EA580C', marginTop: 2 }}>Notice Date {fmtDate(a.notice_date)}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: '#DC2626', marginTop: 2 }}>Est. exit {fmtDate(a.estimated_exit_date)}</Text>
+                    </View>
                   </View>
-                  <View style={{ gap: 6 }}>
-                    <TouchableOpacity onPress={() => {
-                      setEditNoticeForm({ noticeId: noticeRecord?.id || '', allotmentId: a.id, bedId: a.bed_id, tenantId: a.tenant_id, noticeDate: a.notice_date || '', exitDate: a.estimated_exit_date || '', notes: noticeRecord?.notes || '' });
-                      setEditNoticeOpen(true);
-                    }} style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#6366F1" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => doDeleteNotice(noticeRecord || { id: '', allotment_id: a.id, bed_id: a.bed_id, tenant_id: a.tenant_id })}
-                      style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="close-outline" size={16} color="#C62828" />
-                    </TouchableOpacity>
-                  </View>
+                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }}>₹{fmtAmt(a.monthly_rental)}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <OutlineButton title="Edit" icon="pencil-outline" small onPress={() => {
+                    setEditNoticeForm({ noticeId: noticeRecord?.id || '', allotmentId: a.id, bedId: a.bed_id, tenantId: a.tenant_id, noticeDate: a.notice_date || '', exitDate: a.estimated_exit_date || '', notes: noticeRecord?.notes || '' });
+                    setEditNoticeOpen(true);
+                  }} />
+                  <OutlineButton title="Delete" icon="trash-outline" tone="danger" small onPress={() => doDeleteNotice(noticeRecord || { id: '', allotment_id: a.id, bed_id: a.bed_id, tenant_id: a.tenant_id })} />
                 </View>
                 <TouchableOpacity
                   onPress={() => doCreatePreExitTask(a)}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, backgroundColor: 'rgba(230,81,0,0.08)', borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(230,81,0,0.25)' }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(234,88,12,0.08)', borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(234,88,12,0.25)' }}
                 >
-                  <Ionicons name="clipboard-outline" size={15} color="#E65100" />
-                  <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#E65100' }}>Create Pre-Exit Task</Text>
+                  <Ionicons name="clipboard-outline" size={15} color="#EA580C" />
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#EA580C' }}>Create Pre-Exit Task</Text>
                 </TouchableOpacity>
-              </Card>
+              </LifecycleCard>
             );
           })
         }
@@ -3628,8 +3671,8 @@ export default function TenantLifecycleScreen() {
               {/* Header */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#1A1A2E' }}>🎙️ Voice Notice</Text>
-                <TouchableOpacity onPress={() => { clearNoticeTimers(); noticeRecordingRef.current?.stopAndUnloadAsync().catch(() => {}); noticeRecordingRef.current = null; setVoiceNoticeOpen(false); setNoticeRecState('idle'); }}>
-                  <Ionicons name="close-circle" size={28} color="#6B7280" />
+                <TouchableOpacity onPress={() => { clearNoticeTimers(); if (noticeRecorder.isRecording) noticeRecorder.stop().catch(() => {}); setVoiceNoticeOpen(false); setNoticeRecState('idle'); }}>
+                  <Ionicons name="close-circle" size={28} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
@@ -3641,36 +3684,36 @@ export default function TenantLifecycleScreen() {
                   </Text>
                   <TouchableOpacity
                     onPress={startNoticeRecording}
-                    style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#E65100', justifyContent: 'center', alignItems: 'center', shadowColor: '#E65100', shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 }}
+                    style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#EA580C', justifyContent: 'center', alignItems: 'center', shadowColor: '#EA580C', shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 }}
                   >
                     <Ionicons name="mic" size={36} color="#fff" />
                   </TouchableOpacity>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Tap to start recording</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Tap to start recording</Text>
                 </View>
               )}
 
               {/* Recording state */}
               {noticeRecState === 'recording' && (
                 <View style={{ alignItems: 'center', gap: 16, paddingTop: 12 }}>
-                  <Text style={{ fontSize: fontSize.sm, color: '#E65100', fontWeight: '700' }}>Listening…</Text>
+                  <Text style={{ fontSize: fontSize.sm, color: '#EA580C', fontWeight: '700' }}>Listening…</Text>
                   <View style={{ width: 120, height: 120, justifyContent: 'center', alignItems: 'center' }}>
-                    <Animated.View style={{ position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#FFCCBC', opacity: noticePulseOpacity1, transform: [{ scale: noticePulseScale1 }] }} />
-                    <Animated.View style={{ position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: '#FF8A65', opacity: noticePulseOpacity2, transform: [{ scale: noticePulseScale2 }] }} />
+                    <Animated.View style={{ position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#FED7AA', opacity: noticePulseOpacity1, transform: [{ scale: noticePulseScale1 }] }} />
+                    <Animated.View style={{ position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: '#EA580C', opacity: noticePulseOpacity2, transform: [{ scale: noticePulseScale2 }] }} />
                     <TouchableOpacity
                       onPress={stopNoticeRecording}
-                      style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#E65100', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}
+                      style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#EA580C', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}
                     >
                       <Ionicons name="stop" size={30} color="#fff" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Tap to stop • Auto-stops after 2s silence</Text>
+                  <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Tap to stop • Auto-stops after 2s silence</Text>
                 </View>
               )}
 
               {/* Transcribing state */}
               {noticeRecState === 'transcribing' && (
                 <View style={{ alignItems: 'center', gap: 16, paddingTop: 28 }}>
-                  <ActivityIndicator size="large" color="#E65100" />
+                  <ActivityIndicator size="large" color="#EA580C" />
                   <Text style={{ fontSize: fontSize.sm, color: '#666' }}>Transcribing your voice…</Text>
                 </View>
               )}
@@ -3678,8 +3721,8 @@ export default function TenantLifecycleScreen() {
               {/* Done state */}
               {noticeRecState === 'done' && (
                 <View style={{ gap: 14 }}>
-                  <View style={{ backgroundColor: '#FFF8F5', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FFCCBC' }}>
-                    <Text style={{ fontSize: fontSize.xs, color: '#E65100', fontWeight: '700', marginBottom: 6 }}>📝 Transcribed</Text>
+                  <View style={{ backgroundColor: '#FFF8F5', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FED7AA' }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#EA580C', fontWeight: '700', marginBottom: 6 }}>📝 Transcribed</Text>
                     <TextInput
                       value={noticeTranscript}
                       onChangeText={setNoticeTranscript}
@@ -3687,7 +3730,7 @@ export default function TenantLifecycleScreen() {
                       style={{ fontSize: fontSize.sm, color: '#1A1A2E', lineHeight: 22, minHeight: 60 }}
                     />
                   </View>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280', textAlign: 'center' }}>
+                  <Text style={{ fontSize: fontSize.xs, color: '#64748B', textAlign: 'center' }}>
                     Edit if needed, then tap Continue to fill in the notice form.
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -3699,7 +3742,7 @@ export default function TenantLifecycleScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={submitVoiceNotice}
-                      style={{ flex: 2, backgroundColor: '#E65100', borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                      style={{ flex: 2, backgroundColor: '#EA580C', borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                     >
                       <Ionicons name="arrow-forward-circle-outline" size={20} color="#fff" />
                       <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#fff' }}>Continue to Form</Text>
@@ -3711,13 +3754,13 @@ export default function TenantLifecycleScreen() {
               {/* Error state */}
               {noticeRecState === 'error' && (
                 <View style={{ alignItems: 'center', gap: 16, paddingTop: 16 }}>
-                  <Ionicons name="warning-outline" size={44} color="#C62828" />
-                  <Text style={{ fontSize: fontSize.sm, color: '#C62828', textAlign: 'center' }}>{noticeVoiceErr}</Text>
+                  <Ionicons name="warning-outline" size={44} color="#DC2626" />
+                  <Text style={{ fontSize: fontSize.sm, color: '#DC2626', textAlign: 'center' }}>{noticeVoiceErr}</Text>
                   <TouchableOpacity
                     onPress={() => setNoticeRecState('idle')}
-                    style={{ backgroundColor: '#FFEBEE', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
+                    style={{ backgroundColor: '#FEE2E2', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
                   >
-                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#C62828' }}>Try Again</Text>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#DC2626' }}>Try Again</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -3780,71 +3823,141 @@ export default function TenantLifecycleScreen() {
 
     const inspectDone = eForm.inspectFurniture && eForm.inspectBed && eForm.inspectWalls && eForm.inspectBathroom;
     const filtered = filterBySearch(exits, ['tenantName', 'tenants.full_name'], ts('exit'));
+    const filteredNotice = filterBySearch(onNotice, ['tenants.full_name', 'apartments.apartment_code'], ts('exit'));
+
+    // KPI tiles — estimated refund due + upcoming-exit counts across tenants currently on notice.
+    // Estimated refund reuses the Process-Exit preview formula (advance − pending rent − under-1yr
+    // exit fee); damage/EB/key-loss are left out since those are only known after the actual
+    // room inspection at exit time, so this is a best-effort estimate, not the final figure.
+    const kpiNow = new Date();
+    const kpiIn7 = new Date(kpiNow); kpiIn7.setDate(kpiIn7.getDate() + 7);
+    const kpiIn30 = new Date(kpiNow); kpiIn30.setDate(kpiIn30.getDate() + 30);
+    let kpiRefundDue = 0, kpiWeek = 0, kpiMonth = 0;
+    onNotice.forEach((a: any) => {
+      const advance = a.deposit_paid || 0;
+      const pendRent = a.balance_due || 0;
+      let exitFee = 0;
+      if (a.estimated_exit_date && a.onboarding_date) {
+        const stayDays = Math.floor((new Date(a.estimated_exit_date).getTime() - new Date(a.onboarding_date).getTime()) / 86400000);
+        if (stayDays < 365) exitFee = config.exit_fee_under_1yr || 2250;
+      }
+      kpiRefundDue += Math.max(0, advance - pendRent - exitFee);
+      if (a.estimated_exit_date) {
+        const ed = new Date(a.estimated_exit_date);
+        if (ed <= kpiIn7) kpiWeek++;
+        else if (ed <= kpiIn30) kpiMonth++;
+      }
+    });
 
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* On notice — ready for exit */}
-        {onNotice.length > 0 && <>
-          <SectionTitle title={`Tenants on Notice (${onNotice.length})`} />
-          {onNotice.map((a: any) => (
-            <Card key={a.id} style={{ borderColor: '#E65100', borderWidth: 1 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{a.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{a.apartments?.apartment_code}-{a.beds?.bed_code}</Text>
-                  <Row label="Est. Exit" value={fmtDate(a.estimated_exit_date)} valueColor="#E65100" />
-                  <Row label="Advance" value={`₹${fmtAmt(a.deposit_paid)}`} />
-                </View>
-                <ActionBtn title="Exit" small variant="danger" icon="log-out-outline" onPress={() => {
-                  setEForm({ ...blankExit, allotmentId: a.id, tenantId: a.tenant_id, bedId: a.bed_id, exitDate: a.estimated_exit_date || today(), hasNotice: true });
-                  setExitOpen(true);
-                }} />
-              </View>
-            </Card>
-          ))}
-        </>}
+        {/* Sub-tab pills */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <Pressable onPress={() => setExitSubTab('notice')}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999,
+              backgroundColor: exitSubTab === 'notice' ? '#6D5EF6' : '#EEF0F4' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: exitSubTab === 'notice' ? '#fff' : '#334155' }}>
+              Tenants on Notice ({onNotice.length})
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => setExitSubTab('history')}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999,
+              backgroundColor: exitSubTab === 'history' ? '#6D5EF6' : '#EEF0F4' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: exitSubTab === 'history' ? '#fff' : '#334155' }}>
+              Exit History ({exits.length})
+            </Text>
+          </Pressable>
+        </View>
 
-        {/* Pre-exit tasks (created via createExitTask, listed from listExitTasks) */}
-        {exitTasks.length > 0 && <>
-          <SectionTitle title={`Pre-Exit Tasks (${exitTasks.length})`} />
-          {exitTasks.map((t: any) => (
-            <Card key={t.id || t._id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{t.tenants?.full_name || t.task || 'Pre-exit task'}</Text>
-                  <Row label="Target Exit" value={fmtDate(t.exit_date)} valueColor="#E65100" />
-                  <Row label="Assignee" value={t.assigned_to || 'Unassigned'} />
-                </View>
-                <StatusPill status={t.status || 'pending'} />
-              </View>
-            </Card>
-          ))}
-        </>}
+        {/* KPI tiles */}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <KpiTile label="EST. REFUND DUE" value={`₹${fmtAmt(kpiRefundDue)}`} valueColor="#16A34A" />
+          <KpiTile label="1 WEEK" value={String(kpiWeek)} valueColor="#16A34A" />
+          <KpiTile label="1 MONTH" value={String(kpiMonth)} valueColor="#16A34A" />
+        </View>
 
-        <SectionTitle title={`Exit History (${exits.length})`} />
-        <SearchBar tab="exit" placeholder="Search tenant…" />
-        {filtered.length === 0 ? <EmptyCard message="No exits yet" /> :
-          filtered.map((e: any) => (
-            <Card key={e._id || e.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Exit: {fmtDate(e.exitDate || e.exit_date)}</Text>
-                  <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
-                  <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
-                  <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#2E7D32" />
-                  <StatusPill status={e.refundStatus || e.refund_status || 'none'} />
-                </View>
-                <TouchableOpacity onPress={() => {
-                  setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
-                  setEditExitOpen(true);
-                }} style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                  <Ionicons name="pencil-outline" size={16} color="#6366F1" />
-                </TouchableOpacity>
-              </View>
-            </Card>
-          ))
-        }
+        <SearchField value={ts('exit')} onChangeText={(v: string) => setTs('exit', v)} placeholder="Search tenant…" />
+
+        {exitSubTab === 'notice' ? (
+          <>
+            {filteredNotice.length === 0 ? <EmptyCard message="No tenants on notice" /> :
+              filteredNotice.map((a: any) => (
+                <LifecycleCard key={a.id}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                      <AvatarInitial name={a.tenants?.full_name} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{a.tenants?.full_name}</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{a.beds?.bed_code} · {a.apartments?.apartment_code}</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>
+                          Est. exit {fmtDate(a.estimated_exit_date)} · Bal ₹{fmtAmt(a.balance_due)} · Adv ₹{fmtAmt(a.deposit_paid)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontWeight: '800', fontSize: fontSize.sm, color: '#DC2626' }}>₹{fmtAmt(a.balance_due)}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <OutlineButton title="Statement" icon="document-text-outline" tone="success" small
+                      onPress={() => openStatement({ tenantId: a.tenant_id, tenantName: a.tenants?.full_name, allotmentId: a.id })} />
+                    <OutlineButton title="Process Exit" icon="log-out-outline" tone="danger" small onPress={() => {
+                      setEForm({ ...blankExit, allotmentId: a.id, tenantId: a.tenant_id, bedId: a.bed_id, exitDate: a.estimated_exit_date || today(), hasNotice: true });
+                      setExitOpen(true);
+                    }} />
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => doCreatePreExitTask(a)}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(234,88,12,0.08)', borderRadius: 10, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(234,88,12,0.25)' }}
+                  >
+                    <Ionicons name="clipboard-outline" size={15} color="#EA580C" />
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#EA580C' }}>Create Pre-Exit Task</Text>
+                  </TouchableOpacity>
+                </LifecycleCard>
+              ))
+            }
+
+            {/* Pre-exit tasks (created via createExitTask, listed from listExitTasks) */}
+            {exitTasks.length > 0 && <>
+              <SectionTitle title={`Pre-Exit Tasks (${exitTasks.length})`} />
+              {exitTasks.map((t: any) => (
+                <Card key={t.id || t._id}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{t.tenants?.full_name || t.task || 'Pre-exit task'}</Text>
+                      <Row label="Target Exit" value={fmtDate(t.exit_date)} valueColor="#EA580C" />
+                      <Row label="Assignee" value={t.assigned_to || 'Unassigned'} />
+                    </View>
+                    <StatusPill status={t.status || 'pending'} />
+                  </View>
+                </Card>
+              ))}
+            </>}
+          </>
+        ) : (
+          <>
+            {filtered.length === 0 ? <EmptyCard message="No exits yet" /> :
+              filtered.map((e: any) => (
+                <LifecycleCard key={e._id || e.id}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
+                      <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Exit: {fmtDate(e.exitDate || e.exit_date)}</Text>
+                      <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
+                      <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
+                      <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#16A34A" />
+                      <StatusPill status={e.refundStatus || e.refund_status || 'none'} />
+                    </View>
+                    <TouchableOpacity onPress={() => {
+                      setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
+                      setEditExitOpen(true);
+                    }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
+                      <Ionicons name="pencil-outline" size={16} color="#2563EB" />
+                    </TouchableOpacity>
+                  </View>
+                </LifecycleCard>
+              ))
+            }
+          </>
+        )}
 
         {/* Process Exit sheet */}
         <BottomSheet visible={exitOpen} onClose={() => setExitOpen(false)} title="Process Exit">
@@ -3865,8 +3978,8 @@ export default function TenantLifecycleScreen() {
             <CheckRow label="Bathroom OK" checked={eForm.inspectBathroom} onChange={v => setEForm({ ...eForm, inspectBathroom: v })} />
             <Divider />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name={inspectDone ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={inspectDone ? '#2E7D32' : '#6B7280'} />
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: inspectDone ? '#2E7D32' : '#6B7280' }}>
+              <Ionicons name={inspectDone ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={inspectDone ? '#16A34A' : '#64748B'} />
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: inspectDone ? '#16A34A' : '#64748B' }}>
                 {inspectDone ? 'Inspection Complete' : 'Complete all checks above'}
               </Text>
             </View>
@@ -3878,23 +3991,23 @@ export default function TenantLifecycleScreen() {
 
           {/* Exit-month estimated EB — recomputed from the actual exit date (item 6) */}
           {(exitEbLoading || exitEb) && (
-            <Card style={{ marginBottom: 14, borderColor: '#FFE0B2', borderWidth: 1, backgroundColor: '#FFFBF5' }}>
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#8B6914', marginBottom: 8 }}>ESTIMATED EB (EXIT MONTH)</Text>
+            <Card style={{ marginBottom: 14, borderColor: '#FED7AA', borderWidth: 1, backgroundColor: '#FFFBF5' }}>
+              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#C2410C', marginBottom: 8 }}>ESTIMATED EB (EXIT MONTH)</Text>
               {exitEbLoading ? (
-                <Text style={{ fontSize: fontSize.sm, color: '#6B7280' }}>Recomputing from exit date…</Text>
+                <Text style={{ fontSize: fontSize.sm, color: '#64748B' }}>Recomputing from exit date…</Text>
               ) : exitEb ? (
                 <>
-                  <Row label={`Recomputed (${exitEb.daysInExitMonth} day${exitEb.daysInExitMonth === 1 ? '' : 's'})`} value={`₹${fmtAmt(exitEb.recomputed)}`} valueColor="#8B6914" />
+                  <Row label={`Recomputed (${exitEb.daysInExitMonth} day${exitEb.daysInExitMonth === 1 ? '' : 's'})`} value={`₹${fmtAmt(exitEb.recomputed)}`} valueColor="#C2410C" />
                   {exitEb.estimatedEbIncluded && (
                     <Row label="Already on invoice" value={`₹${fmtAmt(exitEb.invoicedOriginal)}`} />
                   )}
                   {exitEb.estimatedEbIncluded && exitEb.recomputed !== exitEb.invoicedOriginal && (
-                    <Text style={{ fontSize: fontSize.xs, color: '#C77800', marginTop: 6 }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#C2410C', marginTop: 6 }}>
                       ⓘ On completing the exit, the invoice EB will change from ₹{fmtAmt(exitEb.invoicedOriginal)} to ₹{fmtAmt(exitEb.recomputed)}.
                     </Text>
                   )}
                   {!exitEb.canRecompute && (
-                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 6 }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 6 }}>
                       Previous-month meter reading missing — keeping the invoiced value.
                     </Text>
                   )}
@@ -3914,15 +4027,15 @@ export default function TenantLifecycleScreen() {
               {preview.under1yr && <Row label="Exit Charges (<1yr)" value={`₹${fmtAmt(preview.exitChg)}`} />}
               <Divider />
               <Row label="Total Deductions" value={`₹${fmtAmt(preview.total)}`} />
-              <Row label="Advance Held" value={`₹${fmtAmt(preview.advance)}`} valueColor="#2E7D32" />
+              <Row label="Advance Held" value={`₹${fmtAmt(preview.advance)}`} valueColor="#16A34A" />
               <Divider />
-              <Row label={preview.refund > 0 ? 'Refund Due' : 'Amount Owed'} value={`₹${fmtAmt(Math.abs(preview.refund))}`} valueColor={preview.refund > 0 ? '#2E7D32' : '#C62828'} />
+              <Row label={preview.refund > 0 ? 'Refund Due' : 'Amount Owed'} value={`₹${fmtAmt(Math.abs(preview.refund))}`} valueColor={preview.refund > 0 ? '#16A34A' : '#DC2626'} />
             </Card>
           )}
 
           <Field label="Notes"><TextF value={eForm.notes} onChange={v => setEForm({ ...eForm, notes: v })} multiline /></Field>
           <ActionBtn title="Process Exit" variant="danger" onPress={doExit} loading={saving} disabled={!eForm.allotmentId || !eForm.exitDate || !inspectDone} />
-          {!inspectDone && eForm.allotmentId && <Text style={{ fontSize: fontSize.xs, color: '#C62828', textAlign: 'center', marginTop: 8 }}>Complete room inspection to enable exit</Text>}
+          {!inspectDone && eForm.allotmentId && <Text style={{ fontSize: fontSize.xs, color: '#DC2626', textAlign: 'center', marginTop: 8 }}>Complete room inspection to enable exit</Text>}
         </BottomSheet>
 
         {/* Edit exit sheet */}
@@ -3952,13 +4065,13 @@ export default function TenantLifecycleScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{p.tenantName}</Text>
-                  <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>{p.paymentDate} · {p.paymentMode?.toUpperCase()}</Text>
-                  {p.referenceNumber ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Ref: {p.referenceNumber}</Text> : null}
+                  <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{p.paymentDate} · {p.paymentMode?.toUpperCase()}</Text>
+                  {p.referenceNumber ? <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Ref: {p.referenceNumber}</Text> : null}
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <Text style={{ fontWeight: '800', fontSize: fontSize.md, color: '#6366F1' }}>₹{fmtAmt(p.amountPaid)}</Text>
-                  <View style={{ backgroundColor: '#F3E5F5', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                    <Text style={{ fontSize: 9, color: '#6366F1', fontWeight: '700', textTransform: 'uppercase' }}>{p.receiptType}</Text>
+                  <Text style={{ fontWeight: '800', fontSize: fontSize.md, color: '#2563EB' }}>₹{fmtAmt(p.amountPaid)}</Text>
+                  <View style={{ backgroundColor: '#EFF6FF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 9, color: '#2563EB', fontWeight: '700', textTransform: 'uppercase' }}>{p.receiptType}</Text>
                   </View>
                 </View>
               </View>
@@ -3975,51 +4088,88 @@ export default function TenantLifecycleScreen() {
     const filtered = filterBySearch(pendingRefunds, ['tenantName', 'tenants.full_name'], ts('refunds'));
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <SectionTitle title="Refund Tracking" />
+          <TouchableOpacity
+            onPress={() => Alert.alert('Download PDF', 'Refund report PDF export is not available yet.')}
+          >
+            <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: fontSize.sm }}>Download PDF</Text>
+          </TouchableOpacity>
+        </View>
+
         {overdueRefunds.length > 0 && (
-          <Card style={{ borderColor: '#C62828', borderWidth: 1.5, backgroundColor: '#FFEBEE', marginBottom: 14 }}>
+          <Card style={{ borderColor: '#DC2626', borderWidth: 1.5, backgroundColor: '#FEE2E2', marginBottom: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="warning" size={18} color="#C62828" />
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#C62828' }}>
+              <Ionicons name="warning" size={18} color="#DC2626" />
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#DC2626' }}>
                 {overdueRefunds.length} overdue refund(s)!
               </Text>
             </View>
           </Card>
         )}
-        <SectionTitle title="Refund Tracking" />
-        <SearchBar tab="refunds" placeholder="Search by tenant name..." />
+
+        <SearchField value={ts('refunds')} onChangeText={(v: string) => setTs('refunds', v)} placeholder="Search by tenant name..." />
+
         {filtered.length === 0 ? <EmptyCard message="No pending refunds 🎉" /> :
           filtered.map((e: any) => {
             const daysSince = daysBetween(e.exitDate || e.exit_date || '');
             const isOverdue = daysSince > (config.refund_deadline_days || 5);
+            // Preserve existing sign convention: backend clamps refund_due at >= 0
+            // today, but this keeps the UI correct if a negative ("tenant owes")
+            // value is ever produced upstream — no new math introduced here.
+            const refundAmt = Number(e.refundDue ?? e.refund_due ?? 0);
+            const tenantOwes = refundAmt < 0;
+            const tenantName = e.tenantName || e.tenants?.full_name;
+            const code = e.tenant_allotments?.apartments?.apartment_code || e.apartments?.apartment_code || '';
+            const phone = e.tenantPhone || e.tenants?.phone || '';
             return (
-              <Card key={e._id || e.id} style={isOverdue ? { borderColor: '#C62828', borderWidth: 1.5 } : {}}>
+              <LifecycleCard key={e._id || e.id} style={isOverdue ? { borderColor: '#DC2626', borderWidth: 1.5 } : {}}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <Text style={{ fontWeight: '700', fontSize: fontSize.sm }}>{e.tenantName || e.tenants?.full_name}</Text>
-                      {isOverdue && <Ionicons name="warning" size={14} color="#C62828" />}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <AvatarInitial name={tenantName} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{tenantName}</Text>
+                        <StatusBadge kind="pending" />
+                        {isOverdue && <Ionicons name="warning" size={14} color="#DC2626" />}
+                      </View>
+                      {!!(code || phone) && (
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                          {[code, phone].filter(Boolean).join(' · ')}
+                        </Text>
+                      )}
+                      <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>
+                        Exit {fmtDate(e.exitDate || e.exit_date)} · Held ₹{fmtAmt(e.advanceHeld || e.advance_held)} · Ded ₹{fmtAmt(e.totalDeductions || e.total_deductions)} · {daysSince} days
+                      </Text>
                     </View>
-                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280' }}>Exit: {fmtDate(e.exitDate || e.exit_date)} · {daysSince}d ago</Text>
-                    <Row label="Advance Held" value={`₹${fmtAmt(e.advanceHeld || e.advance_held)}`} />
-                    <Row label="Deductions" value={`₹${fmtAmt(e.totalDeductions || e.total_deductions)}`} />
-                    <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#2E7D32" />
                   </View>
-                  <View style={{ gap: 6 }}>
-                    <TouchableOpacity onPress={() => {
-                      setEditRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, advanceHeld: e.advanceHeld || e.advance_held || 0, pendingRent: String(e.pendingRent || e.pending_rent || 0), ebCharges: String(e.ebCharges || e.eb_charges || 0), exitCharges: String(e.exitCharges || e.exit_charges || 0), damageCharges: String(e.damageCharges || e.damage_charges || 0), keyLossFee: String(e.keyLossFee || e.key_loss_fee || 0) });
-                      setEditRefundOpen(true);
-                    }} style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#6366F1" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => {
-                      setCompleteRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, tenantId: e.tenantId || e.tenant_id, tenantName: e.tenantName || e.tenants?.full_name || '', refundDue: e.refundDue || e.refund_due || 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
-                      setCompleteRefundOpen(true);
-                    }} style={{ backgroundColor: '#E8F5E9', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="checkmark-circle-outline" size={16} color="#2E7D32" />
-                    </TouchableOpacity>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontWeight: '800', fontSize: fontSize.sm, color: tenantOwes ? '#DC2626' : '#16A34A' }}>
+                      ₹{fmtAmt(Math.abs(refundAmt))}
+                    </Text>
+                    {tenantOwes && <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '600' }}>(Tenant Owes)</Text>}
                   </View>
                 </View>
-              </Card>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <OutlineButton title="Edit" icon="pencil-outline" small onPress={() => {
+                    setEditRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, advanceHeld: e.advanceHeld || e.advance_held || 0, pendingRent: String(e.pendingRent || e.pending_rent || 0), ebCharges: String(e.ebCharges || e.eb_charges || 0), exitCharges: String(e.exitCharges || e.exit_charges || 0), damageCharges: String(e.damageCharges || e.damage_charges || 0), keyLossFee: String(e.keyLossFee || e.key_loss_fee || 0) });
+                    setEditRefundOpen(true);
+                  }} />
+                  {tenantOwes ? (
+                    <OutlineButton title="Collect" icon="cash-outline" tone="success" small onPress={() => {
+                      Alert.alert('Collect from Tenant', `Tenant owes ₹${fmtAmt(Math.abs(refundAmt))}. Collecting dues from an exit is not implemented as a separate flow yet — use Edit to adjust deductions.`);
+                    }} />
+                  ) : (
+                    <PrimaryButton title="Complete" icon="checkmark-circle-outline" small onPress={() => {
+                      setCompleteRefundForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, tenantId: e.tenantId || e.tenant_id, tenantName: tenantName || '', refundDue: e.refundDue || e.refund_due || 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
+                      setRefundProof(null); setRefundProofAmount(null);
+                      setCompleteRefundOpen(true);
+                    }} />
+                  )}
+                  <OutlineButton title="Statement" icon="document-text-outline" tone="success" small
+                    onPress={() => openStatement({ tenantId: e.tenantId || e.tenant_id, tenantName, allotmentId: e.allotmentId || e.allotment_id })} />
+                </View>
+              </LifecycleCard>
             );
           })
         }
@@ -4042,8 +4192,8 @@ export default function TenantLifecycleScreen() {
             const refund = Math.max(0, editRefundForm.advanceHeld - total);
             return (
               <Card style={{ marginBottom: 14 }}>
-                <Row label="Total Deductions" value={`₹${fmtAmt(total)}`} valueColor="#C62828" />
-                <Row label="Refund Due" value={`₹${fmtAmt(refund)}`} valueColor="#2E7D32" />
+                <Row label="Total Deductions" value={`₹${fmtAmt(total)}`} valueColor="#DC2626" />
+                <Row label="Refund Due" value={`₹${fmtAmt(refund)}`} valueColor="#16A34A" />
               </Card>
             );
           })()}
@@ -4051,23 +4201,127 @@ export default function TenantLifecycleScreen() {
         </BottomSheet>
 
         {/* Complete refund sheet */}
-        <BottomSheet visible={completeRefundOpen} onClose={() => setCompleteRefundOpen(false)} title="Complete Refund">
+        <BottomSheet visible={completeRefundOpen} onClose={() => { setCompleteRefundOpen(false); setRefundProof(null); setRefundProofAmount(null); }} title="Complete Refund">
           <Card style={{ marginBottom: 14 }}>
             <Row label="Tenant" value={completeRefundForm.tenantName} />
-            <Row label="Refund Amount" value={`₹${fmtAmt(completeRefundForm.refundDue)}`} valueColor="#2E7D32" />
+            <Row label="Refund Amount" value={`₹${fmtAmt(completeRefundForm.refundDue)}`} valueColor="#16A34A" />
           </Card>
+
+          {/* ── Payment Proof (required) — scanned amount MUST match the refund amount ─── */}
+          {(() => {
+            const due = Math.round(Number(completeRefundForm.refundDue) || 0);
+            const scanned = refundProofAmount;
+            const matched = scanned != null && scanned === due;
+            return (
+              <View style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="receipt-outline" size={14} color="#2563EB" />
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#2563EB', letterSpacing: 1, textTransform: 'uppercase' }}>
+                      Payment Proof
+                    </Text>
+                    <View style={{ backgroundColor: '#FEE2E2', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 9, color: '#DC2626', fontWeight: '700' }}>Required</Text>
+                    </View>
+                  </View>
+                  {proofScanning.refund && (
+                    <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '700' }}>Scanning receipt…</Text>
+                  )}
+                  {refundProof && !proofScanning.refund && (
+                    <TouchableOpacity onPress={() => { setRefundProof(null); setRefundProofAmount(null); }}>
+                      <Text style={{ fontSize: fontSize.xs, color: '#DC2626', fontWeight: '700' }}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => pickProof('refund')}
+                  style={{
+                    height: refundProof ? 160 : 80,
+                    borderRadius: 14, borderWidth: 1.5,
+                    borderStyle: refundProof ? 'solid' : 'dashed',
+                    borderColor: refundProof ? (matched ? '#16A34A' : '#DC2626') : '#EEF1F6',
+                    backgroundColor: refundProof ? (matched ? '#DCFCE7' : '#FEE2E2') : 'rgba(37,99,235,0.04)',
+                    alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {refundProof ? (
+                    <>
+                      <Image source={{ uri: refundProof.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(37,99,235,0.75)', paddingVertical: 5, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>Tap to change</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={{ alignItems: 'center', gap: 6 }}>
+                      <View style={{ flexDirection: 'row', gap: 16 }}>
+                        <View style={{ alignItems: 'center', gap: 4 }}>
+                          <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="image-outline" size={18} color="#2563EB" />
+                          </View>
+                          <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Gallery</Text>
+                        </View>
+                        <View style={{ alignItems: 'center', gap: 4 }}>
+                          <View style={{ width: 36, height: 36, borderRadius: 99, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="camera-outline" size={18} color="#2563EB" />
+                          </View>
+                          <Text style={{ fontSize: 10, color: '#556274', fontWeight: '600' }}>Camera</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 10, color: '#64748B' }}>Upload the ₹{due} payment screenshot</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* match / mismatch indicator */}
+                {refundProof && !proofScanning.refund && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 }}>
+                    <Ionicons
+                      name={matched ? 'checkmark-circle' : 'close-circle'}
+                      size={14}
+                      color={matched ? '#16A34A' : '#DC2626'}
+                    />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: matched ? '#16A34A' : '#DC2626', flex: 1 }}>
+                      {scanned == null
+                        ? `Couldn't read the amount — upload a clear screenshot showing ₹${due}.`
+                        : matched
+                          ? `Amount ₹${scanned} matches — refund allowed.`
+                          : `Screenshot shows ₹${scanned}, but refund is ₹${due}. Amounts must match.`}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })()}
+
           <Field label="Refund Date *"><DateF value={completeRefundForm.refundDate} onChange={v => setCompleteRefundForm({ ...completeRefundForm, refundDate: v })} /></Field>
 
           {/* ── Bank Account (mirrors web app) ───────────────────────────────── */}
           <Field label="Bank Account *">
             {bankAccountOptions.length === 0
-              ? <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
+              ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 4 }}>No bank accounts found. Add one under Accounting → Bank Accounts.</Text>
               : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={completeRefundForm.bankAccountId} onChange={v => setCompleteRefundForm({ ...completeRefundForm, bankAccountId: v })} placeholder="Select bank account" />
             }
           </Field>
 
           <Field label="Reference / UTR Number *"><TextF value={completeRefundForm.referenceNumber} onChange={v => setCompleteRefundForm({ ...completeRefundForm, referenceNumber: v })} placeholder="Enter UTR or transaction ID" /></Field>
-          <ActionBtn title="Mark Refund Complete" onPress={doCompleteRefund} loading={saving} disabled={!completeRefundForm.referenceNumber} />
+          <ActionBtn
+            title="Mark Refund Complete"
+            onPress={doCompleteRefund}
+            loading={saving}
+            disabled={
+              !completeRefundForm.referenceNumber ||
+              !refundProof ||
+              refundProofAmount == null ||
+              refundProofAmount !== Math.round(Number(completeRefundForm.refundDue) || 0)
+            }
+          />
+          {refundProof && !proofScanning.refund && refundProofAmount !== Math.round(Number(completeRefundForm.refundDue) || 0) && (
+            <Text style={{ fontSize: fontSize.xs, color: '#DC2626', textAlign: 'center', marginTop: 6 }}>
+              Refund is blocked until the uploaded screenshot's amount exactly matches ₹{fmtAmt(completeRefundForm.refundDue)}.
+            </Text>
+          )}
         </BottomSheet>
       </ScrollView>
     );
@@ -4133,24 +4387,21 @@ export default function TenantLifecycleScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* Header row */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <SectionTitle title="Not in Property" />
-          <ActionBtn title="Add Absence" icon="add-circle-outline" small onPress={() => {
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <SectionTitle title="Not in Property (Absence Records)" />
+          <PrimaryButton title="Add Absence" icon="add-circle-outline" small onPress={() => {
             setAbsenceEditId(null);
             setAbsenceForm(blankAbsence);
             setAbsenceOpen(true);
           }} />
         </View>
 
-        {/* Info banner */}
-        <View style={{ backgroundColor: VBRAND.purpleSoft, borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-          <Ionicons name="information-circle-outline" size={16} color={VBRAND.purpleDeep} style={{ marginTop: 1 }} />
-          <Text style={{ flex: 1, fontSize: fontSize.xs, color: VBRAND.ink600, lineHeight: 18 }}>
-            Absences over 30 days excluded from electricity billing.
-          </Text>
-        </View>
+        {/* Subtitle */}
+        <Text style={{ fontSize: fontSize.xs, color: VBRAND.ink600, marginBottom: 12, lineHeight: 18 }}>
+          Record tenant absences exceeding 30 days to exclude them from electricity billing.
+        </Text>
 
-        <SearchBar tab="absent" placeholder="Search by tenant name…" />
+        <SearchField value={ts('absent')} onChangeText={(v: string) => setTs('absent', v)} placeholder="Search by tenant name…" />
 
         {filtered.length === 0 ? (
           <EmptyCard message="No absence records found" />
@@ -4170,48 +4421,53 @@ export default function TenantLifecycleScreen() {
             const aptBed = allot
               ? `${allot.apartments?.apartment_code || '?'}-${allot.beds?.bed_code || '?'}`
               : '—';
+            const tenantName = r.tenants?.full_name || '—';
 
             return (
-              <Card key={r.id}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: '700', fontSize: fontSize.sm, color: '#111827' }}>
-                      {r.tenants?.full_name || '—'}
+              <LifecycleCard key={r.id}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                  <AvatarInitial name={tenantName} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontWeight: '700', fontSize: 14, color: VBRAND.ink900 }} numberOfLines={1}>
+                      {tenantName}
                     </Text>
-                    <Text style={{ fontSize: fontSize.xs, color: '#6B7280', marginBottom: 4 }}>{aptBed}</Text>
-                    <Row label="From"     value={fmtDate(r.from_date)} />
-                    <Row label="To"       value={fmtDate(r.to_date)} />
-                    <Row label="Duration" value={`${duration} day${duration !== 1 ? 's' : ''}`} valueColor="#6366F1" />
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }}>{aptBed}</Text>
+                    <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 4 }}>
+                      {fmtDate(r.from_date)} → {fmtDate(r.to_date)} · {duration} day{duration !== 1 ? 's' : ''}
+                    </Text>
                     {r.reason ? (
-                      <Row label="Reason" value={r.reason} />
+                      <Text style={{ fontSize: 12, color: VBRAND.ink600, marginTop: 2 }} numberOfLines={2}>
+                        Reason: {r.reason}
+                      </Text>
                     ) : null}
                   </View>
-                  <View style={{ gap: 6, marginLeft: 10 }}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setAbsenceEditId(r.id);
-                        setAbsenceForm({
-                          allotmentId: r.allotment_id || '',
-                          tenantId: r.tenant_id,
-                          fromDate: r.from_date,
-                          toDate: r.to_date,
-                          reason: r.reason || '',
-                        });
-                        setAbsenceOpen(true);
-                      }}
-                      style={{ backgroundColor: '#F3E5F5', borderRadius: 8, padding: 8 }}
-                    >
-                      <Ionicons name="pencil-outline" size={16} color="#6366F1" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => doDeleteAbsence(r.id)}
-                      style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: 8 }}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#C62828" />
-                    </TouchableOpacity>
-                  </View>
                 </View>
-              </Card>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <OutlineButton
+                    title="Edit"
+                    icon="pencil-outline"
+                    small
+                    onPress={() => {
+                      setAbsenceEditId(r.id);
+                      setAbsenceForm({
+                        allotmentId: r.allotment_id || '',
+                        tenantId: r.tenant_id,
+                        fromDate: r.from_date,
+                        toDate: r.to_date,
+                        reason: r.reason || '',
+                      });
+                      setAbsenceOpen(true);
+                    }}
+                  />
+                  <OutlineButton
+                    title="Delete"
+                    icon="trash-outline"
+                    tone="danger"
+                    small
+                    onPress={() => doDeleteAbsence(r.id)}
+                  />
+                </View>
+              </LifecycleCard>
             );
           })
         )}
@@ -4266,9 +4522,9 @@ export default function TenantLifecycleScreen() {
             const d2 = new Date(absenceForm.toDate);
             const days = Math.floor((d2.getTime() - d1.getTime()) / 86400000) + 1;
             return (
-              <View style={{ backgroundColor: days >= 30 ? '#E8F5E9' : '#FFF3E0', borderRadius: 10, padding: 10, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name={days >= 30 ? 'checkmark-circle-outline' : 'time-outline'} size={16} color={days >= 30 ? '#2E7D32' : '#E65100'} />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: days >= 30 ? '#2E7D32' : '#E65100' }}>
+              <View style={{ backgroundColor: days >= 30 ? '#DCFCE7' : '#FFEDD5', borderRadius: 10, padding: 10, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name={days >= 30 ? 'checkmark-circle-outline' : 'time-outline'} size={16} color={days >= 30 ? '#16A34A' : '#EA580C'} />
+                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: days >= 30 ? '#16A34A' : '#EA580C' }}>
                   {days} day{days !== 1 ? 's' : ''}{days >= 30 ? ' — qualifies for EB exclusion' : ' — minimum 30 days for EB exclusion'}
                 </Text>
               </View>
@@ -4293,6 +4549,12 @@ export default function TenantLifecycleScreen() {
   // ─── TAB RENDERER ─────────────────────────────────────────────────────────
 
   const tabContent: Record<string, () => React.JSX.Element> = {
+    overview:  () => (
+      <>
+        {renderBedStatusCard()}
+        {renderBedFocusDetail()}
+      </>
+    ),
     map:       renderBedMap,
     booking:   renderBooking,
     onboard:   renderOnboarding,
@@ -4365,7 +4627,7 @@ export default function TenantLifecycleScreen() {
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
-                    if (!activeTab) setBedFocusSearch(prev => prev);
+                    if (activeTab === 'overview') setBedFocusSearch(prev => prev);
                     Alert.alert('Search', 'Use the search field in the detail panel or module below.');
                   }}
                   style={{
@@ -4392,67 +4654,32 @@ export default function TenantLifecycleScreen() {
           )}
         </View>
 
-        {/* Module icon tabs — web life-tabs-icons */}
+        {/* Module icon tabs — web life-tabs-icons (pill strip: active = solid purple, inactive = light gray) */}
         {!anySheetOpen && (
           <View>
-            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-              {renderBedStatusCard()}
-            </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={{ marginBottom: 4 }}
               contentContainerStyle={{
-                gap: 8, paddingVertical: 4, paddingHorizontal: 16,
+                paddingVertical: 4, paddingHorizontal: 16,
               }}
             >
               {TABS.map(tab => {
                 const active = activeTab === tab.key;
                 return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    onPress={() => selectModule(tab.key)}
-                    activeOpacity={0.85}
-                    style={{
-                      minWidth: 72, minHeight: 54, paddingHorizontal: 10, paddingVertical: 8,
-                      borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 4,
-                      backgroundColor: active ? '#EFF6FF' : VBRAND.surfaceSoft,
-                      borderWidth: 1,
-                      borderColor: active ? '#BFDBFE' : VBRAND.softLine,
+                  <Pressable key={tab.key} onPress={() => {
+                      if (tab.key === 'excel') { Alert.alert('Excel Upload', 'Excel upload opened'); return; }
+                      setActiveTab(tab.key);
                     }}
-                  >
-                    <Ionicons
-                      name={tab.icon as any}
-                      size={20}
-                      color={active ? VBRAND.purpleDeep : VBRAND.ink600}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 10, fontWeight: active ? '800' : '600',
-                        color: active ? VBRAND.purpleDeep : VBRAND.ink600,
-                        textAlign: 'center',
-                      }}
-                      numberOfLines={2}
-                    >
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8,
+                      borderRadius: 999, marginRight: 8,
+                      backgroundColor: active ? '#6D5EF6' : '#EEF0F4' }}>
+                    <Ionicons name={tab.icon as any} size={15} color={active ? '#fff' : '#334155'} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : '#334155' }}>{tab.label}</Text>
+                  </Pressable>
                 );
               })}
-              <TouchableOpacity
-                onPress={() => Alert.alert('Excel Upload', 'Excel upload opened')}
-                activeOpacity={0.85}
-                style={{
-                  minWidth: 72, minHeight: 54, paddingHorizontal: 10, paddingVertical: 8,
-                  borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 4,
-                  backgroundColor: VBRAND.surfaceSoft, borderWidth: 1, borderColor: VBRAND.softLine,
-                }}
-              >
-                <Ionicons name="document-attach-outline" size={20} color={VBRAND.ink600} />
-                <Text style={{ fontSize: 10, fontWeight: '600', color: VBRAND.ink600, textAlign: 'center' }}>
-                  Excel Upload
-                </Text>
-              </TouchableOpacity>
             </ScrollView>
           </View>
         )}
@@ -4470,6 +4697,137 @@ export default function TenantLifecycleScreen() {
             ? (tabContent[activeTab] || renderBedFocusDetail)()
             : renderBedFocusDetail()}
         </ScrollView>
+
+        {/* ── Tenant Statement (opened from a switch row's "View", or Exit/Refunds "Statement") ── */}
+        <BottomSheet visible={!!stmtCtx} onClose={() => setStmtCtx(null)} title={`Tenant Statement — ${stmtCtx?.tenantName || ''}`}>
+          {stmtCtx ? (() => {
+            const typeLabel = (t: string) => t === 'booking' ? 'Booking' : t === 'onboarding' ? 'Onboarding' : t === 'additional_payment' ? 'Payment' : t === 'settlement' ? 'Settlement' : t === 'rent' ? 'Rent' : (t || 'Payment');
+            const pays = stmtReceipts;
+            const settles = pays.filter((r: any) => r.receiptType === 'settlement');
+
+            // Charges & Payments ledger: invoices = debits, receipts = credits, running balance.
+            const invEntries = stmtInvoices.map((i: any) => ({
+              date: i.billingMonth || '', sortKey: (i.billingMonth || '9999-99') + '-15',
+              category: 'Invoice', desc: i.invoiceNumber || 'Invoice',
+              debit: Number(i.totalAmount) || 0, credit: 0,
+            }));
+            const payEntries = pays.map((r: any) => ({
+              date: r.paymentDate || '', sortKey: r.paymentDate || '9999-99-99',
+              category: 'Payment', desc: `${typeLabel(r.receiptType)}${r.paymentMode ? ' · ' + r.paymentMode : ''}`,
+              debit: 0, credit: Number(r.amountPaid) || 0,
+            }));
+            // Adjustments: credit_note = credit (e.g. room-switch/deposit-return credit),
+            // debit_note = debit (e.g. CC charges). Previously omitted → credits invisible.
+            const adjEntries = (stmtAdjustments || []).map((a: any) => {
+              const amt = Number(a.amount) || 0;
+              const isCredit = a.adjustment_type === 'credit_note';
+              const date = (a.adjustment_date || '').slice(0, 10);
+              return {
+                date, sortKey: (date || '9999-99-99'),
+                category: isCredit ? 'Credit' : 'Adjustment',
+                desc: a.reason || a.category || (isCredit ? 'Credit note' : 'Debit note'),
+                debit: isCredit ? 0 : amt, credit: isCredit ? amt : 0,
+              };
+            });
+            const ledger = [...invEntries, ...payEntries, ...adjEntries].sort((a: any, b: any) => String(a.sortKey).localeCompare(String(b.sortKey)));
+            let running = 0;
+            ledger.forEach((e: any) => { running += e.debit - e.credit; e.balance = running; });
+
+            const totalCharged = ledger.reduce((n: number, e: any) => n + e.debit, 0);
+            const totalPaid = ledger.reduce((n: number, e: any) => n + e.credit, 0);
+            const totalSettled = settles.reduce((n: number, r: any) => n + r.amountPaid, 0);
+            const balanceDue = totalCharged - totalPaid;
+            const allot = allotments.find((a: any) => a.id === stmtCtx.allotmentId) || allotments.find((a: any) => a.tenant_id === stmtCtx.tenantId);
+            const deposit = Number(allot?.deposit_paid) || 0;
+
+            const TABS3: { k: 'ledger' | 'deposit' | 'summary'; label: string }[] = [
+              { k: 'ledger',  label: 'Charges & Payments' },
+              { k: 'deposit', label: 'Deposit Ledger' },
+              { k: 'summary', label: 'Summary' },
+            ];
+
+            return (
+              <View>
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                  {TABS3.map(t => (
+                    <TouchableOpacity key={t.k} onPress={() => setStmtTab(t.k)}
+                      style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, backgroundColor: stmtTab === t.k ? '#2563EB' : 'rgba(37,99,235,0.08)' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: stmtTab === t.k ? '#fff' : '#2563EB', textAlign: 'center' }}>{t.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {stmtLoading ? <EmptyCard message="Loading…" /> : (
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+                    {stmtTab === 'ledger' && (
+                      ledger.length === 0 ? <EmptyCard message="No charges or payments" /> :
+                      ledger.map((e: any, idx: number) => (
+                        <Card key={idx}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ backgroundColor: e.debit > 0 ? 'rgba(220,38,38,0.1)' : 'rgba(22,163,74,0.1)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: e.debit > 0 ? '#DC2626' : '#16A34A' }}>{e.category}</Text>
+                                </View>
+                                <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>{e.date || '—'}</Text>
+                              </View>
+                              <Text style={{ fontSize: fontSize.xs, color: '#556274', marginTop: 3 }} numberOfLines={1}>{e.desc}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              {e.debit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#DC2626' }}>₹{fmtAmt(e.debit)}</Text> : null}
+                              {e.credit ? <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#16A34A' }}>−₹{fmtAmt(e.credit)}</Text> : null}
+                              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Bal ₹{fmtAmt(e.balance)}</Text>
+                            </View>
+                          </View>
+                        </Card>
+                      ))
+                    )}
+
+                    {stmtTab === 'deposit' && (
+                      <Card>
+                        <Row label="Deposit Collected" value={`₹${fmtAmt(deposit)}`} />
+                        {depEdit.editing ? (
+                          <View style={{ marginVertical: 8 }}>
+                            <Field label="Deposit Collected (₹)"><TextF value={depEdit.value} onChange={(v: string) => setDepEdit({ editing: true, value: v })} keyboardType="numeric" /></Field>
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                              <ActionBtn title="Save" small onPress={() => doSaveDeposit(allot, depEdit.value)} loading={saving} />
+                              <ActionBtn title="Cancel" small onPress={() => setDepEdit({ editing: false, value: '' })} />
+                            </View>
+                          </View>
+                        ) : (
+                          <TouchableOpacity onPress={() => setDepEdit({ editing: true, value: String(deposit) })}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, marginBottom: 6 }}>
+                            <Ionicons name="pencil-outline" size={14} color="#2563EB" />
+                            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: '#2563EB' }}>Edit Deposit</Text>
+                          </TouchableOpacity>
+                        )}
+                        {settles.length === 0 ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginVertical: 4 }}>No settlement entries.</Text> :
+                          settles.map((r: any) => (
+                            <Row key={r._id} label={`Settled · ${fmtDate(r.paymentDate)}`} value={`−₹${fmtAmt(r.amountPaid)}`} valueColor="#DC2626" />
+                          ))}
+                        <Row label="Net Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} valueColor="#16A34A" />
+                        <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 8 }}>
+                          Editing updates the deposit held on the allotment. Full per-entry ledger edit needs the pending backend deploy.
+                        </Text>
+                      </Card>
+                    )}
+
+                    {stmtTab === 'summary' && (
+                      <Card>
+                        <Row label="Total Charged" value={`₹${fmtAmt(totalCharged)}`} valueColor="#DC2626" />
+                        <Row label="Total Paid" value={`₹${fmtAmt(totalPaid)}`} valueColor="#16A34A" />
+                        <Row label="Balance Due" value={`₹${fmtAmt(balanceDue)}`} valueColor={balanceDue > 0 ? '#DC2626' : '#16A34A'} />
+                        <Row label="Deposit Held" value={`₹${fmtAmt(deposit - totalSettled)}`} />
+                        <Row label="Invoices" value={`${stmtInvoices.length}`} />
+                        <Row label="Payments" value={`${pays.length}`} />
+                      </Card>
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            );
+          })() : null}
+        </BottomSheet>
       </SafeAreaView>
     </View>
   );

@@ -7,24 +7,23 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "in.co.vishful.spaces"
+      "bundleIdentifier": "in.co.vishful.spaces",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Vishful Spaces uses the camera to capture property and asset photos, electricity meter readings, KYC documents, and ticket attachments.",
+        "NSMicrophoneUsageDescription": "Vishful Spaces uses the microphone to record voice notes for maintenance tickets.",
+        "NSPhotoLibraryUsageDescription": "Vishful Spaces accesses your photo library to attach images to properties, assets, tickets, and KYC records."
+      }
     },
     "android": {
-      "package": "in.co.vishful.spaces",
-      "versionCode": 3,
+      "package": "dev.a0.apps.vishfulpm538",
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {

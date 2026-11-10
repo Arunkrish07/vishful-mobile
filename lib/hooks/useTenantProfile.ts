@@ -79,8 +79,13 @@ export function useTenantProfile(options: UseTenantProfileOptions = {}): UseTena
         return;
       }
 
-      // Fetch from server
-      const result = await sb.getTenantProfile(phone);
+      // Fetch from server.
+      // NOTE: api.tenants.getTenantProfile currently returns a flat object (or null),
+      // whereas this hook is written against the richer TenantProfileResponse
+      // ({found, reason, message, ...}) contract. This hook has no live consumers yet;
+      // the annotation preserves the intended contract so it works if the service is
+      // repointed to a {found,...}-shaped action (e.g. tenantsextraactions).
+      const result = (await sb.getTenantProfile(phone)) as unknown as TenantProfileResponse | null;
 
       if (result?.found) {
         // Success

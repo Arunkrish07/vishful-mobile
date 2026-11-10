@@ -2,7 +2,7 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { getSupabase, ORG_ID, safeList } from "./lib/supabaseAdmin";
+import { getSupabase, ORG_ID, safeList, fetchAllPages } from "./lib/supabaseAdmin";
 import { filterLiveBeds, computePropertyStatus, computeAccountingMetrics } from "./metrics";
 
 // ─── PERIOD HELPERS ───────────────────────────────────────────────────────────
@@ -180,7 +180,9 @@ export const getReportsSummary = action({
       safeList(sb.from("invoices").select("*").eq("organization_id", ORG_ID).eq("is_deleted", false)),
       safeList(sb.from("receipts").select("*").eq("organization_id", ORG_ID).eq("is_deleted", false)),
       safeList(sb.from("expenses").select("*").eq("organization_id", ORG_ID)),
-      safeList(sb.from("tenant_allotments").select("tenant_id,bed_id,staying_status").eq("organization_id", ORG_ID)),
+      // Paginate: this feeds BOTH occupancy and totalUniqueTenants (all history),
+      // so it must be complete — an unpaginated fetch caps at 1000 of ~1200 rows.
+      fetchAllPages((from, to) => sb.from("tenant_allotments").select("tenant_id,bed_id,staying_status").eq("organization_id", ORG_ID).range(from, to)),
       safeList(sb.from("apartments").select("id,property_id,status").eq("organization_id", ORG_ID)),
       safeList(sb.from("beds").select("id,apartment_id,status").eq("organization_id", ORG_ID)),
       safeList(sb.from("maintenance_tickets").select("id,status,created_at").eq("organization_id", ORG_ID)),
@@ -277,7 +279,7 @@ export const getPropertyPnL = action({
       safeList(sb.from("beds").select("id,apartment_id,status,bed_lifecycle_status").eq("organization_id", ORG_ID)),
       safeList(sb.from("invoices").select("*").eq("organization_id", ORG_ID).eq("is_deleted", false)),
       safeList(sb.from("expenses").select("*").eq("organization_id", ORG_ID)),
-      safeList(sb.from("tenant_allotments").select("bed_id,staying_status").eq("organization_id", ORG_ID)),
+      safeList(sb.from("tenant_allotments").select("bed_id,staying_status").eq("organization_id", ORG_ID).in("staying_status", ["Staying", "On-Notice", "Booked"])),
     ]);
 
     const liveBedsAll = filterLiveBeds(beds, apartments);
@@ -386,7 +388,7 @@ export const getOccupancyDetail = action({
       safeList(sb.from("properties").select("*").eq("organization_id", ORG_ID)),
       safeList(sb.from("apartments").select("id,property_id,status").eq("organization_id", ORG_ID)),
       safeList(sb.from("beds").select("id,apartment_id").eq("organization_id", ORG_ID)),
-      safeList(sb.from("tenant_allotments").select("bed_id,staying_status,tenant_id").eq("organization_id", ORG_ID)),
+      safeList(sb.from("tenant_allotments").select("bed_id,staying_status,tenant_id").eq("organization_id", ORG_ID).in("staying_status", ["Staying", "On-Notice", "Booked"])),
     ]);
     const liveBedsAll = filterLiveBeds(beds, apartments);
     return properties.map((prop: any) => {

@@ -137,8 +137,17 @@ export const listReadings = action({
       });
     });
 
+    // Sort chronologically (newest first) — billing_month is "MMM-yy", so a plain
+    // string sort is alphabetical (Apr, Aug, Dec…) and puts the wrong month on top.
+    const MON = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+    const monthRank = (bm: string): number => {
+      const [mon, yr] = String(bm || "").toLowerCase().split("-");
+      const mi = MON.indexOf((mon || "").slice(0, 3));
+      if (mi < 0) return -1;
+      return (2000 + (parseInt(yr, 10) || 0)) * 12 + mi;
+    };
     return Object.values(groupMap).sort((a: any, b: any) =>
-      b.billing_month.localeCompare(a.billing_month)
+      monthRank(b.billing_month) - monthRank(a.billing_month)
     );
   },
 });

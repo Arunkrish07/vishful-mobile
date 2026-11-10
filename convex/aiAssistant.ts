@@ -1,7 +1,9 @@
 "use node";
 
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
+import { getSupabase, ORG_ID, safeList, normaliseStatus } from "./lib/supabaseAdmin";
 
 // ─── AI ASSISTANT ────────────────────────────────────────────────────────────
 // The mobile Floating AI assistant calls api.aiAssistant.askAssistant({ question,
@@ -10,19 +12,94 @@ import { v } from "convex/values";
 // touches the client. Set it in the Convex dashboard → Settings → Environment
 // Variables, then `npx convex deploy`.
 //
-// SCOPE: this is a read-only Q&A assistant (help, how-to, drafting). It does NOT
-// yet have live database access or the web app's transactional command execution
-// (create invoice / record payment / etc.) — that is a much larger follow-up.
-// The system prompt tells the model to NOT invent live figures and to point the
-// user at the relevant screen instead.
+// SCOPE: read-only Q&A assistant (help, how-to, drafting) PLUS an organization-wide
+// LIVE DATA SNAPSHOT injected into the system prompt on every turn. The snapshot
+// (tenants by status, occupancy, tickets, current-FY financials, properties) is
+// built from Supabase via the same authoritative source as the Reports screen
+// (reports.getReportsSummary) so the numbers reconcile 1:1 with the app. It is
+// AGGREGATE data only — it does NOT include per-record lists (e.g. "who exactly
+// hasn't paid") or transactional command execution (create invoice / record
+// payment); the prompt tells the model to point the user at the relevant screen
+// for record-level detail and to never invent figures outside the snapshot.
 
-const SYSTEM_PROMPT = `You are the AI assistant inside "Vishful Spaces", a mobile property-management app for co-living / PG operators (properties, apartments, beds, tenants, maintenance tickets, accounting, and team management).
+// ─── LIVE DATA SNAPSHOT ───────────────────────────────────────────────────────
 
-Help staff with how-to guidance, explanations, and drafting (announcements, messages, summaries).
+// Compact INR formatter for the snapshot (e.g. 15956000 → "₹1.60 Cr" / "₹3.35 L").
+function inr(n: number): string {
+  const v = Math.round(Number(n) || 0);
+  if (Math.abs(v) >= 10000000) return `₹${(v / 10000000).toFixed(2)} Cr`;
+  if (Math.abs(v) >= 100000) return `₹${(v / 100000).toFixed(2)} L`;
+  return `₹${v.toLocaleString("en-IN")}`;
+}
 
-Important: you do NOT have direct access to the live database. If the user asks for specific live numbers or records (e.g. "how many tenants do I have", "list overdue invoices", "who hasn't paid"), do not invent them — briefly say you can't read live data yet and point them to the relevant screen (Tenants, Tickets, Accounting, etc.).
+// Build the organization-wide snapshot as a plain text block for the system prompt.
+// Returns null if the data layer is unreachable, so the caller can degrade to
+// generic help instead of hard-failing.
+async function buildLiveSnapshot(ctx: any): Promise<string | null> {
+  try {
+    const sb = getSupabase();
 
-Answer concisely and practically. Do not include any internal or system XML tags in your response.`;
+    // Authoritative KPIs (occupancy + current-FY financials + tickets + active/booked
+    // tenant counts) — reuse the exact source the Reports screen renders so figures match.
+    const summary: any = await ctx.runAction(api.reports.getReportsSummary, { period: "current_fy" });
+
+    // Tenant status buckets straight from the tenants table (per-tenant staying_status),
+    // matching the Tenants screen's tab counts. Plus the property roster.
+    const [tenants, properties] = await Promise.all([
+      safeList(sb.from("tenants").select("staying_status").eq("organization_id", ORG_ID)),
+      safeList(sb.from("properties").select("property_name,name,code,status").eq("organization_id", ORG_ID)),
+    ]);
+
+    const bucket = { New: 0, Booked: 0, Staying: 0, "On-Notice": 0, Exited: 0 } as Record<string, number>;
+    for (const t of tenants) {
+      const s = normaliseStatus(t.staying_status);
+      if (bucket[s] === undefined) bucket[s] = 0;
+      bucket[s]++;
+    }
+
+    const liveProps = properties.filter((p: any) =>
+      !p.status || ["live", "Live"].includes(String(p.status)),
+    );
+    const propNames = properties.map((p: any) => p.property_name || p.name || p.code || "Unnamed");
+
+    const a = summary?.accounting || {};
+    const occ = summary?.propertyStatus || {};
+    const tk = summary?.tickets || {};
+
+    return [
+      `LIVE DATA SNAPSHOT — organization-wide. Money figures are current financial year (FY). Occupancy/tenant counts are as of now. All amounts in INR.`,
+      ``,
+      `TENANTS: ${tenants.length} total — ${bucket.Staying} Staying, ${bucket["On-Notice"]} On-Notice, ${bucket.Booked} Booked, ${bucket.New} New, ${bucket.Exited} Exited.`,
+      `OCCUPANCY: ${occ.total ?? 0} live beds — ${occ.occupied ?? 0} occupied, ${occ.notice ?? 0} on-notice, ${occ.booked ?? 0} booked, ${occ.vacant ?? 0} vacant. Occupancy rate ${occ.occupancyPct ?? 0}% (occupied + on-notice).`,
+      `PROPERTIES: ${properties.length} total (${liveProps.length} live)${propNames.length ? ` — ${propNames.join(", ")}` : ""}.`,
+      `TICKETS: ${tk.total ?? 0} this FY — ${tk.open ?? 0} open, ${tk.closed ?? 0} closed, ${tk.needsTenantApproval ?? 0} awaiting tenant approval.`,
+      `FINANCIALS (current FY): Total invoiced ${inr(a.totalInvoiced)}, Rental revenue ${inr(a.totalRentalRevenue)}, EB charged ${inr(a.totalEbCharged)}, Collections ${inr(a.totalCollections)}, Pending collection ${inr(a.totalPendingCollection)}, Deposits collected ${inr(a.depositCollections)}, Refunds given ${inr(a.totalRefundsGiven)}, Expenses ${inr(a.totalExpenses)}, Profit ${inr(a.totalProfit)}.`,
+    ].join("\n");
+  } catch (e: any) {
+    console.warn("[aiAssistant] snapshot build failed:", e?.message);
+    return null;
+  }
+}
+
+function buildSystemPrompt(snapshot: string | null): string {
+  const base = `You are the AI assistant inside "Vishful Spaces", a property-management app for co-living / PG operators (properties, apartments, beds, tenants, maintenance tickets, accounting, and team management).
+
+Help staff with how-to guidance, explanations, drafting (announcements, messages, summaries), and answering questions about their organization's live data using the snapshot below.
+
+Answer concisely and practically. When you cite a number, use the snapshot values verbatim (you may reformat currency, e.g. lakhs/crores). Do not include any internal or system XML tags in your response.`;
+
+  if (!snapshot) {
+    return `${base}
+
+Note: the live-data snapshot is temporarily unavailable this turn. If asked for specific figures, say the data couldn't be loaded right now and point the user to the relevant screen (Tenants, Reports, Tickets, Accounting).`;
+  }
+
+  return `${base}
+
+Use the following snapshot as your source of truth for live figures. It is AGGREGATE data only — it does not contain per-record lists. If asked for record-level detail the snapshot can't answer (e.g. "which tenants haven't paid", "list overdue invoices", a specific tenant's balance), give what the snapshot supports and point the user to the relevant screen (Tenants, Reports, Tickets, Accounting, EB). Never invent figures that aren't in the snapshot.
+
+${snapshot}`;
+}
 
 export const askAssistant = action({
   args: {
@@ -32,7 +109,7 @@ export const askAssistant = action({
     userId: v.optional(v.string()),
   },
   returns: v.any(),
-  handler: async (_ctx, { question, history }) => {
+  handler: async (ctx, { question, history }) => {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const groqKey = process.env.GROQ_API_KEY;
     if (!anthropicKey && !groqKey) {
@@ -49,6 +126,12 @@ export const askAssistant = action({
     if (!msgs.length || msgs[msgs.length - 1].role !== "user") {
       msgs.push({ role: "user", content: question });
     }
+
+    // Inject the live organization snapshot into the system prompt so the model can
+    // answer data questions ("how many tenants are staying", "what's my pending
+    // collection") with real figures instead of refusing.
+    const snapshot = await buildLiveSnapshot(ctx);
+    const SYSTEM_PROMPT = buildSystemPrompt(snapshot);
 
     try {
       // Prefer Anthropic when configured; otherwise use Groq (OpenAI-compatible).

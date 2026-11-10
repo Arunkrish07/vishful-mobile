@@ -2,7 +2,9 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { getSupabase, ORG_ID, safeList, insertRow } from "./lib/supabaseAdmin";
+import { getSupabase, ORG_ID, safeList, insertRow, fetchAllPages } from "./lib/supabaseAdmin";
+import { selectOutstandingRecipients, hasUsablePhone } from "../lib/outstandingReminders";
+
 
 // ─── LIST READINGS (grouped by billing_month + property_id) ──────────────────
 export const listReadings = action({
@@ -454,7 +456,7 @@ export const listInvoices = action({
     let query = sb
       .from("invoices")
       .select(
-        "id, invoice_number, tenant_id, allotment_id, property_id, apartment_id, bed_id, billing_month, rent_amount, electricity_amount, other_charges, total_amount, amount_paid, due_date, status, is_deleted, created_at"
+        "id, invoice_number, tenant_id, allotment_id, property_id, apartment_id, bed_id, billing_month, rent_amount, electricity_amount, estimated_eb, late_fee, other_charges, total_amount, amount_paid, due_date, invoice_type, status, is_deleted, created_at"
       )
       .eq("organization_id", ORG_ID)
       .or("is_deleted.is.null,is_deleted.eq.false")
@@ -510,15 +512,234 @@ export const listInvoices = action({
         tenantName: tenantName.get(row.tenant_id) || "Unknown",
         propertyName: propName.get(row.property_id) || "",
         billingMonth: row.billing_month || "",
+        dueDate: row.due_date || null,
+        invoiceType: row.invoice_type || "regular",
         rentAmount: Number(row.rent_amount ?? 0),
         electricityAmount: Number(row.electricity_amount ?? 0),
+        estimatedEb: Number(row.estimated_eb ?? 0),
+        lateFee: Number(row.late_fee ?? 0),
         otherCharges: Number(row.other_charges ?? 0),
         totalAmount: total,
         paidAmount: paid,
+        balance: Math.max(total - paid, 0),
+        outstanding: s ? Number(s.amount_outstanding ?? 0) : Math.max(total - paid, 0),
         status: st,
       };
     });
     return status && status !== "all" ? mapped.filter((m) => m.status === status) : mapped;
+  },
+});
+
+// ─── PROFITABILITY (property-level, read-only; web ProfitabilityTab top level) ─
+// profit = revenue − expenses − rentalCost, per property, for a financial year.
+export const getProfitability = action({
+  args: { fyStartYear: v.optional(v.number()) },
+  returns: v.any(),
+  handler: async (_ctx, { fyStartYear }) => {
+    const sb = getSupabase();
+    const now = new Date();
+    const fy = fyStartYear ?? (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1);
+    const fromDate = `${fy}-04-01`, toDate = `${fy + 1}-03-31`;
+
+    const [invoices, expenses, ownerPays, apts, props] = await Promise.all([
+      safeList(sb.from("invoices").select("property_id, total_amount, invoice_date, is_deleted").eq("organization_id", ORG_ID).or("is_deleted.is.null,is_deleted.eq.false").gte("invoice_date", fromDate).lte("invoice_date", toDate)),
+      safeList(sb.from("expenses").select("property_id, amount, expense_date").eq("organization_id", ORG_ID).gte("expense_date", fromDate).lte("expense_date", toDate)),
+      safeList(sb.from("owner_payments").select("apartment_id, escalated_amount, bill_date").eq("organization_id", ORG_ID).gte("bill_date", fromDate).lte("bill_date", toDate)),
+      safeList(sb.from("apartments").select("id, property_id").eq("organization_id", ORG_ID)),
+      safeList(sb.from("properties").select("id, property_name").eq("organization_id", ORG_ID)),
+    ]);
+    const aptProp = new Map<string, string>(); for (const a of apts as any[]) aptProp.set(a.id, a.property_id);
+    const acc = new Map<string, { revenue: number; expense: number; rentalCost: number }>();
+    const bump = (pid: string) => (acc.get(pid) || (acc.set(pid, { revenue: 0, expense: 0, rentalCost: 0 }), acc.get(pid)!));
+    for (const i of invoices as any[]) { if (i.property_id) bump(i.property_id).revenue += Number(i.total_amount) || 0; }
+    for (const e of expenses as any[]) { if (e.property_id) bump(e.property_id).expense += Number(e.amount) || 0; }
+    for (const o of ownerPays as any[]) { const pid = aptProp.get(o.apartment_id); if (pid) bump(pid).rentalCost += Number(o.escalated_amount) || 0; }
+
+    const pName = new Map<string, string>(); for (const p of props as any[]) pName.set(p.id, p.property_name);
+    const rows = [...acc.entries()].map(([pid, v2]) => {
+      const profit = v2.revenue - v2.expense - v2.rentalCost;
+      return { propertyId: pid, propertyName: pName.get(pid) || "Unknown", revenue: v2.revenue, expense: v2.expense, rentalCost: v2.rentalCost, profit, margin: v2.revenue > 0 ? (profit / v2.revenue) * 100 : 0 };
+    }).sort((a, b) => b.revenue - a.revenue);
+    const totals = rows.reduce((s, r) => ({ revenue: s.revenue + r.revenue, expense: s.expense + r.expense, rentalCost: s.rentalCost + r.rentalCost, profit: s.profit + r.profit }), { revenue: 0, expense: 0, rentalCost: 0, profit: 0 });
+    return { fyLabel: `${fy}-${String((fy + 1) % 100).padStart(2, "0")}`, rows, totals };
+  },
+});
+
+// ─── DEPOSIT SETTLEMENTS (read-only, web parity) ─────────────────────────────
+export const getDepositSettlements = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("deposit_settlements")
+        .select("id, tenant_id, allotment_id, deposit_amount, pending_rent, pending_eb, pending_late_fees, damages, other_deductions, total_deductions, refund_amount, settlement_date, status, notes, is_deleted")
+        .eq("organization_id", ORG_ID).or("is_deleted.is.null,is_deleted.eq.false")
+        .order("settlement_date", { ascending: false }),
+    );
+    const tenantIds = [...new Set(rows.map((r) => r.tenant_id).filter(Boolean))];
+    const tenants: any[] = tenantIds.length ? await safeList(sb.from("tenants").select("id, full_name").eq("organization_id", ORG_ID).in("id", tenantIds)) : [];
+    const tName = new Map<string, string>(); for (const t of tenants) tName.set(t.id, t.full_name);
+    return rows.map((r) => {
+      const totalDed = Number(r.total_deductions ?? ((Number(r.pending_rent) || 0) + (Number(r.pending_eb) || 0) + (Number(r.pending_late_fees) || 0) + (Number(r.damages) || 0) + (Number(r.other_deductions) || 0)));
+      const refund = Number(r.refund_amount ?? (Number(r.deposit_amount) || 0) - totalDed);
+      return {
+        id: r.id, tenantName: tName.get(r.tenant_id) || "Unknown", allotmentId: r.allotment_id,
+        depositAmount: Number(r.deposit_amount ?? 0), pendingRent: Number(r.pending_rent ?? 0), pendingEB: Number(r.pending_eb ?? 0),
+        pendingLateFees: Number(r.pending_late_fees ?? 0), damages: Number(r.damages ?? 0), otherDeductions: Number(r.other_deductions ?? 0),
+        totalDeductions: totalDed, refundAmount: refund, status: r.status || "settled", settlementDate: r.settlement_date || null, notes: r.notes || "",
+      };
+    });
+  },
+});
+
+// ─── EXIT RECONCILIATION WORKLIST (read-only, web parity) ─────────────────────
+export const getExitReconciliationWorklist = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("v_exit_reconciliation_worklist").select("*").eq("organization_id", ORG_ID),
+    );
+    return rows.map((r) => {
+      const duesNow = Number(r.dues_now ?? 0);
+      const addEb = Number(r.eb_already ?? 0) === 0 ? 0 : 0; // eb_already/exit_charge_already are "already billed" flags — no auto-add on read
+      const duesAfter = Math.round(duesNow);
+      const depositHeld = Number(r.deposit_held ?? 0);
+      const refund = Math.max(Math.round(depositHeld - Math.max(duesAfter, 0)), 0);
+      return {
+        allotmentId: r.allotment_id, tenantId: r.tenant_id, tenantName: r.tenant_name || "Unknown",
+        propertyName: r.property_name || "", bedLabel: r.bed_label || r.bed_code || `${r.apartment_code || ""}-${r.bed_code || ""}`,
+        actualExitDate: r.actual_exit_date || null, duesNow, depositHeld, ebAlready: Number(r.eb_already ?? 0),
+        exitChargeAlready: Number(r.exit_charge_already ?? 0), settlementStatus: r.settlement_status || "", duesAfter, refund,
+      };
+    });
+  },
+});
+
+// ─── GST FILED WORKINGS (read-only, web parity) ──────────────────────────────
+export const getGstFiledWorkings = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("gst_monthly_workings").select("id, month, year, generated_at, generated_by, summary_json, rcm_json")
+        .eq("organization_id", ORG_ID).order("year", { ascending: false }).order("month", { ascending: false }),
+    );
+    return rows.map((r) => {
+      const s = r.summary_json || {};
+      const rcm = r.rcm_json || {};
+      return {
+        id: r.id, month: r.month, year: r.year, generatedAt: r.generated_at || null,
+        summary: s, rcm: rcm,
+      };
+    });
+  },
+});
+
+// ─── TENANT LEDGER (v_tenant_ledger, read-only, web parity) ───────────────────
+export const getTenantLedger = action({
+  args: { allotmentId: v.optional(v.string()), tenantId: v.optional(v.string()) },
+  returns: v.any(),
+  handler: async (_ctx, { allotmentId, tenantId }) => {
+    const sb = getSupabase();
+    let q = sb.from("v_tenant_ledger")
+      .select("tenant_id, allotment_id, entry_date, posted_at, journal_entry_id, is_reversal_of, source_table, description, account_code, account_name, debit, credit, running_balance")
+      .eq("organization_id", ORG_ID).order("entry_date", { ascending: true }).order("posted_at", { ascending: true });
+    if (allotmentId) q = q.eq("allotment_id", allotmentId);
+    else if (tenantId) q = q.eq("tenant_id", tenantId);
+    const rows: any[] = await safeList(q);
+    // Drop reversal pairs (a reversal row + the entry it reverses).
+    const reversedJe = new Set(rows.map((r) => r.is_reversal_of).filter(Boolean));
+    const clean = rows.filter((r) => !r.is_reversal_of && !reversedJe.has(r.journal_entry_id));
+    let totalCharges = 0, totalPayments = 0;
+    for (const r of clean) { totalCharges += Number(r.debit) || 0; totalPayments += Number(r.credit) || 0; }
+    const last = clean.length ? clean[clean.length - 1] : null;
+    return {
+      entries: clean.map((r) => ({
+        entryDate: r.entry_date, accountCode: r.account_code, accountName: r.account_name, sourceTable: r.source_table,
+        description: r.description, debit: Number(r.debit) || 0, credit: Number(r.credit) || 0, runningBalance: Number(r.running_balance) || 0,
+      })),
+      summary: { totalCharges, totalPayments, outstandingDue: last ? Number(last.running_balance) || 0 : (totalCharges - totalPayments) },
+    };
+  },
+});
+
+// ─── TRIAL BALANCE (RPC get_trial_balance_detailed, read-only, web parity) ────
+export const getTrialBalance = action({
+  args: { from: v.string(), to: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { from, to }) => {
+    const sb = getSupabase();
+    const { data, error } = await sb.rpc("get_trial_balance_detailed", { p_org: ORG_ID, p_from: from, p_to: to });
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    const rows: any[] = Array.isArray(data) ? data : [];
+    let periodDebit = 0, periodCredit = 0, cumDebit = 0, cumCredit = 0;
+    for (const r of rows) {
+      periodDebit += Number(r.total_debit) || 0; periodCredit += Number(r.total_credit) || 0;
+      cumDebit += Number(r.cum_total_debit) || 0; cumCredit += Number(r.cum_total_credit) || 0;
+    }
+    return {
+      rows: rows.map((r) => ({
+        accountId: r.account_id, code: r.code, name: r.name, accountType: r.account_type, normalBalance: r.normal_balance, depth: Number(r.depth) || 0,
+        periodDebit: Number(r.total_debit) || 0, periodCredit: Number(r.total_credit) || 0, periodBalance: Number(r.balance) || 0,
+        cumDebit: Number(r.cum_total_debit) || 0, cumCredit: Number(r.cum_total_credit) || 0, cumBalance: Number(r.cum_balance) || 0,
+      })),
+      periodTotals: { debit: periodDebit, credit: periodCredit },
+      asOfTotals: { debit: cumDebit, credit: cumCredit },
+    };
+  },
+});
+
+// ─── TENANT ADJUSTMENTS (credit/debit notes, read-only, web parity) ──────────
+export const listAdjustments = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    const rows: any[] = await safeList(
+      sb.from("tenant_adjustments")
+        .select("id, adjustment_date, adjustment_type, category, amount, reason, reference_number, billing_month, tenant_id, allotment_id, property_id, apartment_id, bed_id, is_locked, created_at")
+        .eq("organization_id", ORG_ID)
+        .or("is_deleted.is.null,is_deleted.eq.false")
+        .order("adjustment_date", { ascending: false }),
+    );
+    const tenantIds = [...new Set(rows.map((r) => r.tenant_id).filter(Boolean))];
+    const propertyIds = [...new Set(rows.map((r) => r.property_id).filter(Boolean))];
+    const tenants: any[] = tenantIds.length ? await safeList(sb.from("tenants").select("id, full_name").eq("organization_id", ORG_ID).in("id", tenantIds)) : [];
+    const props: any[] = propertyIds.length ? await safeList(sb.from("properties").select("id, property_name").eq("organization_id", ORG_ID).in("id", propertyIds)) : [];
+    const tName = new Map<string, string>(); for (const t of tenants) tName.set(t.id, t.full_name);
+    const pName = new Map<string, string>(); for (const p of props) pName.set(p.id, p.property_name);
+    return rows.map((r) => ({
+      id: r.id,
+      adjustmentDate: r.adjustment_date || null,
+      adjustmentType: r.adjustment_type || "credit_note",
+      category: r.category || "others",
+      amount: Number(r.amount ?? 0),
+      reason: r.reason || "",
+      referenceNumber: r.reference_number || "",
+      billingMonth: r.billing_month || "",
+      tenantId: r.tenant_id,
+      tenantName: tName.get(r.tenant_id) || "Unknown",
+      propertyName: pName.get(r.property_id) || "",
+      isLocked: !!r.is_locked,
+    }));
+  },
+});
+
+// ─── INVOICE DETAIL (line items + EB tenant shares, read-only, web parity) ────
+export const getInvoiceDetail = action({
+  args: { invoiceId: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, { invoiceId }) => {
+    const sb = getSupabase();
+    const [lineItems, ebShares] = await Promise.all([
+      safeList(sb.from("invoice_line_items").select("id, invoice_id, line_type, amount, description, metadata, created_at").eq("invoice_id", invoiceId).order("created_at", { ascending: true })),
+      safeList(sb.from("eb_tenant_shares").select("*").eq("invoice_id", invoiceId)),
+    ]);
+    return { lineItems, ebShares };
   },
 });
 
@@ -722,22 +943,33 @@ export const listExpenses = action({
     // Real schema: expenses.category_id → expense_categories.label (there is no expenses.category column).
     const rows = await safeList(
       sb.from("expenses")
-        .select("id, category_id, description, amount, expense_date, created_at")
+        .select("id, category_id, property_id, vendor_id, description, amount, expense_date, billing_month, receipt_url, data_source, created_at")
         .eq("organization_id", ORG_ID)
-        .order("created_at", { ascending: false })
+        .order("expense_date", { ascending: false })
     );
     const catIds = [...new Set(rows.map((r: any) => r.category_id).filter(Boolean))];
-    const cats = catIds.length
-      ? await safeList(sb.from("expense_categories").select("id, label").eq("organization_id", ORG_ID).in("id", catIds))
-      : [];
-    const catLabel = new Map<string, string>();
-    for (const c of cats) catLabel.set(c.id, c.label);
+    const propIds = [...new Set(rows.map((r: any) => r.property_id).filter(Boolean))];
+    const venIds = [...new Set(rows.map((r: any) => r.vendor_id).filter(Boolean))];
+    const [cats, props, vens] = await Promise.all([
+      catIds.length ? safeList(sb.from("expense_categories").select("id, label").eq("organization_id", ORG_ID).in("id", catIds)) : Promise.resolve([]),
+      propIds.length ? safeList(sb.from("properties").select("id, property_name").eq("organization_id", ORG_ID).in("id", propIds)) : Promise.resolve([]),
+      venIds.length ? safeList(sb.from("vendors").select("id, name").in("id", venIds)) : Promise.resolve([]),
+    ]);
+    const catLabel = new Map<string, string>(); for (const c of cats as any[]) catLabel.set(c.id, c.label);
+    const propName = new Map<string, string>(); for (const p of props as any[]) propName.set(p.id, p.property_name);
+    const venName = new Map<string, string>(); for (const vv of vens as any[]) venName.set(vv.id, vv.name);
     return rows.map((row: any) => ({
       id: row.id,
+      categoryId: row.category_id || null,
       category: row.category_id ? (catLabel.get(row.category_id) || null) : null,
+      propertyName: propName.get(row.property_id) || "",
+      vendorName: venName.get(row.vendor_id) || "",
       description: row.description || null,
-      amount: row.amount ?? 0,
+      amount: Number(row.amount ?? 0),
       expense_date: row.expense_date || null,
+      billingMonth: row.billing_month || "",
+      receiptUrl: row.receipt_url || null,
+      locked: row.data_source === "locked",
       created_at: row.created_at || null,
     }));
   },
@@ -777,20 +1009,39 @@ export const listOwnerPayments = action({
     const sb = getSupabase();
     const rows = await safeList(
       sb.from("owner_payments")
-        // Real schema: base_amount/escalated_amount (no `amount`), paid_date (no `payment_date`).
-        .select("id, owner_id, base_amount, escalated_amount, paid_date, payment_mode, notes, created_at")
+        .select("id, owner_id, apartment_id, base_amount, escalated_amount, bill_date, due_date, payment_month, status, paid_date, payment_mode, reference_number, notes, created_at")
         .eq("organization_id", ORG_ID)
-        .order("created_at", { ascending: false })
+        .order("bill_date", { ascending: false })
     );
-    return rows.map((row: any) => ({
-      id: row.id,
-      owner_id: row.owner_id || null,
-      amount: Number(row.escalated_amount ?? row.base_amount ?? 0),
-      payment_date: row.paid_date || null,
-      payment_mode: row.payment_mode || null,
-      notes: row.notes || null,
-      created_at: row.created_at || null,
-    }));
+    const ownerIds = [...new Set(rows.map((r: any) => r.owner_id).filter(Boolean))];
+    const aptIds = [...new Set(rows.map((r: any) => r.apartment_id).filter(Boolean))];
+    const [owners, apts] = await Promise.all([
+      ownerIds.length ? safeList(sb.from("owners").select("id, full_name").eq("organization_id", ORG_ID).in("id", ownerIds)) : Promise.resolve([]),
+      aptIds.length ? safeList(sb.from("apartments").select("id, apartment_code, property_id").eq("organization_id", ORG_ID).in("id", aptIds)) : Promise.resolve([]),
+    ]);
+    const oName = new Map<string, string>(); for (const o of owners as any[]) oName.set(o.id, o.full_name);
+    const aCode = new Map<string, string>(); for (const a of apts as any[]) aCode.set(a.id, a.apartment_code);
+    const today = new Date().toISOString().slice(0, 10);
+    return rows.map((row: any) => {
+      const stored = String(row.status || "").toLowerCase();
+      const computedStatus = stored === "paid" ? "paid" : (row.due_date && row.due_date < today ? "overdue" : "pending");
+      return {
+        id: row.id,
+        owner_id: row.owner_id || null,
+        ownerName: oName.get(row.owner_id) || "Unknown",
+        apartmentCode: aCode.get(row.apartment_id) || "",
+        amount: Number(row.escalated_amount ?? 0),
+        billDate: row.bill_date || null,
+        dueDate: row.due_date || null,
+        paymentMonth: row.payment_month || "",
+        status: computedStatus,
+        payment_date: row.paid_date || null,
+        payment_mode: row.payment_mode || null,
+        referenceNumber: row.reference_number || "",
+        notes: row.notes || null,
+        created_at: row.created_at || null,
+      };
+    });
   },
 });
 
@@ -978,5 +1229,109 @@ export const listFlatReadings = action({
       unitCost:      Number(r.unit_cost) || 0,
       isLocked:      !!r.is_locked,
     }));
+  },
+});
+
+// ─── OUTSTANDING DUES (ledger-backed reminder audience, web parity) ──────────
+// Who currently owes money and how much, drawn from the LEDGER views (not
+// invoices.status). Read-only preview. Enriches each recipient with the phone
+// number so the UI can open a per-tenant WhatsApp/dialer deep link.
+export const fetchOutstandingRecipients = action({
+  args: {},
+  returns: v.any(),
+  handler: async () => {
+    const sb = getSupabase();
+    // Audience is drawn from the reliable ledger view v_tenant_current_dues.
+    // NOTE (verified on dev 2026-09-04): the sibling v_invoice_settlement_status
+    // view is NOT reliably queryable via the service-role client — .range()/.limit()
+    // intermittently return 0 rows (the view is expensive and reads flake to empty).
+    // So we deliberately do NOT use it; auto_selected falls back to has_phone
+    // instead of the web's invoice-backed nuance. v_tenant_current_dues needs an
+    // explicit .order() before .range() or it too returns 0.
+    const dues: any[] = await safeList(
+      sb.from("v_tenant_current_dues")
+        .select("tenant_id, ar_balance")
+        .eq("organization_id", ORG_ID)
+        .order("tenant_id", { ascending: true })
+        .range(0, 99999),
+    );
+
+    const tenantIds = [...new Set((dues as any[]).map((d) => d.tenant_id).filter(Boolean))] as string[];
+    if (tenantIds.length === 0) return [];
+
+    const tenantNames = new Map<string, string>();
+    const tenantPhones = new Map<string, string>();
+    const tenantsMissingPhone = new Set<string>();
+    const CHUNK = 200;
+    for (let i = 0; i < tenantIds.length; i += CHUNK) {
+      const slice = tenantIds.slice(i, i + CHUNK);
+      const tRows: any[] = await safeList(
+        sb.from("tenants").select("id, full_name, phone").eq("organization_id", ORG_ID).in("id", slice),
+      );
+      for (const t of tRows) {
+        tenantNames.set(t.id, t.full_name || "Tenant");
+        if (hasUsablePhone(t.phone)) tenantPhones.set(t.id, String(t.phone));
+        else tenantsMissingPhone.add(t.id);
+      }
+    }
+    // A tenant absent from `tenants` entirely has no number either.
+    for (const id of tenantIds) if (!tenantNames.has(id)) tenantsMissingPhone.add(id);
+
+    // Settlements omitted (view unreliable) → auto_selected = has_phone.
+    const recipients = selectOutstandingRecipients(dues as any, tenantNames, tenantsMissingPhone);
+    // Attach the phone number (for the UI's WhatsApp/dialer deep link).
+    return recipients.map((r) => ({ ...r, phone: tenantPhones.get(r.tenant_id) || null }));
+  },
+});
+
+// ─── ADVANCE (tenant deposit) COLLECTED BY FINANCIAL YEAR (read-only) ─────────
+// Sums `tenant_allotments.deposit_paid` bucketed by the Indian financial year
+// (Apr–Mar) of each allotment's `onboarding_date`. Read-only; no writes.
+function fyLabelFromDate(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10); // 1–12
+  const startYear = month >= 4 ? year : year - 1;
+  const endYY = String((startYear + 1) % 100).padStart(2, "0");
+  return `${startYear}-${endYY}`;
+}
+
+export const getAdvanceByFinancialYear = action({
+  args: { fy: v.optional(v.string()) },
+  returns: v.any(),
+  handler: async (_ctx, { fy }) => {
+    const sb = getSupabase();
+    const rows: any[] = await fetchAllPages((from, to) =>
+      sb
+        .from("tenant_allotments")
+        .select("id, deposit_paid, onboarding_date, staying_status")
+        .eq("organization_id", ORG_ID)
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
+
+    const byFy: Record<string, { fy: string; total: number; count: number; missingDate: number }> = {};
+    let noDate = 0;
+    for (const r of rows) {
+      const label = fyLabelFromDate(r.onboarding_date);
+      const amt = parseFloat(r.deposit_paid ?? 0) || 0;
+      if (!label) { noDate += 1; continue; }
+      if (!byFy[label]) byFy[label] = { fy: label, total: 0, count: 0, missingDate: 0 };
+      byFy[label].total += amt;
+      byFy[label].count += 1;
+    }
+
+    const years = Object.values(byFy).sort((a, b) => b.fy.localeCompare(a.fy));
+    const requested = fy ? byFy[fy] ?? { fy, total: 0, count: 0, missingDate: 0 } : null;
+
+    return {
+      requestedFy: fy ?? null,
+      requested,
+      totalAllotments: rows.length,
+      allotmentsWithoutOnboardingDate: noDate,
+      years,
+    };
   },
 });
