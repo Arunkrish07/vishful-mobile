@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Vishful Spaces",
+    "slug": "vishful-spaces",
+    "scheme": "vishfulspaces",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.co.vishful.spaces"
+    },
+    "android": {
+      "package": "in.co.vishful.spaces",
+      "versionCode": 3,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "description": "Vishful Spaces — co-living and property management",
+    "extra": {
+      "eas": {
+        "projectId": "6a9c678e-87a9-4eb1-ac8d-34fe9e5c89d0"
+      }
+    },
+    "owner": "krisharun6789"
+  }
+}
