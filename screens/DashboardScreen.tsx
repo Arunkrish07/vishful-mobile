@@ -717,7 +717,7 @@ export default function DashboardScreen() {
       const [data, tickets, ext, hero, dues, punc, disc] = await Promise.all([
         sb.getDashboardData().catch((e) => { console.log('[DASH] getStats failed:', e?.name, '|', e?.message, '|', String(e)); return EMPTY_DASHBOARD; }),
         fetchTickets('admin').catch(() => []),
-        client.action(api.dashboard.getExtendedStats, extArgs).catch(() => EMPTY_EXTENDED),
+        sb.getExtendedStats(extArgs.period, (extArgs as any).customFrom, (extArgs as any).customTo).catch(() => EMPTY_EXTENDED),
         getHeroMonthly().catch(() => null),
         getDuesTotals().catch(() => null),
         getTenantPunctuality(token!, apiPeriod.period, apiPeriod.customFrom, apiPeriod.customTo).catch(() => null),
@@ -865,9 +865,9 @@ export default function DashboardScreen() {
     setAiError('');
     setAiAnswer('');
     try {
-      const { client: convexClient, api: convexApi } = await import('../lib/convexApi') as any;
+      const { supabase } = await import('../lib/supabase') as any;
       const composed = `Here is my current dashboard snapshot:\n${kpiContext}\n\nQuestion: ${q}`;
-      const res = await convexClient.action((convexApi as any).aiAssistant.askAssistant, { question: composed, history: [] });
+      const { data: res } = await supabase.functions.invoke('ask_assistant', { body: { question: composed, history: [] } });
       setAiAnswer((res && res.answer) ? String(res.answer) : 'No response.');
     } catch (e: any) {
       setAiError('Could not reach the AI assistant. Please try again.');

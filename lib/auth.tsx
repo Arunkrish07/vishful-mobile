@@ -237,6 +237,8 @@ export function AuthProvider({ children }: { children: any }) {
   const logout = useCallback(() => {
     sessionValidated.current = false;
     refreshTokenRef.current = null;
+    // Clear the Supabase client session too (direct-to-Supabase data layer).
+    sb.signOutSupabase().catch(() => {});
     // Best-effort: drop this device's push token before clearing the session.
     import('./pushNotifications').then(m => m.unregisterPush()).catch(() => {});
     setToken(null);
