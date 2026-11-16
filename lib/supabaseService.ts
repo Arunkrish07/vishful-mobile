@@ -1,14 +1,13 @@
 /**
  * supabaseService.ts
  *
- * Frontend API layer — routes ALL data operations through Convex actions.
- * Convex actions use Supabase service role key server-side.
- * No direct Supabase calls from the client.
+ * Frontend API layer — talks DIRECTLY to Supabase under the logged-in user's
+ * session JWT (RLS). No Convex. Secret-key features (WhatsApp send, OCR, AI,
+ * KYC token mint, OTP) go through Supabase Edge Functions.
  */
-import { client, api } from "./convexApi";
 import { supabase } from "./supabase";
 import {
-  ORG_ID, safeList, insertRow, updateRow, deleteDisabledResult,
+  ORG_ID, safeList, insertRow, updateRow, deleteRow, deleteDisabledResult, DELETES_ENABLED,
   filterLiveBeds, fetchAllPages, cleanPhone, phoneVariants, toISODate,
 } from "./supabaseDb";
 
@@ -215,8 +214,32 @@ export async function requestAccountDeletion(
   if (!token || typeof token !== 'string' || token.trim().length === 0) {
     return { success: false, message: 'Your session has expired. Please sign in again.' };
   }
+  // Direct Supabase port of convex/account.ts requestAccountDeletion (non-destructive —
+  // logs an account_deletion_requested row to audit_logs under the user's session).
   try {
-    return await client.action((api as any).account.requestAccountDeletion, { token, reason });
+    const session: any = await getSession(token);
+    if (!session?.valid || !session?.userId) {
+      return { success: false, message: 'Your session has expired. Please sign in again.' };
+    }
+    const tableName = session.role === 'tenant' ? 'tenants' : 'team_members';
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase.from('audit_logs').insert({
+      organization_id: session.organizationId || ORG_ID,
+      table_name: tableName,
+      action: 'account_deletion_requested',
+      performed_by: session.userId,
+      record_id: session.userId,
+      performed_at: nowIso,
+      changes: {
+        requestType: 'account_deletion', name: session.userName || '', phone: session.phone || '',
+        role: session.role || '', requestedAt: nowIso, reason: reason || null, source: 'mobile_app',
+      },
+    });
+    if (error) {
+      console.warn('[requestAccountDeletion]', error.message);
+      return { success: false, message: 'Could not submit your request. Please try again.' };
+    }
+    return { success: true };
   } catch (e: any) {
     console.warn('[supabaseService] requestAccountDeletion error:', e?.message);
     return { success: false, message: 'Could not submit your request. Please try again.' };
@@ -516,8 +539,15 @@ export async function getBedTenantDiscrepancies(): Promise<{ bed: number; tenant
   return { bed, tenant };
 }
 
-export async function issueKycToken(propertyId: string, token: string): Promise<{ ok: boolean; qr?: string | null; propertyName?: string | null; reused?: boolean; error?: string }> {
-  return client.action((api as any).tenants.issueKycToken, { propertyId, token });
+export async function issueKycToken(propertyId: string, _token?: string): Promise<{ ok: boolean; qr?: string | null; propertyName?: string | null; reused?: boolean; error?: string }> {
+  // Direct invoke of the `kyc-token-issue` edge fn — the supabase client carries
+  // the logged-in user's JWT + anon apikey automatically (no explicit token needed).
+  try {
+    const { data, error } = await supabase.functions.invoke("kyc-token-issue", { body: { property_id: propertyId } });
+    if (error) return { ok: false, error: error.message || "Could not issue KYC QR." };
+    const d: any = data || {};
+    return { ok: true, qr: d.qr || null, propertyName: d.property_name || null, reused: !!d.reused };
+  } catch (e: any) { return { ok: false, error: e?.message || "Request failed." }; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -850,6 +880,137 @@ export async function updateTenant(id: string, args: any) {
   if (args.fullName || args.full_name) row.full_name = args.fullName || args.full_name;
   if (Object.keys(row).length === 0) return { success: true };
   return updateRow("tenants", id, row);
+}
+
+// ─── Tenant remarks / rating / dedup (ported from convex/tenants.ts) ─────────
+export async function listTenantRemarks(tenantId: string) {
+  return safeList(
+    supabase.from("tenant_remarks").select("*")
+      .eq("tenant_id", tenantId).eq("organization_id", ORG_ID)
+      .order("created_at", { ascending: false })
+  );
+}
+
+export async function addTenantRemark(args: {
+  tenantId: string; remarkType: string; title: string;
+  description?: string; severity: string; createdBy: string;
+}) {
+  await insertRow("tenant_remarks", {
+    organization_id: ORG_ID,
+    tenant_id:   args.tenantId,
+    remark_type: args.remarkType,
+    title:       args.title,
+    description: args.description || null,
+    severity:    args.severity,
+    created_by:  args.createdBy,
+  });
+  return { success: true };
+}
+
+// Mirrors web lib/tenant-rating.ts: payment timeliness (4) + ticket volume (3) + remarks (3) = 10.
+export async function computeTenantRating(tenantId: string) {
+  const [{ data: invoices }, { data: receipts }, { count: ticketCount }, { data: remarks }] =
+    await Promise.all([
+      supabase.from("invoices").select("id, due_date, billing_month").eq("tenant_id", tenantId).eq("organization_id", ORG_ID),
+      supabase.from("receipts").select("payment_date, billing_month").eq("tenant_id", tenantId).eq("organization_id", ORG_ID),
+      supabase.from("maintenance_tickets").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("organization_id", ORG_ID),
+      supabase.from("tenant_remarks").select("remark_type, severity").eq("tenant_id", tenantId).eq("organization_id", ORG_ID),
+    ]);
+
+  let paymentScore = 4;
+  if (invoices && invoices.length > 0) {
+    const scores: number[] = [];
+    for (const inv of invoices as any[]) {
+      if (!inv.due_date) continue;
+      const dueDate = new Date(inv.due_date);
+      const match = ((receipts as any[]) || []).find((r: any) => {
+        if (!r.payment_date) return false;
+        if (r.billing_month && inv.billing_month && r.billing_month === inv.billing_month) return true;
+        const pd = new Date(r.payment_date);
+        const diff = (pd.getTime() - dueDate.getTime()) / 86400000;
+        return diff >= -15 && diff <= 60;
+      });
+      if (!match) { scores.push(0); continue; }
+      const daysLate = Math.max(0, Math.floor((new Date(match.payment_date).getTime() - dueDate.getTime()) / 86400000));
+      scores.push(daysLate <= 7 ? 4 : daysLate <= 15 ? 3 : daysLate <= 30 ? 2 : 1);
+    }
+    if (scores.length) paymentScore = scores.reduce((s, v) => s + v, 0) / scores.length;
+  }
+
+  const tc = ticketCount || 0;
+  const ticketScore = tc === 0 ? 3 : tc <= 2 ? 2 : tc <= 5 ? 1 : 0;
+
+  let remarkScore = 3;
+  if (remarks && (remarks as any[]).length > 0) {
+    let raw = 0;
+    for (const r of remarks as any[]) {
+      if (r.remark_type === "positive") raw += 1;
+      else if (r.remark_type === "negative") raw -= r.severity === "critical" ? 2 : r.severity === "high" ? 1.5 : 1;
+      else if (r.remark_type === "dispute") raw -= r.severity === "critical" ? 2.5 : 2;
+    }
+    remarkScore = Math.max(0, Math.min(3, 3 + raw * 0.5));
+  }
+
+  const finalScore = Math.max(0, Math.min(10, Math.round((paymentScore + ticketScore + remarkScore) * 10) / 10));
+  await supabase.from("tenants").update({ tenant_rating: finalScore, rating_last_computed: new Date().toISOString() } as any).eq("id", tenantId);
+  return { score: finalScore };
+}
+
+// Finds all phone numbers with 2+ tenants (web runDuplicateScanAll parity).
+export async function getDuplicateTenants() {
+  const data = await safeList(
+    supabase.from("tenants")
+      .select("id, full_name, phone, email, staying_status, kyc_completed")
+      .eq("organization_id", ORG_ID)
+      .not("phone", "is", null)
+      .order("created_at", { ascending: false })
+  );
+  const norm = (v: string) => String(v || "").replace(/\D/g, "").trim();
+  const map = new Map<string, any[]>();
+  for (const r of data as any[]) {
+    const p = norm(r.phone);
+    if (!p) continue;
+    if (!map.has(p)) map.set(p, []);
+    map.get(p)!.push(r);
+  }
+  return Array.from(map.entries())
+    .filter(([, list]) => list.length >= 2)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([phone, tenants]) => ({ phone, tenants }));
+}
+
+export async function searchTenantsByPhone(phone: string) {
+  return safeList(
+    supabase.from("tenants")
+      .select("id, full_name, phone, email, staying_status, kyc_completed")
+      .eq("organization_id", ORG_ID)
+      .eq("phone", phone.trim())
+      .order("created_at", { ascending: false })
+  );
+}
+
+export async function mergeTenants(primaryId: string, secondaryId: string, fieldValues?: any) {
+  if (!primaryId || !secondaryId || primaryId === secondaryId) {
+    return { ok: false, error: "Pick two different tenant records to merge." };
+  }
+  try {
+    const { data, error } = await supabase.rpc("merge_tenants", {
+      p_primary_id: primaryId,
+      p_secondary_id: secondaryId,
+      p_field_values: fieldValues || {},
+    });
+    if (error) return { ok: false, error: error.message };
+    const moved = (data as any)?.moved || {};
+    const totalMoved = Object.values(moved).reduce((s: number, n: any) => s + Number(n || 0), 0);
+    return { ok: true, moved, totalMoved };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Merge failed." };
+  }
+}
+
+// Deletes are disabled org-wide (product decision) — throw so the UI shows the reason.
+export async function deleteTenant(_tenantId: string): Promise<never> {
+  throw new Error("Deleting is currently disabled.");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1916,15 +2077,397 @@ export async function getEBAnalytics(propertyId?: string) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// OWNERS (ported verbatim from convex/owners.ts)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export async function listOwners() {
+  const owners = await safeList(
+    supabase.from("owners")
+      .select("id, full_name, phone, email, pan_number, aadhar_number, address, city, state, pincode, bank_name, bank_account_number, bank_ifsc, gst_number, notes, photo_url, id_proof_url, created_at")
+      .eq("organization_id", ORG_ID)
+      .order("created_at", { ascending: false })
+  );
+  if (!owners.length) return [];
+  const ownerIds = owners.map((o: any) => o.id);
+  const contracts = await safeList(
+    supabase.from("owner_contracts")
+      .select("id, owner_id, contract_type, start_date, end_date, monthly_rent, status, apartment_id, apartments(apartment_code, property_id, properties(property_name))")
+      .in("owner_id", ownerIds)
+      .order("start_date", { ascending: false })
+  );
+  const today = new Date();
+  const isExpired = (endDate: string | null) => {
+    if (!endDate) return false;
+    try { return new Date(endDate) < today; } catch { return false; }
+  };
+  const isActiveContract = (c: any) =>
+    !isExpired(c.end_date) && String(c.status || "").toLowerCase() !== "inactive";
+  const contractsByOwner: Record<string, any[]> = {};
+  for (const c of contracts as any[]) {
+    if (!contractsByOwner[c.owner_id]) contractsByOwner[c.owner_id] = [];
+    contractsByOwner[c.owner_id].push(c);
+  }
+  return (owners as any[]).map((o: any) => {
+    const ownerContracts = contractsByOwner[o.id] || [];
+    const activeContract = ownerContracts.find(isActiveContract) || null;
+    return {
+      id: o.id, name: o.full_name || "—", phone: o.phone || "", email: o.email || null,
+      panNumber: o.pan_number || null, aadharNumber: o.aadhar_number || null,
+      address: o.address || null, city: o.city || null, state: o.state || null, pincode: o.pincode || null,
+      bankName: o.bank_name || null, bankAccountNumber: o.bank_account_number || null, bankIfsc: o.bank_ifsc || null,
+      gstNumber: o.gst_number || null, notes: o.notes || null, photoUrl: o.photo_url || null,
+      contractCount: ownerContracts.length,
+      activeContract: activeContract ? {
+        id: activeContract.id, contractType: activeContract.contract_type,
+        startDate: activeContract.start_date, endDate: activeContract.end_date,
+        monthlyRent: Number(activeContract.monthly_rent) || 0, status: activeContract.status,
+        apartmentCode: activeContract.apartments?.apartment_code || null,
+        propertyId: activeContract.apartments?.property_id || null,
+        propertyName: activeContract.apartments?.properties?.property_name || null,
+      } : null,
+      propertyIds: ownerContracts.map((c: any) => c.apartments?.property_id).filter(Boolean),
+    };
+  });
+}
+
+export async function getOwnerDetail(ownerId: string) {
+  const [ownerRows, contracts] = await Promise.all([
+    safeList(supabase.from("owners").select("id, full_name, phone, email, pan_number, aadhar_number, address, city, state, pincode, bank_name, bank_account_number, bank_ifsc, gst_number, notes, photo_url, id_proof_url, status").eq("id", ownerId).eq("organization_id", ORG_ID).limit(1)),
+    safeList(
+      supabase.from("owner_contracts")
+        .select("*, apartments(apartment_code, property_id, properties(property_name, address, city, state))")
+        .eq("owner_id", ownerId)
+        .order("created_at", { ascending: false })
+    ),
+  ]);
+  const owner: any = ownerRows[0] || null;
+  if (!owner) return null;
+  return {
+    owner: {
+      id: owner.id, name: owner.full_name || "—", phone: owner.phone || "", email: owner.email || null,
+      panNumber: owner.pan_number || null, aadharNumber: owner.aadhar_number || null,
+      address: owner.address || null, city: owner.city || null, state: owner.state || null, pincode: owner.pincode || null,
+      bankName: owner.bank_name || null, bankAccountNumber: owner.bank_account_number || null, bankIfsc: owner.bank_ifsc || null,
+      gstNumber: owner.gst_number || null, notes: owner.notes || null, photoUrl: owner.photo_url || null,
+      idProofUrl: owner.id_proof_url || null, status: owner.status || "active",
+    },
+    contracts: (contracts as any[]).map((c: any) => ({
+      id: c.id, contractType: c.contract_type, startDate: c.start_date, endDate: c.end_date,
+      monthlyRent: Number(c.monthly_rent) || 0, status: c.status,
+      securityDeposit: Number(c.security_deposit) || 0, paymentDueDay: c.payment_due_day,
+      apartmentCode: c.apartments?.apartment_code || null, propertyId: c.apartments?.property_id || null,
+      propertyName: c.apartments?.properties?.property_name || null, propertyCity: c.apartments?.properties?.city || null,
+      agreementUrl: c.agreement_url || null, notes: c.notes || null,
+      revenueSharePercentage: c.revenue_share_percentage != null ? Number(c.revenue_share_percentage) : null,
+      lockInMonths: c.lock_in_months != null ? Number(c.lock_in_months) : null,
+      escalationPercentage: c.escalation_percentage != null ? Number(c.escalation_percentage) : null,
+      escalationIntervalMonths: c.escalation_interval_months != null ? Number(c.escalation_interval_months) : null,
+      rentPaidInAdvance: !!c.rent_paid_in_advance, paymentSchedule: c.payment_schedule || "monthly",
+      renewalPeriods: c.renewal_periods != null ? Number(c.renewal_periods) : null,
+      gstInfo: c.gst_info || null, rentIncludesGst: c.gst_info === "Rent Includes GST",
+    })),
+  };
+}
+
+export async function listApartmentsForContract() {
+  const apts = await safeList(
+    supabase.from("apartments")
+      .select("id, apartment_code, property_id, status, properties(property_name)")
+      .eq("organization_id", ORG_ID).order("apartment_code")
+  );
+  const activeCon = await safeList(
+    supabase.from("owner_contracts").select("apartment_id, end_date, status")
+      .eq("organization_id", ORG_ID).in("status", ["active", "upcoming"])
+  );
+  const takenIds = new Set(
+    (activeCon as any[])
+      .filter((c: any) => { if (!c.end_date) return true; return new Date(c.end_date) >= new Date(); })
+      .map((c: any) => c.apartment_id)
+  );
+  return (apts as any[]).map((a: any) => ({
+    id: a.id, apartmentCode: a.apartment_code,
+    propertyName: a.properties?.property_name || "—", propertyId: a.property_id,
+    status: a.status || "In-Progress", hasActiveContract: takenIds.has(a.id),
+  })).sort((a: any, b: any) =>
+    a.propertyName.localeCompare(b.propertyName) ||
+    a.apartmentCode.localeCompare(b.apartmentCode, undefined, { numeric: true })
+  );
+}
+
+function ownerAutoRenewalDate(endDate: string): string | null {
+  try {
+    const d = new Date(endDate);
+    d.setMonth(d.getMonth() - 3);
+    return d.toISOString().split("T")[0];
+  } catch { return null; }
+}
+
+// Pure port of generateOwnerContractPayments (web)
+function generateContractPayments(contract: any): any[] {
+  if (!contract.start_date || !contract.end_date || !contract.monthly_rent || Number(contract.monthly_rent) <= 0)
+    return [];
+  const payments: any[] = [];
+  const start = new Date(contract.start_date);
+  const end = new Date(contract.end_date);
+  const baseAmount = Number(contract.monthly_rent);
+  const escalationPct = Number(contract.escalation_percentage) || 0;
+  const escalationInterval = Number(contract.escalation_interval_months) || 12;
+  const dueDay = Math.min(Number(contract.payment_due_day) || 1, 28);
+  const rentInAdvance = !!contract.rent_paid_in_advance;
+  const today = new Date();
+  const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+  const addMonths = (d: Date, n: number) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
+  let current = startOfMonth(start);
+  let monthIndex = 0;
+  while (current <= end) {
+    const billMonthForCap = rentInAdvance ? current : addMonths(current, 1);
+    if (startOfMonth(billMonthForCap) > startOfMonth(today)) break;
+    let amount = baseAmount;
+    if (escalationPct > 0 && escalationInterval > 0 && monthIndex > 0) {
+      const escalations = Math.floor(monthIndex / escalationInterval);
+      amount = baseAmount * Math.pow(1 + escalationPct / 100, escalations);
+    }
+    amount = Math.ceil(amount);
+    const y = current.getFullYear();
+    const m = current.getMonth();
+    const billMonth = rentInAdvance ? current : addMonths(current, 1);
+    const billDateStr = `${billMonth.getFullYear()}-${String(billMonth.getMonth() + 1).padStart(2, "0")}-01`;
+    const dueMonth = rentInAdvance ? current : addMonths(current, 1);
+    const dueDateStr = `${dueMonth.getFullYear()}-${String(dueMonth.getMonth() + 1).padStart(2, "0")}-${String(dueDay).padStart(2, "0")}`;
+    payments.push({
+      month: `${y}-${String(m + 1).padStart(2, "0")}`,
+      billDate: billDateStr, dueDate: dueDateStr, actualDueDate: dueDateStr,
+      baseAmount, amount,
+    });
+    current = addMonths(current, 1);
+    monthIndex++;
+  }
+  return payments;
+}
+
+// Regenerate payments for one contract, preserving paid records
+async function regeneratePaymentsForContract(contractId: string) {
+  const conRows = await safeList(supabase.from("owner_contracts").select("*").eq("id", contractId).limit(1));
+  const contract: any = conRows[0];
+  if (!contract) return;
+  const payments = generateContractPayments(contract);
+  if (payments.length === 0) return;
+  const existing = await safeList(supabase.from("owner_payments").select("*").eq("contract_id", contractId));
+  const existingMap = new Map((existing as any[]).map((p: any) => [p.payment_month, p]));
+  await supabase.from("owner_payments").delete().eq("contract_id", contractId);
+  const rows = payments.map((p) => {
+    const prev: any = existingMap.get(p.month);
+    return {
+      organization_id: ORG_ID, owner_id: contract.owner_id, contract_id: contractId,
+      apartment_id: contract.apartment_id, payment_month: p.month,
+      bill_date: p.billDate, due_date: p.dueDate,
+      actual_due_date: prev?.actual_due_date || p.actualDueDate,
+      base_amount: p.baseAmount, escalated_amount: p.amount,
+      status: prev?.status || "pending", paid_date: prev?.paid_date || null,
+      payment_mode: prev?.payment_mode || null, notes: prev?.notes || null,
+      reference_number: prev?.reference_number || null,
+    };
+  });
+  if (rows.length > 0) await supabase.from("owner_payments").insert(rows);
+}
+
+export async function createOwnerContract(ownerId: string, data: any) {
+  const aptIds: string[] = data.apartment_ids || [];
+  if (aptIds.length === 0) throw new Error("Select at least one apartment");
+  const created: string[] = [];
+  for (const aptId of aptIds) {
+    const aptRows = await safeList(supabase.from("apartments").select("id, property_id, apartment_code").eq("id", aptId).limit(1));
+    const apt: any = aptRows[0];
+    const payload: Record<string, any> = {
+      organization_id: ORG_ID, owner_id: ownerId, apartment_id: aptId,
+      property_id: apt?.property_id || null,
+      contract_type: data.contract_type || "lease",
+      start_date: data.start_date || null, end_date: data.end_date || null,
+      monthly_rent: data.monthly_rent ? parseFloat(data.monthly_rent) : null,
+      revenue_share_percentage: data.revenue_share_percentage ? parseFloat(data.revenue_share_percentage) : null,
+      security_deposit: data.security_deposit ? parseFloat(data.security_deposit) : null,
+      lock_in_months: data.lock_in_months ? parseInt(data.lock_in_months) : null,
+      escalation_percentage: data.escalation_percentage ? parseFloat(data.escalation_percentage) : null,
+      escalation_interval_months: data.escalation_interval_months ? parseInt(data.escalation_interval_months) : null,
+      payment_due_day: parseInt(data.payment_due_day) || 1,
+      rent_paid_in_advance: !!data.rent_paid_in_advance,
+      gst_info: data.gst_info || "GST under RCM", notes: data.notes || null,
+      agreement_url: data.agreement_url || null, payment_schedule: data.payment_schedule || "monthly",
+      renewal_periods: data.renewal_periods ? parseInt(data.renewal_periods) : 0,
+      renewal_date: data.end_date ? ownerAutoRenewalDate(data.end_date) : null,
+      status: "active",
+    };
+    const { data: newContract, error } = await supabase.from("owner_contracts").insert(payload).select("id").single();
+    if (error) throw new Error(error.message);
+    created.push((newContract as any).id);
+    try {
+      const conRows = await safeList(supabase.from("owner_contracts").select("*").eq("id", (newContract as any).id).limit(1));
+      const contract: any = conRows[0];
+      if (contract) {
+        const pays = generateContractPayments(contract);
+        if (pays.length > 0) {
+          const rows = pays.map((p) => ({
+            organization_id: ORG_ID, owner_id: ownerId, contract_id: (newContract as any).id,
+            apartment_id: aptId, payment_month: p.month, bill_date: p.billDate,
+            due_date: p.dueDate, actual_due_date: p.actualDueDate,
+            base_amount: p.baseAmount, escalated_amount: p.amount, status: "pending",
+          }));
+          await supabase.from("owner_payments").insert(rows);
+        }
+      }
+    } catch (_) { /* schedule generation best-effort */ }
+    if (data.start_date || data.end_date) {
+      await supabase.from("apartments").update({
+        ...(data.start_date ? { start_date: data.start_date } : {}),
+        ...(data.end_date ? { end_date: data.end_date } : {}),
+      } as any).eq("id", aptId);
+    }
+  }
+  return { success: true, contractIds: created };
+}
+
+export async function createOwner(data: any) {
+  const { first_name, last_name, ...rest } = data;  // gender/title are UI-only
+  const fullName = `${first_name || ""} ${last_name || ""}`.trim();
+  if (!fullName) throw new Error("Name is required");
+  const { data: row, error } = await supabase.from("owners").insert({
+    full_name: fullName, phone: rest.phone || null, email: rest.email || null,
+    pan_number: rest.pan_number || null, aadhar_number: rest.aadhar_number || null,
+    address: rest.address || null, city: rest.city || null, state: rest.state || null, pincode: rest.pincode || null,
+    bank_name: rest.bank_name || null, bank_account_number: rest.bank_account_number || null, bank_ifsc: rest.bank_ifsc || null,
+    gst_number: rest.gst_number || null, notes: rest.notes || null,
+    photo_url: rest.photo_url || null, id_proof_url: rest.id_proof_url || null,
+    organization_id: ORG_ID, status: "active",
+  }).select("id").single();
+  if (error) throw new Error(error.message);
+  return (row as any).id;
+}
+
+export async function updateOwner(id: string, data: any) {
+  const { first_name, last_name, ...rest } = data;  // gender/title/created_at/etc UI-only, ignored
+  const updates: Record<string, any> = {};
+  if (first_name !== undefined || last_name !== undefined) {
+    updates.full_name = `${first_name || ""} ${last_name || ""}`.trim();
+  }
+  ["phone", "email", "pan_number", "aadhar_number", "address", "city", "state",
+   "pincode", "bank_name", "bank_account_number", "bank_ifsc", "gst_number",
+   "notes", "photo_url", "id_proof_url"].forEach((k) => {
+    if (rest[k] !== undefined) updates[k] = rest[k] || null;
+  });
+  const { error } = await supabase.from("owners").update(updates).eq("id", id).eq("organization_id", ORG_ID);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function toggleOwnerStatus(id: string, currentStatus: string) {
+  const newStatus = currentStatus === "active" ? "inactive" : "active";
+  const { error } = await supabase.from("owners").update({ status: newStatus }).eq("id", id).eq("organization_id", ORG_ID);
+  if (error) throw new Error(error.message);
+  return { status: newStatus };
+}
+
+export async function updateContract(id: string, data: any) {
+  const payload: Record<string, any> = {
+    contract_type: data.contract_type,
+    start_date: data.start_date || null, end_date: data.end_date || null,
+    monthly_rent: data.monthly_rent ? parseFloat(data.monthly_rent) : null,
+    revenue_share_percentage: data.revenue_share_percentage ? parseFloat(data.revenue_share_percentage) : null,
+    security_deposit: data.security_deposit ? parseFloat(data.security_deposit) : null,
+    lock_in_months: data.lock_in_months ? parseInt(data.lock_in_months) : null,
+    escalation_percentage: data.escalation_percentage ? parseFloat(data.escalation_percentage) : null,
+    escalation_interval_months: data.escalation_interval_months ? parseInt(data.escalation_interval_months) : null,
+    payment_due_day: parseInt(data.payment_due_day) || 1,
+    rent_paid_in_advance: !!data.rent_paid_in_advance,
+    gst_info: data.gst_info || "GST under RCM", notes: data.notes || null,
+    payment_schedule: data.payment_schedule || "monthly",
+    renewal_periods: data.renewal_periods ? parseInt(data.renewal_periods) : null,
+    agreement_url: data.agreement_url || null,
+  };
+  Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+  const { error } = await supabase.from("owner_contracts").update(payload).eq("id", id);
+  if (error) throw new Error(error.message);
+  await regeneratePaymentsForContract(id);
+  return { success: true };
+}
+
+// Deletes are disabled org-wide (product decision) — throw so the UI shows the reason.
+export async function deleteContract(_id: string): Promise<never> {
+  throw new Error("Deleting is currently disabled.");
+}
+
+export async function getContractPayments(contractId: string) {
+  return safeList(
+    supabase.from("owner_payments").select("*")
+      .eq("contract_id", contractId).order("payment_month", { ascending: false })
+  );
+}
+
+export async function listOwnerPaymentsConsolidated(ownerId: string) {
+  return safeList(
+    supabase.from("owner_payments")
+      .select("*, apartments(apartment_code), owner_contracts(contract_type)")
+      .eq("owner_id", ownerId).order("payment_month", { ascending: false })
+  );
+}
+
+export async function recordOwnerPayment(id: string, data: any) {
+  if (!data.paid_date) throw new Error("Payment date is required");
+  const { error } = await supabase.from("owner_payments").update({
+    status: "paid", paid_date: data.paid_date,
+    payment_mode: data.payment_mode || "transfer",
+    reference_number: data.reference_number || null, notes: data.notes || null,
+  }).eq("id", id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function editOwnerPayment(id: string, data: any) {
+  const updates: Record<string, any> = {
+    escalated_amount: parseFloat(data.escalated_amount) || 0,
+    due_date: data.due_date, actual_due_date: data.actual_due_date || data.due_date,
+    notes: data.notes || null, reference_number: data.reference_number || null,
+  };
+  if (data.status === "paid") {
+    updates.status = "paid"; updates.paid_date = data.paid_date || null;
+    updates.payment_mode = data.payment_mode || null;
+  } else {
+    updates.status = "pending"; updates.paid_date = null; updates.payment_mode = null;
+  }
+  const { error } = await supabase.from("owner_payments").update(updates).eq("id", id);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+export async function regenerateOwnerBills(ownerId: string, _mode?: string) {
+  const contracts = await safeList(
+    supabase.from("owner_contracts").select("id").eq("owner_id", ownerId).eq("organization_id", ORG_ID)
+  );
+  for (const c of contracts as any[]) {
+    await regeneratePaymentsForContract(c.id);
+  }
+  return { success: true, contracts: contracts.length };
+}
+
+export async function listPropertiesForFilter() {
+  const props = await safeList(
+    supabase.from("properties").select("id, property_name, code").eq("organization_id", ORG_ID).order("property_name")
+  );
+  return (props as any[]).map((p: any) => ({ id: p.id, name: p.property_name || p.name || p.code || "Property" }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TICKETS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function fetchTickets(role: string, userId?: string, tenantId?: string) {
-  return client.action(api.tickets.listTickets, { role, userId, tenantId });
+  // Delegate to the already-ported Supabase ticketService (no Convex).
+  const { fetchTickets: fn } = await import("../services/ticketService");
+  return fn(role, userId, tenantId);
 }
 
 export async function createTicket(args: any) {
-  return client.action(api.tickets.createTicket, { data: args });
+  const { createTicket: fn } = await import("../services/ticketService");
+  return fn(args);
 }
 
 export async function updateTicketAsset(ticketId: string, assetId: string | null) {
@@ -2243,6 +2786,24 @@ export async function getOrgSettings() {
   return { costApprovalThreshold: 5000, organizationName: "Vishful Spaces LLP" };
 }
 
+// Direct Supabase port of convex/settings.ts getOrgExitSettings — raw exit/approval
+// columns off the organizations row (shape matches the Convex action).
+export async function getOrgExitSettings(): Promise<{
+  exit_task_assignee_1: string | null;
+  exit_task_assignee_2: string | null;
+  ticket_auto_approve_threshold: number | null;
+  ticket_repeat_check_days: number | null;
+} | null> {
+  const rows = await safeList(
+    supabase
+      .from("organizations")
+      .select("exit_task_assignee_1, exit_task_assignee_2, ticket_auto_approve_threshold, ticket_repeat_check_days")
+      .eq("id", ORG_ID)
+      .limit(1)
+  );
+  return (rows[0] as any) ?? null;
+}
+
 export async function updateOrgSettings(args: any) {
   const updates: Record<string, any> = {};
   if (args.costApprovalThreshold !== undefined) updates.ticket_auto_approve_threshold = args.costApprovalThreshold;
@@ -2263,15 +2824,221 @@ export async function updateOrgSettings(args: any) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SETTINGS — roles / permissions / rules / bed types / bank accounts / lifecycle
+// (ported verbatim from convex/settings.ts; new fns take a single args object so
+//  SettingsScreen's generic dispatcher can call sb[action](args) uniformly)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export async function getRolePermissions() {
+  return safeList(supabase.from("role_permissions").select("*").eq("organization_id", ORG_ID).order("module"));
+}
+
+export async function upsertRolePermission(args: { id?: string; role: string; module: string; can_create: boolean; can_read: boolean; can_update: boolean; can_delete: boolean }) {
+  if (args.id) {
+    const { id, role, module, ...rest } = args;
+    return updateRow("role_permissions", id, { ...rest, updated_at: new Date().toISOString() });
+  }
+  const existing = await safeList(
+    supabase.from("role_permissions").select("id").eq("organization_id", ORG_ID).eq("role", args.role).eq("module", args.module).limit(1)
+  );
+  if (existing.length > 0) {
+    const { id: _id, role, module, ...rest } = args;
+    return updateRow("role_permissions", (existing[0] as any).id, { ...rest, updated_at: new Date().toISOString() });
+  }
+  return insertRow("role_permissions", { organization_id: ORG_ID, role: args.role, module: args.module, can_create: args.can_create, can_read: args.can_read, can_update: args.can_update, can_delete: args.can_delete });
+}
+
+export async function deleteRolePermission(args: { id: string }) {
+  return deleteRow("role_permissions", args.id);
+}
+
+export async function deleteAllRolePermissions(args: { role: string }) {
+  if (!DELETES_ENABLED) throw new Error("Deleting is currently disabled.");
+  await supabase.from("role_permissions").delete().eq("organization_id", ORG_ID).eq("role", args.role);
+  await supabase.from("tab_permissions").delete().eq("organization_id", ORG_ID).eq("role", args.role);
+  return { success: true };
+}
+
+export async function getTabPermissions() {
+  return safeList(supabase.from("tab_permissions").select("*").eq("organization_id", ORG_ID).order("module"));
+}
+
+export async function upsertTabPermission(args: { id?: string; role: string; module: string; tab_key: string; is_visible: boolean; can_create?: boolean; can_read?: boolean; can_update?: boolean; can_delete?: boolean }) {
+  const payload: Record<string, any> = {
+    is_visible: args.is_visible,
+    can_create: args.can_create ?? false,
+    can_read: args.can_read ?? true,
+    can_update: args.can_update ?? false,
+    can_delete: args.can_delete ?? false,
+    updated_at: new Date().toISOString(),
+  };
+  if (args.id) return updateRow("tab_permissions", args.id, payload);
+  const existing = await safeList(
+    supabase.from("tab_permissions").select("id").eq("organization_id", ORG_ID).eq("role", args.role).eq("module", args.module).eq("tab_key", args.tab_key).limit(1)
+  );
+  if (existing.length > 0) return updateRow("tab_permissions", (existing[0] as any).id, payload);
+  return insertRow("tab_permissions", { organization_id: ORG_ID, role: args.role, module: args.module, tab_key: args.tab_key, ...payload });
+}
+
+export async function deleteTabPermission(args: { id: string }) {
+  return deleteRow("tab_permissions", args.id);
+}
+
+export async function getUserRoles() {
+  return safeList(supabase.from("user_roles").select("*"));
+}
+
+export async function assignUserRole(args: { user_id: string; role: string }) {
+  const existing = await safeList(
+    supabase.from("user_roles").select("id").eq("user_id", args.user_id).eq("role", args.role).limit(1)
+  );
+  if (existing.length > 0) throw new Error("User already has this role");
+  return insertRow("user_roles", { user_id: args.user_id, role: args.role });
+}
+
+export async function removeUserRole(args: { user_id: string; role: string }) {
+  if (!DELETES_ENABLED) throw new Error("Deleting is currently disabled.");
+  await supabase.from("user_roles").delete().eq("user_id", args.user_id).eq("role", args.role);
+  return { success: true };
+}
+
+// ─── ASSIGNMENT RULES ────────────────────────────────────────────────
+export async function listAssignmentRules() {
+  return safeList(supabase.from("ticket_assignment_rules").select("*").eq("organization_id", ORG_ID).order("priority"));
+}
+export async function createAssignmentRule(args: { data: any }) {
+  return insertRow("ticket_assignment_rules", { ...args.data, organization_id: ORG_ID });
+}
+export async function updateAssignmentRule(args: { id: string; data: any }) {
+  return updateRow("ticket_assignment_rules", args.id, args.data);
+}
+export async function deleteAssignmentRule(args: { id: string }) {
+  return deleteRow("ticket_assignment_rules", args.id);
+}
+
+// ─── BED TYPES ───────────────────────────────────────────────────────
+export async function listBedTypes() {
+  return safeList(supabase.from("bed_type_config").select("*").eq("organization_id", ORG_ID).order("sort_order"));
+}
+export async function createBedType(args: { name: string; sort_order?: number }) {
+  return insertRow("bed_type_config", { name: args.name, sort_order: args.sort_order ?? 0, organization_id: ORG_ID });
+}
+export async function deleteBedType(args: { id: string }) {
+  return deleteRow("bed_type_config", args.id);
+}
+
+// ─── MAINTENANCE ITEMS ───────────────────────────────────────────────
+export async function listMaintenanceItems() {
+  return safeList(supabase.from("maintenance_items").select("*").eq("organization_id", ORG_ID).order("name"));
+}
+export async function createMaintenanceItem(args: { data: any }) {
+  const data = args.data;
+  return insertRow("maintenance_items", { name: data.name, unit: data.unit || null, description: data.description || null, organization_id: ORG_ID });
+}
+export async function deleteMaintenanceItem(args: { id: string }) {
+  return deleteRow("maintenance_items", args.id);
+}
+
+// ─── ISSUE TYPES (for rules tab) ─────────────────────────────────────
+export async function listIssueTypes() {
+  return safeList(supabase.from("issue_types").select("id, name, icon, priority, sla_hours").eq("organization_id", ORG_ID).order("name"));
+}
+
+// ─── LIFECYCLE CONFIG ────────────────────────────────────────────────
+export async function getLifecycleConfig() {
+  const rows = await safeList(supabase.from("lifecycle_config").select("*").eq("organization_id", ORG_ID).order("from_date", { ascending: false }).limit(1));
+  return (rows[0] as any) || null;
+}
+export async function saveLifecycleConfig(args: { data: any }) {
+  const { id, ...rest } = args.data;
+  if (id) return updateRow("lifecycle_config", id, rest);
+  const today = new Date().toISOString().split("T")[0];
+  return insertRow("lifecycle_config", { organization_id: ORG_ID, from_date: today, to_date: null, notice_period_days: 30, refund_deadline_days: 5, ...rest });
+}
+
+// ─── ORG EXIT + AUTO APPROVAL SETTINGS ──────────────────────────────
+export async function saveOrgExitSettings(args: { data: any }) {
+  const data = args.data;
+  const payload: Record<string, any> = {};
+  if (data.exit_task_assignee_1 !== undefined) payload.exit_task_assignee_1 = data.exit_task_assignee_1 || null;
+  if (data.exit_task_assignee_2 !== undefined) payload.exit_task_assignee_2 = data.exit_task_assignee_2 === "__none" ? null : (data.exit_task_assignee_2 || null);
+  if (data.ticket_auto_approve_threshold !== undefined) payload.ticket_auto_approve_threshold = Number(data.ticket_auto_approve_threshold);
+  if (data.ticket_repeat_check_days !== undefined) payload.ticket_repeat_check_days = Number(data.ticket_repeat_check_days);
+  const { error } = await supabase.from("organizations").update(payload as any).eq("id", ORG_ID);
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+// ─── BANK ACCOUNTS ───────────────────────────────────────────────────
+async function clearOtherPrimaries(exceptId?: string) {
+  let q = supabase.from("organization_bank_accounts").update({ is_primary: false } as any).eq("organization_id", ORG_ID).eq("is_primary", true);
+  if (exceptId) q = q.neq("id", exceptId);
+  await q;
+}
+function remapBankFields(d: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = { ...d };
+  delete out.id;
+  delete out.is_active; // no such column on organization_bank_accounts
+  if ("account_holder" in out) { out.account_name = out.account_holder; delete out.account_holder; }
+  if ("ifsc" in out) { out.ifsc_code = out.ifsc; delete out.ifsc; }
+  return out;
+}
+export async function getBankAccounts() {
+  return safeList(
+    supabase.from("organization_bank_accounts").select("id, bank_name, account_number, account_name").eq("organization_id", ORG_ID).eq("status", "active").order("bank_name")
+  );
+}
+export async function createBankAccount(args: { data: any }) {
+  const data = args.data;
+  if (data.is_primary) await clearOtherPrimaries();
+  return insertRow("organization_bank_accounts", { bank_name: data.bank_name, account_number: data.account_number, account_name: data.account_holder || data.account_name || null, ifsc_code: data.ifsc || data.ifsc_code || null, branch: data.branch || null, is_primary: data.is_primary || false, status: "active", organization_id: ORG_ID });
+}
+export async function updateBankAccount(args: { id: string; data: any }) {
+  const { id: _id, ...rest } = args.data;
+  if (rest.is_primary) await clearOtherPrimaries(args.id);
+  return updateRow("organization_bank_accounts", args.id, remapBankFields(rest));
+}
+export async function deleteBankAccount(args: { id: string }) {
+  await deleteRow("organization_bank_accounts", args.id);
+  return { success: true };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // REPORTS (proxy to Convex)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function getMaintenanceReport(startDate: string, endDate: string) {
-  return client.action(api.reports.getMaintenanceReport, { startDate, endDate });
+  // Direct Supabase port of convex/reports.ts getMaintenanceReport.
+  const tickets = await safeList(
+    supabase.from("maintenance_tickets").select("*").eq("organization_id", ORG_ID).gte("created_at", startDate).lte("created_at", endDate)
+  );
+  const totalTickets = tickets.length;
+  const resolvedTickets = tickets.filter((t: any) => ["resolved", "completed"].includes((t.status || "").toLowerCase())).length;
+  const slaViolations = tickets.filter((t: any) => t.sla_violated === true).length;
+  const totalMaintenanceCost = tickets.reduce((sum: number, t: any) => sum + (Number(t.cost) || Number(t.total_cost) || 0), 0);
+  const statusCounts: Record<string, number> = {};
+  tickets.forEach((t: any) => { const s = t.status || "unknown"; statusCounts[s] = (statusCounts[s] || 0) + 1; });
+  const byStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
+  const catCounts: Record<string, number> = {};
+  tickets.forEach((t: any) => { const c = t.category || t.issue_category || "Uncategorized"; catCounts[c] = (catCounts[c] || 0) + 1; });
+  const byCategory = Object.entries(catCounts).map(([name, count]) => ({ name, count }));
+  return { summary: { totalTickets, resolvedTickets, slaViolations, totalMaintenanceCost }, byStatus, byCategory };
 }
 
 export async function getOccupancyReport() {
-  return client.action(api.reports.getOccupancyReport, {});
+  // Direct Supabase port of convex/reports.ts getOccupancyReport.
+  const [properties, apartments, beds] = await Promise.all([
+    safeList(supabase.from("properties").select("*").eq("organization_id", ORG_ID)),
+    safeList(supabase.from("apartments").select("*").eq("organization_id", ORG_ID)),
+    safeList(supabase.from("beds").select("*").eq("organization_id", ORG_ID)),
+  ]);
+  return properties.map((p: any) => {
+    const propAptIds = apartments.filter((a: any) => a.property_id === p.id).map((a: any) => a.id);
+    const propBeds = beds.filter((b: any) => propAptIds.includes(b.apartment_id));
+    const totalBeds = propBeds.length;
+    const occupiedBeds = propBeds.filter((b: any) => b.is_occupied === true || (b.bed_lifecycle_status || "").toLowerCase() === "occupied").length;
+    return { propertyName: p.property_name || p.name || p.code || "Unknown", totalBeds, occupiedBeds, occupancyRate: totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0 };
+  });
 }
 // ─── REPORTS period helpers (ported from convex/reports.ts) ──────────────────
 type ReportingPeriod = "current_fy" | "last_fy" | "last_2fy" | "last_5y" | "from_beginning";
@@ -2366,7 +3133,20 @@ export async function getReportsSummary(period: string) {
   };
 }
 export async function getOccupancyDetail() {
-  return client.action((api as any).reports.getOccupancyDetail, {});
+  // Direct Supabase port of convex/reports.ts getOccupancyDetail.
+  const [properties, apartments, beds, allotments] = await Promise.all([
+    safeList(supabase.from("properties").select("*").eq("organization_id", ORG_ID)),
+    safeList(supabase.from("apartments").select("id,property_id,status").eq("organization_id", ORG_ID)),
+    safeList(supabase.from("beds").select("id,apartment_id").eq("organization_id", ORG_ID)),
+    safeList(supabase.from("tenant_allotments").select("bed_id,staying_status,tenant_id").eq("organization_id", ORG_ID).in("staying_status", ["Staying", "On-Notice", "Booked"])),
+  ]);
+  const liveBedsAll = mFilterLiveBeds(beds, apartments);
+  return properties.map((prop: any) => {
+    const propAptIdSet = new Set(apartments.filter((a: any) => a.property_id === prop.id).map((a: any) => a.id));
+    const propLiveBeds = liveBedsAll.filter((b: any) => propAptIdSet.has(b.apartment_id));
+    const pps = computePropertyStatus(propLiveBeds, allotments);
+    return { propertyName: prop.property_name || prop.name || prop.code || "Unknown", totalBeds: pps.total, occupied: pps.occupied, notice: pps.notice, booked: pps.booked, vacant: pps.vacant, occupancyPct: pps.occupancyPct };
+  });
 }
 export async function getPropertyPnL(period: string) {
   const { from, to } = rptPeriodDateRange((period || "current_fy") as ReportingPeriod);
@@ -2445,14 +3225,56 @@ export async function getEBReconciliation(period: string) {
   }).filter((r: any) => r.ebBilled > 0 || r.ebActual > 0);
 }
 export async function listScopedProperties() {
-  return client.action((api as any).reports.listScopedProperties, {});
+  // Direct Supabase port of convex/reports.ts listScopedProperties (live props only).
+  const props = await safeList(
+    supabase.from("properties").select("id, property_name, status").eq("organization_id", ORG_ID)
+  );
+  return props
+    .filter((p: any) => !p.status || ["Live", "live"].includes(String(p.status)))
+    .map((p: any) => ({ id: p.id, name: p.property_name || "Unnamed" }));
 }
 export async function getAvailabilityData(propertyId: string) {
-  return client.action((api as any).reports.getAvailabilityData, { propertyId });
+  // Direct Supabase port of convex/reports.ts getAvailabilityData.
+  const apartments = await safeList(
+    supabase.from("apartments").select("id, apartment_code, property_id, status, gender_allowed").eq("property_id", propertyId).eq("organization_id", ORG_ID)
+  );
+  const apartmentIds = apartments.map((a: any) => a.id);
+  if (apartmentIds.length === 0) return { apartments: [], beds: [], allotments: [], tenants: [] };
+  const [beds, allotments] = await Promise.all([
+    safeList(supabase.from("beds").select("id, apartment_id, bed_code, bed_type, toilet_type, status").in("apartment_id", apartmentIds)),
+    safeList(supabase.from("tenant_allotments").select("id, tenant_id, bed_id, apartment_id, staying_status, estimated_exit_date, actual_exit_date").in("apartment_id", apartmentIds)),
+  ]);
+  const tenantIds = [...new Set(
+    allotments.filter((al: any) => ["Staying", "On-Notice", "Booked"].includes(al.staying_status)).map((al: any) => al.tenant_id).filter(Boolean)
+  )];
+  const tenants = tenantIds.length
+    ? await safeList(supabase.from("tenants").select("id, full_name, profession, designation, company_name, state, company_city, city, food_preference").in("id", tenantIds))
+    : [];
+  return { apartments, beds, allotments, tenants };
 }
 
 export async function getRevenueReport(billingMonth: string) {
-  return client.action(api.reports.getRevenueReport, { billingMonth });
+  // Direct Supabase port of convex/reports.ts getRevenueReport.
+  const [invoices, properties] = await Promise.all([
+    safeList(supabase.from("invoices").select("*").eq("organization_id", ORG_ID).eq("billing_month", billingMonth)),
+    safeList(supabase.from("properties").select("*").eq("organization_id", ORG_ID)),
+  ]);
+  const propMap: Record<string, string> = {};
+  properties.forEach((p: any) => { propMap[p.id] = p.property_name || p.name || p.code || "Unknown"; });
+  const totalRevenue = invoices.reduce((sum: number, inv: any) => sum + (Number(inv.total_amount) || 0), 0);
+  const collected = invoices.filter((inv: any) => inv.status === "paid").reduce((sum: number, inv: any) => sum + (Number(inv.total_amount) || 0), 0);
+  const pending = invoices.filter((inv: any) => ["sent", "partial", "overdue"].includes(inv.status)).reduce((sum: number, inv: any) => sum + (Number(inv.total_amount) || 0), 0);
+  const byPropMap: Record<string, { total: number; collected: number }> = {};
+  invoices.forEach((inv: any) => {
+    const pid = inv.property_id || "unknown";
+    if (!byPropMap[pid]) byPropMap[pid] = { total: 0, collected: 0 };
+    byPropMap[pid].total += Number(inv.total_amount) || 0;
+    if (inv.status === "paid") byPropMap[pid].collected += Number(inv.total_amount) || 0;
+  });
+  const byProperty = Object.entries(byPropMap).map(([pid, data]) => ({
+    propertyName: propMap[pid] || "Unknown", total: data.total, collected: data.collected,
+  }));
+  return { totalRevenue, collected, pending, byProperty };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2463,64 +3285,252 @@ export async function listAuditLogs(args: {
   page?: number; pageSize?: number; tableName?: string;
   action?: string; performedBy?: string; from?: string; to?: string;
 } = {}) {
-  return client.action((api as any).auditlogs.listAuditLogs, args);
+  // Direct Supabase port of convex/auditlogs.ts listAuditLogs (paginated + performer names).
+  const page = Math.max(0, args.page ?? 0);
+  const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 50));
+  const fromIdx = page * pageSize;
+  const toIdx = fromIdx + pageSize - 1;
+  let q = supabase
+    .from("audit_logs")
+    .select("id, table_name, action, performed_by, performed_at, changes, record_id", { count: "exact" })
+    .eq("organization_id", ORG_ID)
+    .order("performed_at", { ascending: false });
+  if (args.tableName && args.tableName !== "all") q = q.eq("table_name", args.tableName);
+  if (args.action && args.action !== "all") q = q.eq("action", args.action);
+  if (args.performedBy && args.performedBy !== "all") q = q.eq("performed_by", args.performedBy);
+  if (args.from) q = q.gte("performed_at", args.from);
+  if (args.to) q = q.lte("performed_at", args.to);
+  const { data, error, count } = await q.range(fromIdx, toIdx);
+  if (error) { console.warn("[auditlogs]", error.message); return { rows: [], total: 0, page, pageSize }; }
+  const rows: any[] = data || [];
+  const ids = [...new Set(rows.map((r) => r.performed_by).filter(Boolean))];
+  const profiles = ids.length ? await safeList(supabase.from("profiles").select("id, full_name, email").in("id", ids)) : [];
+  const nameById = new Map<string, string>();
+  for (const p of profiles as any[]) nameById.set(p.id, p.full_name || p.email || String(p.id).slice(0, 8));
+  return {
+    rows: rows.map((r) => ({
+      id: r.id, tableName: r.table_name || "", action: r.action || "", performedBy: r.performed_by || null,
+      performerName: r.performed_by ? (nameById.get(r.performed_by) || String(r.performed_by).slice(0, 8)) : "System",
+      performedAt: r.performed_at || null, changes: r.changes || null, recordId: r.record_id || null,
+    })),
+    total: count ?? rows.length, page, pageSize,
+  };
 }
+
+// Direct Supabase ports of convex/whatsapplogs.ts. Reads hit tables under the
+// user JWT; resend/resume invoke the existing `whatsapp-send-job` edge function
+// (the Convex handler was only a proxy to it — no new edge function needed).
+const mapWaDelivery = (r: any) => ({
+  id: r.id, jobId: r.job_id, tenantId: r.tenant_id || null, deliveryKind: r.delivery_kind || null,
+  tenantName: r.tenant_name || null, label: r.label || null, status: r.status || "",
+  errorMessage: r.error_message || null, phoneMasked: r.phone_masked || null,
+  createdAt: r.created_at || null, sentAt: r.sent_at || null,
+});
 
 export async function listWhatsappJobs(args: { jobType?: string; limit?: number } = {}) {
-  return client.action((api as any).whatsapplogs.listWhatsappJobs, args);
+  let q = supabase
+    .from("whatsapp_send_jobs")
+    .select("id, job_type, label, status, total_count, sent_count, failed_count, error_message, created_at, updated_at")
+    .eq("organization_id", ORG_ID)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(100, Math.max(1, args.limit ?? 50)));
+  if (args.jobType && args.jobType !== "all") q = q.eq("job_type", args.jobType);
+  const rows = await safeList(q);
+  return rows.map((r: any) => ({
+    id: r.id, jobType: r.job_type || "", label: r.label || null, status: r.status || "",
+    totalCount: Number(r.total_count ?? 0), sentCount: Number(r.sent_count ?? 0), failedCount: Number(r.failed_count ?? 0),
+    errorMessage: r.error_message || null, createdAt: r.created_at || null, updatedAt: r.updated_at || null,
+  }));
 }
 export async function listWhatsappJobDeliveries(jobId: string) {
-  return client.action((api as any).whatsapplogs.listJobDeliveries, { jobId });
+  const rows = await safeList(
+    supabase.from("whatsapp_send_deliveries")
+      .select("id, job_id, tenant_id, delivery_kind, tenant_name, label, status, error_message, phone_masked, created_at, sent_at")
+      .eq("organization_id", ORG_ID).eq("job_id", jobId).order("created_at", { ascending: true })
+  );
+  return rows.map(mapWaDelivery);
 }
 export async function searchWhatsappDeliveries(term: string) {
-  return client.action((api as any).whatsapplogs.searchWhatsappDeliveries, { term });
+  const clean = String(term || "").trim().replace(/[%_,()\\"']/g, " ").replace(/\s+/g, " ").trim();
+  if (clean.length < 2) return [];
+  const digits = clean.replace(/\D/g, "");
+  let tenantIds: string[] = [];
+  if (digits.length >= 6) {
+    const ts = await safeList(
+      supabase.from("tenants").select("id").eq("organization_id", ORG_ID).ilike("phone", `%${digits.slice(-10)}%`).limit(200)
+    );
+    tenantIds = ts.map((t: any) => t.id).filter(Boolean);
+  }
+  const orParts = [`tenant_name.ilike.%${clean}%`, `label.ilike.%${clean}%`];
+  if (tenantIds.length) orParts.push(`tenant_id.in.(${tenantIds.join(",")})`);
+  const rows = await safeList(
+    supabase.from("whatsapp_send_deliveries")
+      .select("id, job_id, tenant_id, delivery_kind, tenant_name, label, status, error_message, phone_masked, created_at, sent_at")
+      .eq("organization_id", ORG_ID).or(orParts.join(",")).order("created_at", { ascending: false }).limit(100)
+  );
+  return rows.map(mapWaDelivery);
 }
 export async function resendWhatsappDelivery(deliveryId: string) {
-  return client.action((api as any).whatsapplogs.resendDelivery, { deliveryId });
+  try {
+    const { error } = await supabase.functions.invoke("whatsapp-send-job", { body: { action: "resend_delivery", delivery_id: deliveryId } });
+    if (error) return { ok: false, reason: error.message || "resend failed" };
+    return { ok: true };
+  } catch (e: any) { return { ok: false, reason: e?.message || "edge function unavailable" }; }
 }
 export async function updateTenantPhoneAndResend(tenantId: string, newPhone: string, deliveryId: string) {
-  return client.action((api as any).whatsapplogs.updateTenantPhoneAndResend, { tenantId, newPhone, deliveryId });
+  const phone = (newPhone || "").trim();
+  if (!phone) return { ok: false, reason: "Enter a phone number" };
+  try { await updateRow("tenants", tenantId, { phone }); }
+  catch (e: any) { return { ok: false, reason: e?.message || "Could not update phone" }; }
+  try {
+    const { error } = await supabase.functions.invoke("whatsapp-send-job", { body: { action: "resend_delivery", delivery_id: deliveryId } });
+    if (error) return { ok: true, resent: false, reason: error.message || "Number saved, but resend failed" };
+    return { ok: true, resent: true };
+  } catch (e: any) { return { ok: true, resent: false, reason: e?.message || "Number saved, but resend is unavailable" }; }
 }
 export async function resendAllFailedWhatsappDeliveries(jobId: string) {
-  return client.action((api as any).whatsapplogs.resendAllFailed, { jobId });
+  const rows = await safeList(
+    supabase.from("whatsapp_send_deliveries").select("id").eq("organization_id", ORG_ID).eq("job_id", jobId).in("status", ["failed", "pending"])
+  );
+  const ids = rows.map((r: any) => r.id).filter(Boolean);
+  const results = await Promise.allSettled(
+    ids.map((id: string) => supabase.functions.invoke("whatsapp-send-job", { body: { action: "resend_delivery", delivery_id: id } }))
+  );
+  const failed = results.filter((r) => r.status === "rejected" || (r as any).value?.error).length;
+  return { ok: true, attempted: ids.length, failed };
 }
 export async function resumeWhatsappJob(jobId: string) {
-  return client.action((api as any).whatsapplogs.resumeJob, { jobId });
+  try {
+    const { error: upErr } = await supabase.from("whatsapp_send_jobs").update({ status: "pending", error_message: null } as any).eq("id", jobId).eq("organization_id", ORG_ID);
+    if (upErr) return { ok: false, reason: upErr.message };
+    const { error } = await supabase.functions.invoke("whatsapp-send-job", { body: { job_id: jobId } });
+    if (error) return { ok: false, reason: error.message || "resume failed" };
+    return { ok: true };
+  } catch (e: any) { return { ok: false, reason: e?.message || "edge function unavailable" }; }
 }
 
+// Direct Supabase ports of convex/market.ts — all RPC-backed (under the user JWT,
+// get_market_competitors' caller-org check now passes, unlike the old service-role
+// path). triggerMarketScan/retryMarketIntel invoke the existing `market-trigger` edge fn.
 export async function getMarketCompetitors(args: { limit?: number } = {}) {
-  return client.action((api as any).market.getMarketCompetitors, args);
+  try {
+    const { data, error } = await (supabase.rpc as any)("get_market_competitors", {
+      p_organization_id: ORG_ID,
+      p_limit: Math.min(200, Math.max(1, args.limit ?? 100)),
+    });
+    if (error) throw error;
+    const rows: any[] = Array.isArray(data) ? data : [];
+    return rows.map((c: any) => {
+      const intel = c.intelligence || {};
+      return {
+        id: c.id, name: c.name || "Unknown", rating: c.rating ?? null, reviewCount: c.review_count ?? null,
+        website: c.website_url || null, lastScrapedAt: c.last_scraped_at || null,
+        localityName: c.locality?.name || null, city: c.locality?.city || null,
+        marketSegment: intel.market_segment || null, crawlStatus: intel.crawl_status || null,
+        intelligence: {
+          marketSegment: intel.market_segment || null, crawlStatus: intel.crawl_status || null,
+          pricingMin: intel.pricing_min ?? null, pricingMax: intel.pricing_max ?? null,
+          roomTypes: intel.room_types || null, amenityScore: intel.amenity_score ?? null,
+          digitalMaturityScore: intel.digital_maturity_score ?? null, targetDemographic: intel.target_demographic || null,
+          hasOnlineBooking: intel.has_online_booking ?? null, hasVirtualTour: intel.has_virtual_tour ?? null,
+          hasPhotos: intel.has_photos ?? null, uspTags: intel.usp_tags || null, amenities: intel.amenities || null,
+          phone: intel.phone || null, email: intel.email || null, errorMessage: intel.error_message || null,
+          crawledUrl: intel.crawled_url || null,
+        },
+      };
+    });
+  } catch (e: any) { console.warn("[market] get_market_competitors failed:", e?.message); return []; }
 }
 export async function getExpansionOpportunities() {
-  return client.action((api as any).market.getExpansionOpportunities, {});
+  try {
+    const { data, error } = await (supabase.rpc as any)("get_expansion_opportunities", { p_organization_id: ORG_ID });
+    if (error) throw error;
+    const rows: any[] = Array.isArray(data) ? data : [];
+    return rows.map((o: any) => ({
+      localityName: o.locality_name || "", city: o.city || "",
+      competitorCount: Number(o.competitor_count ?? 0), avgMarketPrice: Number(o.avg_market_price ?? 0),
+      opportunityScore: Number(o.opportunity_score ?? 0),
+    }));
+  } catch (e: any) { console.warn("[market] get_expansion_opportunities failed:", e?.message); return []; }
 }
 export async function triggerMarketScan() {
-  return client.action((api as any).market.triggerMarketScan, {});
+  try {
+    const { data, error } = await supabase.functions.invoke("market-trigger", { body: {} });
+    if (error) return { ok: false, reason: error.message || "market sync failed" };
+    return { ok: true, jobs: (data as any)?.jobs ?? null };
+  } catch (e: any) { return { ok: false, reason: e?.message || "edge function unavailable" }; }
 }
 export async function retryMarketIntel() {
-  return client.action((api as any).market.retryMarketIntel, {});
+  try {
+    const { data, error } = await supabase.functions.invoke("market-trigger", { body: { action: "retry-intel" } });
+    if (error) return { ok: false, reason: error.message || "retry failed" };
+    return { ok: true, retried: (data as any)?.retried ?? null };
+  } catch (e: any) { return { ok: false, reason: e?.message || "edge function unavailable" }; }
 }
-// Tracked-locality CRUD (Market Settings tab)
+// Tracked-locality CRUD (Market Settings tab) — mutating RPCs
 export async function getTrackedLocalities() {
-  return client.action((api as any).market.getTrackedLocalities, {});
+  try {
+    const { data, error } = await (supabase.rpc as any)("get_tracked_localities", { p_organization_id: ORG_ID });
+    if (error) throw error;
+    const rows: any[] = Array.isArray(data) ? data : [];
+    return rows.map((t: any) => ({
+      id: t.id, isActive: t.is_active ?? true, cityWideScan: t.city_wide_scan ?? false, createdAt: t.created_at || null,
+      locality: { id: t.locality?.id || null, name: t.locality?.name || null, city: t.locality?.city || null, state: t.locality?.state || null },
+    }));
+  } catch (e: any) { console.warn("[market] get_tracked_localities failed:", e?.message); return []; }
 }
 export async function upsertTrackedLocality(localityName: string, city: string) {
-  return client.action((api as any).market.upsertTrackedLocality, { localityName, city });
+  try {
+    const { data, error } = await (supabase.rpc as any)("upsert_tracked_locality", { p_organization_id: ORG_ID, p_locality_name: localityName, p_city: city });
+    if (error) return { ok: false, reason: error.message || "Could not add locality" };
+    return { ok: true, data };
+  } catch (e: any) { return { ok: false, reason: e?.message || "Could not add locality" }; }
 }
 export async function toggleTrackedLocality(trackingId: string) {
-  return client.action((api as any).market.toggleTrackedLocality, { trackingId });
+  try {
+    const { error } = await (supabase.rpc as any)("toggle_tracked_locality", { p_tracking_id: trackingId, p_organization_id: ORG_ID });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e: any) { return { ok: false, reason: e?.message || "toggle failed" }; }
 }
 export async function removeTrackedLocality(trackingId: string) {
-  return client.action((api as any).market.removeTrackedLocality, { trackingId });
+  try {
+    const { error } = await (supabase.rpc as any)("remove_tracked_locality", { p_tracking_id: trackingId, p_organization_id: ORG_ID });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e: any) { return { ok: false, reason: e?.message || "remove failed" }; }
 }
 export async function toggleCityWideScan(city: string) {
-  return client.action((api as any).market.toggleCityWideScan, { city });
+  try {
+    const { error } = await (supabase.rpc as any)("toggle_city_wide_scan", { p_organization_id: ORG_ID, p_city: city });
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e: any) { return { ok: false, reason: e?.message || "toggle failed" }; }
 }
 export async function getMarketSummary() {
-  return client.action((api as any).market.getMarketSummary, {});
+  try {
+    const { data, error } = await (supabase.rpc as any)("get_market_summary_v1", { p_organization_id: ORG_ID });
+    if (error) throw error;
+    const d: any = data || {};
+    return {
+      competitorCount: d.competitorCount ?? d.competitor_count ?? 0,
+      trackedLocalities: d.trackedLocalities ?? d.tracked_localities ?? 0,
+      lastScrapedAt: d.lastScrapedAt ?? d.last_scraped_at ?? null,
+      avgMarketPrice: d.avgMarketPrice ?? d.avg_market_price ?? null,
+    };
+  } catch (e: any) { console.warn("[market] get_market_summary_v1 failed:", e?.message); return null; }
 }
 export async function getMarketBenchmark() {
-  return client.action((api as any).market.getMarketBenchmark, {});
+  try {
+    const { data, error } = await (supabase.rpc as any)("get_market_benchmark_v1", { p_organization_id: ORG_ID });
+    if (error) throw error;
+    const rows: any[] = Array.isArray(data?.localities) ? data.localities : (Array.isArray(data) ? data : []);
+    return rows.map((r: any) => ({
+      localityName: r.locality_name || null, roomTypeLabel: r.room_type_label || null,
+      priceMedian: r.price_median ?? null, priceP25: r.price_p25 ?? null, priceP75: r.price_p75 ?? null,
+      priceAvg: r.price_avg ?? null, propertyCount: r.property_count ?? 0,
+    }));
+  } catch (e: any) { console.warn("[market] get_market_benchmark_v1 failed:", e?.message); return []; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2760,7 +3770,16 @@ export async function getAssetDetail(assetId: string) {
 
 // ── Asset payments ──
 export async function listAssetPayments(assetId: string) {
-  return client.action((api as any).assets.listAssetPayments, { assetId });
+  // Direct Supabase port of convex/assets.ts listAssetPayments.
+  const rows = await safeList(
+    supabase.from("asset_payments").select("*, vendors(vendor_name)").eq("asset_id", assetId).eq("organization_id", ORG_ID).order("payment_date", { ascending: false })
+  );
+  return rows.map((p: any) => ({
+    id: p.id, assetId: p.asset_id, date: p.payment_date, amount: Number(p.amount) || 0,
+    mode: p.payment_mode || null, reference: p.reference_number || null, vendorId: p.vendor_id || null,
+    vendor: (p.vendors as any)?.vendor_name || null, bankAccountId: p.bank_account_id || null,
+    proofUrl: p.payment_proof_url || null, notes: p.notes || null,
+  }));
 }
 export async function recordAssetPayment(data: any) {
   const { data: row, error } = await supabase.from("asset_payments").insert({
@@ -2894,24 +3913,35 @@ export async function listEbPayments() {
   return fn();
 }
 export async function saveEbPayment(data: any) {
-  return client.action((api as any).electricity.saveEbPayment, { data });
+  const { saveEbPayment: fn } = await import("./electricity");
+  return fn(data);
 }
 export async function loadCurrentEb(propertyId: string) {
-  return client.action((api as any).electricity.loadCurrentEb, { propertyId });
+  const { loadCurrentEb: fn } = await import("./electricity");
+  return fn(propertyId);
 }
 export async function saveEbMonitoring(rows: any[]) {
-  return client.action((api as any).electricity.saveEbMonitoring, { rows });
+  const { saveEbMonitoring: fn } = await import("./electricity");
+  return fn(rows);
 }
 export async function deleteEbPayment(id: string) {
-  return client.action((api as any).electricity.deleteEbPayment, { id });
+  const { deleteEbPayment: fn } = await import("./electricity");
+  return fn(id);
 }
 export async function loadEbPayBulkRows(propertyId: string, billDate: string) {
-  return client.action((api as any).electricity.loadEbPayBulkRows, { propertyId, billDate });
+  const { loadEbPayBulkRows: fn } = await import("./electricity");
+  return fn(propertyId, billDate);
 }
 
 // ─── Settings extras ──────────────────────────────────────────────────────────
 export async function getUniversalMetrics(period: string) {
-  return client.action((api as any).reports.getUniversalMetrics, { period });
+  // No Convex handler ever existed for this (unused by screens); delegate to the
+  // ported universal-metrics RPC so there is zero Convex reference.
+  try {
+    const { from, to } = rptPeriodDateRange((period || "current_fy") as ReportingPeriod);
+    const { data } = await supabase.rpc("get_universal_metrics_v2", rptMetricsRpcArgs((period || "current_fy") as ReportingPeriod, from, to));
+    return data ?? null;
+  } catch { return null; }
 }
 
 
@@ -2987,7 +4017,8 @@ export async function listOwnerPayments() {
 }
 
 export async function listFlatReadings() {
-  return client.action((api as any).electricity.listFlatReadings, {});
+  const { listFlatReadings: fn } = await import("./electricity");
+  return fn();
 }
 
 /**
@@ -3221,35 +4252,155 @@ export async function listVendorsFallback(authToken: string): Promise<any[]> {
 }
 
 export async function sendOnboardingKycWhatsapp(allotmentId: string, registrationData: any) {
-  return client.action((api as any).tenants.sendOnboardingKycWhatsapp, { allotmentId, registrationData });
+  // Direct invoke of the `offline-kyc-issue` edge fn (crypto link + DB insert + WhatsApp send).
+  try {
+    const { data, error } = await supabase.functions.invoke("offline-kyc-issue", { body: { allotment_id: allotmentId, registration_data: registrationData || {} } });
+    if (error) return { ok: false, reason: error.message || "offline-kyc-issue failed", whatsapp: false };
+    const payload: any = data || {};
+    return { ok: !!payload.ok || !!payload.link, link: payload.link || null, alreadySubmitted: !!payload.already_submitted, whatsapp: payload.whatsapp ?? null };
+  } catch (e: any) { return { ok: false, reason: e?.message || "edge function unavailable", whatsapp: false }; }
 }
 export async function getOnboardingRegistrationData(allotmentId: string) {
-  return client.action((api as any).tenants.getOnboardingRegistrationData, { allotmentId });
+  // Direct Supabase port of convex/tenants.ts getOnboardingRegistrationData.
+  const { data: allot } = await supabase.from("tenant_allotments").select("id, tenant_id, bed_id, apartment_id, organization_id").eq("id", allotmentId).single();
+  if (!allot) return null;
+  const [tenantRes, aptRes, bedRes] = await Promise.all([
+    allot.tenant_id ? supabase.from("tenants").select("*").eq("id", allot.tenant_id).single() : Promise.resolve({ data: null }),
+    allot.apartment_id ? supabase.from("apartments").select("apartment_code, property_id").eq("id", allot.apartment_id).single() : Promise.resolve({ data: null }),
+    allot.bed_id ? supabase.from("beds").select("bed_code, bed_type, toilet_type").eq("id", allot.bed_id).single() : Promise.resolve({ data: null }),
+  ]);
+  const t: any = (tenantRes as any).data || {};
+  const apt: any = (aptRes as any).data || {};
+  const bed: any = (bedRes as any).data || {};
+  return {
+    tenant: {
+      first_name: t.first_name, last_name: t.last_name, full_name: t.full_name,
+      address: t.address || t.permanent_address, city: t.city, email: t.email,
+      aadhar_number: t.aadhar_number || t.id_proof_number, aadhar_image_url: t.aadhar_image_url,
+      company_name: t.company_name, phone: t.phone, emergency_contact_phone: t.emergency_contact_phone,
+    },
+    apartment: { apartment_code: apt.apartment_code },
+    bed: { bed_code: bed.bed_code, bed_type: bed.bed_type, toilet_type: bed.toilet_type },
+  };
 }
 
 export async function sendAnnouncementWhatsapp(title: string, content: string, priority?: string, imageUrl?: string | null) {
-  return client.action((api as any).anouncements.sendAnnouncementWhatsapp, { title, content, priority, imageUrl });
+  // Direct Supabase port of convex/anouncements.ts sendAnnouncementWhatsapp: resolve
+  // WhatsApp controls, create a durable whatsapp_send_jobs row, kick off the
+  // `whatsapp-send-job` edge worker (visible/retryable in WhatsApp Logs).
+  let controlsRow: any = null;
+  try {
+    const { data } = await supabase.from("org_whatsapp_settings").select("notifications_enabled, test_phone, test_mode_enabled").eq("organization_id", ORG_ID).maybeSingle();
+    controlsRow = data;
+  } catch { controlsRow = null; }
+  const orgSandbox = Boolean(controlsRow?.test_mode_enabled);
+  const controls = {
+    enabled: controlsRow?.notifications_enabled ?? true,
+    testNumber: (controlsRow?.test_phone ?? "").trim(),
+    testAnnouncementMode: orgSandbox,
+    testInvoiceMode: orgSandbox,
+  };
+  if (!controls.enabled) return { ok: false, skipped: "whatsapp_disabled", reason: "WhatsApp notifications are turned off in Settings." };
+  let job: any;
+  try {
+    job = await insertRow("whatsapp_send_jobs", {
+      created_by: null, job_type: "announcement", status: "pending", label: title.slice(0, 120),
+      payload: { title, content, priority: priority ?? "normal", image_url: (imageUrl && String(imageUrl).trim()) || null, controls },
+    });
+  } catch (e: any) { return { ok: false, reason: e?.message || "Could not create the send job." }; }
+  const jobId = job?.id;
+  if (!jobId) return { ok: false, reason: "Send job was not created." };
+  try {
+    const { error } = await supabase.functions.invoke("whatsapp-send-job", { body: { job_id: jobId } });
+    if (error) {
+      try { await updateRow("whatsapp_send_jobs", jobId, { status: "failed", error_message: error.message || "kickoff failed" }); } catch { /* best-effort */ }
+      return { ok: false, queued: true, jobId, reason: error.message || "Send job created but the worker did not start; retry from WhatsApp Logs." };
+    }
+    return { ok: true, queued: true, jobId };
+  } catch (e: any) {
+    try { await updateRow("whatsapp_send_jobs", jobId, { status: "failed", error_message: e?.message || "kickoff failed" }); } catch { /* best-effort */ }
+    return { ok: false, queued: true, jobId, reason: e?.message || "Send job created but the worker is unavailable; retry from WhatsApp Logs." };
+  }
 }
 export async function uploadAnnouncementImage(base64: string, contentType?: string, ext?: string) {
-  return client.action((api as any).anouncements.uploadAnnouncementImage, { base64, contentType, ext });
+  // Direct Supabase port of convex/anouncements.ts — banners live in the `org-assets`
+  // bucket under announcements/<orgId>/... (web parity).
+  const extension = (ext || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+  const path = `announcements/${ORG_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const byteChars = atob(base64);
+  const bytes = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+  const { error } = await supabase.storage
+    .from('org-assets')
+    .upload(path, bytes.buffer, { contentType: contentType || 'image/jpeg', upsert: true });
+  if (error) return { ok: false, reason: error.message };
+  const { data: pub } = supabase.storage.from('org-assets').getPublicUrl(path);
+  return { ok: true, url: pub?.publicUrl || null };
 }
 export async function deleteAnnouncementImage(imageUrl: string | null | undefined) {
-  return client.action((api as any).anouncements.deleteAnnouncementImage, { imageUrl: imageUrl ?? null });
+  const trimmed = (imageUrl ?? '').toString().trim();
+  if (!trimmed) return { ok: true, skipped: 'no_url' };
+  if (!/^https:\/\//i.test(trimmed)) return { ok: true, skipped: 'not_url' };
+  const marker = '/object/public/org-assets/';
+  const idx = trimmed.indexOf(marker);
+  if (idx === -1) return { ok: true, skipped: 'not_org_assets' };
+  let path = decodeURIComponent(trimmed.slice(idx + marker.length));
+  const q = path.indexOf('?');
+  if (q !== -1) path = path.slice(0, q);
+  if (!path.startsWith('announcements/')) return { ok: true, skipped: 'not_announcement' };
+  try {
+    const { error } = await supabase.storage.from('org-assets').remove([path]);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, reason: e?.message || 'remove failed' };
+  }
 }
 export async function listAnnouncements() {
-  return client.action((api as any).anouncements.listAnnouncements, {});
+  // Direct Supabase port of convex/anouncements.ts listAnnouncements (org-scoped, newest first).
+  return safeList(
+    supabase
+      .from('announcements')
+      .select('id, title, content, image_url, priority, is_published, published_at, created_at, created_by, organization_id')
+      .eq('organization_id', ORG_ID)
+      .order('created_at', { ascending: false })
+  );
 }
 export async function getCostApprovers() {
-  return client.action((api as any).tickets.getCostApprovers, {});
+  // Direct Supabase port of convex/tickets.ts getCostApprovers.
+  return safeList(supabase.from("cost_estimate_approvers").select("*").eq("organization_id", ORG_ID));
 }
 export async function createAnnouncement(args: { title: string; content: string; priority?: string; imageUrl?: string | null; isPublished?: boolean; createdBy?: string | null }) {
-  return client.action((api as any).anouncements.createAnnouncement, args);
+  // Direct Supabase port of convex/anouncements.ts createAnnouncement (insertRow auto-scopes org_id).
+  const published = Boolean(args.isPublished);
+  const row = await insertRow('announcements', {
+    title: (args.title || '').trim(),
+    content: (args.content || '').trim(),
+    priority: args.priority || 'normal',
+    image_url: (args.imageUrl && String(args.imageUrl).trim()) || null,
+    is_published: published,
+    published_at: published ? new Date().toISOString() : null,
+    created_by: args.createdBy ?? null,
+  });
+  return { ok: true, announcement: row };
 }
 export async function updateAnnouncement(args: { id: string; title?: string; content?: string; priority?: string; imageUrl?: string | null; isPublished?: boolean }) {
-  return client.action((api as any).anouncements.updateAnnouncement, args);
+  // Direct Supabase port of convex/anouncements.ts updateAnnouncement.
+  const patch: Record<string, any> = {};
+  if (args.title !== undefined) patch.title = args.title.trim();
+  if (args.content !== undefined) patch.content = args.content.trim();
+  if (args.priority !== undefined) patch.priority = args.priority;
+  if (args.imageUrl !== undefined) patch.image_url = (args.imageUrl && String(args.imageUrl).trim()) || null;
+  if (args.isPublished !== undefined) {
+    patch.is_published = args.isPublished;
+    patch.published_at = args.isPublished ? new Date().toISOString() : null;
+  }
+  const row = await updateRow('announcements', args.id, patch);
+  return { ok: true, announcement: row };
 }
-export async function deleteAnnouncement(id: string) {
-  return client.action((api as any).anouncements.deleteAnnouncement, { id });
+export async function deleteAnnouncement(_id: string) {
+  // Deletes are globally disabled during the migration (DELETES_ENABLED=false in supabaseDb.ts).
+  return deleteDisabledResult();
 }
 
 // ─── PROPERTY IMAGES ──────────────────────────────────────────────────────────

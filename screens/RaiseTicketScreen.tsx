@@ -6,8 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { useAction } from 'convex/react';
-import { api } from '../convex/_generated/api';
+import { createTicket } from '../services/ticketService';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 // SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
@@ -229,8 +228,6 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
       setSelectedIssueTypeId(autoId);
     }
   }, [classification, issueTypes]);
-
-  const createTicket = useAction(api.tickets.createTicket);
 
   // ── Recording refs ───────────────────────────────────────────────────────
   const audioRecorder     = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
@@ -486,9 +483,8 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
       const safeApartmentId    = tenantProfile?.apartment_id   ?? tenantLocation?.apartmentId ?? null;
       const safeBedId          = tenantProfile?.bed_id         ?? tenantLocation?.bedId       ?? null;
 
-      // ── Create ticket via Convex (uses admin Supabase client — bypasses RLS) ──
+      // ── Create ticket via Supabase (direct port of Convex createTicketHelper) ──
       const result = await createTicket({
-        data: {
           tenant_id:       safeTenantId,
           property_id:     safePropertyId,
           apartment_id:    safeApartmentId,
@@ -507,7 +503,6 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
             voice_transcription: transcript,
             keywords: classification.keywords,
           },
-        },
       });
 
       console.log('[RaiseTicket] Ticket created:', result?.id || result?.ticket_number);

@@ -17,7 +17,6 @@ import { LoadingScreen, DateField } from '../components/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { fetchTickets } from '../services/ticketService';
-import { client, api } from '../lib/convexApi';
 import { getHeroMonthly, getDuesTotals, getTenantPunctuality } from '../lib/dashboardMetrics';
 import { useQuery } from '@tanstack/react-query';
 

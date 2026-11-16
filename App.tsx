@@ -44,7 +44,6 @@ import WhatsAppLogsScreen from './screens/WhatsAppLogsScreen';
 import AuditLogsScreen from './screens/AuditLogsScreen';
 import FloatingAIAssistant from './screens/Floatingaiassistant';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
 
 // ── Inline Permissions System ────────────────────────────────────────────────
 // Fetches role_permissions from Supabase and exposes canAccess(module).
@@ -901,27 +900,23 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-const convexClient = new ConvexReactClient('https://polished-sockeye-740.convex.cloud');
-
 export default function App() {
   return (
     <ErrorBoundary>
-      <ConvexProvider client={convexClient}>
-        <SafeAreaProvider>
-          <PersistQueryClientProvider
-            client={queryClient}
-            persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE }}
-          >
-            <ThemeProvider>
-              <AuthProvider>
-                <PermissionsProvider>
-                  <AppNavigator />
-                </PermissionsProvider>
-              </AuthProvider>
-            </ThemeProvider>
-          </PersistQueryClientProvider>
-        </SafeAreaProvider>
-      </ConvexProvider>
+      <SafeAreaProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE }}
+        >
+          <ThemeProvider>
+            <AuthProvider>
+              <PermissionsProvider>
+                <AppNavigator />
+              </PermissionsProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </PersistQueryClientProvider>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

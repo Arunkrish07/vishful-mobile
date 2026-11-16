@@ -24,7 +24,7 @@ import { GlassBackground, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { fetchTickets, tenantApproveCompletion, checkTenantPendingTickets, Ticket } from '../services/ticketService';
 import { getTenantNotices, recordNotice, getTenantLocation, listInvoices, listAnnouncements } from '../lib/supabaseService';
-import { client, api } from '../lib/convexApi';
+import { getIssueTypes, createTicket } from '../services/ticketService';
 import { CONVEX_SITE_URL } from '../lib/config';
 
 // ─── Convex HTTP endpoints ────────────────────────────────────────────────────
@@ -338,7 +338,7 @@ export default function TenantHomeScreen({ navigation }: any) {
   useEffect(() => {
     if (!voiceModalOpen) return;
     setLoadingIssueTypes(true);
-    client.action(api.tickets.getIssueTypes, {})
+    getIssueTypes()
       .then((t: any) => {
         const types = t || [];
         setIssueTypes(types);
@@ -594,19 +594,17 @@ export default function TenantHomeScreen({ navigation }: any) {
           return;
         }
       }
-      const result = await client.action(api.tickets.createTicket, {
-        data: {
-          description:   editedTranscript.trim(),
-          issue_type_id: selectedTypeId,
-          tenant_id:     tenantId    || null,
-          property_id:   tenantLocation?.propertyId  || null,
-          apartment_id:  tenantLocation?.apartmentId || null,
-          bed_id:        tenantLocation?.bedId       || null,
-          created_by:    userId                      || null,
-          source:        'voice',
-        },
+      const result = await createTicket({
+        description:   editedTranscript.trim(),
+        issue_type_id: selectedTypeId,
+        tenant_id:     tenantId    || null,
+        property_id:   tenantLocation?.propertyId  || null,
+        apartment_id:  tenantLocation?.apartmentId || null,
+        bed_id:        tenantLocation?.bedId       || null,
+        created_by:    userId                      || null,
+        source:        'voice',
       });
-      setCreatedTicketNumber(result?.ticket_number || result?.ticketNumber || '');
+      setCreatedTicketNumber((result as any)?.ticket_number || (result as any)?.ticketNumber || '');
       setVoiceStep('success');
       await loadPending();
     } catch (e: any) {

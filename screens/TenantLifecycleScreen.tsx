@@ -25,7 +25,7 @@ import { spacing, fontSize, borderRadius } from '../lib/theme';
 import { LoadingScreen, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
-import { client, api } from '../lib/convexApi';
+import * as lc from '../lib/lifecycle';
 import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
 import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField, AvatarInitial, KpiTile } from '../components/lifecycle';
 import { StatusBadge } from '../components/lifecycle/StatusBadge';
@@ -816,7 +816,7 @@ export default function TenantLifecycleScreen() {
     setBedPay({ loading: true, months: [] });
     (async () => {
       try {
-        const inv = await client.action((api as any).accounting.listInvoices, { tenantId: tid });
+        const inv = await sb.listInvoices({ tenantId: tid });
         if (!alive) return;
         const byMonth = new Map<string, number>();
         (inv || []).forEach((i: any) => {
@@ -1091,7 +1091,7 @@ export default function TenantLifecycleScreen() {
     if (!exitOpen || !eForm.allotmentId || !eForm.exitDate) { setExitEb(null); return; }
     let active = true;
     setExitEbLoading(true);
-    (client.action as any)((api as any).tenants.computeExitMonthEb, {
+    lc.computeExitMonthEb({
       allotmentId: eForm.allotmentId,
       exitDate: eForm.exitDate,
     })
@@ -1115,10 +1115,10 @@ export default function TenantLifecycleScreen() {
   const fetchAll = useCallback(async () => {
     try {
       const [data, switches, rcpts, preExitTasks] = await Promise.all([
-        client.action((api as any).tenants.getLifecycleFullData, {}),
-        client.action((api as any).tenants.listRoomSwitches, {}).catch(() => []),
-        client.action((api as any).tenants.listLifecycleReceipts, {}).catch(() => []),
-        client.action((api as any).tenantsextraactions.listExitTasks, {}).catch(() => []),
+        lc.getLifecycleFullData(),
+        lc.listRoomSwitches().catch(() => []),
+        lc.listLifecycleReceipts().catch(() => []),
+        lc.listExitTasks().catch(() => []),
       ]);
 
       if (!mounted.current) return;
@@ -1304,7 +1304,7 @@ export default function TenantLifecycleScreen() {
         finally { setProofUploading(false); }
       }
 
-      await client.action((api as any).tenants.createBookingFull, {
+      await lc.createBookingFull({
         data: {
           tenantId: bForm.tenantId, bedId: bForm.bedId,
           propertyId: apt.property_id || '', apartmentId: apt.id || '',
@@ -1327,7 +1327,7 @@ export default function TenantLifecycleScreen() {
       { text: 'No', style: 'cancel' },
       { text: 'Cancel Booking', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.cancelBookingFull, { allotmentId: cancelId, reason: 'Cancelled by admin' });
+          await lc.cancelBookingFull({ allotmentId: cancelId, reason: 'Cancelled by admin' });
           Alert.alert('Done', 'Booking cancelled.'); setCancelOpen(false); setCancelId(''); fetchAll();
         });
       }},
@@ -1401,7 +1401,7 @@ export default function TenantLifecycleScreen() {
         finally { setProofUploading(false); }
       }
 
-      await client.action((api as any).tenants.processOnboardingFull, {
+      await lc.processOnboardingFull({
         data: {
           allotmentId: oForm.allotmentId, onboardingDate: oForm.date,
           bedId: oForm.bedId, paymentMode: oForm.payMode, referenceNumber: oForm.refNo,
@@ -1559,7 +1559,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Undo Onboarding', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.undoOnboardingFull, { allotmentId });
+          await lc.undoOnboardingFull({ allotmentId });
           Alert.alert('Done', 'Tenant reverted to Booked.'); setUndoOnboardId(null); fetchAll();
         });
       }},
@@ -1569,7 +1569,7 @@ export default function TenantLifecycleScreen() {
   async function doSwitch() {
     if (!swForm.allotmentId || !swForm.newBedId) return Alert.alert('Validation', 'Select tenant and new bed.');
     await withSave(async () => {
-      await client.action((api as any).tenants.processSwitchFull, {
+      await lc.processSwitchFull({
         data: {
           allotmentId: swForm.allotmentId, tenantId: swForm.tenantId,
           oldBedId: swForm.oldBedId, newBedId: swForm.newBedId,
@@ -1600,9 +1600,9 @@ export default function TenantLifecycleScreen() {
       // Adjustments = credit/debit notes (room-switch rent credits, deposit-return
       // credits, CC debit notes) which were previously invisible in this modal.
       const [inv, rec, adj] = await Promise.all([
-        client.action((api as any).accounting.listInvoices, { tenantId: s.tenantId }),
-        client.action((api as any).accounting.listReceipts, {}).catch(() => []),
-        client.action((api as any).accounting.listAdjustments, {}).catch(() => []),
+        sb.listInvoices({ tenantId: s.tenantId }),
+        sb.listReceipts().catch(() => []),
+        sb.listAdjustments().catch(() => []),
       ]);
       setStmtInvoices(inv || []);
       setStmtAdjustments((adj || []).filter((a: any) => a.tenant_id === s.tenantId));
@@ -1626,7 +1626,7 @@ export default function TenantLifecycleScreen() {
   async function doSaveDeposit(allot: any, value: string) {
     if (!allot) { Alert.alert('No allotment', 'No active allotment found to edit.'); return; }
     await withSave(async () => {
-      await client.action((api as any).tenants.updateAllotmentDetails, {
+      await lc.updateAllotmentDetails({
         data: {
           allotmentId:   allot.id,
           onboardingDate: allot.onboarding_date || '',
@@ -1645,7 +1645,7 @@ export default function TenantLifecycleScreen() {
     const exitDate = a.estimated_exit_date || '';
     if (!exitDate) { Alert.alert('Missing date', 'This notice has no estimated exit date. Edit the notice to set one first.'); return; }
     await withSave(async () => {
-      await client.action((api as any).tenantsextraactions.createExitTask, {
+      await lc.createExitTask({
         data: { allotmentId: a.id, tenantId: a.tenant_id, exitDate },
       });
       Alert.alert('Pre-Exit Task Created', 'Assigned to the exit-task staff configured in Settings.');
@@ -1668,7 +1668,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Complete', style: 'default', onPress: async () => {
         try { setSaving(true);
-          await client.action((api as any).tenants.completeSwitch, { switchId: s._id });
+          await lc.completeSwitch({ switchId: s._id });
           Alert.alert('Success', 'Switch completed'); fetchAll();
         } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
       }},
@@ -1679,7 +1679,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Cancel Switch', style: 'destructive', onPress: async () => {
         try { setSaving(true);
-          await client.action((api as any).tenants.cancelSwitch, { switchId: s._id });
+          await lc.cancelSwitch({ switchId: s._id });
           Alert.alert('Cancelled', 'Switch cancelled'); fetchAll();
         } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
       }},
@@ -1801,7 +1801,7 @@ export default function TenantLifecycleScreen() {
   async function doNotice() {
     if (!nForm.allotmentId || !nForm.exitDate) return Alert.alert('Validation', 'Select tenant and exit date.');
     await withSave(async () => {
-      await client.action((api as any).tenants.createNoticeFull, {
+      await lc.createNoticeFull({
         data: { allotmentId: nForm.allotmentId, tenantId: nForm.tenantId, bedId: nForm.bedId, exitDate: nForm.exitDate, notes: nForm.notes },
       });
       Alert.alert('Success', 'Notice recorded!'); setNoticeOpen(false); setNForm(blankNotice); fetchAll();
@@ -1814,7 +1814,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.deleteNoticeFull, {
+          await lc.deleteNoticeFull({
             noticeId: notice.id, allotmentId: notice.allotment_id,
             bedId: allot?.bed_id || notice.bed_id, tenantId: notice.tenant_id,
           });
@@ -1827,7 +1827,7 @@ export default function TenantLifecycleScreen() {
   async function doUpdateNotice() {
     if (!editNoticeForm.noticeId && !editNoticeForm.allotmentId) return;
     await withSave(async () => {
-      await client.action((api as any).tenants.updateNoticeFull, {
+      await lc.updateNoticeFull({
         data: { noticeId: editNoticeForm.noticeId, allotmentId: editNoticeForm.allotmentId, noticeDate: editNoticeForm.noticeDate, exitDate: editNoticeForm.exitDate, notes: editNoticeForm.notes },
       });
       Alert.alert('Updated', 'Notice updated.'); setEditNoticeOpen(false); fetchAll();
@@ -1857,7 +1857,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Process Exit', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.processExitFull, {
+          await lc.processExitFull({
             data: {
               allotmentId: eForm.allotmentId, tenantId: eForm.tenantId,
               bedId: eForm.bedId, exitDate: eForm.exitDate,
@@ -1895,7 +1895,7 @@ export default function TenantLifecycleScreen() {
     const total   = damage + keyLoss + exitChg + pendRent;
     const refund  = (exitRec.advance_held || 0) - total;
     await withSave(async () => {
-      await client.action((api as any).tenants.updateExitFull, {
+      await lc.updateExitFull({
         data: { exitId: editExitForm.exitId, allotmentId: editExitForm.allotmentId, exitDate: editExitForm.exitDate, hasNotice: editExitForm.hasNotice, keyReturned: editExitForm.keyReturned, damageCharges: damage, keyLossFee: keyLoss, exitCharges: exitChg, totalDeductions: total, refundDue: refund, notes: editExitForm.notes },
       });
       setEditExitOpen(false); fetchAll();
@@ -1906,7 +1906,7 @@ export default function TenantLifecycleScreen() {
     const amt = parseFloat(addPayForm.amount) || 0;
     if (amt <= 0 || !addPayForm.paymentMode) return Alert.alert('Validation', 'Enter amount and payment mode.');
     await withSave(async () => {
-      await client.action((api as any).tenants.addLifecyclePayment, {
+      await lc.addLifecyclePayment({
         data: { allotmentId: addPayForm.allotmentId, amount: amt, paymentMode: addPayForm.paymentMode, referenceNumber: addPayForm.refNo, bankAccountId: addPayForm.bankAccountId || null, ccCharges: parseFloat(addPayForm.ccCharges) || 0 },
       });
       Alert.alert('Success', 'Payment recorded.'); setAddPayOpen(false); fetchAll();
@@ -1915,7 +1915,7 @@ export default function TenantLifecycleScreen() {
 
   async function doEditOccupied() {
     await withSave(async () => {
-      await client.action((api as any).tenants.updateAllotmentDetails, {
+      await lc.updateAllotmentDetails({
         data: { allotmentId: editOccForm.allotmentId, onboardingDate: editOccForm.onboardingDate, discount: parseFloat(editOccForm.discount) || 0, premium: parseFloat(editOccForm.premium) || 0, depositPaid: parseFloat(editOccForm.depositPaid) || 0 },
       });
       setEditOccOpen(false); fetchAll();
@@ -1924,7 +1924,7 @@ export default function TenantLifecycleScreen() {
 
   async function doEditRefund() {
     await withSave(async () => {
-      await client.action((api as any).tenants.updateExitRefund, {
+      await lc.updateExitRefund({
         data: { exitId: editRefundForm.exitId, allotmentId: editRefundForm.allotmentId, advanceHeld: editRefundForm.advanceHeld, pendingRent: parseFloat(editRefundForm.pendingRent) || 0, ebCharges: parseFloat(editRefundForm.ebCharges) || 0, exitCharges: parseFloat(editRefundForm.exitCharges) || 0, damageCharges: parseFloat(editRefundForm.damageCharges) || 0, keyLossFee: parseFloat(editRefundForm.keyLossFee) || 0 },
       });
       setEditRefundOpen(false); fetchAll();
@@ -1939,7 +1939,7 @@ export default function TenantLifecycleScreen() {
     if (refundProofAmount !== due) return Alert.alert('Amount mismatch', `The screenshot shows ₹${refundProofAmount} but the refund amount is ₹${due}. Only a screenshot with the exact refund amount is allowed.`);
     if (!completeRefundForm.referenceNumber) return Alert.alert('Validation', 'Enter reference number.');
     await withSave(async () => {
-      await client.action((api as any).tenants.completeRefundFull, {
+      await lc.completeRefundFull({
         data: { exitId: completeRefundForm.exitId, allotmentId: completeRefundForm.allotmentId, tenantId: completeRefundForm.tenantId, refundDate: completeRefundForm.refundDate, referenceNumber: completeRefundForm.referenceNumber, bankAccountId: completeRefundForm.bankAccountId || null },
       });
       Alert.alert('Success', 'Refund completed!'); setCompleteRefundOpen(false); fetchAll();
@@ -4336,13 +4336,13 @@ export default function TenantLifecycleScreen() {
       return Alert.alert('Validation', 'To date must be on or after from date.');
     await withSave(async () => {
       if (absenceEditId) {
-        await client.action((api as any).tenants.updateAbsenceRecord, {
+        await lc.updateAbsenceRecord({
           id: absenceEditId,
           data: { fromDate: absenceForm.fromDate, toDate: absenceForm.toDate, reason: absenceForm.reason },
         });
         Alert.alert('Updated', 'Absence record updated.');
       } else {
-        await client.action((api as any).tenants.createAbsenceRecord, {
+        await lc.createAbsenceRecord({
           data: {
             tenantId: absenceForm.tenantId,
             allotmentId: absenceForm.allotmentId || null,
@@ -4365,7 +4365,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.deleteAbsenceRecord, { id });
+          await lc.deleteAbsenceRecord({ id });
           fetchAll();
         });
       }},

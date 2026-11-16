@@ -210,3 +210,134 @@ export async function listEbPayments() {
     billing_period_end: p.billing_period_end || null, notes: p.notes || null,
   }));
 }
+
+// ─── CURRENT EB (monitoring snapshots per apartment) ─────────────────────────
+// Port of convex/electricity.ts loadCurrentEb.
+export async function loadCurrentEb(propertyId: string) {
+  const [apts, readings, snaps] = await Promise.all([
+    safeList(supabase.from("apartments").select("id, apartment_code, eb_meter_number").eq("organization_id", ORG_ID).eq("property_id", propertyId).eq("status", "Live").order("apartment_code")),
+    safeList(supabase.from("electricity_readings").select("apartment_id, reading_end, billing_month, created_at").eq("organization_id", ORG_ID).eq("property_id", propertyId).order("created_at", { ascending: false })),
+    safeList(supabase.from("eb_monitoring_readings").select("id, apartment_id, current_reading, meter_photo_url, created_at").eq("property_id", propertyId).order("created_at", { ascending: false })),
+  ]);
+  const lastReading: Record<string, any> = {};
+  for (const r of readings) { if (r.apartment_id && !(r.apartment_id in lastReading)) lastReading[r.apartment_id] = r; }
+  const lastSnap: Record<string, any> = {};
+  for (const s of snaps) { if (s.apartment_id && !(s.apartment_id in lastSnap)) lastSnap[s.apartment_id] = s; }
+  return apts.map((apt: any) => {
+    const rd = lastReading[apt.id];
+    const sv = lastSnap[apt.id];
+    return {
+      apartmentId: apt.id,
+      apartmentCode: apt.apartment_code,
+      ebMeterNumber: apt.eb_meter_number || "",
+      startReading: rd ? Number(rd.reading_end) || 0 : 0,
+      startMonth: rd ? rd.billing_month || null : null,
+      currentReading: sv?.current_reading != null ? String(sv.current_reading) : "",
+      photoUrl: sv?.meter_photo_url ?? null,
+      existingId: sv?.id ?? null,
+    };
+  });
+}
+
+// Overwrite-model upsert of today's monitoring snapshots. Port of saveEbMonitoring.
+export async function saveEbMonitoring(rows: any[]) {
+  const list: any[] = Array.isArray(rows) ? rows : [];
+  const today = new Date().toISOString().slice(0, 10);
+  let saved = 0;
+  for (const r of list) {
+    const payload: any = {
+      organization_id: ORG_ID,
+      property_id: r.propertyId,
+      apartment_id: r.apartmentId,
+      reading_date: today,
+      start_reading: Number(r.startReading) || 0,
+      start_month: r.startMonth ?? null,
+      current_reading: Number(r.currentReading) || 0,
+      units_consumed: Number(r.unitsConsumed) || 0,
+      eb_amount: Number(r.ebAmount) || 0,
+      is_danger: !!r.isDanger,
+      meter_photo_url: r.photoUrl ?? null,
+    };
+    if (r.existingId) {
+      const { error } = await supabase.from("eb_monitoring_readings").update(payload).eq("id", r.existingId).eq("organization_id", ORG_ID);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("eb_monitoring_readings").insert(payload);
+      if (error) throw new Error(error.message);
+    }
+    saved++;
+  }
+  return { success: true, saved };
+}
+
+// ─── EB PAYMENTS (insert/update + bulk rows) ─────────────────────────────────
+// Port of saveEbPayment.
+export async function saveEbPayment(data: any) {
+  const payload: any = {
+    organization_id: ORG_ID,
+    property_id: data.property_id,
+    apartment_id: data.apartment_id || null,
+    bill_date: data.bill_date,
+    bill_amount: parseFloat(data.bill_amount),
+    payment_date: data.payment_date || null,
+    payment_mode: data.payment_mode || null,
+    reference_number: data.reference_number || null,
+    bank_account_id: data.bank_account_id || null,
+    billing_period_start: data.billing_period_start || null,
+    billing_period_end: data.billing_period_end || null,
+    notes: data.notes || null,
+  };
+  if (data.id) {
+    const { error } = await supabase.from("eb_payments").update(payload).eq("id", data.id).eq("organization_id", ORG_ID);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from("eb_payments").insert(payload);
+    if (error) throw new Error(error.message);
+  }
+  return { success: true };
+}
+
+// Deletes globally disabled during migration (DELETES_ENABLED=false).
+export async function deleteEbPayment(_id: string) { return deleteDisabledResult(); }
+
+// Port of loadEbPayBulkRows — apartments for a property prefilled with any existing bill.
+export async function loadEbPayBulkRows(propertyId: string, billDate: string) {
+  const [apts, existing] = await Promise.all([
+    safeList(supabase.from("apartments").select("id, apartment_code").eq("organization_id", ORG_ID).eq("property_id", propertyId).eq("status", "Live").order("apartment_code")),
+    billDate ? safeList(supabase.from("eb_payments").select("id, apartment_id, bill_amount, reference_number").eq("organization_id", ORG_ID).eq("property_id", propertyId).eq("bill_date", billDate)) : Promise.resolve([] as any[]),
+  ]);
+  const existingMap: Record<string, any> = {};
+  existing.forEach((p: any) => { if (p.apartment_id) existingMap[p.apartment_id] = p; });
+  return apts.map((apt: any) => {
+    const ex = existingMap[apt.id];
+    return {
+      apartment_id: apt.id,
+      apartment_code: apt.apartment_code,
+      bill_amount: ex ? String(ex.bill_amount) : "",
+      reference_number: ex ? (ex.reference_number || "") : "",
+      existing_id: ex?.id || null,
+    };
+  });
+}
+
+// ─── FLAT READINGS (all electricity_readings, newest first) ──────────────────
+// Port of convex/accounting.ts listFlatReadings.
+export async function listFlatReadings() {
+  const rows = await safeList(
+    supabase.from("electricity_readings")
+      .select("id, apartment_id, property_id, billing_month, reading_start, reading_end, units_consumed, unit_cost, is_locked")
+      .eq("organization_id", ORG_ID)
+      .order("billing_month", { ascending: false })
+  );
+  return rows.map((r: any) => ({
+    id: r.id,
+    apartmentId: r.apartment_id,
+    propertyId: r.property_id,
+    billingMonth: r.billing_month || "",
+    readingStart: Number(r.reading_start) || 0,
+    readingEnd: Number(r.reading_end) || 0,
+    unitsConsumed: Number(r.units_consumed) || 0,
+    unitCost: Number(r.unit_cost) || 0,
+    isLocked: !!r.is_locked,
+  }));
+}

@@ -9,7 +9,8 @@
 import { Platform } from 'react-native';
 import { isRunningInExpoGo } from 'expo';
 import * as Device from 'expo-device';
-import { client, api } from './convexApi';
+import { supabase } from './supabase';
+import { ORG_ID } from './supabaseDb';
 
 let _lastRegisteredToken: string | null = null;
 
@@ -42,12 +43,19 @@ export async function registerForPush(userId?: string | null, role?: string | nu
     const { data: token } = await Notifications.getDevicePushTokenAsync();
     if (!token || token === _lastRegisteredToken) return;
 
-    await client.action((api as any).notifications.registerDeviceToken, {
-      token: String(token),
-      userId: userId ?? null,
-      role: role ?? null,
-      platform: Platform.OS,
-    });
+    // Direct Supabase port of convex/notifications.registerDeviceToken (upsert on token).
+    const { error } = await supabase.from('device_push_tokens').upsert(
+      {
+        token: String(token),
+        user_id: userId ?? null,
+        role: role ?? null,
+        platform: Platform.OS,
+        organization_id: ORG_ID,
+        updated_at: new Date().toISOString(),
+      } as any,
+      { onConflict: 'token' }
+    );
+    if (error) throw new Error(error.message);
     _lastRegisteredToken = String(token);
   } catch (err) {
     // Expected in Expo Go / when unsupported — never surface to the user.
@@ -59,7 +67,8 @@ export async function registerForPush(userId?: string | null, role?: string | nu
 export async function unregisterPush(): Promise<void> {
   try {
     if (!_lastRegisteredToken) return;
-    await client.action((api as any).notifications.removeDeviceToken, { token: _lastRegisteredToken });
+    // Direct Supabase port of convex/notifications.removeDeviceToken (device-session cleanup).
+    await supabase.from('device_push_tokens').delete().eq('token', _lastRegisteredToken);
     _lastRegisteredToken = null;
   } catch (err) {
     console.log('[push] unregister skipped:', (err as any)?.message || err);

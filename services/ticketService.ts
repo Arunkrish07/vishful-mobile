@@ -1,9 +1,8 @@
 /**
  * ticketService.ts
- * Routes all ticket operations through Convex actions → Supabase.
- * No direct Supabase calls from client.
+ * Direct Supabase (user JWT / RLS). No Convex. AI features (issue classification,
+ * payment-proof OCR) go through Supabase Edge Functions (ai-diagnosis, payments-extract-proof).
  */
-import { client, api } from "../lib/convexApi";
 import { supabase } from "../lib/supabase"; // direct client (Storage + data)
 import { ORG_ID, safeList, insertRow, updateRow, deleteDisabledResult } from "../lib/supabaseDb";
 import { calcWorkingHoursSlaDeadline } from "../lib/ticketSla";
@@ -873,15 +872,15 @@ export async function checkTenantPendingTickets(tenantId: string): Promise<{ has
 }
 
 export async function fetchProperties(): Promise<any[]> {
-  try { return await client.action(api.tickets.getProperties, {}); } catch { return []; }
+  try { return await safeList(supabase.from("properties").select("id, property_name").eq("organization_id", ORG_ID).order("property_name", { ascending: true })); } catch { return []; }
 }
 
 export async function fetchApartments(propertyId: string): Promise<any[]> {
-  try { return await client.action(api.tickets.getApartments, { propertyId }); } catch { return []; }
+  try { return await safeList(supabase.from("apartments").select("id, apartment_code, property_id").eq("property_id", propertyId).order("apartment_code", { ascending: true })); } catch { return []; }
 }
 
 export async function fetchBeds(apartmentId: string): Promise<any[]> {
-  try { return await client.action(api.tickets.getBeds, { apartmentId }); } catch { return []; }
+  try { return await safeList(supabase.from("beds").select("id, bed_code, apartment_id, bed_type, toilet_type").eq("apartment_id", apartmentId).order("bed_code", { ascending: true })); } catch { return []; }
 }
 
 // ─── KYC DOCUMENT UPLOAD ──────────────────────────────────────────────────────
@@ -993,23 +992,153 @@ export async function saveTicketResolution(args: {
   proofOfPurchaseUrl?: string; proofOfPaymentUrl?: string;
   isUnlockEdit?: boolean;
 }): Promise<{ success: boolean; newStatus: string }> {
-  return client.action((api as any).tickets.saveResolution, args);
+  // Direct Supabase port of convex/tickets.ts saveResolution (upsert resolution +
+  // approval routing + accounting expense sync + log). Runs under the user JWT.
+  const { data: ticket } = await supabase
+    .from("maintenance_tickets")
+    .select("status, tenant_id, created_by, property_id, apartment_id, bed_id, issue_type_id, asset_id, ticket_number, organization_id")
+    .eq("id", args.ticketId)
+    .single();
+  if (!ticket) throw new Error("Ticket not found");
+
+  const totalParts = (args.items || []).reduce((s: number, i: any) => s + ((i.qty || 1) * (i.unit_cost || 0)), 0);
+  const totalCost = totalParts + (args.totalLabourCost || 0);
+
+  if (totalCost > 0) {
+    if (!args.paymentDate) throw new Error("Payment date is required when actual cost is greater than 0.");
+    if (!args.bankAccountId) throw new Error("Bank account is required when actual cost is greater than 0.");
+    if (!args.paymentReferenceNo) throw new Error("Payment reference no. is required when actual cost is greater than 0.");
+    if (!args.proofOfPurchaseUrl) throw new Error("Bill of purchase is required to complete resolution when cost is involved.");
+  }
+
+  const { data: existing } = await supabase.from("ticket_resolutions").select("id").eq("ticket_id", args.ticketId).maybeSingle();
+  const resPayload: any = {
+    ticket_id: args.ticketId, organization_id: ORG_ID,
+    resolution_type: args.resolutionType, service_type: args.serviceType, closure_summary: args.closureSummary,
+    total_labour_cost: args.totalLabourCost || 0, total_parts_cost: totalParts, total_cost: totalCost,
+    vendor_name_manual: args.vendorNameManual || null, vendor_id: args.vendorId || null,
+    items_used: args.items || [], actual_items_used: args.items || [], actual_total_cost: totalCost,
+    payment_date: args.paymentDate || null, bank_account_id: args.bankAccountId || null,
+    payment_reference_no: args.paymentReferenceNo || null, proof_of_purchase_url: args.proofOfPurchaseUrl || null,
+    proof_of_payment_url: args.proofOfPaymentUrl || null, resolved_by: args.userId, resolved_at: new Date().toISOString(),
+  };
+
+  let resolutionRowId: string | undefined;
+  if (existing?.id) {
+    await supabase.from("ticket_resolutions").update(resPayload).eq("id", existing.id);
+    resolutionRowId = existing.id;
+    await supabase.from("maintenance_tickets").update({ resolution_id: existing.id } as any).eq("id", args.ticketId);
+  } else {
+    const { data: res } = await supabase.from("ticket_resolutions").insert(resPayload).select("id").single();
+    resolutionRowId = res?.id;
+    if (res?.id) await supabase.from("maintenance_tickets").update({ resolution_id: res.id } as any).eq("id", args.ticketId);
+  }
+
+  if (args.isUnlockEdit) {
+    const itemSummary = (args.items || []).filter((i: any) => i.name).map((i: any) => `${i.name} × ${i.qty}`).join("; ");
+    await insertRow("ticket_logs", {
+      ticket_id: args.ticketId, action: "Resolution updated (admin unlock)", created_by: args.userId,
+      notes: `Edited on closed ticket. Cost: ₹${Math.round(totalCost)}${itemSummary ? ` | Items: ${itemSummary}` : ""}`,
+    });
+    if (resolutionRowId && totalCost > 0 && args.paymentDate) {
+      await _syncExpenseToSupabase(ticket, resolutionRowId, totalCost, args.paymentDate, args.vendorId || null, args.proofOfPurchaseUrl || null, args.closureSummary);
+    }
+    return { success: true, newStatus: ticket.status };
+  }
+
+  const isAdminCreated = !ticket.tenant_id;
+  let pendingStatus: string = isAdminCreated ? "pending_admin_approval" : "pending_tenant_approval";
+  if (isAdminCreated) {
+    const { data: estRows } = await supabase.from("ticket_cost_estimates").select("id").eq("ticket_id", args.ticketId).limit(1);
+    if (!estRows || (estRows as any[]).length === 0) pendingStatus = "closed";
+  }
+  await supabase.from("maintenance_tickets").update({
+    status: pendingStatus, resolved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  } as any).eq("id", args.ticketId);
+
+  if (resolutionRowId && totalCost > 0 && args.paymentDate) {
+    await _syncExpenseToSupabase(ticket, resolutionRowId, totalCost, args.paymentDate, args.vendorId || null, args.proofOfPurchaseUrl || null, args.closureSummary);
+  }
+
+  const itemSummary = (args.items || []).filter((i: any) => i.name).map((i: any) => `${i.name} × ${i.qty}`).join("; ");
+  await insertRow("ticket_logs", {
+    ticket_id: args.ticketId, action: "Resolution submitted", created_by: args.userId,
+    notes: `Type: ${args.resolutionType} • Service: ${args.serviceType} • Cost: ₹${Math.round(totalCost)}${itemSummary ? ` | Items: ${itemSummary}` : ""}${args.closureSummary ? ` | Summary: ${args.closureSummary}` : ""}`,
+    new_status: pendingStatus,
+  });
+
+  return { success: true, newStatus: pendingStatus };
+}
+
+// Internal: sync a resolved ticket's cost into accounting expenses (web parity,
+// idempotent on ticket_resolution_id). Failure never blocks the resolution save.
+async function _syncExpenseToSupabase(
+  ticket: any, resolutionRowId: string, totalCost: number, paymentDate: string,
+  vendorId: string | null, proofUrl: string | null, closureSummary: string,
+) {
+  try {
+    const { data: existing } = await supabase.from("expenses").select("id").eq("ticket_resolution_id", resolutionRowId).maybeSingle();
+    let categoryId: string | null = null;
+    let subcategoryId: string | null = null;
+    if (ticket.issue_type_id) {
+      const { data: mapping } = await supabase.from("issue_type_expense_mapping").select("expense_category_id, expense_subcategory_id")
+        .eq("organization_id", ORG_ID).eq("issue_type_id", ticket.issue_type_id).maybeSingle();
+      if ((mapping as any)?.expense_category_id) {
+        categoryId = (mapping as any).expense_category_id;
+        subcategoryId = (mapping as any).expense_subcategory_id || null;
+      }
+    }
+    if (!categoryId) {
+      const { data: cat } = await supabase.from("expense_categories").select("id").eq("organization_id", ORG_ID).ilike("label", "%maintenance%").limit(1).maybeSingle();
+      categoryId = (cat as any)?.id || null;
+    }
+    if (!categoryId) return;
+    const billingMonth = paymentDate.slice(0, 7);
+    const description = `[Maintenance] Ticket ${ticket.ticket_number ?? ticket.id}\n${closureSummary}\nReference: resolution ${resolutionRowId}`.trim();
+    const payload: any = {
+      organization_id: ORG_ID, category_id: categoryId, subcategory_id: subcategoryId,
+      issue_type_id: ticket.issue_type_id || null, amount: Math.round(totalCost * 100) / 100,
+      expense_date: paymentDate, billing_month: billingMonth, description, receipt_url: proofUrl,
+      property_id: ticket.property_id || null, apartment_id: ticket.apartment_id || null, bed_id: ticket.bed_id || null,
+      vendor_id: vendorId, data_source: "ticket_resolution", ticket_resolution_id: resolutionRowId,
+    };
+    if (existing?.id) {
+      await supabase.from("expenses").update(payload).eq("id", (existing as any).id);
+    } else {
+      await supabase.from("expenses").insert(payload);
+    }
+  } catch (e) {
+    console.error("[_syncExpenseToSupabase] error:", e);
+  }
 }
 
 export async function postTicketComment(ticketId: string, text: string, userId: string): Promise<{ success: boolean }> {
-  return client.action((api as any).tickets.postComment, { ticketId, text, userId });
+  // Direct Supabase port of convex/tickets.ts postComment (insertRow auto-scopes org_id).
+  await insertRow("ticket_logs", { ticket_id: ticketId, action: "Comment", created_by: userId, notes: text.trim() });
+  return { success: true };
 }
 
 export async function fetchVendors(): Promise<{ id: string; vendor_name: string }[]> {
-  try { return await client.action((api as any).tickets.getVendors, {}); } catch { return []; }
+  try { return await safeList(supabase.from("vendors").select("id, vendor_name").eq("organization_id", ORG_ID).eq("status", "active").order("vendor_name")) as any; } catch { return []; }
 }
 
 export async function fetchTicketResolution(ticketId: string): Promise<any | null> {
-  try { return await client.action((api as any).tickets.getResolution, { ticketId }); } catch { return null; }
+  try {
+    const { data } = await supabase.from("ticket_resolutions").select("*").eq("ticket_id", ticketId).maybeSingle();
+    return data || null;
+  } catch { return null; }
 }
 
 export async function unlockResolutionEditing(ticketId: string, userId: string, reason: string): Promise<void> {
-  await client.action((api as any).tickets.unlockResolutionEditing, { ticketId, userId, reason });
+  // Direct Supabase port of convex/tickets.ts unlockResolutionEditing.
+  const { data: ticket } = await supabase.from("maintenance_tickets").select("status").eq("id", ticketId).single();
+  if (!ticket) throw new Error("Ticket not found");
+  if (ticket.status !== "closed") throw new Error("Only closed tickets can be unlocked.");
+  await insertRow("ticket_logs", {
+    ticket_id: ticketId, action: "Admin unlocked resolution editing",
+    notes: reason?.trim() ? `Reason: ${reason.trim()}` : "Unlocked resolution editing on a closed ticket.",
+    created_by: userId,
+  });
 }
 
 export async function classifyIssue(description: string, issueTypes: any[]): Promise<{
@@ -1021,13 +1150,29 @@ export async function classifyIssue(description: string, issueTypes: any[]): Pro
   action: 'auto_select' | 'suggest' | 'manual' | 'idle';
 }> {
   try {
-    return await client.action((api as any).tickets.classifyIssue, {
-      description,
-      issueTypes: issueTypes.map((t: any) => ({
-        id: t.id, name: t.name,
-        subTypes: (t.subTypes || []).map((s: any) => ({ id: s.id, name: s.name, description: s.description || '' })),
-      })),
+    // Web parity: the issue classifier runs in the `ai-diagnosis` edge function
+    // (mode: 'classify_issue'). The supabase client carries the user's JWT.
+    const { data, error } = await supabase.functions.invoke('ai-diagnosis', {
+      body: {
+        mode: 'classify_issue',
+        description,
+        issueTypes: issueTypes.map((t: any) => ({
+          id: t.id, name: t.name,
+          subTypes: (t.subTypes || []).map((s: any) => ({ id: s.id, name: s.name, description: s.description || '' })),
+        })),
+      },
     });
+    if (error || !data) throw (error || new Error('no data'));
+    const topConf = Number(data.top_confidence ?? 0);
+    const action = topConf >= 85 ? 'auto_select' : topConf >= 55 ? 'suggest' : 'manual';
+    return {
+      matches: data.matches || [],
+      top_issue_type_id: data.top_issue_type_id ?? null,
+      top_confidence: topConf,
+      top_issue_sub_type_id: data.top_issue_sub_type_id ?? null,
+      top_issue_sub_type_confidence: Number(data.top_issue_sub_type_confidence ?? 0),
+      action,
+    };
   } catch {
     return { matches: [], top_issue_type_id: null, top_confidence: 0, top_issue_sub_type_id: null, top_issue_sub_type_confidence: 0, action: 'manual' };
   }
@@ -1041,12 +1186,50 @@ export async function extractPaymentProof(imageBase64: string): Promise<{
   _requireManualAmount?: boolean; _message?: string; _source?: string;
 }> {
   try {
-    return await client.action((api as any).tickets.extractPaymentProof, { imageBase64 });
+    // Web parity: OCR runs in the `payments-extract-proof` edge function, which takes a
+    // file_url. Upload the base64 image to the payment-proofs bucket, then invoke.
+    const byteChars = atob(imageBase64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const path = `ocr/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+    const { error: upErr } = await supabase.storage.from('payment-proofs').upload(path, bytes.buffer, { contentType: 'image/jpeg', upsert: true });
+    if (upErr) throw upErr;
+    const { data: pub } = supabase.storage.from('payment-proofs').getPublicUrl(path);
+    const fileUrl = pub?.publicUrl;
+    if (!fileUrl) throw new Error('upload failed');
+    const { data, error } = await supabase.functions.invoke('payments-extract-proof', { body: { file_url: fileUrl } });
+    if (error || !data) throw (error || new Error('no data'));
+    return {
+      amount: data.amount ?? null,
+      payment_date: data.payment_date ?? null,
+      bank_name: data.bank_name ?? null,
+      transaction_reference: data.transaction_reference ?? null,
+      _requireManualAmount: data._requireManualAmount,
+      _message: data._message,
+      _source: data._source,
+    };
   } catch {
     return { amount: null, payment_date: null, bank_name: null, transaction_reference: null };
   }
 }
 
 export async function fetchBankAccounts(): Promise<{ id: string; bank_name: string; account_number?: string; account_name?: string }[]> {
-  try { return await client.action((api as any).tickets.getBankAccounts, {}); } catch { return []; }
+  // Direct Supabase port of convex/tickets.ts getBankAccounts.
+  try { return await safeList(supabase.from("organization_bank_accounts").select("id, bank_name, account_number, account_name").eq("organization_id", ORG_ID).eq("status", "active").order("bank_name")) as any; } catch { return []; }
+}
+
+// Direct Supabase port of convex/tickets.ts getIssueTypes — embeds linked asset types
+// (via issue_type_asset_types junction) so the Categories tab matches the web app.
+export async function getIssueTypes(): Promise<any[]> {
+  try {
+    return await safeList(
+      supabase
+        .from("issue_types")
+        .select("*, issue_type_asset_types(asset_type_id, asset_types(id, name))")
+        .eq("organization_id", ORG_ID)
+        .order("name", { ascending: true })
+    );
+  } catch {
+    return [];
+  }
 }

@@ -10,14 +10,13 @@ import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, borderRadius } from '../lib/theme';
 import { GlassBackground, EmptyState, LoadingScreen, DateField, SearchField, IconBtnSolid } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
-import { client as convexClient, api as convexApi } from '../lib/convexApi';
+import * as sb from '../lib/supabaseService';
 import { INDIAN_STATES, INDIAN_CITIES } from '../lib/indianCitiesStates';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 // SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
 import * as FileSystem from 'expo-file-system/legacy';
 
-const owners = (convexApi as any).owners;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtAmt  = (v: number) => `₹${(v || 0).toLocaleString('en-IN')}`;
@@ -236,13 +235,14 @@ function DocUpload({ label, value, onChange, folder, isImage }: {
       );
       const base64 = await FileSystem.readAsStringAsync(manip.uri, { encoding: FileSystem.EncodingType.Base64 });
 
-      const res: any = await convexClient.action(owners.uploadDocument, {
+      const url = await sb.uploadDocument(
         base64,
-        fileName: `${label.replace(/\s+/g, '_').toLowerCase()}.jpg`,
+        `${label.replace(/\s+/g, '_').toLowerCase()}.jpg`,
         folder,
-        contentType: 'image/jpeg',
-      });
-      onChange(res.url);
+        'image/jpeg',
+      );
+      if (!url) throw new Error('Upload failed');
+      onChange(url);
     } catch (e: any) {
       Alert.alert('Upload failed', e.message || 'Could not upload file');
     } finally {
@@ -338,9 +338,9 @@ function OwnerFormModal({ mode, initial, onClose, onSaved }: {
     try {
       // title is UI-only (not a DB column) — backend ignores it
       if (mode === 'add') {
-        await convexClient.action(owners.createOwner, { data: form });
+        await sb.createOwner(form);
       } else {
-        await convexClient.action(owners.updateOwner, { id: initial.id, data: form });
+        await sb.updateOwner(initial.id, form);
       }
       onSaved();
     } catch (e: any) { Alert.alert('Error', e.message); }
@@ -456,12 +456,11 @@ function PaymentModal({ payment, mode, aptCode, onClose, onSaved }: {
     try {
       if (mode === 'record') {
         if (!form.paid_date) { Alert.alert('Required', 'Payment date is required'); setSaving(false); return; }
-        await convexClient.action(owners.recordOwnerPayment, {
-          id: payment.id,
-          data: { paid_date: form.paid_date, payment_mode: form.payment_mode, reference_number: form.reference_number, notes: form.notes },
+        await sb.recordOwnerPayment(payment.id, {
+          paid_date: form.paid_date, payment_mode: form.payment_mode, reference_number: form.reference_number, notes: form.notes,
         });
       } else {
-        await convexClient.action(owners.editOwnerPayment, { id: payment.id, data: form });
+        await sb.editOwnerPayment(payment.id, form);
       }
       onSaved();
     } catch (e: any) { Alert.alert('Error', e.message); }
@@ -539,7 +538,7 @@ function ContractDetailModal({ contract, onClose }: { contract: any; onClose: ()
 
   const load = useCallback(() => {
     setLoading(true);
-    convexClient.action(owners.getContractPayments, { contractId: contract.id })
+    sb.getContractPayments(contract.id)
       .then((d: any) => setPayments(d || []))
       .catch(() => setPayments([]))
       .finally(() => setLoading(false));
@@ -659,13 +658,13 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
   const [period, setPeriod]             = useState('current_fy');
 
   const loadDetail = useCallback(() => {
-    convexClient.action(owners.getOwnerDetail, { ownerId })
+    sb.getOwnerDetail(ownerId)
       .then(setData).catch(() => setData(null)).finally(() => setLoading(false));
   }, [ownerId]);
 
   const loadPayments = useCallback(() => {
     setPaymentsLoading(true);
-    convexClient.action(owners.listOwnerPaymentsConsolidated, { ownerId })
+    sb.listOwnerPaymentsConsolidated(ownerId)
       .then((d: any) => setAllPayments(d || []))
       .catch(() => setAllPayments([]))
       .finally(() => setPaymentsLoading(false));
@@ -685,7 +684,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
         { text: 'Cancel', style: 'cancel' },
         { text: isActive ? 'Deactivate' : 'Activate', style: isActive ? 'destructive' : 'default', onPress: async () => {
           try {
-            await convexClient.action(owners.toggleOwnerStatus, { id: ownerId, currentStatus: isActive ? 'active' : 'inactive' });
+            await sb.toggleOwnerStatus(ownerId, isActive ? 'active' : 'inactive');
             loadDetail(); onChanged();
           } catch (e: any) { Alert.alert('Error', e.message); }
         }},
@@ -697,7 +696,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
     Alert.alert('Delete Contract', `Delete this ${(c.contractType || '').replace(/_/g, ' ')} contract? Payment records will also be removed.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await convexClient.action(owners.deleteContract, { id: c.id }); loadDetail(); }
+        try { await sb.deleteContract(c.id); loadDetail(); }
         catch (e: any) { Alert.alert('Error', e.message); }
       }},
     ]);
@@ -708,7 +707,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
       { text: 'Cancel', style: 'cancel' },
       { text: 'Regenerate', onPress: async () => {
         try {
-          await convexClient.action(owners.regenerateOwnerBills, { ownerId, mode: 'all' });
+          await sb.regenerateOwnerBills(ownerId, 'all');
           Alert.alert('Done', 'Bills regenerated.');
           if (tab === 'payments') loadPayments();
         } catch (e: any) { Alert.alert('Error', e.message); }
@@ -1108,7 +1107,7 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
 
   useEffect(() => {
     if (isEdit) return;
-    convexClient.action(owners.listApartmentsForContract, {})
+    sb.listApartmentsForContract()
       .then(setApts).catch(() => setApts([])).finally(() => setLoadingApts(false));
   }, [isEdit]);
 
@@ -1132,10 +1131,10 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
     try {
       const gstInfo = ownerGst?.trim() ? (form.rent_includes_gst ? 'Rent Includes GST' : 'Rent Excludes GST') : 'GST under RCM';
       if (isEdit) {
-        await convexClient.action(owners.updateContract, { id: editTarget.id, data: { ...form, gst_info: gstInfo } });
+        await sb.updateContract(editTarget.id, { ...form, gst_info: gstInfo });
         Alert.alert('Success', 'Contract updated.');
       } else {
-        await convexClient.action(owners.createOwnerContract, { ownerId, data: { ...form, gst_info: gstInfo } });
+        await sb.createOwnerContract(ownerId, { ...form, gst_info: gstInfo });
         Alert.alert('Success', `Contract created for ${form.apartment_ids.length} apartment(s).`);
       }
       onSaved();
@@ -1379,8 +1378,8 @@ export default function OwnersScreen() {
   const fetchOwners = useCallback(async () => {
     try {
       const [data, props] = await Promise.all([
-        convexClient.action(owners.listOwners, {}),
-        convexClient.action(owners.listPropertiesForFilter, {}).catch(() => []),
+        sb.listOwners(),
+        sb.listPropertiesForFilter().catch(() => []),
       ]);
       setOwnersList(data || []);
       setProperties(props || []);

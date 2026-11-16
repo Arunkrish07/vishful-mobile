@@ -34,7 +34,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
-import { client as convexClient, api as convexApi } from '../lib/convexApi';
+import { getOrgExitSettings } from '../lib/supabaseService';
 import { GlassBackground, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { DiagnosticFlow, DiagnosticFlowResult } from './DiagnosticFlow';
@@ -695,7 +695,7 @@ function TicketDetailScreen({ navigation, route }: any) {
 
   // Org auto-approve threshold for cost estimates (web parity — was hardcoded ₹1,000)
   useEffect(() => {
-    convexClient.action((convexApi as any).settings.getOrgExitSettings, {})
+    getOrgExitSettings()
       .then((data: any) => {
         const val = Number(data?.ticket_auto_approve_threshold);
         if (Number.isFinite(val) && val > 0) setAutoApproveThreshold(val);

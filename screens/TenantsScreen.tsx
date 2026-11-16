@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { fetchVisibleTabKeys, filterTabs } from '../lib/tabPermissions';
-import { client as convexClient, api as convexApi } from '../lib/convexApi';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATUS CONFIG
@@ -436,7 +435,7 @@ export default function TenantsScreen() {
   const loadRemarks = useCallback(async (tenantId: string) => {
     setRemarksLoading(true);
     try {
-      const data = await convexClient.action((convexApi as any).tenants.listTenantRemarks, { tenantId });
+      const data = await sb.listTenantRemarks(tenantId);
       setTenantRemarks(data || []);
     } catch { setTenantRemarks([]); }
     setRemarksLoading(false);
@@ -453,7 +452,7 @@ export default function TenantsScreen() {
     if (!remarkForm.title.trim()) { Alert.alert('Required', 'Title is required'); return; }
     setRemarkLoading(true);
     try {
-      await convexClient.action((convexApi as any).tenants.addTenantRemark, {
+      await sb.addTenantRemark({
         tenantId:    detailTenant._id,
         remarkType:  remarkForm.remark_type,
         title:       remarkForm.title,
@@ -472,7 +471,7 @@ export default function TenantsScreen() {
   const handleComputeRating = async (tenantId: string) => {
     setComputingRatingId(tenantId);
     try {
-      const result = await convexClient.action((convexApi as any).tenants.computeTenantRating, { tenantId });
+      const result = await sb.computeTenantRating(tenantId);
       Alert.alert('Rating computed', `Score: ${result.score.toFixed(1)} / 10`);
       refresh();
       // Also update detailTenant in-place
@@ -493,7 +492,7 @@ export default function TenantsScreen() {
         setBatchRatingProgress({ done: 0, total: ids.length });
         let done = 0;
         for (const id of ids) {
-          try { await convexClient.action((convexApi as any).tenants.computeTenantRating, { tenantId: id }); }
+          try { await sb.computeTenantRating(id); }
           catch { /* skip failed */ }
           done++;
           setBatchRatingProgress({ done, total: ids.length });
@@ -509,7 +508,7 @@ export default function TenantsScreen() {
   const runDuplicateScanAll = async () => {
     setDupLoading(true); setDupResults([]);
     try {
-      const groups = await convexClient.action((convexApi as any).tenants.getDuplicateTenants, {});
+      const groups = await sb.getDuplicateTenants();
       setDupGroups(groups || []);
     } catch (e: any) { Alert.alert('Error', e.message); }
     setDupLoading(false);
@@ -519,7 +518,7 @@ export default function TenantsScreen() {
     if (!dupPhone.trim()) return;
     setDupLoading(true); setDupGroups([]);
     try {
-      const results = await convexClient.action((convexApi as any).tenants.searchTenantsByPhone, { phone: dupPhone.trim() });
+      const results = await sb.searchTenantsByPhone(dupPhone.trim());
       setDupResults(results || []);
     } catch (e: any) { Alert.alert('Error', e.message); }
     setDupLoading(false);
@@ -552,7 +551,7 @@ export default function TenantsScreen() {
           try {
             let moved = 0;
             for (const s of secondaries) {
-              const res: any = await convexClient.action((convexApi as any).tenants.mergeTenants, { primaryId: primary.id, secondaryId: s.id });
+              const res: any = await sb.mergeTenants(primary.id, s.id);
               if (!res?.ok) throw new Error(res?.error || 'Merge failed');
               moved += res.totalMoved || 0;
             }
@@ -575,7 +574,7 @@ export default function TenantsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
-          await convexClient.action((convexApi as any).tenants.deleteTenant, { tenantId: t._id });
+          await sb.deleteTenant(t._id);
           refresh();
           Alert.alert('Deleted', 'Tenant removed.');
         } catch (e: any) { Alert.alert('Cannot delete', e.message); }
