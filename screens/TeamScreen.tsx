@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Alert, RefreshControl, TextInput, Image, ActivityIndicator,
+  Modal, Alert, RefreshControl, TextInput, Image, ActivityIndicator, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
+import {
+  markSalaryBillPaid, saveManualPaySlip, updateSalaryBillFields, deleteSalaryBill,
+  setDepartmentExempt, computeCurrentPeriodBreakdown, previewPaySlipAmounts,
+  type PaySlipFormInput,
+} from '../lib/teamPayroll';
 import { useAuth } from '../lib/auth';
 import { Button, Input, EmptyState, LoadingScreen, GlassBackground, DateField, IconBtnSolid, SearchField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
@@ -94,7 +99,21 @@ export default function TeamScreen() {
   const [loading, setLoading]       = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedSpecs, setSelectedSpecs] = useState<string[]>([]);
+  const [showExited, setShowExited] = useState(false);
+  const [deptExemptBusy, setDeptExemptBusy] = useState<string | null>(null);
   const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
+  // Pay-slip (manual generate + edit) modal
+  const EMPTY_PAYSLIP: PaySlipFormInput = {
+    team_member_id: '', month: payrollMonthKey(new Date()),
+    working_days: '26', present_days: '0', base_salary: '',
+    advance_deducted: '0', other_deductions: '0', notes: '',
+  };
+  const [showPaySlip, setShowPaySlip]       = useState(false);
+  const [editingBillId, setEditingBillId]   = useState<string | null>(null);
+  const [paySlipForm, setPaySlipForm]       = useState<PaySlipFormInput>({ ...EMPTY_PAYSLIP });
+  const [paySlipBusy, setPaySlipBusy]       = useState(false);
+  const setPSF = (k: keyof PaySlipFormInput) => (v: string) => setPaySlipForm(p => ({ ...p, [k]: v }));
 
   // Modals
   const [showAdd, setShowAdd]           = useState(false);
@@ -132,7 +151,7 @@ export default function TeamScreen() {
       sb.listOrgTickets().catch(() => []),
     ]).then(([m, p, a, d, t]: any) => {
       if (!mounted.current) return;
-      setMembers((m ?? []).filter((x: any) => String(x?.status || '').toLowerCase() === 'active'));
+      setMembers(m ?? []);
       setPayments(p ?? []);
       setAttendance(a ?? []);
       setDepartments(Array.isArray(d) ? d : []);
@@ -154,7 +173,7 @@ export default function TeamScreen() {
         sb.listOrgTickets().catch(() => []),
       ]);
       if (mounted.current) {
-        setMembers((m ?? []).filter((x: any) => String(x?.status || '').toLowerCase() === 'active')); setPayments(p ?? []); setAttendance(a ?? []);
+        setMembers(m ?? []); setPayments(p ?? []); setAttendance(a ?? []);
         setDepartments(Array.isArray(d) ? d : []);
         setTickets(Array.isArray(t) ? t : []);
       }
@@ -243,36 +262,128 @@ export default function TeamScreen() {
     finally { if (mounted.current) setSalaryBusy(null); }
   }, []);
 
-  // ── Filtered ──
+  // Mark-Paid (money path): records a salary team_payment + posts Accounting→Expenses,
+  // then flips the bill to 'paid' — ported from web markSalaryBillPaid.
+  const handleMarkPaid = useCallback(async (bill: any, member: any) => {
+    setSalaryBusy(bill.id);
+    try {
+      const { syncWarning } = await markSalaryBillPaid(bill, member);
+      if (mounted.current) setSalaryBills(prev => prev.map(b => b.id === bill.id ? { ...b, status: 'paid' } : b));
+      Alert.alert('Marked paid', syncWarning || 'Salary posted to Accounting → Expenses.');
+      refresh(); // refresh Payments tab so the new salary payment shows
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not mark paid');
+    } finally { if (mounted.current) setSalaryBusy(null); }
+  }, [refresh]);
+
+  const openNewPaySlip = useCallback(() => {
+    setEditingBillId(null);
+    setPaySlipForm({ ...EMPTY_PAYSLIP, month: salaryMonth });
+    setShowPaySlip(true);
+  }, [salaryMonth]);
+
+  const openEditPaySlip = useCallback((bill: any) => {
+    setEditingBillId(bill.id);
+    setPaySlipForm({
+      team_member_id: bill.team_member_id || '',
+      month: bill.month || payrollMonthKey(new Date()),
+      working_days: bill.working_days != null ? String(bill.working_days) : '26',
+      present_days: bill.present_days != null ? String(bill.present_days) : '0',
+      base_salary: bill.base_salary != null ? String(bill.base_salary) : '',
+      advance_deducted: bill.advance_deducted != null ? String(bill.advance_deducted) : '0',
+      other_deductions: bill.other_deductions != null ? String(bill.other_deductions) : '0',
+      notes: bill.notes || '',
+    });
+    setShowPaySlip(true);
+  }, []);
+
+  const handleSavePaySlip = useCallback(async () => {
+    if (!editingBillId && !paySlipForm.team_member_id) { Alert.alert('Validation', 'Select a team member'); return; }
+    if (!/^\d{4}-\d{2}$/.test(paySlipForm.month.trim())) { Alert.alert('Validation', 'Month must be YYYY-MM'); return; }
+    if (!paySlipForm.base_salary || parseFloat(paySlipForm.base_salary) <= 0) { Alert.alert('Validation', 'Base salary is required'); return; }
+    setPaySlipBusy(true);
+    try {
+      if (editingBillId) await updateSalaryBillFields(editingBillId, paySlipForm);
+      else await saveManualPaySlip(paySlipForm);
+      setShowPaySlip(false);
+      setEditingBillId(null);
+      await loadSalary();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not save pay slip');
+    } finally { if (mounted.current) setPaySlipBusy(false); }
+  }, [editingBillId, paySlipForm, loadSalary]);
+
+  const handleDeletePaySlip = useCallback((bill: any) => {
+    Alert.alert('Delete Pay Slip', `Delete the pay slip for ${bill.month}? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteSalaryBill(bill.id);
+            setShowPaySlip(false);
+            setEditingBillId(null);
+            await loadSalary();
+          } catch (e: any) { Alert.alert('Delete Pay Slip', e?.message || 'Deleting is currently disabled.'); }
+        },
+      },
+    ]);
+  }, [loadSalary]);
+
+  const handleToggleDeptExempt = useCallback(async (dept: any, value: boolean) => {
+    setDeptExemptBusy(dept.id);
+    // optimistic
+    setDepartments(prev => prev.map((d: any) => d.id === dept.id ? { ...d, attendance_exempt: value } : d));
+    try {
+      await setDepartmentExempt(dept.id, value);
+    } catch (e: any) {
+      setDepartments(prev => prev.map((d: any) => d.id === dept.id ? { ...d, attendance_exempt: !value } : d));
+      Alert.alert('Error', e?.message || 'Could not update attendance exemption');
+    } finally { if (mounted.current) setDeptExemptBusy(null); }
+  }, []);
+
+  // ── Active members (analytics/KPIs track active staff; exited stay out) ──
+  const activeMembers = useMemo(
+    () => (members || []).filter((x: any) => String(x?.status || '').toLowerCase() === 'active'),
+    [members],
+  );
+
+  // ── Filtered (members list) — exited (inactive) hidden unless "Show exited" is on ──
   const filteredMembers = (members || []).filter(m => {
+    const isExited = String(m?.status || '').toLowerCase() === 'inactive';
+    if (isExited && !showExited) return false;
     const q = search.toLowerCase();
     const fullName = `${m.first_name || ''} ${m.last_name || ''}`.trim().toLowerCase();
     return !q || fullName.includes(q) || (m.phone || '').includes(q) || (m.designation || '').toLowerCase().includes(q);
   });
+  const exitedCount = useMemo(
+    () => (members || []).filter((x: any) => String(x?.status || '').toLowerCase() === 'inactive').length,
+    [members],
+  );
 
   // ── Attendance analytics (pure lib) ──
   const currentMonth = monthKey();
   const kpis = useMemo(
-    () => teamKpis(members || [], attendance || []),
-    [members, attendance],
+    () => teamKpis(activeMembers, attendance || []),
+    [activeMembers, attendance],
   );
   const dashRows = useMemo(
-    () => computeMemberRows(members || [], attendance || [], currentMonth)
+    () => computeMemberRows(activeMembers, attendance || [], currentMonth)
       .filter(r => r.rate !== null)
       .sort((a, b) => (a.rate as number) - (b.rate as number)),
-    [members, attendance, currentMonth],
+    [activeMembers, attendance, currentMonth],
   );
   const rollup = useMemo(
-    () => orgRollup(members || [], attendance || [], currentMonth),
-    [members, attendance, currentMonth],
+    () => orgRollup(activeMembers, attendance || [], currentMonth),
+    [activeMembers, attendance, currentMonth],
   );
   const todaySnap = useMemo(
-    () => daySnapshot(members || [], attendance || [], toYmd(new Date())),
-    [members, attendance],
+    () => daySnapshot(activeMembers, attendance || [], toYmd(new Date())),
+    [activeMembers, attendance],
   );
   const attention = useMemo(
-    () => needsAttention(members || [], attendance || [], currentMonth, 5),
-    [members, attendance, currentMonth],
+    () => needsAttention(activeMembers, attendance || [], currentMonth, 5),
+    [activeMembers, attendance, currentMonth],
   );
 
   // ── CRUD ──
@@ -581,7 +692,7 @@ export default function TeamScreen() {
 
   // ── Performance rows (per-member maintenance-ticket stats) ──
   const perfRows = useMemo(() => {
-    return (members || []).map((m: any) => {
+    return activeMembers.map((m: any) => {
       const assignedTickets = (tickets || []).filter((t: any) => t.assigned_to === m.id);
       const assigned = assignedTickets.length;
       const resolved = assignedTickets.filter((t: any) => {
@@ -592,7 +703,7 @@ export default function TeamScreen() {
       const name = `${m.first_name || ''} ${m.last_name || ''}`.trim() || '—';
       return { id: m.id, name, assigned, resolved, rate };
     }).sort((a, b) => b.assigned - a.assigned);
-  }, [members, tickets]);
+  }, [activeMembers, tickets]);
 
   const openEdit = (m: any) => {
     setSelected(m);
@@ -682,7 +793,14 @@ export default function TeamScreen() {
         >
           {activeTab === 'members' && (
             <>
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setShowExited(v => !v)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: showExited ? '#0F172A' : '#F1F3F9', borderWidth: 1, borderColor: showExited ? '#0F172A' : '#EEF1F6' }}
+                >
+                  <Ionicons name={showExited ? 'eye-outline' : 'eye-off-outline'} size={14} color={showExited ? '#fff' : '#64748B'} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: showExited ? '#fff' : '#64748B' }}>Show exited{exitedCount ? ` (${exitedCount})` : ''}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => { setNewDeptName(''); setEditingDeptId(null); setEditingDeptName(''); setShowDepartments(true); }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#2563EB14', borderWidth: 1, borderColor: '#2563EB30' }}
@@ -716,7 +834,7 @@ export default function TeamScreen() {
 
           {activeTab === 'dashboard' && (
             <AttendanceDashboardView
-              memberCount={(members || []).length}
+              memberCount={activeMembers.length}
               rollup={rollup}
               today={todaySnap}
               rows={dashRows}
@@ -755,11 +873,18 @@ export default function TeamScreen() {
                   })}
                 </View>
               </ScrollView>
-              <TouchableOpacity disabled={generating} onPress={handleGenerateSalary}
-                style={{ backgroundColor: '#0F172A', borderRadius: 12, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: generating ? 0.6 : 1 }}>
-                {generating ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles-outline" size={16} color="#fff" />}
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{generating ? 'Generating…' : 'Generate drafts from attendance'}</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity disabled={generating} onPress={handleGenerateSalary}
+                  style={{ flex: 1, backgroundColor: '#0F172A', borderRadius: 12, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: generating ? 0.6 : 1 }}>
+                  {generating ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles-outline" size={16} color="#fff" />}
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{generating ? 'Generating…' : 'Generate from attendance'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={openNewPaySlip}
+                  style={{ backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 11, paddingHorizontal: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                  <Ionicons name="add" size={16} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>New</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             {salaryLoading ? (
               <ActivityIndicator color="#2563EB" style={{ marginTop: 30 }} />
@@ -793,19 +918,24 @@ export default function TeamScreen() {
                       {deductions > 0 && <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Deductions</Text><Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>−₹{Math.round(deductions).toLocaleString('en-IN')}</Text></View>}
                       <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Net payable</Text><Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>₹{Math.round(net).toLocaleString('en-IN')}</Text></View>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                         <TouchableOpacity disabled={payslipBusy === b.id} onPress={() => handleDownloadPayslip(b, name, m?.designation)} style={{ backgroundColor: '#fff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: '#EEF1F6' }}>
                           {payslipBusy === b.id
                             ? <ActivityIndicator size="small" color="#2563EB" />
                             : <><Ionicons name="download-outline" size={15} color="#2563EB" /><Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 13 }}>Payslip</Text></>}
                         </TouchableOpacity>
+                        {st !== 'paid' && (
+                          <TouchableOpacity onPress={() => openEditPaySlip(b)} style={{ backgroundColor: '#fff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: '#EEF1F6' }}>
+                            <Ionicons name="pencil-outline" size={15} color="#2563EB" /><Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 13 }}>Edit</Text>
+                          </TouchableOpacity>
+                        )}
                         {st === 'draft' && (
                           <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'approved')} style={{ flex: 1, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
                             {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Approve</Text>}
                           </TouchableOpacity>
                         )}
                         {st === 'approved' && (
-                          <TouchableOpacity disabled={busy} onPress={() => handleSalaryStatus(b, 'paid')} style={{ flex: 1, backgroundColor: '#16A34A', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
+                          <TouchableOpacity disabled={busy} onPress={() => handleMarkPaid(b, m)} style={{ flex: 1, backgroundColor: '#16A34A', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: busy ? 0.5 : 1 }}>
                             {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Mark Paid</Text>}
                           </TouchableOpacity>
                         )}
@@ -1062,17 +1192,103 @@ export default function TeamScreen() {
                         <ActionChip label="Cancel" icon="close-outline" color="#64748B" onPress={() => { setEditingDeptId(null); setEditingDeptName(''); }} />
                       </View>
                     ) : (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, paddingRight: 8 }}>{d.name || '—'}</Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <ActionChip label="Rename" icon="pencil-outline" color="#2563EB" onPress={() => { setEditingDeptId(d.id); setEditingDeptName(d.name || ''); }} />
-                          <ActionChip label="Delete" icon="trash-outline" color="#dc2626" onPress={() => handleDeleteDept(d)} />
+                      <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, paddingRight: 8 }}>{d.name || '—'}</Text>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <ActionChip label="Rename" icon="pencil-outline" color="#2563EB" onPress={() => { setEditingDeptId(d.id); setEditingDeptName(d.name || ''); }} />
+                            <ActionChip label="Delete" icon="trash-outline" color="#dc2626" onPress={() => handleDeleteDept(d)} />
+                          </View>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: '#F1F5F9' }}>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>Attendance exempt</Text>
+                            <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>Skip attendance & automatic salary bills</Text>
+                          </View>
+                          <Switch
+                            value={!!d.attendance_exempt}
+                            disabled={deptExemptBusy === d.id}
+                            onValueChange={(v) => handleToggleDeptExempt(d, v)}
+                            trackColor={{ false: '#CBD5E1', true: '#2563EB' }}
+                            thumbColor="#fff"
+                          />
                         </View>
                       </View>
                     )}
                   </View>
                 ))
               )}
+            </ScrollView>
+          </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* Pay Slip (manual generate + edit) Modal */}
+      <Modal visible={showPaySlip} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => { setShowPaySlip(false); setEditingBillId(null); }}>
+                <Ionicons name="close" size={24} color="#0F172A" />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>{editingBillId ? 'Edit Pay Slip' : 'New Pay Slip'}</Text>
+              {editingBillId ? (
+                <TouchableOpacity onPress={() => { const b = salaryBills.find((x: any) => x.id === editingBillId); if (b) handleDeletePaySlip(b); }}>
+                  <Ionicons name="trash-outline" size={22} color="#dc2626" />
+                </TouchableOpacity>
+              ) : <View style={{ width: 24 }} />}
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+              {/* Member picker (create only; fixed when editing) */}
+              {editingBillId ? (
+                <View style={styles.selectedBanner}>
+                  <Ionicons name="person-circle-outline" size={20} color="#2563EB" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginLeft: 8 }}>
+                    {(() => { const mm = (members || []).find((x: any) => x.id === paySlipForm.team_member_id); return mm ? `${mm.first_name || ''} ${mm.last_name || ''}`.trim() : 'Member'; })()}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#64748B', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 }}>Team Member *</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {activeMembers.map((mm: any) => {
+                        const active = paySlipForm.team_member_id === mm.id;
+                        const nm = `${mm.first_name || ''} ${mm.last_name || ''}`.trim() || 'Member';
+                        return (
+                          <TouchableOpacity key={mm.id} onPress={() => setPaySlipForm(p => ({ ...p, team_member_id: mm.id, base_salary: p.base_salary || (mm.salary_amount != null ? String(mm.salary_amount) : '') }))}
+                            style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: active ? '#2563EB' : '#F1F3F9', borderWidth: 1, borderColor: active ? '#2563EB' : '#EEF1F6' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#fff' : '#64748B' }}>{nm}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
+              <Input label="Month (YYYY-MM) *" value={paySlipForm.month} onChangeText={setPSF('month')} placeholder="2026-11" icon="calendar-number-outline" />
+              <Input label="Working Days" value={paySlipForm.working_days} onChangeText={setPSF('working_days')} placeholder="26" keyboardType="numeric" icon="calendar-outline" />
+              <Input label="Present Days" value={paySlipForm.present_days} onChangeText={setPSF('present_days')} placeholder="0" keyboardType="numeric" icon="checkmark-circle-outline" />
+              <Input label="Base Salary (₹) *" value={paySlipForm.base_salary} onChangeText={setPSF('base_salary')} placeholder="0" keyboardType="numeric" icon="cash-outline" />
+              <Input label="Advance Deducted (₹)" value={paySlipForm.advance_deducted} onChangeText={setPSF('advance_deducted')} placeholder="0" keyboardType="numeric" icon="remove-circle-outline" />
+              <Input label="Other Deductions (₹)" value={paySlipForm.other_deductions} onChangeText={setPSF('other_deductions')} placeholder="0" keyboardType="numeric" icon="remove-circle-outline" />
+              <Input label="Notes" value={paySlipForm.notes} onChangeText={setPSF('notes')} placeholder="Optional notes…" multiline icon="create-outline" />
+
+              {/* Live earned / net preview */}
+              {(() => {
+                const { earned, net } = previewPaySlipAmounts(paySlipForm);
+                return (
+                  <View style={{ flexDirection: 'row', gap: 16, marginTop: 6, marginBottom: 6, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12 }}>
+                    <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Earned</Text><Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>₹{Math.round(earned).toLocaleString('en-IN')}</Text></View>
+                    <View><Text style={{ fontSize: 10, color: '#94A3B8' }}>Net payable</Text><Text style={{ fontSize: 15, fontWeight: '900', color: '#16A34A' }}>₹{Math.round(net).toLocaleString('en-IN')}</Text></View>
+                  </View>
+                );
+              })()}
+              <Text style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6 }}>Earned = Base ÷ Working days × Present days. Net = Earned − Advance − Other.</Text>
+
+              <View style={{ marginTop: 10 }}>
+                <Button title={editingBillId ? 'Update Pay Slip' : 'Save Pay Slip'} onPress={handleSavePaySlip} loading={paySlipBusy} icon="checkmark-circle-outline" />
+              </View>
             </ScrollView>
           </SafeAreaView>
         </GlassBackground>
@@ -1442,6 +1658,7 @@ const HEAT_COLORS: Record<string, string> = {
 
 function MemberAttendancePanel({ member, attendance }: any) {
   const month = monthKey();
+  const breakdown = useMemo(() => computeCurrentPeriodBreakdown(member, attendance || []), [member, attendance]);
   const summary = useMemo(() => memberMonthSummary(member, attendance, month), [member, attendance, month]);
   const heat = useMemo(() => calendarHeat([member], attendance, month), [member, attendance, month]);
   const monthRows = useMemo(() => memberMonthRows(member.id, attendance, month), [member, attendance, month]);
@@ -1480,6 +1697,39 @@ function MemberAttendancePanel({ member, attendance }: any) {
           {`${member.first_name || ''} ${member.last_name || ''}`.trim()}
         </Text>
       </View>
+
+      {/* Current pay-period salary breakdown (estimated from attendance) */}
+      {breakdown && breakdown.baseSalary > 0 && (
+        <View style={[styles.card, { padding: 14, borderLeftWidth: 4, borderLeftColor: '#2563EB' }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>Current pay period salary</Text>
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{breakdown.periodLabel}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: '#2563EB' }}>₹{Math.round(breakdown.earned).toLocaleString('en-IN')}</Text>
+              <Text style={{ fontSize: 10, color: '#94A3B8' }}>Estimated from attendance</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
+            {[
+              { l: 'Paid days', v: String(breakdown.presentDays) },
+              { l: 'Leave', v: String(breakdown.summary.leaveDays) },
+              { l: 'Absent', v: String(breakdown.summary.absentDays) },
+              { l: 'Sundays paid', v: String(breakdown.summary.sundayPaidDays) },
+              { l: 'Base / day', v: `₹${Math.round(breakdown.perDayRate).toLocaleString('en-IN')}` },
+            ].map(x => (
+              <View key={x.l} style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 8, minWidth: 64 }}>
+                <Text style={{ fontSize: 9, color: '#94A3B8', textTransform: 'uppercase' }}>{x.l}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginTop: 1 }}>{x.v}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 8 }}>
+            Present & Late = paid · Sunday = paid · Leave & Absent = deducted · Base ₹{breakdown.baseSalary.toLocaleString('en-IN')} / {breakdown.daysInPeriod} days
+          </Text>
+        </View>
+      )}
 
       {/* Summary tiles */}
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>

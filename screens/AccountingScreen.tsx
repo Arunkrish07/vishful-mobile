@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Image, Linking, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
+import * as aw from '../lib/accountingWrites';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, borderRadius, fontSize, glass } from '../lib/theme';
 import { Button, Input, Badge, EmptyState, LoadingScreen, PickerSelect, GlassBackground, DateField, SearchField, IconBtnSolid } from '../components/shared';
@@ -179,6 +180,36 @@ export default function AccountingScreen() {
   const [ledgerTenant, setLedgerTenant] = useState('');
   const [ledger, setLedger] = useState<any | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+
+  // ── WRITE features (web parity: Expenses/Adjustments/Settlements/Exit/Invoices) ──
+  const [writeBusy, setWriteBusy] = useState(false);
+  // Expenses add/edit
+  const [expRefs, setExpRefs] = useState<{ properties: any[]; apartments: any[]; beds: any[]; vendors: any[]; categories: any[] } | null>(null);
+  const [showExp, setShowExp] = useState(false);
+  const [expEditId, setExpEditId] = useState<string | null>(null);
+  const [expForm, setExpForm] = useState<any>({ property_id: '', apartment_id: '', bed_ids: [] as string[], category_id: '', vendor_id: '', description: '', amount: '', expense_date: '' });
+  // Adjustments create/edit
+  const [adjActiveTenants, setAdjActiveTenants] = useState<any[] | null>(null);
+  const [showAdj, setShowAdj] = useState(false);
+  const [adjEditId, setAdjEditId] = useState<string | null>(null);
+  const [adjForm, setAdjForm] = useState<any>({ tenant_id: '', allotment_id: '', adjustment_type: 'credit_note', category: 'others', amount: '', reason: '', reference_number: '', adjustment_date: '', property_id: '', apartment_id: '', bed_id: '' });
+  // Settlements create + complete refund
+  const [setlRefs, setSetlRefs] = useState<{ exitedTenants: any[]; banks: any[] } | null>(null);
+  const [showSetl, setShowSetl] = useState(false);
+  const [setlForm, setSetlForm] = useState<any>({ tenant_id: '', allotment_id: '', deposit_amount: '', pending_rent: '0', pending_eb: '0', pending_late_fees: '0', damages: '0', other_deductions: '0', notes: '', settlement_date: '', payment_bank_id: '', payment_reference: '' });
+  const [showRefund, setShowRefund] = useState(false);
+  const [refundForm, setRefundForm] = useState<any>({ settlement_id: '', allotment_id: '', tenant_name: '', deposit_amount: 0, total_deductions: 0, refund_amount: 0, refund_date: '', refund_bank_id: '', refund_reference: '' });
+  // Exit reconciliation settle
+  const [showExit, setShowExit] = useState(false);
+  const [exitRow, setExitRow] = useState<any>(null);
+  const [exitForm, setExitForm] = useState<any>({ exitDate: '', addEb: '', addExit: '', refund: '', touchedRefund: false, refundDate: '', bankId: '', ref: '' });
+  // Invoice edit + lock
+  const [showInvEdit, setShowInvEdit] = useState(false);
+  const [invEditForm, setInvEditForm] = useState<any>({ rent_amount: '', electricity_amount: '', estimated_eb: '', late_fee: '', other_charges: '' });
+  // Rental payment — record owner payout
+  const [showPayout, setShowPayout] = useState(false);
+  const [payoutRow, setPayoutRow] = useState<any>(null);
+  const [payoutForm, setPayoutForm] = useState<any>({ paid_date: '', payment_mode: 'transfer', reference_number: '', notes: '' });
 
   // Adjustments load when its tab opens.
   useEffect(() => {
@@ -510,6 +541,183 @@ export default function AccountingScreen() {
     }
   };
 
+  // ── WRITE handlers (web parity) ──
+  const reloadSection = () => setRefreshKey((k: number) => k + 1);
+
+  const ensureExpRefs = async () => {
+    if (expRefs) return expRefs;
+    const r = await aw.loadExpenseFormRefs();
+    if (mounted.current) setExpRefs(r);
+    return r;
+  };
+  const openExpAdd = async () => {
+    setExpEditId(null);
+    setExpForm({ property_id: '', apartment_id: '', bed_ids: [], category_id: '', vendor_id: '', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0] });
+    setShowExp(true);
+    ensureExpRefs().catch(() => {});
+  };
+  const openExpEdit = async (e: any) => {
+    await ensureExpRefs().catch(() => {});
+    setExpEditId(e.id);
+    setExpForm({ property_id: '', apartment_id: '', bed_ids: [], category_id: e.categoryId || '', vendor_id: '', description: e.description || '', amount: String(e.amount ?? ''), expense_date: e.expense_date || new Date().toISOString().split('T')[0] });
+    setShowExp(true);
+  };
+  const saveExp = async () => {
+    const catKey = (expRefs?.categories || []).find((c: any) => c.id === expForm.category_id)?.key;
+    setWriteBusy(true);
+    try {
+      await aw.saveExpense({ ...expForm, categoryKey: catKey }, expEditId);
+      setShowExp(false); reloadSection();
+    } catch (e: any) { Alert.alert('Expense', e?.message || 'Could not save expense.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+
+  const openAdjAdd = async () => {
+    setAdjEditId(null);
+    setAdjForm({ tenant_id: '', allotment_id: '', adjustment_type: 'credit_note', category: 'others', amount: '', reason: '', reference_number: '', adjustment_date: new Date().toISOString().split('T')[0], property_id: '', apartment_id: '', bed_id: '' });
+    setShowAdj(true);
+    if (!adjActiveTenants) aw.loadAdjustmentActiveTenants().then((r) => { if (mounted.current) setAdjActiveTenants(r); }).catch(() => {});
+  };
+  const saveAdj = async () => {
+    setWriteBusy(true);
+    try {
+      await aw.saveAdjustment(adjForm, adjEditId);
+      setShowAdj(false); setAdjustments(null); // force adjustments reload
+    } catch (e: any) { Alert.alert('Adjustment', e?.message || 'Could not save adjustment.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+
+  const openSetlCreate = async () => {
+    setSetlForm({ tenant_id: '', allotment_id: '', deposit_amount: '', pending_rent: '0', pending_eb: '0', pending_late_fees: '0', damages: '0', other_deductions: '0', notes: '', settlement_date: new Date().toISOString().split('T')[0], payment_bank_id: '', payment_reference: '' });
+    setShowSetl(true);
+    if (!setlRefs) aw.loadSettlementRefs().then((r) => { if (mounted.current) setSetlRefs(r); }).catch(() => {});
+  };
+  const onSetlTenant = async (allotmentId: string) => {
+    const t = (setlRefs?.exitedTenants || []).find((x: any) => x.allotment_id === allotmentId);
+    if (!t) return;
+    setSetlForm((f: any) => ({ ...f, tenant_id: t.tenant_id, allotment_id: allotmentId }));
+    try {
+      const pre = await aw.computeSettlementPrefill(allotmentId, t.tenant_id, t.deposit_paid);
+      if (mounted.current) setSetlForm((f: any) => ({ ...f, deposit_amount: String(pre.deposit_amount), pending_rent: String(pre.pending_rent), pending_eb: String(pre.pending_eb), pending_late_fees: String(pre.pending_late_fees) }));
+    } catch { /* keep manual */ }
+  };
+  const saveSetl = async () => {
+    setWriteBusy(true);
+    try {
+      await aw.createSettlement(setlForm);
+      setShowSetl(false); setSettlements(null); reloadSection();
+    } catch (e: any) { Alert.alert('Settlement', e?.message || 'Could not create settlement.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+  const openRefund = (s: any) => {
+    setRefundForm({ settlement_id: s.id, allotment_id: s.allotmentId || '', tenant_name: s.tenantName || '', deposit_amount: Number(s.depositAmount || 0), total_deductions: Number(s.totalDeductions || 0), refund_amount: Number(s.refundAmount || 0), refund_date: new Date().toISOString().split('T')[0], refund_bank_id: '', refund_reference: '' });
+    setShowRefund(true);
+    if (!setlRefs) aw.loadSettlementRefs().then((r) => { if (mounted.current) setSetlRefs(r); }).catch(() => {});
+  };
+  const saveRefund = async () => {
+    setWriteBusy(true);
+    try {
+      await aw.completeRefund(refundForm);
+      setShowRefund(false); setSettlements(null); reloadSection();
+    } catch (e: any) { Alert.alert('Complete Refund', e?.message || 'Could not complete refund.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+
+  const openExit = (x: any) => {
+    setExitRow(x);
+    setExitForm({ exitDate: x.actualExitDate || '', addEb: '', addExit: '', refund: '', touchedRefund: false, refundDate: x.actualExitDate || '', bankId: '', ref: '' });
+    setShowExit(true);
+    if (!setlRefs) aw.loadSettlementRefs().then((r) => { if (mounted.current) setSetlRefs(r); }).catch(() => {});
+  };
+  const exitDerived = () => {
+    const duesAfter = aw.computeDuesAfter(Number(exitRow?.duesNow) || 0, Number(exitForm.addEb) || 0, Number(exitForm.addExit) || 0);
+    const computedRefund = aw.computeExitRefund(Number(exitRow?.depositHeld) || 0, duesAfter);
+    return { duesAfter, computedRefund };
+  };
+  const saveExit = async () => {
+    if (!exitRow) return;
+    setWriteBusy(true);
+    try {
+      await aw.settleExit({
+        allotmentId: exitRow.allotmentId, propertyId: exitRow.propertyId, apartmentId: exitRow.apartmentId,
+        bedId: exitRow.bedId, tenantId: exitRow.tenantId, propertyName: exitRow.propertyName,
+        exitDate: exitForm.exitDate, addEb: exitForm.addEb, addExit: exitForm.addExit,
+        refund: exitForm.refund, touchedRefund: exitForm.touchedRefund,
+        refundDate: exitForm.refundDate, bankId: exitForm.bankId, ref: exitForm.ref,
+      });
+      setShowExit(false); setExitRecon(null); reloadSection();
+    } catch (e: any) { Alert.alert('Exit Settlement', e?.message || 'Could not settle exit.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+
+  const openInvEdit = (iv: any) => {
+    setInvEditForm({ rent_amount: String(iv.rentAmount || 0), electricity_amount: String(iv.electricityAmount || 0), estimated_eb: String(iv.estimatedEb || 0), late_fee: String(iv.lateFee || 0), other_charges: String(iv.otherCharges || 0) });
+    setShowInvEdit(true);
+  };
+  const saveInvEdit = async () => {
+    const iv = invDetail?.inv; if (!iv) return;
+    setWriteBusy(true);
+    try {
+      const r: any = await aw.saveInvoiceEdit({ id: iv.id || iv._id, locked: iv.locked, paidAmount: iv.paidAmount }, {
+        rent_amount: Number(invEditForm.rent_amount) || 0, electricity_amount: Number(invEditForm.electricity_amount) || 0,
+        estimated_eb: Number(invEditForm.estimated_eb) || 0, late_fee: Number(invEditForm.late_fee) || 0,
+        other_charges: Number(invEditForm.other_charges) || 0,
+      });
+      setShowInvEdit(false); setInvDetail(null); reloadSection();
+      if (r?.lineItemWarning) Alert.alert('Invoice updated', String(r.lineItemWarning));
+    } catch (e: any) { Alert.alert('Edit Invoice', e?.message || 'Could not update invoice.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+  const toggleInvLock = async (iv: any) => {
+    setWriteBusy(true);
+    try {
+      await aw.setInvoiceLock({ id: iv.id || iv._id, invoiceNumber: iv.invoiceNumber, locked: iv.locked }, !iv.locked);
+      setInvDetail((d: any) => d ? { ...d, inv: { ...d.inv, locked: !iv.locked } } : d);
+      reloadSection();
+    } catch (e: any) { Alert.alert('Lock', e?.message || 'Could not change lock state.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+  const markPaid = (iv: any) => {
+    const bal = Number(iv.balance ?? Math.max((iv.totalAmount || 0) - (iv.paidAmount || 0), 0));
+    if (bal <= 0) { Alert.alert('Mark Paid', 'Invoice is already fully paid.'); return; }
+    Alert.alert('Mark as Paid', `Record a cash payment of Rs ${bal.toLocaleString('en-IN')} to clear this invoice?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Mark Paid', onPress: async () => {
+        setWriteBusy(true);
+        try {
+          const res: any = await aw.markInvoicePaid(iv, { paymentMode: 'cash' });
+          if (res?.ok === false) { Alert.alert('Mark Paid', res.reason || 'Could not record payment.'); return; }
+          setInvDetail(null); reloadSection();
+        } catch (e: any) { Alert.alert('Mark Paid', e?.message || 'Could not mark paid.'); }
+        finally { if (mounted.current) setWriteBusy(false); }
+      } },
+    ]);
+  };
+  const sendInvWa = async (iv: any) => {
+    setWriteBusy(true);
+    try {
+      const res: any = await aw.sendInvoicesWhatsApp([iv]);
+      if (res?.ok) Alert.alert('WhatsApp', `Invoice queued for sending (job ${res.jobId}). Track it in WhatsApp Logs.`);
+      else Alert.alert('WhatsApp', res?.reason || 'Could not queue the invoice.');
+    } catch (e: any) { Alert.alert('WhatsApp', e?.message || 'Could not send invoice.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+
+  const openPayout = (p: any) => {
+    setPayoutRow(p);
+    setPayoutForm({ paid_date: new Date().toISOString().split('T')[0], payment_mode: 'transfer', reference_number: '', notes: '' });
+    setShowPayout(true);
+  };
+  const savePayout = async () => {
+    if (!payoutRow) return;
+    setWriteBusy(true);
+    try {
+      await sb.recordOwnerPayment(payoutRow.id, payoutForm);
+      setShowPayout(false); reloadSection();
+    } catch (e: any) { Alert.alert('Owner Payout', e?.message || 'Could not record payout.'); }
+    finally { if (mounted.current) setWriteBusy(false); }
+  };
+
   if (!invoices) return <LoadingScreen />;
 
   const filtered = (filter === 'all' ? invoices : invoices.filter((i: any) => i.status === filter))
@@ -774,6 +982,9 @@ export default function AccountingScreen() {
             const shown = adjType === 'all' ? adjustments : adjustments.filter((a: any) => a.adjustmentType === adjType);
             return (
               <>
+                <View style={{ marginBottom: spacing.md }}>
+                  <Button title="Add Adjustment" icon="add-circle-outline" onPress={openAdjAdd} />
+                </View>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
                   <View style={{ flex: 1, backgroundColor: '#ECFDF5', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#BBF7D0' }}>
                     <Text style={{ fontSize: 10, color: '#16A34A', textTransform: 'uppercase' }}>Credits</Text>
@@ -818,9 +1029,12 @@ export default function AccountingScreen() {
           })()
         )}
 
-        {/* ── SETTLEMENTS (deposit settlements, read-only) ── */}
-        {section === 'settlements' && (
-          secLoading || settlements === null ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 30 }} /> :
+        {/* ── SETTLEMENTS (create / complete refund) ── */}
+        {section === 'settlements' && (<>
+          <View style={{ marginBottom: spacing.md }}>
+            <Button title="Create Settlement" icon="add-circle-outline" onPress={openSetlCreate} />
+          </View>
+          {secLoading || settlements === null ? <ActivityIndicator color={ACC.purple} style={{ marginTop: 30 }} /> :
           settlements.length === 0 ? <EmptyState title="No settlements" subtitle="Deposit settlements appear here" icon="wallet-outline" /> : (
             <>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
@@ -852,12 +1066,17 @@ export default function AccountingScreen() {
                       <Text style={styles.cardSub}>Deductions {fmtMoney(x.totalDeductions)}</Text>
                       {x.damages > 0 && <Text style={styles.cardSub}>Damages {fmtMoney(x.damages)}</Text>}
                     </View>
+                    {x.status !== 'completed' && (
+                      <TouchableOpacity onPress={() => openRefund(x)} style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: borderRadius.md, backgroundColor: '#DCFCE7' }}>
+                        <Ionicons name="checkmark-circle-outline" size={15} color="#16A34A" /><Text style={{ color: '#16A34A', fontWeight: '800', fontSize: fontSize.sm }}>Complete Refund</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 );
               })}
             </>
-          )
-        )}
+          )}
+        </>)}
 
         {/* ── EXIT RECONCILIATION (worklist, read-only) ── */}
         {section === 'exit_recon' && (
@@ -882,6 +1101,9 @@ export default function AccountingScreen() {
                     <Text style={styles.cardSub}>Deposit {fmtMoney(x.depositHeld)}</Text>
                     {!!x.settlementStatus && <Text style={styles.cardSub}>{x.settlementStatus}</Text>}
                   </View>
+                  <TouchableOpacity onPress={() => openExit(x)} style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: borderRadius.md, backgroundColor: ACC.purple }}>
+                    <Ionicons name="checkmark-done-outline" size={15} color="#fff" /><Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.sm }}>Settle Exit</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
             </>
@@ -980,9 +1202,12 @@ export default function AccountingScreen() {
           )
         )}
 
-        {/* ── EXPENSES (read-only) ── */}
-        {section === 'expenses' && (
-          expenses.length === 0 ? (
+        {/* ── EXPENSES (add / edit) ── */}
+        {section === 'expenses' && (<>
+          <View style={{ marginBottom: spacing.md }}>
+            <Button title="Add Expense" icon="add-circle-outline" onPress={openExpAdd} />
+          </View>
+          {expenses.length === 0 ? (
             <EmptyState title="No Expenses" subtitle="Recorded expenses will appear here" icon="receipt-outline" />
           ) : (<>
             <View style={{ backgroundColor: '#FEF2F2', borderRadius: 14, padding: 12, marginBottom: spacing.md }}>
@@ -997,10 +1222,15 @@ export default function AccountingScreen() {
                 </View>
                 {!!e.description && <Text style={styles.cardSub} numberOfLines={2}>{e.description}</Text>}
                 <Text style={styles.cardSub}>{e.expense_date ? formatDate(e.expense_date) : '—'}{e.propertyName ? ` · ${e.propertyName}` : ''}{e.vendorName ? ` · ${e.vendorName}` : ''}</Text>
+                {!e.locked && (
+                  <TouchableOpacity onPress={() => openExpEdit(e)} style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line }}>
+                    <Ionicons name="pencil-outline" size={15} color={ACC.purple} /><Text style={{ color: ACC.purple, fontWeight: '700', fontSize: fontSize.sm }}>Edit</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
-          </>)
-        )}
+          </>)}
+        </>)}
 
         {/* ── RENTAL PAYMENTS / owner payouts (read-only) ── */}
         {section === 'payments' && (
@@ -1035,6 +1265,11 @@ export default function AccountingScreen() {
                       </View>
                     </View>
                   </View>
+                  {p.status !== 'paid' && p.id && (
+                    <TouchableOpacity onPress={() => openPayout(p)} style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: borderRadius.md, backgroundColor: ACC.purple }}>
+                      <Ionicons name="wallet-outline" size={15} color="#fff" /><Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.sm }}>Record Payout</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })}
@@ -1381,10 +1616,249 @@ export default function AccountingScreen() {
                       <Button title="Record Payment" icon="cash-outline" onPress={() => { const inv = iv; setInvDetail(null); setShowPay(inv); }} />
                     </View>
                   </View>
+                  {/* Invoice write actions (web parity: edit / lock / mark-paid / WhatsApp) */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    <TouchableOpacity disabled={iv.locked || writeBusy} onPress={() => openInvEdit(iv)} style={{ flexGrow: 1, minWidth: '46%', opacity: iv.locked ? 0.5 : 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line }}>
+                      <Ionicons name="pencil-outline" size={15} color={ACC.purple} /><Text style={{ color: ACC.purple, fontWeight: '700', fontSize: fontSize.sm }}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity disabled={writeBusy} onPress={() => toggleInvLock(iv)} style={{ flexGrow: 1, minWidth: '46%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line }}>
+                      <Ionicons name={iv.locked ? 'lock-open-outline' : 'lock-closed-outline'} size={15} color={ACC.ink2} /><Text style={{ color: ACC.ink2, fontWeight: '700', fontSize: fontSize.sm }}>{iv.locked ? 'Unlock' : 'Lock'}</Text>
+                    </TouchableOpacity>
+                    {iv.status !== 'paid' && (
+                      <TouchableOpacity disabled={writeBusy} onPress={() => markPaid(iv)} style={{ flexGrow: 1, minWidth: '46%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: borderRadius.md, backgroundColor: '#DCFCE7' }}>
+                        <Ionicons name="checkmark-circle-outline" size={15} color="#16A34A" /><Text style={{ color: '#16A34A', fontWeight: '800', fontSize: fontSize.sm }}>Mark Paid</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity disabled={writeBusy} onPress={() => sendInvWa(iv)} style={{ flexGrow: 1, minWidth: '46%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: borderRadius.md, backgroundColor: '#25D366' }}>
+                      <Ionicons name="logo-whatsapp" size={15} color="#fff" /><Text style={{ color: '#fff', fontWeight: '800', fontSize: fontSize.sm }}>Send WhatsApp</Text>
+                    </TouchableOpacity>
+                  </View>
                 </>
               ); })()}
             </ScrollView>
           )}
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* ── Expense add/edit ── (web ExpensesTab) */}
+      <Modal visible={showExp} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowExp(false)}><Text style={{ color: colors.danger }}>Cancel</Text></TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>{expEditId ? 'Edit' : 'Add'} Expense</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>
+            <PickerSelect label="Property *" value={expForm.property_id} options={(expRefs?.properties || []).map((p: any) => ({ label: p.property_name, value: p.id }))} onSelect={(v: string) => setExpForm((f: any) => ({ ...f, property_id: v, apartment_id: '', bed_ids: [] }))} />
+            <PickerSelect label="Apartment (optional)" value={expForm.apartment_id} options={(expRefs?.apartments || []).filter((a: any) => !expForm.property_id || a.property_id === expForm.property_id).map((a: any) => ({ label: a.apartment_code, value: a.id }))} onSelect={(v: string) => setExpForm((f: any) => ({ ...f, apartment_id: v, bed_ids: [] }))} />
+            {!!expForm.apartment_id && (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Beds (tap to split cost)</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {(expRefs?.beds || []).filter((b: any) => b.apartment_id === expForm.apartment_id).map((b: any) => {
+                    const on = (expForm.bed_ids || []).includes(b.id);
+                    return (
+                      <TouchableOpacity key={b.id} onPress={() => setExpForm((f: any) => ({ ...f, bed_ids: on ? f.bed_ids.filter((x: string) => x !== b.id) : [...(f.bed_ids || []), b.id] }))}
+                        style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: on ? ACC.purple : ACC.line, backgroundColor: on ? ACC.purple : '#fff' }}>
+                        <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: on ? '#fff' : ACC.ink2 }}>{b.bed_code}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+            <PickerSelect label="Category *" value={expForm.category_id} options={(expRefs?.categories || []).map((c: any) => ({ label: c.label || c.key, value: c.id }))} onSelect={(v: string) => setExpForm((f: any) => ({ ...f, category_id: v }))} />
+            <PickerSelect label="Vendor" value={expForm.vendor_id} options={(expRefs?.vendors || []).map((v: any) => ({ label: v.vendor_name, value: v.id }))} onSelect={(v: string) => setExpForm((f: any) => ({ ...f, vendor_id: v }))} />
+            <Input label="Amount (Rs) *" value={expForm.amount} onChangeText={(v: string) => setExpForm((f: any) => ({ ...f, amount: v }))} keyboardType="numeric" placeholder="0" />
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Expense Date</Text>
+              <DateField value={expForm.expense_date} onChange={(v: string) => setExpForm((f: any) => ({ ...f, expense_date: v }))} />
+            </View>
+            <Input label="Description" value={expForm.description} onChangeText={(v: string) => setExpForm((f: any) => ({ ...f, description: v }))} placeholder="Optional" />
+            <Button title={expEditId ? 'Update Expense' : 'Add Expense'} onPress={saveExp} loading={writeBusy} icon="receipt-outline" />
+          </ScrollView>
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* ── Adjustment add ── (web TenantAdjustmentsTab) */}
+      <Modal visible={showAdj} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowAdj(false)}><Text style={{ color: colors.danger }}>Cancel</Text></TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>{adjEditId ? 'Edit' : 'Add'} Adjustment</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>
+            <PickerSelect label="Tenant" value={adjForm.tenant_id} options={(adjActiveTenants || []).map((t: any) => ({ label: `${t.full_name} — ${t.apartment_code}/${t.bed_code}`, value: t.tenant_id }))}
+              onSelect={(v: string) => { const t = (adjActiveTenants || []).find((x: any) => x.tenant_id === v); setAdjForm((f: any) => ({ ...f, tenant_id: v, allotment_id: t?.allotment_id || '', property_id: t?.property_id || '', apartment_id: t?.apartment_id || '', bed_id: t?.bed_id || '' })); }} />
+            <PickerSelect label="Type" value={adjForm.adjustment_type} options={[{ label: 'Credit Note', value: 'credit_note' }, { label: 'Debit Note', value: 'debit_note' }]} onSelect={(v: string) => setAdjForm((f: any) => ({ ...f, adjustment_type: v }))} />
+            <PickerSelect label="Category *" value={adjForm.category} options={aw.ADJUSTMENT_CATEGORIES.map((c) => ({ label: c.label, value: c.value }))} onSelect={(v: string) => setAdjForm((f: any) => ({ ...f, category: v }))} />
+            <Input label="Amount (Rs)" value={adjForm.amount} onChangeText={(v: string) => setAdjForm((f: any) => ({ ...f, amount: v }))} keyboardType="numeric" placeholder="0" />
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Date</Text>
+              <DateField value={adjForm.adjustment_date} onChange={(v: string) => setAdjForm((f: any) => ({ ...f, adjustment_date: v }))} />
+            </View>
+            <Input label="Reason" value={adjForm.reason} onChangeText={(v: string) => setAdjForm((f: any) => ({ ...f, reason: v }))} placeholder="Optional" />
+            <Input label="Reference Number" value={adjForm.reference_number} onChangeText={(v: string) => setAdjForm((f: any) => ({ ...f, reference_number: v }))} placeholder="Optional" />
+            <Button title={adjEditId ? 'Update' : 'Add Adjustment'} onPress={saveAdj} loading={writeBusy} icon="swap-horizontal-outline" />
+          </ScrollView>
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* ── Settlement create ── (web SettlementsTab) */}
+      <Modal visible={showSetl} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowSetl(false)}><Text style={{ color: colors.danger }}>Cancel</Text></TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Final Settlement</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>
+            <PickerSelect label="Tenant (Exited)" value={setlForm.allotment_id} options={(setlRefs?.exitedTenants || []).map((t: any) => ({ label: `${t.full_name}${t.actual_exit_date ? ` — ${formatDate(t.actual_exit_date)}` : ''}`, value: t.allotment_id }))} onSelect={onSetlTenant} />
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Date of Settlement *</Text>
+              <DateField value={setlForm.settlement_date} onChange={(v: string) => setSetlForm((f: any) => ({ ...f, settlement_date: v }))} />
+            </View>
+            <Input label="Deposit Amount (Rs)" value={setlForm.deposit_amount} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, deposit_amount: v }))} keyboardType="numeric" />
+            <Input label="Pending Rent (Rs)" value={setlForm.pending_rent} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, pending_rent: v }))} keyboardType="numeric" />
+            <Input label="Pending EB (Rs)" value={setlForm.pending_eb} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, pending_eb: v }))} keyboardType="numeric" />
+            <Input label="Late Fees (Rs)" value={setlForm.pending_late_fees} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, pending_late_fees: v }))} keyboardType="numeric" />
+            <Input label="Damages (Rs)" value={setlForm.damages} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, damages: v }))} keyboardType="numeric" />
+            <Input label="Other Deductions (Rs)" value={setlForm.other_deductions} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, other_deductions: v }))} keyboardType="numeric" />
+            {(() => {
+              const dep = parseFloat(setlForm.deposit_amount) || 0;
+              const ded = ['pending_rent', 'pending_eb', 'pending_late_fees', 'damages', 'other_deductions'].reduce((s, k) => s + (parseFloat(setlForm[k]) || 0), 0);
+              const ref = dep - ded;
+              return (
+                <View style={{ backgroundColor: ACC.soft, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={styles.cardSub}>Total Deductions</Text><Text style={{ color: ACC.bad, fontWeight: '700' }}>- Rs {ded.toLocaleString('en-IN')}</Text></View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}><Text style={{ fontWeight: '800', color: ACC.ink }}>{ref >= 0 ? 'Refund' : 'Amount Payable'}</Text><Text style={{ fontWeight: '900', color: ref >= 0 ? ACC.good : ACC.bad }}>Rs {Math.abs(ref).toLocaleString('en-IN')}</Text></View>
+                </View>
+              );
+            })()}
+            <PickerSelect label="Bank (payment)" value={setlForm.payment_bank_id} options={(setlRefs?.banks || []).map((b: any) => ({ label: `${b.bank_name}${b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}`, value: b.id }))} onSelect={(v: string) => setSetlForm((f: any) => ({ ...f, payment_bank_id: v }))} />
+            <Input label="Reference (UTR / Txn ID)" value={setlForm.payment_reference} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, payment_reference: v }))} placeholder="Optional" />
+            <Input label="Notes" value={setlForm.notes} onChangeText={(v: string) => setSetlForm((f: any) => ({ ...f, notes: v }))} placeholder="Optional" />
+            <Button title="Create Settlement" onPress={saveSetl} loading={writeBusy} icon="wallet-outline" />
+          </ScrollView>
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* ── Complete Refund ── (web SettlementsTab completeRefundMutation) */}
+      <Modal visible={showRefund} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowRefund(false)}><Text style={{ color: colors.danger }}>Cancel</Text></TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Complete Refund</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>
+            <View style={{ backgroundColor: ACC.soft, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={styles.cardSub}>Tenant</Text><Text style={{ fontWeight: '700', color: ACC.ink }}>{refundForm.tenant_name}</Text></View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}><Text style={styles.cardSub}>Refund Amount</Text><Text style={{ fontWeight: '900', color: Number(refundForm.refund_amount) >= 0 ? ACC.good : ACC.bad }}>Rs {Math.abs(Number(refundForm.refund_amount)).toLocaleString('en-IN')}</Text></View>
+            </View>
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Refund Date *</Text>
+              <DateField value={refundForm.refund_date} onChange={(v: string) => setRefundForm((f: any) => ({ ...f, refund_date: v }))} />
+            </View>
+            <PickerSelect label="Bank Account *" value={refundForm.refund_bank_id} options={(setlRefs?.banks || []).map((b: any) => ({ label: `${b.bank_name}${b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}${b.is_primary ? ' (Primary)' : ''}`, value: b.id }))} onSelect={(v: string) => setRefundForm((f: any) => ({ ...f, refund_bank_id: v }))} />
+            <Input label="Reference Number *" value={refundForm.refund_reference} onChangeText={(v: string) => setRefundForm((f: any) => ({ ...f, refund_reference: v }))} placeholder="UTR / Transaction ID" />
+            <Button title="Complete Refund" onPress={saveRefund} loading={writeBusy} icon="checkmark-circle-outline" />
+          </ScrollView>
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* ── Exit Settlement ── (web ExitReconciliationTab) */}
+      <Modal visible={showExit} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowExit(false)}><Text style={{ color: colors.danger }}>Cancel</Text></TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Settle Exit</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          {exitRow && (
+            <ScrollView style={{ padding: spacing.xl }}>
+              <View style={{ backgroundColor: ACC.soft, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                <Text style={{ fontWeight: '800', color: ACC.ink }}>{exitRow.tenantName}</Text>
+                <Text style={styles.cardSub}>{exitRow.bedLabel} · Dues {fmtMoney(exitRow.duesNow)} · Deposit {fmtMoney(exitRow.depositHeld)}</Text>
+              </View>
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Exit Date *</Text>
+                <DateField value={exitForm.exitDate} onChange={(v: string) => setExitForm((f: any) => ({ ...f, exitDate: v, refundDate: f.refundDate || v }))} />
+              </View>
+              <Input label="+ Estimated EB (Rs)" value={exitForm.addEb} onChangeText={(v: string) => setExitForm((f: any) => ({ ...f, addEb: v }))} keyboardType="numeric" placeholder="0" />
+              <Input label="+ Exit Charges (Rs)" value={exitForm.addExit} onChangeText={(v: string) => setExitForm((f: any) => ({ ...f, addExit: v }))} keyboardType="numeric" placeholder="0" />
+              {(() => { const d = exitDerived(); return (
+                <View style={{ backgroundColor: ACC.soft, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={styles.cardSub}>Dues after</Text><Text style={{ fontWeight: '700', color: ACC.ink }}>{fmtMoney(d.duesAfter)}</Text></View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}><Text style={styles.cardSub}>Suggested refund</Text><Text style={{ fontWeight: '900', color: ACC.good }}>{fmtMoney(d.computedRefund)}</Text></View>
+                </View>
+              ); })()}
+              <Input label="Refund (override)" value={exitForm.touchedRefund ? exitForm.refund : String(exitDerived().computedRefund)} onChangeText={(v: string) => setExitForm((f: any) => ({ ...f, refund: v, touchedRefund: true }))} keyboardType="numeric" />
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Refund Date</Text>
+                <DateField value={exitForm.refundDate} onChange={(v: string) => setExitForm((f: any) => ({ ...f, refundDate: v }))} />
+              </View>
+              <PickerSelect label="Refund Bank" value={exitForm.bankId} options={(setlRefs?.banks || []).map((b: any) => ({ label: `${b.bank_name}${b.account_number ? ` ····${String(b.account_number).slice(-4)}` : ''}`, value: b.id }))} onSelect={(v: string) => setExitForm((f: any) => ({ ...f, bankId: v }))} />
+              <Input label="Reference" value={exitForm.ref} onChangeText={(v: string) => setExitForm((f: any) => ({ ...f, ref: v }))} placeholder="Optional" />
+              <Button title="Settle Exit" onPress={saveExit} loading={writeBusy} icon="checkmark-done-outline" />
+            </ScrollView>
+          )}
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* ── Invoice edit ── (web InvoicesTab handleSaveEdit) */}
+      <Modal visible={showInvEdit} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowInvEdit(false)}><Text style={{ color: colors.danger }}>Cancel</Text></TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Edit Invoice</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>
+            <Input label="Rent (Rs)" value={invEditForm.rent_amount} onChangeText={(v: string) => setInvEditForm((f: any) => ({ ...f, rent_amount: v }))} keyboardType="numeric" />
+            <Input label="Actual EB (Rs)" value={invEditForm.electricity_amount} onChangeText={(v: string) => setInvEditForm((f: any) => ({ ...f, electricity_amount: v }))} keyboardType="numeric" />
+            <Input label="Estimated EB (Rs)" value={invEditForm.estimated_eb} onChangeText={(v: string) => setInvEditForm((f: any) => ({ ...f, estimated_eb: v }))} keyboardType="numeric" />
+            <Input label="Late Fee (Rs)" value={invEditForm.late_fee} onChangeText={(v: string) => setInvEditForm((f: any) => ({ ...f, late_fee: v }))} keyboardType="numeric" />
+            <Input label="Other Charges (Rs)" value={invEditForm.other_charges} onChangeText={(v: string) => setInvEditForm((f: any) => ({ ...f, other_charges: v }))} keyboardType="numeric" />
+            <Button title="Save Invoice" onPress={saveInvEdit} loading={writeBusy} icon="save-outline" />
+          </ScrollView>
+        </SafeAreaView>
+        </GlassBackground>
+      </Modal>
+
+      {/* ── Record Owner Payout ── (web RentalPaymentsTab / sb.recordOwnerPayment) */}
+      <Modal visible={showPayout} animationType="slide" presentationStyle="pageSheet">
+        <GlassBackground>
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={[glass.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg }]}>
+            <TouchableOpacity onPress={() => setShowPayout(false)}><Text style={{ color: colors.danger }}>Cancel</Text></TouchableOpacity>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: colors.text }}>Record Payout</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <ScrollView style={{ padding: spacing.xl }}>
+            {payoutRow && <Text style={{ fontSize: fontSize.sm, color: ACC.ink2, marginBottom: spacing.md }}>{payoutRow.ownerName}{payoutRow.apartmentCode ? ` · ${payoutRow.apartmentCode}` : ''} — {fmtMoney(payoutRow.amount)}</Text>}
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: ACC.ink2, marginBottom: 6 }}>Payment Date *</Text>
+              <DateField value={payoutForm.paid_date} onChange={(v: string) => setPayoutForm((f: any) => ({ ...f, paid_date: v }))} />
+            </View>
+            <PickerSelect label="Payment Mode" value={payoutForm.payment_mode} options={[{ label: 'Bank Transfer', value: 'transfer' }, { label: 'Cash', value: 'cash' }, { label: 'UPI', value: 'upi' }, { label: 'Cheque', value: 'cheque' }]} onSelect={(v: string) => setPayoutForm((f: any) => ({ ...f, payment_mode: v }))} />
+            <Input label="Reference Number" value={payoutForm.reference_number} onChangeText={(v: string) => setPayoutForm((f: any) => ({ ...f, reference_number: v }))} placeholder="Optional" />
+            <Input label="Notes" value={payoutForm.notes} onChangeText={(v: string) => setPayoutForm((f: any) => ({ ...f, notes: v }))} placeholder="Optional" />
+            <Button title="Record Payout" onPress={savePayout} loading={writeBusy} icon="wallet-outline" />
+          </ScrollView>
         </SafeAreaView>
         </GlassBackground>
       </Modal>

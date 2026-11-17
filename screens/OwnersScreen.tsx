@@ -11,9 +11,11 @@ import { colors, spacing, fontSize, borderRadius } from '../lib/theme';
 import { GlassBackground, EmptyState, LoadingScreen, DateField, SearchField, IconBtnSolid } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import * as sb from '../lib/supabaseService';
+import * as ownerImport from '../lib/ownerImport';
 import { INDIAN_STATES, INDIAN_CITIES } from '../lib/indianCitiesStates';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as DocumentPicker from 'expo-document-picker';
 // SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -738,6 +740,46 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
     } catch (_) { /* user cancelled */ }
   };
 
+  // ── Import payments (CSV — web parity for the xlsx import) ──────────────────
+  const [importOpen, setImportOpen]   = useState(false);
+  const [importMode, setImportMode]   = useState<'append' | 'replace'>('append');
+  const [importing, setImporting]     = useState(false);
+
+  const downloadTemplate = async () => {
+    try { await ownerImport.downloadOwnerPaymentsTemplate(); }
+    catch (e: any) { Alert.alert('Template', e?.message || 'Could not share the template.'); }
+  };
+
+  const pickAndImport = async () => {
+    try {
+      const res: any = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'application/csv', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (res?.canceled) return;
+      const asset = res?.assets?.[0] || res; // SDK 58 returns { assets: [...] }
+      const uri = asset?.uri;
+      if (!uri) { Alert.alert('Import', 'Could not read the selected file.'); return; }
+      setImporting(true);
+      const csvText = await FileSystem.readAsStringAsync(uri, { encoding: 'utf8' as any });
+      const result = await ownerImport.importOwnerPayments({ ownerId, csvText, mode: importMode });
+      if ((result as any).success) {
+        const r: any = result;
+        Alert.alert('Import complete', `${r.inserted} payment(s) imported (${r.mode}).${r.skipped ? ` ${r.skipped} row(s) skipped.` : ''}`);
+        setImportOpen(false);
+        loadPayments();
+      } else if ((result as any).disabled) {
+        Alert.alert('Replace unavailable', (result as any).message);
+      } else {
+        Alert.alert('Import failed', (result as any).message || 'Unknown error.');
+      }
+    } catch (e: any) {
+      Alert.alert('Import failed', e?.message || String(e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const filteredContracts = (data?.contracts || []).filter((c: any) =>
     !contractSearch ||
     (c.propertyName || '').toLowerCase().includes(contractSearch.toLowerCase()) ||
@@ -966,6 +1008,11 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                         <Ionicons name="refresh-outline" size={14} color="#0284C7" />
                         <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284C7' }}>Regenerate</Text>
                       </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setImportMode('append'); setImportOpen(true); }}
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 12 }}>
+                        <Ionicons name="cloud-upload-outline" size={14} color="#7C3AED" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#7C3AED' }}>Import</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -1044,6 +1091,51 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
           {showEditOwner && owner && (
             <OwnerFormModal mode="edit" initial={{ ...owner, full_name: owner.name }} onClose={() => setShowEditOwner(false)} onSaved={() => { setShowEditOwner(false); loadDetail(); onChanged(); }} />
           )}
+
+          {/* Import owner payments (CSV) */}
+          <Modal visible={importOpen} transparent animationType="fade" onRequestClose={() => { if (!importing) setImportOpen(false); }}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 24 }}>
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>Import Payments</Text>
+                  <TouchableOpacity onPress={() => !importing && setImportOpen(false)}><Ionicons name="close" size={22} color="#64748B" /></TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12, lineHeight: 18 }}>
+                  Upload a CSV of rental payments. Apartment codes must match this owner's contracts. Download the template for the exact columns.
+                </Text>
+
+                <TouchableOpacity onPress={downloadTemplate} disabled={importing}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, backgroundColor: '#F5F3FF', borderRadius: 12, marginBottom: 14 }}>
+                  <Ionicons name="download-outline" size={15} color="#7C3AED" />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#7C3AED' }}>Download CSV Template</Text>
+                </TouchableOpacity>
+
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#556274', marginBottom: 6 }}>IMPORT MODE</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                  {(['append', 'replace'] as const).map(m => (
+                    <TouchableOpacity key={m} onPress={() => setImportMode(m)} disabled={importing}
+                      style={{ flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, alignItems: 'center',
+                        borderColor: importMode === m ? '#7C3AED' : '#E5E7EB', backgroundColor: importMode === m ? '#F5F3FF' : '#FFFFFF' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: importMode === m ? '#7C3AED' : '#64748B' }}>
+                        {m === 'append' ? 'Append' : 'Replace all'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {importMode === 'replace' && (
+                  <Text style={{ fontSize: 11, color: '#B45309', marginBottom: 14 }}>
+                    Replace clears this owner's existing payments first. This requires deletes to be enabled.
+                  </Text>
+                )}
+
+                <TouchableOpacity onPress={pickAndImport} disabled={importing}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, backgroundColor: importing ? '#A78BDA' : '#7C3AED', borderRadius: 12 }}>
+                  {importing ? <ActivityIndicator color="#fff" /> : <Ionicons name="cloud-upload-outline" size={16} color="#fff" />}
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>{importing ? 'Importing…' : 'Select CSV & Import'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       </GlassBackground>
     </Modal>

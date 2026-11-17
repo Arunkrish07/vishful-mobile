@@ -794,6 +794,7 @@ export default function TenantLifecycleScreen() {
   const [editExitOpen,      setEditExitOpen]      = useState(false);
   const [editRefundOpen,    setEditRefundOpen]    = useState(false);
   const [completeRefundOpen,setCompleteRefundOpen]= useState(false);
+  const [collectOpen,       setCollectOpen]       = useState(false);
   const [undoOnboardId,     setUndoOnboardId]     = useState<string | null>(null);
 
   // ── Absence (Not in Property) state ──────────────────────────────────────
@@ -1108,6 +1109,8 @@ export default function TenantLifecycleScreen() {
   const [editExitForm, setEditExitForm] = useState<any>({ exitId: '', allotmentId: '', exitDate: '', hasNotice: false, keyReturned: true, damageCharges: '0', notes: '' });
   const [editRefundForm, setEditRefundForm] = useState<any>({ exitId: '', allotmentId: '', advanceHeld: 0, pendingRent: '0', ebCharges: '0', exitCharges: '0', damageCharges: '0', keyLossFee: '0' });
   const [completeRefundForm, setCompleteRefundForm] = useState<any>({ exitId: '', allotmentId: '', tenantId: '', tenantName: '', refundDue: 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
+  // Collect-from-tenant (negative exit refund). amountOwed is the SIGNED refund_due (negative).
+  const [collectForm, setCollectForm] = useState<any>({ exitId: '', allotmentId: '', tenantId: '', tenantName: '', apartmentCode: '', amountOwed: 0, amount: '', paymentMode: '', referenceNumber: '', bankAccountId: '' });
   refundDueRef.current = Math.round(Number(completeRefundForm.refundDue) || 0);
 
   // ─── FETCH ─────────────────────────────────────────────────────────────────
@@ -1944,6 +1947,65 @@ export default function TenantLifecycleScreen() {
       });
       Alert.alert('Success', 'Refund completed!'); setCompleteRefundOpen(false); fetchAll();
     });
+  }
+
+  // Collect from tenant when the exit refund is NEGATIVE (tenant owes). Mirrors web collectPayment.
+  async function doCollectExit() {
+    const owed = Math.abs(Number(collectForm.amountOwed) || 0);
+    const amt = parseFloat(collectForm.amount) || 0;
+    if (amt <= 0) return Alert.alert('Validation', 'Enter an amount greater than 0.');
+    if (amt > owed + 0.01) return Alert.alert('Validation', `Amount cannot exceed ₹${fmtAmt(owed)}.`);
+    if (!collectForm.paymentMode) return Alert.alert('Validation', 'Select a payment mode.');
+    await withSave(async () => {
+      await lc.collectExitPayment({
+        data: {
+          exitId: collectForm.exitId,
+          allotmentId: collectForm.allotmentId || null,
+          tenantId: collectForm.tenantId,
+          amount: amt,
+          amountOwed: Number(collectForm.amountOwed) || 0,
+          paymentMode: collectForm.paymentMode,
+          referenceNumber: collectForm.referenceNumber || null,
+          bankAccountId: collectForm.bankAccountId || null,
+        },
+      });
+      Alert.alert('Collected', 'Payment recorded.'); setCollectOpen(false); fetchAll();
+    });
+  }
+
+  // Cancel / reverse a processed exit → tenant back to On-Notice. Mirrors web cancelExit.
+  function doCancelExit(e: any) {
+    const refundStatus = e.refundStatus || e.refund_status || 'none';
+    if (refundStatus !== 'pending' && refundStatus !== 'none') {
+      return Alert.alert('Cannot Reverse', 'This exit cannot be reversed because its refund has already been processed.');
+    }
+    const name = e.tenantName || e.tenants?.full_name || 'this tenant';
+    Alert.alert(
+      'Reverse Exit',
+      `Reverse the exit for ${name}? The tenant returns to On-Notice and the bed is freed back to notice. Any exit refund settlement for this allotment is undone.`,
+      [
+        { text: 'Keep Exit', style: 'cancel' },
+        { text: 'Reverse Exit', style: 'destructive', onPress: async () => {
+          await withSave(async () => {
+            try {
+              await lc.cancelExitFull({
+                data: {
+                  exitId: e._id || e.id,
+                  allotmentId: e.allotmentId || e.allotment_id,
+                  bedId: e.bedId || e.bed_id,
+                  tenantId: e.tenantId || e.tenant_id,
+                  refundStatus,
+                },
+              });
+              Alert.alert('Reversed', 'Exit reversed — tenant is back to On-Notice.');
+              fetchAll();
+            } catch (err: any) {
+              Alert.alert('Could not reverse', err?.message || String(err));
+            }
+          });
+        }},
+      ],
+    );
   }
 
   // ─── RENDER HELPERS ────────────────────────────────────────────────────────
@@ -3946,12 +4008,19 @@ export default function TenantLifecycleScreen() {
                       <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#16A34A" />
                       <StatusPill status={e.refundStatus || e.refund_status || 'none'} />
                     </View>
-                    <TouchableOpacity onPress={() => {
-                      setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
-                      setEditExitOpen(true);
-                    }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#2563EB" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity onPress={() => {
+                        setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
+                        setEditExitOpen(true);
+                      }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
+                        <Ionicons name="pencil-outline" size={16} color="#2563EB" />
+                      </TouchableOpacity>
+                      {((e.refundStatus || e.refund_status || 'none') === 'pending' || (e.refundStatus || e.refund_status || 'none') === 'none') && (
+                        <TouchableOpacity onPress={() => doCancelExit(e)} style={{ backgroundColor: '#FEF2F2', borderRadius: 8, padding: 8 }}>
+                          <Ionicons name="arrow-undo-outline" size={16} color="#DC2626" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </LifecycleCard>
               ))
@@ -4157,7 +4226,19 @@ export default function TenantLifecycleScreen() {
                   }} />
                   {tenantOwes ? (
                     <OutlineButton title="Collect" icon="cash-outline" tone="success" small onPress={() => {
-                      Alert.alert('Collect from Tenant', `Tenant owes ₹${fmtAmt(Math.abs(refundAmt))}. Collecting dues from an exit is not implemented as a separate flow yet — use Edit to adjust deductions.`);
+                      setCollectForm({
+                        exitId: e._id || e.id,
+                        allotmentId: e.allotmentId || e.allotment_id || '',
+                        tenantId: e.tenantId || e.tenant_id || '',
+                        tenantName: tenantName || '',
+                        apartmentCode: code || '',
+                        amountOwed: refundAmt, // signed (negative)
+                        amount: String(Math.abs(refundAmt) || ''),
+                        paymentMode: '',
+                        referenceNumber: '',
+                        bankAccountId: '',
+                      });
+                      setCollectOpen(true);
                     }} />
                   ) : (
                     <PrimaryButton title="Complete" icon="checkmark-circle-outline" small onPress={() => {
@@ -4322,6 +4403,47 @@ export default function TenantLifecycleScreen() {
               Refund is blocked until the uploaded screenshot's amount exactly matches ₹{fmtAmt(completeRefundForm.refundDue)}.
             </Text>
           )}
+        </BottomSheet>
+
+        {/* Collect-from-tenant sheet (negative exit refund) */}
+        <BottomSheet visible={collectOpen} onClose={() => setCollectOpen(false)} title="Collect from Tenant">
+          <Card style={{ marginBottom: 14 }}>
+            <Row label="Tenant" value={collectForm.tenantName} />
+            {!!collectForm.apartmentCode && <Row label="Apartment" value={collectForm.apartmentCode} />}
+            <Row label="Amount Owed" value={`₹${fmtAmt(Math.abs(Number(collectForm.amountOwed) || 0))}`} valueColor="#DC2626" />
+          </Card>
+          <Field label="Amount to Collect (₹) *">
+            <TextF value={collectForm.amount} onChange={v => setCollectForm({ ...collectForm, amount: v })} keyboardType="numeric" placeholder="0" />
+          </Field>
+          <Field label="Payment Mode *">
+            <SelectF options={PAY_MODES} value={collectForm.paymentMode} onChange={v => setCollectForm({ ...collectForm, paymentMode: v })} placeholder="Select payment mode" />
+          </Field>
+          <Field label="Bank Account">
+            {bankAccountOptions.length === 0
+              ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 4 }}>No bank accounts found.</Text>
+              : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={collectForm.bankAccountId} onChange={v => setCollectForm({ ...collectForm, bankAccountId: v })} placeholder="Select bank account" />
+            }
+          </Field>
+          <Field label="Reference Number">
+            <TextF value={collectForm.referenceNumber} onChange={v => setCollectForm({ ...collectForm, referenceNumber: v })} placeholder="UTR / transaction ID" />
+          </Field>
+          {(() => {
+            const collecting = parseFloat(collectForm.amount) || 0;
+            const owed = Math.abs(Number(collectForm.amountOwed) || 0);
+            const remaining = Math.max(0, owed - collecting);
+            return (
+              <Card style={{ marginBottom: 14 }}>
+                <Row label="Collecting" value={`₹${fmtAmt(collecting)}`} valueColor="#16A34A" />
+                <Row label="Remaining Owed" value={`₹${fmtAmt(remaining)}`} valueColor={remaining > 0 ? '#DC2626' : '#16A34A'} />
+              </Card>
+            );
+          })()}
+          <ActionBtn
+            title="Record Payment"
+            onPress={doCollectExit}
+            loading={saving}
+            disabled={!(parseFloat(collectForm.amount) > 0) || !collectForm.paymentMode}
+          />
         </BottomSheet>
       </ScrollView>
     );

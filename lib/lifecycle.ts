@@ -780,3 +780,186 @@ export async function createExitTask(args: { data: { allotmentId: string; tenant
   if (error) throw new Error(`Create exit task failed: ${error.message}`);
   return row;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// EXIT REFUNDS — Collect (negative refund) + Cancel/Reverse a processed exit
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * COLLECT PAYMENT for a NEGATIVE exit refund (tenant owes money at exit).
+ * Verbatim port of web collectPayment mutation —
+ * C:/vishful-web-v7/.../src/pages/TenantLifecycle.tsx lines 4810-4868.
+ *
+ * Sequence (money-critical, signs identical to web):
+ *   1. INSERT receipts (receipt_type = "additional_payment").
+ *   2. refund_due moves toward 0: newRefundDue = oldRefundDue(negative) + amt;
+ *      status "none" when |new| < 0.01 else "pending"; UPDATE tenant_exits.
+ *   3. Sync open deposit_settlements.refund_amount = max(newRefundDue, 0)
+ *      (web calls syncOpenDepositSettlementWithExit — inlined here as an UPDATE,
+ *       not a delete, so no DELETES_ENABLED gate is needed).
+ *   4. Best-effort audit_logs row (web parity; wrapped so it never breaks the money write).
+ *
+ * `amountOwed` is the SIGNED stored refund_due (negative when the tenant owes),
+ * used as web's `oldRefundDue` — no re-read of the exits list.
+ */
+export async function collectExitPayment(args: {
+  data: {
+    exitId: string;
+    allotmentId: string | null;
+    tenantId: string;
+    amount: number;
+    amountOwed: number; // signed; negative = tenant owes
+    paymentMode: string;
+    referenceNumber?: string | null;
+    bankAccountId?: string | null;
+  };
+}) {
+  const d = args.data;
+  const amt = Number(d.amount) || 0;
+  if (amt <= 0) throw new Error("Amount must be positive");
+  const owed = Number(d.amountOwed) || 0; // negative
+  const absOwed = Math.abs(owed);
+  if (amt > absOwed + 0.01) throw new Error(`Amount cannot exceed ₹${Math.round(absOwed)}`);
+  if (!d.paymentMode) throw new Error("Please select a payment mode");
+
+  // 1. Insert receipt. (Web omits bank_account_id on this insert; mobile stores it
+  //    conditionally for parity with its other receipt inserts — not a money change.)
+  await insertRow("receipts", {
+    tenant_id: d.tenantId,
+    tenant_allotment_id: d.allotmentId,
+    amount_paid: amt,
+    base_amount: amt,
+    processing_fee: 0,
+    payment_mode: d.paymentMode,
+    reference_number: d.referenceNumber || null,
+    payment_date: new Date().toISOString().split("T")[0],
+    receipt_type: "additional_payment",
+    ...(d.bankAccountId ? { bank_account_id: d.bankAccountId } : {}),
+  });
+
+  // 2. Recalculate refund_due (old is negative; adding collection moves toward 0).
+  const oldRefundDue = owed;
+  const newRefundDue = oldRefundDue + amt;
+  const newStatus = Math.abs(newRefundDue) < 0.01 ? "none" : "pending";
+  await supabase
+    .from("tenant_exits")
+    .update({
+      refund_due: Math.abs(newRefundDue) < 0.01 ? 0 : newRefundDue,
+      refund_status: newStatus,
+    } as any)
+    .eq("id", d.exitId)
+    .eq("organization_id", ORG_ID);
+
+  // 3. Keep open deposit_settlements in sync (UPDATE, not delete).
+  if (d.allotmentId) {
+    await supabase
+      .from("deposit_settlements")
+      .update({ refund_amount: Math.max(newRefundDue, 0) } as any)
+      .eq("allotment_id", d.allotmentId)
+      .eq("organization_id", ORG_ID);
+  }
+
+  // 4. Audit log (best-effort — web writes one; never block the money write on it).
+  try {
+    const { data: authData } = await supabase.auth.getUser();
+    await supabase.from("audit_logs").insert({
+      organization_id: ORG_ID,
+      table_name: "tenant_exits",
+      record_id: d.exitId,
+      action: "COLLECT_PAYMENT",
+      performed_by: authData?.user?.id || null,
+      old_value: { refund_due: oldRefundDue },
+      new_value: { refund_due: newRefundDue, amount_collected: amt, payment_mode: d.paymentMode },
+    } as any);
+  } catch (e: any) {
+    console.warn("[collectExitPayment] audit log skipped:", e?.message);
+  }
+
+  return { success: true };
+}
+
+/**
+ * CANCEL / REVERSE a processed exit — tenant reverts to On-Notice.
+ * Port of web cancelExit mutation (bed-not-occupied path) —
+ * C:/vishful-web-v7/.../src/pages/TenantLifecycle.tsx lines 4272-4324.
+ *
+ * Web reversal sequence (simple path):
+ *   1. purgeRefundRecordsForAllotment → HARD-delete deposit_settlements (DB trigger
+ *      reverses any journal entries those settlement INSERTs posted). This is the
+ *      ONLY money-bearing step; tenant_exits itself has no journal trigger.
+ *   2. HARD-delete the tenant_exits row.
+ *   3. UPDATE tenant_allotments → staying_status "On-Notice", actual_exit_date null.
+ *   4. UPDATE beds → "notice-booked" if another Booked allotment holds the bed, else "notice".
+ *   5. UPDATE tenants → On-Notice.
+ *
+ * Mobile adaptation (honours the no-deletes product switch):
+ *   • deposit_settlements removal triggers the money reversal, so it must be a real
+ *     delete → routed through DELETES_ENABLED. When settlement rows exist and deletes
+ *     are disabled, we surface "Deleting is currently disabled." and do NOT touch anything.
+ *     (A pending/none refund normally has NO settlements, so the common case proceeds.)
+ *   • tenant_exits is removed by VOIDING it (is_deleted = true) instead of hard delete —
+ *     getLifecycleFullData() filters is_deleted=false so the row disappears, and there is
+ *     no journal side-effect (web comment, same file ~line 4416).
+ *   • Occupied-bed case (web opens a deposit-settlement dialog / processOccupiedSettlement)
+ *     is NOT ported — blocked with a message pointing to the web app.
+ */
+export async function cancelExitFull(args: {
+  data: { exitId: string; allotmentId: string; bedId: string; tenantId: string; refundStatus?: string };
+}) {
+  const { exitId, allotmentId, bedId, tenantId } = args.data;
+  const refundStatus = args.data.refundStatus || "none";
+
+  // Precondition: refund must still be pending/none (not completed).
+  if (refundStatus !== "pending" && refundStatus !== "none") {
+    throw new Error("Cannot cancel exit: refund has already been processed.");
+  }
+
+  // Bed occupancy / booking state (live from DB, like web's in-memory allotments scan).
+  const bedAllots = await safeList(
+    supabase.from("tenant_allotments")
+      .select("id, staying_status, tenants(full_name)")
+      .eq("bed_id", bedId).eq("organization_id", ORG_ID),
+  );
+  const occupied = (bedAllots as any[]).find(
+    (a: any) => a.staying_status === "Staying" && a.id !== allotmentId,
+  );
+  if (occupied) {
+    const who = occupied?.tenants?.full_name || "another tenant";
+    throw new Error(
+      `This bed is now occupied by ${who}. Settling and reversing an occupied-bed exit is only available in the web app.`,
+    );
+  }
+
+  // Money reversal (deposit_settlements). Web hard-deletes; mobile gates on DELETES_ENABLED.
+  const settlements = await safeList(
+    supabase.from("deposit_settlements").select("id").eq("allotment_id", allotmentId).eq("organization_id", ORG_ID),
+  );
+  if ((settlements as any[]).length > 0) {
+    if (!DELETES_ENABLED) throw new Error("Deleting is currently disabled.");
+    const { error: delErr } = await supabase
+      .from("deposit_settlements").delete().eq("allotment_id", allotmentId).eq("organization_id", ORG_ID);
+    if (delErr) throw new Error(`Purge deposit settlements failed: ${delErr.message}`);
+  }
+
+  // Remove the exit record by VOIDING it (no hard delete, no journal side-effect).
+  await supabase.from("tenant_exits").update({ is_deleted: true } as any).eq("id", exitId).eq("organization_id", ORG_ID);
+
+  // Revert allotment → On-Notice.
+  await supabase.from("tenant_allotments")
+    .update({ staying_status: "On-Notice", actual_exit_date: null } as any)
+    .eq("id", allotmentId).eq("organization_id", ORG_ID);
+
+  // Bed → notice-booked when a Booked allotment holds the bed, else notice.
+  const bookedForBed = (bedAllots as any[]).find(
+    (a: any) => a.staying_status === "Booked" && a.id !== allotmentId,
+  );
+  await supabase.from("beds")
+    .update({ bed_lifecycle_status: bookedForBed ? "notice-booked" : "notice" } as any)
+    .eq("id", bedId);
+
+  // Revert tenant → on-notice (mobile tenants.staying_status convention is lowercase,
+  // cf. createNoticeFull; web uses "On-Notice").
+  await supabase.from("tenants").update({ staying_status: "on-notice" } as any).eq("id", tenantId);
+
+  return { success: true };
+}
