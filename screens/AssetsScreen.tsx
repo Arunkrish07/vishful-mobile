@@ -1446,8 +1446,15 @@ export default function AssetsScreen() {
   const [maintTickets,   setMaintTickets]   = useState<any[]>([]);
   const [maintLoading,   setMaintLoading]   = useState(false);
   const [maintLoaded,    setMaintLoaded]    = useState(false);
-  const [onlyWithTickets,setOnlyWithTickets]= useState(true);
+  const [onlyWithTickets,setOnlyWithTickets]= useState(false);
   const [expandedMaint,  setExpandedMaint]  = useState<Set<string>>(new Set());
+  // Web-parity maintenance analytics UI state (mirrors AssetMaintenanceTab.tsx)
+  const [maintView,        setMaintView]        = useState<'by_apartment' | 'by_type'>('by_apartment');
+  const [maintSearch,      setMaintSearch]      = useState('');
+  const [maintTypeFilter,  setMaintTypeFilter]  = useState('all');
+  const [maintKpiDetail,   setMaintKpiDetail]   = useState<null | 'types' | 'problematic' | 'spend' | 'repeat' | 'open'>(null);
+  const [expandedMaintApt, setExpandedMaintApt] = useState<Set<string>>(new Set());
+  const [expandedMaintType,setExpandedMaintType]= useState<Set<string>>(new Set());
   // Inventory paging — avoids blocking the JS thread rendering ~1700 cards at once.
   const ASSET_PAGE = 30;
   const [assetLimit, setAssetLimit] = useState(ASSET_PAGE);
@@ -1652,6 +1659,257 @@ export default function AssetsScreen() {
       .filter((g) => g.price > 0 && g.spend >= 0.6 * g.price)
       .sort((a, b) => (b.pct || 0) - (a.pct || 0)),
   [maintGroups]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Web-parity maintenance ANALYTICS (verbatim port of AssetMaintenanceTab.tsx)
+  // ══════════════════════════════════════════════════════════════════════════
+  const MAINT_OPEN_STATUSES = useMemo(() => new Set([
+    'open', 'assigned', 'in_progress', 'waiting_for_parts', 'waiting_for_cost_approval', 'reassigned',
+  ]), []);
+
+  // One analytics row per asset: tickets attached, location (apt/bed) derived from allocations.
+  const maintAssetRows = useMemo(() => {
+    const bedMap = new Map<string, any>();
+    for (const b of beds) if (b && b._id != null) bedMap.set(String(b._id), b);
+    const allocByAsset = new Map<string, any>();
+    for (const al of allocations) if (al && al.asset_id != null) allocByAsset.set(String(al.asset_id), al);
+
+    const ticketsByAsset = new Map<string, any[]>();
+    for (const t of maintTickets) {
+      const k = String(t?.asset_id ?? '');
+      if (!k) continue;
+      // Per-ticket cost: closure_cost already coalesces ticket_resolutions.total_cost (see listAssetMaintenance).
+      const cost = (t.closure_cost != null && Number.isFinite(Number(t.closure_cost))) ? Number(t.closure_cost) : null;
+      const summaryBits = [
+        t.resolution_type ? String(t.resolution_type).split('_').join(' ') : '',
+        t.service_type ? String(t.service_type).split('_').join(' ') : '',
+        t.closure_summary || '',
+      ].filter(Boolean);
+      const row = {
+        id: t.id,
+        ticket_number: t.ticket_number || '—',
+        created_at: t.created_at || null,
+        issue_name: t.issue_type || '—',
+        status: String(t.status || ''),
+        resolved_at: t.resolved_at || null,
+        resolution_summary: summaryBits.join(' · ') || '—',
+        cost,
+      };
+      const arr = ticketsByAsset.get(k) || [];
+      arr.push(row);
+      ticketsByAsset.set(k, arr);
+    }
+
+    return assets.map((a: any) => {
+      const alloc = allocByAsset.get(String(a._id));
+      const bedId: string | null = alloc?.bed_id ?? null;            // mobile asset shape has no bed_id
+      let aptId: string | null = alloc?.apartment_id ?? a.apartmentId ?? null;
+      if (bedId && !aptId) aptId = bedMap.get(String(bedId))?.apartmentId ?? null;
+      const bedCode = bedId ? (alloc?.beds?.bed_code || bedMap.get(String(bedId))?.code || '') : '';
+      const tickets = ticketsByAsset.get(String(a._id)) || [];
+      return {
+        id: String(a._id),
+        asset_code: a.assetCode || '',
+        label: [a.brand, a.model].filter(Boolean).join(' '),
+        type_id: (a.assetTypeId ?? null) as string | null,
+        type_name: a.typeName || 'Uncategorized',
+        purchase: Number(a.purchasePrice || 0),
+        maint_cost: tickets.reduce((s: number, t: any) => s + (t.cost || 0), 0),
+        tickets,
+        open_tickets: tickets.filter((t: any) => MAINT_OPEN_STATUSES.has(t.status)).length,
+        apartment_id: aptId,
+        bed_id: bedId,
+        bed_code: bedCode,
+      };
+    });
+  }, [assets, allocations, beds, maintTickets, MAINT_OPEN_STATUSES]);
+
+  // Shared filters for both sub-views.
+  const maintFilteredAssets = useMemo(() => {
+    const aptMap = new Map(apartments.map((a: any) => [String(a._id), a]));
+    const term = maintSearch.trim().toLowerCase();
+    return maintAssetRows.filter((a) => {
+      if (onlyWithTickets && a.tickets.length === 0) return false;
+      if (maintTypeFilter !== 'all' && a.type_id !== maintTypeFilter) return false;
+      if (!term) return true;
+      const aptCode = a.apartment_id ? String(aptMap.get(String(a.apartment_id))?.code || '') : '';
+      return aptCode.toLowerCase().includes(term)
+        || a.bed_code.toLowerCase().includes(term)
+        || a.asset_code.toLowerCase().includes(term)
+        || a.type_name.toLowerCase().includes(term)
+        || a.label.toLowerCase().includes(term);
+    });
+  }, [maintAssetRows, apartments, maintSearch, maintTypeFilter, onlyWithTickets]);
+
+  // Grouping: by apartment → Common + per-bed.
+  const maintApartmentGroups = useMemo(() => {
+    const groups = new Map<string, any>();
+    for (const apt of apartments) {
+      groups.set(String(apt._id), {
+        id: String(apt._id),
+        aptCode: String(apt.code || ''),
+        propertyName: apt.propertyName || '',
+        bedAssets: [] as any[],
+        commonAssets: [] as any[],
+      });
+    }
+    const unassigned: any[] = [];
+    for (const a of maintFilteredAssets) {
+      const g = a.apartment_id ? groups.get(String(a.apartment_id)) : null;
+      if (!g) { unassigned.push(a); continue; }
+      if (a.bed_id) g.bedAssets.push(a); else g.commonAssets.push(a);
+    }
+    const list = [...groups.values()]
+      .filter((g) => g.bedAssets.length + g.commonAssets.length > 0)
+      .map((g) => {
+        const all = [...g.bedAssets, ...g.commonAssets];
+        return {
+          ...g,
+          totalPurchase: all.reduce((s: number, a: any) => s + a.purchase, 0),
+          totalMaint: all.reduce((s: number, a: any) => s + a.maint_cost, 0),
+          ticketCount: all.reduce((s: number, a: any) => s + a.tickets.length, 0),
+          openCount: all.reduce((s: number, a: any) => s + a.open_tickets, 0),
+        };
+      })
+      .sort((x, y) => y.ticketCount - x.ticketCount || y.totalMaint - x.totalMaint);
+    return { list, unassigned };
+  }, [apartments, maintFilteredAssets]);
+
+  // Grouping: by asset type → apartment subgroups.
+  const maintTypeGroups = useMemo(() => {
+    const aptMap = new Map(apartments.map((a: any) => [String(a._id), a]));
+    const byType = new Map<string, any>();
+    for (const a of maintFilteredAssets) {
+      const key = a.type_id || 'untyped';
+      const g = byType.get(key) || { typeName: a.type_name, assets: [] as any[] };
+      g.assets.push(a);
+      byType.set(key, g);
+    }
+    return [...byType.entries()]
+      .map(([typeId, g]) => {
+        const byApt = new Map<string, any>();
+        for (const a of g.assets) {
+          const key = a.apartment_id || 'unassigned';
+          const code = a.apartment_id ? (aptMap.get(String(a.apartment_id))?.code || '?') : 'Unassigned';
+          const ag = byApt.get(key) || { aptCode: String(code), assets: [] as any[] };
+          ag.assets.push(a);
+          byApt.set(key, ag);
+        }
+        return {
+          typeId,
+          typeName: g.typeName,
+          assetCount: g.assets.length,
+          ticketCount: g.assets.reduce((s: number, a: any) => s + a.tickets.length, 0),
+          openCount: g.assets.reduce((s: number, a: any) => s + a.open_tickets, 0),
+          totalPurchase: g.assets.reduce((s: number, a: any) => s + a.purchase, 0),
+          totalMaint: g.assets.reduce((s: number, a: any) => s + a.maint_cost, 0),
+          apartments: [...byApt.values()].sort((x: any, y: any) =>
+            y.assets.reduce((s: number, a: any) => s + a.tickets.length, 0)
+            - x.assets.reduce((s: number, a: any) => s + a.tickets.length, 0)),
+        };
+      })
+      .sort((x, y) => y.ticketCount - x.ticketCount || y.totalMaint - x.totalMaint);
+  }, [maintFilteredAssets, apartments]);
+
+  // KPIs — computed on the unfiltered fleet so they describe the whole estate.
+  const maintEstateKpis = useMemo(() => {
+    const rows = maintAssetRows;
+    const withTickets = rows.filter((a) => a.tickets.length > 0);
+    const openTickets = rows.reduce((s, a) => s + a.open_tickets, 0);
+    const totalPurchase = rows.reduce((s, a) => s + a.purchase, 0);
+    const totalMaint = rows.reduce((s, a) => s + a.maint_cost, 0);
+    const repeatAssets = rows.filter((a) => a.tickets.length >= 2);
+    const aptMap = new Map(apartments.map((a: any) => [String(a._id), a]));
+    const aptTickets = new Map<string, { code: string; tickets: number; maint: number }>();
+    for (const a of rows) {
+      if (!a.apartment_id || a.tickets.length === 0) continue;
+      const cur = aptTickets.get(String(a.apartment_id)) || { code: String(aptMap.get(String(a.apartment_id))?.code || '?'), tickets: 0, maint: 0 };
+      cur.tickets += a.tickets.length;
+      cur.maint += a.maint_cost;
+      aptTickets.set(String(a.apartment_id), cur);
+    }
+    const hotspotApt = [...aptTickets.values()].sort((x, y) => y.tickets - x.tickets || y.maint - x.maint)[0] || null;
+    const typeAgg = new Map<string, { name: string; tickets: number; maint: number; purchase: number }>();
+    for (const a of rows) {
+      const key = a.type_id || 'untyped';
+      const cur = typeAgg.get(key) || { name: a.type_name, tickets: 0, maint: 0, purchase: 0 };
+      cur.tickets += a.tickets.length;
+      cur.maint += a.maint_cost;
+      cur.purchase += a.purchase;
+      typeAgg.set(key, cur);
+    }
+    const typeList = [...typeAgg.values()];
+    const hotspotType = [...typeList].sort((x, y) => y.tickets - x.tickets)[0] || null;
+    const costliestType = [...typeList].sort((x, y) => y.maint - x.maint)[0] || null;
+    return {
+      totalAssets: rows.length,
+      assetsWithTickets: withTickets.length,
+      openTickets,
+      totalPurchase,
+      totalMaint,
+      maintIntensity: totalPurchase > 0 ? (totalMaint / totalPurchase) * 100 : 0,
+      repeatAssets: repeatAssets.length,
+      hotspotApt,
+      hotspotType,
+      costliestType,
+      typesInUse: typeAgg.size,
+    };
+  }, [maintAssetRows, apartments]);
+
+  // Rows behind each tappable asset-type KPI card (primary | apartment(s) | why).
+  const maintKpiDetailContent = useMemo(() => {
+    if (!maintKpiDetail) return null;
+    const fc = (v: number) => { const n = Math.round(Number(v || 0)); return n > 0 ? `₹${n.toLocaleString('en-IN')}` : '—'; };
+    const assetLabel = (a: any) => `${a.type_name}${a.label ? ` · ${a.label}` : ''} · ${a.asset_code}`;
+    const aptCodeById = new Map(apartments.map((a: any) => [String(a._id), String(a.code)]));
+    const aptOf = (a: any) => a.apartment_id ? (aptCodeById.get(String(a.apartment_id)) || '?') : 'Unassigned';
+    const typeApts = (g: any) => g.apartments.map((ag: any) => `${ag.aptCode} (${ag.assets.length})`).join(', ');
+    if (maintKpiDetail === 'repeat') {
+      return {
+        title: 'Repeat-issue assets',
+        description: 'Assets with 2 or more tickets — recurring problems and preventive-maintenance candidates.',
+        primaryHeader: 'Asset',
+        rows: maintAssetRows.filter((a) => a.tickets.length >= 2)
+          .sort((x, y) => y.tickets.length - x.tickets.length)
+          .map((a) => ({ primary: assetLabel(a), apartment: aptOf(a), reason: `${a.tickets.length} tickets (${a.open_tickets} open) · maintenance ${fc(a.maint_cost)}` })),
+      };
+    }
+    if (maintKpiDetail === 'open') {
+      return {
+        title: 'Assets with open tickets',
+        description: 'Assets that currently have at least one unresolved ticket.',
+        primaryHeader: 'Asset',
+        rows: maintAssetRows.filter((a) => a.open_tickets > 0)
+          .sort((x, y) => y.open_tickets - x.open_tickets)
+          .map((a) => ({ primary: assetLabel(a), apartment: aptOf(a), reason: `${a.open_tickets} open of ${a.tickets.length} total tickets` })),
+      };
+    }
+    if (maintKpiDetail === 'problematic') {
+      return {
+        title: 'Most problematic asset types',
+        description: 'Types ranked by ticket volume, highest first.',
+        primaryHeader: 'Asset type',
+        rows: maintTypeGroups.filter((g) => g.ticketCount > 0)
+          .map((g) => ({ primary: g.typeName, apartment: typeApts(g), reason: `${g.ticketCount} tickets (${g.openCount} open) across ${g.assetCount} assets` })),
+      };
+    }
+    if (maintKpiDetail === 'spend') {
+      return {
+        title: 'Maintenance spend by asset type',
+        description: 'Types ranked by lifetime maintenance cost, with spend as a share of purchase value.',
+        primaryHeader: 'Asset type',
+        rows: [...maintTypeGroups].filter((g) => g.totalMaint > 0)
+          .sort((x, y) => y.totalMaint - x.totalMaint)
+          .map((g) => ({ primary: g.typeName, apartment: typeApts(g), reason: `${fc(g.totalMaint)} maintenance${g.totalPurchase > 0 ? ` · ${((g.totalMaint / g.totalPurchase) * 100).toFixed(1)}% of purchase value` : ''}` })),
+      };
+    }
+    return {
+      title: 'Asset types in use',
+      description: 'Every asset type in the fleet and the apartments where its assets are placed.',
+      primaryHeader: 'Asset type',
+      rows: maintTypeGroups.map((g) => ({ primary: g.typeName, apartment: typeApts(g), reason: `${g.assetCount} assets · ${g.ticketCount} tickets · maintenance ${fc(g.totalMaint)}` })),
+    };
+  }, [maintKpiDetail, maintAssetRows, maintTypeGroups, apartments]);
 
   // ── render: INVENTORY ──
   const renderInventory = () => {
@@ -1951,6 +2209,9 @@ export default function AssetsScreen() {
     if (maintLoading && !maintLoaded) {
       return <View style={{ alignItems: 'center', paddingVertical: 48 }}><ActivityIndicator size="large" color="#2563EB" /><Text style={{ marginTop: 12, color: '#6B7280' }}>Loading maintenance…</Text></View>;
     }
+
+    const card = { backgroundColor: '#fff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } } as const;
+    const fmtCost = (v: number | null | undefined) => { const n = Math.round(Number(v || 0)); return n > 0 ? `₹${n.toLocaleString('en-IN')}` : '—'; };
     const tStColor = (s: any) => {
       const x = String(s || '').toLowerCase();
       if (['completed', 'closed', 'resolved'].includes(x)) return '#16a34a';
@@ -1958,115 +2219,273 @@ export default function AssetsScreen() {
       if (['in_progress', 'in progress', 'assigned', 'accepted', 'scheduled'].includes(x)) return '#2563EB';
       return '#F59E0B';
     };
-    const toggleExpand = (id: string) => setExpandedMaint((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
+    const toggleIn = (set: (u: (p: Set<string>) => Set<string>) => void) => (id: string) => set((prev) => {
+      const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
     });
-    // When the toggle is off, also surface loaded assets that have zero tickets.
-    const withTicketIds = new Set(maintGroups.map((g) => g.assetId));
-    const extraGroups = onlyWithTickets ? [] : assets
-      .filter((a: any) => a && a._id != null && !withTicketIds.has(String(a._id)))
-      .map((a: any) => ({ assetId: String(a._id), asset: a, tickets: [] as any[], openCount: 0, spend: 0, price: a.purchasePrice != null ? Number(a.purchasePrice) : 0, pct: null }));
-    const displayGroups = [...maintGroups, ...extraGroups];
+    const toggleAsset = toggleIn(setExpandedMaint);
+    const toggleApt = toggleIn(setExpandedMaintApt);
+    const toggleType = toggleIn(setExpandedMaintType);
+    const typeOptions = [{ label: 'All asset types', value: 'all' }, ...types.map((t: any) => ({ label: t.name, value: t._id }))];
+
+    // ── small KPI card (tappable when onPress given) ──
+    const kpiCard = (key: string, label: string, value: any, sub?: string, onPress?: () => void, accent?: string) => {
+      const inner = (
+        <>
+          <Text style={{ fontSize: 10, color: accent || '#2563EB', fontWeight: '800', textTransform: 'uppercase' }} numberOfLines={1}>{label}</Text>
+          <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', marginTop: 4 }} numberOfLines={1}>{value}</Text>
+          {!!sub && <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }} numberOfLines={2}>{sub}</Text>}
+        </>
+      );
+      const st = { ...card, padding: 12, width: '48.5%', marginBottom: 8 } as any;
+      return onPress
+        ? <TouchableOpacity key={key} activeOpacity={0.7} onPress={onPress} style={st}>{inner}</TouchableOpacity>
+        : <View key={key} style={st}>{inner}</View>;
+    };
+
+    // ── cost chips (cart purchase · wrench maintenance) ──
+    const costChips = (purchase: number, maint: number) => (
+      <>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <Ionicons name="cart-outline" size={13} color="#0284c7" />
+          <Text style={{ fontSize: 12, color: '#111827' }}>{fmtCost(purchase)}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+          <Ionicons name="construct-outline" size={13} color="#d97706" />
+          <Text style={{ fontSize: 12, color: '#111827' }}>{fmtCost(maint)}</Text>
+        </View>
+      </>
+    );
+
+    // ── count badges (assets / tickets / open) ──
+    const countBadges = (assetCount: number, ticketCount: number, openCount: number) => (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+        <Pill label={`${assetCount} assets`} color="#6B7280" bg="#F1F3F9" />
+        <Pill label={`${ticketCount} tickets`} color={ticketCount > 0 ? '#2563EB' : '#6B7280'} bg={ticketCount > 0 ? 'rgba(37,99,235,0.12)' : '#F1F3F9'} />
+        {openCount > 0 && <Pill label={`${openCount} open`} color="#DC2626" bg="#FEE2E2" />}
+      </View>
+    );
+
+    // ── expandable asset row → ticket table ──
+    const assetRowBlock = (a: any) => {
+      const open = expandedMaint.has(a.id);
+      return (
+        <View key={a.id} style={{ borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 10, backgroundColor: '#F8FAFC', marginTop: 6, overflow: 'hidden' }}>
+          <TouchableOpacity activeOpacity={0.7} disabled={a.tickets.length === 0} onPress={() => a.tickets.length > 0 && toggleAsset(a.id)} style={{ padding: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#111827' }}>{a.type_name}</Text>
+              {!!a.label && <Text style={{ fontSize: 12, color: '#6B7280' }}>· {a.label}</Text>}
+              <Text style={{ fontSize: 12, color: '#6B7280' }}>· {a.asset_code}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+              {costChips(a.purchase, a.maint_cost)}
+              <View style={{ flex: 1 }} />
+              <Pill label={`${a.tickets.length} ticket${a.tickets.length === 1 ? '' : 's'}`} color={a.tickets.length > 0 ? '#2563EB' : '#6B7280'} bg={a.tickets.length > 0 ? 'rgba(37,99,235,0.12)' : '#F1F3F9'} />
+              {a.open_tickets > 0 && <Pill label={`${a.open_tickets} open`} color="#DC2626" bg="#FEE2E2" />}
+              {a.tickets.length > 0 && <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color="#6B7280" />}
+            </View>
+          </TouchableOpacity>
+          {open && a.tickets.length > 0 && (
+            <View style={{ borderTopWidth: 1, borderTopColor: '#EEF1F6', padding: 10, backgroundColor: '#fff' }}>
+              {a.tickets.map((t: any) => (
+                <View key={t.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#111827' }}>{t.ticket_number}</Text>
+                      <Pill label={t.status || 'open'} color={tStColor(t.status)} bg={tStColor(t.status) + '18'} />
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: t.cost != null ? '#16a34a' : '#6B7280' }}>{t.cost != null ? fmtCost(t.cost) : '—'}</Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: '#556274', marginTop: 2 }}>{t.issue_name}</Text>
+                  <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Raised {fmtDate(t.created_at)} · Resolved {fmtDate(t.resolved_at)}</Text>
+                  {t.resolution_summary !== '—' && <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{t.resolution_summary}</Text>}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      );
+    };
+
+    // When loaded and there are genuinely no asset-linked tickets, show the friendly empty state.
+    if (maintLoaded && maintTickets.length === 0) {
+      return (
+        <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+          <Ionicons name="construct-outline" size={52} color="#e0d9ec" />
+          <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No maintenance tickets</Text>
+          <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Asset-linked tickets appear here</Text>
+        </View>
+      );
+    }
+
+    const k = maintEstateKpis;
+    const aptView = maintView === 'by_apartment';
 
     return (
       <View>
-        {/* KPI strip */}
+        {/* ── Shared filter bar ── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 10, marginBottom: 10 }}>
+          <Ionicons name="search-outline" size={16} color="#6B7280" />
+          <TextInput value={maintSearch} onChangeText={setMaintSearch} placeholder="Search apartment, bed, asset…" placeholderTextColor="#6B7280" style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: '#111827' }} />
+          {!!maintSearch && <TouchableOpacity onPress={() => setMaintSearch('')}><Ionicons name="close-circle" size={16} color="#6B7280" /></TouchableOpacity>}
+        </View>
+        <PickerSelect label="Asset Type" value={maintTypeFilter} options={typeOptions} onSelect={setMaintTypeFilter} />
+        <Checkbox checked={onlyWithTickets} onToggle={() => setOnlyWithTickets((v) => !v)} label="Show only assets with tickets" />
+
+        {/* ── Inner sub-view tabs ── */}
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
-            <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '800', textTransform: 'uppercase' }}>Assets w/ Tickets</Text>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', marginTop: 4 }}>{maintKpis.assetsWithTickets}</Text>
-          </View>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
-            <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '800', textTransform: 'uppercase' }}>Open Tickets</Text>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#DC2626', marginTop: 4 }}>{maintKpis.totalOpen}</Text>
-          </View>
-          <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
-            <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: '800', textTransform: 'uppercase' }}>Repeat (≥2)</Text>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#F59E0B', marginTop: 4 }}>{maintKpis.repeatOffenders}</Text>
-          </View>
+          <TouchableOpacity onPress={() => setMaintView('by_apartment')} activeOpacity={0.7} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 10, backgroundColor: aptView ? '#EFF6FF' : '#F1F3F9', borderWidth: 1, borderColor: aptView ? '#2563EB' : 'transparent' }}>
+            <Ionicons name="business-outline" size={14} color={aptView ? '#2563EB' : '#64748B'} />
+            <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '800', color: aptView ? '#2563EB' : '#64748B' }}>Apartment Based Listing</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setMaintView('by_type')} activeOpacity={0.7} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 10, backgroundColor: !aptView ? '#F5F3FF' : '#F1F3F9', borderWidth: 1, borderColor: !aptView ? '#6D28D9' : 'transparent' }}>
+            <Ionicons name="cube-outline" size={14} color={!aptView ? '#6D28D9' : '#64748B'} />
+            <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '800', color: !aptView ? '#6D28D9' : '#64748B' }}>Asset Type Based Listing</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Repair-vs-Replace insights (pure compute, no AI) */}
-        {replaceFlags.length > 0 && (
-          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#F59E0B40' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <Ionicons name="bulb-outline" size={16} color="#F59E0B" />
-              <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>Repair vs Replace</Text>
-            </View>
-            <Text style={{ fontSize: 11, color: '#6B7280', marginBottom: 10 }}>Repair spend has reached 60%+ of purchase price on these assets.</Text>
-            {replaceFlags.map((g) => (
-              <View key={g.assetId} style={{ borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>{g.asset?.assetCode || 'Unknown asset'}</Text>
-                  <Text style={{ fontSize: 12, color: '#556274' }}>{g.asset?.typeName || '—'}</Text>
-                  <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>Spend {fmtFull(g.spend)} of {fmtFull(g.price)}</Text>
+        {/* ── KPI cards ── */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          {aptView ? [
+            kpiCard('apts', 'Apartments with assets', maintApartmentGroups.list.length),
+            kpiCard('total', 'Total assets', k.totalAssets, `${fmtCost(k.totalPurchase)} invested`),
+            kpiCard('withTk', 'Assets with tickets', k.assetsWithTickets, k.totalAssets > 0 ? `${Math.round((k.assetsWithTickets / k.totalAssets) * 100)}% of fleet` : undefined),
+            kpiCard('open', 'Open tickets', k.openTickets),
+            kpiCard('spend', 'Maintenance spend', fmtCost(k.totalMaint), `${k.maintIntensity.toFixed(1)}% of purchase value`),
+            kpiCard('hotspot', 'Hotspot apartment', k.hotspotApt ? k.hotspotApt.code : '—', k.hotspotApt ? `${k.hotspotApt.tickets} tickets · ${fmtCost(k.hotspotApt.maint)}` : undefined),
+          ] : [
+            kpiCard('types', 'Asset types in use', k.typesInUse, 'click for details', () => setMaintKpiDetail('types'), '#6D28D9'),
+            kpiCard('prob', 'Most problematic type', (k.hotspotType && k.hotspotType.tickets > 0) ? k.hotspotType.name : '—', (k.hotspotType && k.hotspotType.tickets > 0) ? `${k.hotspotType.tickets} tickets · click for details` : undefined, () => setMaintKpiDetail('problematic'), '#6D28D9'),
+            kpiCard('costly', 'Highest maintenance spend', (k.costliestType && k.costliestType.maint > 0) ? k.costliestType.name : '—', (k.costliestType && k.costliestType.maint > 0) ? `${fmtCost(k.costliestType.maint)} · click for details` : undefined, () => setMaintKpiDetail('spend'), '#6D28D9'),
+            kpiCard('repeat', 'Repeat-issue assets', k.repeatAssets, 'assets with 2+ tickets — click for details', () => setMaintKpiDetail('repeat'), '#6D28D9'),
+            kpiCard('openT', 'Open tickets', k.openTickets, 'click for details', () => setMaintKpiDetail('open'), '#6D28D9'),
+          ]}
+        </View>
+
+        {/* ── Body: by apartment ── */}
+        {aptView && (
+          <View style={{ marginTop: 4 }}>
+            {maintApartmentGroups.list.map((g) => {
+              const open = expandedMaintApt.has(g.id);
+              const m: Record<string, any[]> = {};
+              for (const a of g.bedAssets) { (m[a.bed_code] = m[a.bed_code] || []).push(a); }
+              const bedGroups = Object.entries(m).sort(([x], [y]) => x.localeCompare(y));
+              return (
+                <View key={g.id} style={{ ...card, marginBottom: 10 }}>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => toggleApt(g.id)}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{g.aptCode}</Text>
+                      {!!g.propertyName && <Text style={{ fontSize: 11, color: '#6B7280', flex: 1 }} numberOfLines={1}>{g.propertyName}</Text>}
+                      {!g.propertyName && <View style={{ flex: 1 }} />}
+                      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#6B7280" />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                      {costChips(g.totalPurchase, g.totalMaint)}
+                      <View style={{ flex: 1 }} />
+                      {countBadges(g.bedAssets.length + g.commonAssets.length, g.ticketCount, g.openCount)}
+                    </View>
+                  </TouchableOpacity>
+                  {open && (
+                    <View style={{ marginTop: 10 }}>
+                      {g.commonAssets.length > 0 && (
+                        <View style={{ marginBottom: 6 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="home-outline" size={12} color="#6B7280" />
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#6B7280' }}>Common ({g.commonAssets.length})</Text>
+                          </View>
+                          {g.commonAssets.map(assetRowBlock)}
+                        </View>
+                      )}
+                      {bedGroups.map(([bedCode, bedGroup]) => (
+                        <View key={bedCode} style={{ marginBottom: 6 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="bed-outline" size={12} color="#6B7280" />
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#6B7280' }}>Bed {bedCode} ({bedGroup.length})</Text>
+                          </View>
+                          {bedGroup.map(assetRowBlock)}
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <Pill label="Consider replacing" color="#B45309" bg="#FEF3C7" />
-                  <Text style={{ fontSize: 15, fontWeight: '900', color: '#DC2626' }}>{g.pct}%</Text>
-                </View>
+              );
+            })}
+            {maintApartmentGroups.unassigned.length > 0 && (
+              <View style={{ ...card, marginBottom: 10 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', marginBottom: 2 }}>Unassigned assets ({maintApartmentGroups.unassigned.length})</Text>
+                {maintApartmentGroups.unassigned.map(assetRowBlock)}
               </View>
-            ))}
+            )}
+            {maintApartmentGroups.list.length === 0 && maintApartmentGroups.unassigned.length === 0 && (
+              <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center', paddingVertical: 32 }}>No assets match the current filters.</Text>
+            )}
           </View>
         )}
 
-        {/* Filter toggle */}
-        <Checkbox checked={onlyWithTickets} onToggle={() => setOnlyWithTickets((v) => !v)} label="Only assets with tickets" />
-
-        {/* Per-asset groups */}
-        {displayGroups.length === 0 ? (
-          <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-            <Ionicons name="construct-outline" size={52} color="#e0d9ec" />
-            <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No maintenance tickets</Text>
-            <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Asset-linked tickets appear here</Text>
-          </View>
-        ) : displayGroups.map((g) => {
-          const expanded = expandedMaint.has(g.assetId);
-          const apt = g.asset?.locationName;
-          return (
-            <View key={g.assetId} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => g.tickets.length > 0 && toggleExpand(g.assetId)} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#2563EB' }}>{g.asset?.assetCode || 'Unknown asset'}</Text>
-                    <Pill label={`${g.tickets.length} ticket${g.tickets.length !== 1 ? 's' : ''}`} color="#2563EB" bg="rgba(37,99,235,0.12)" />
-                    {g.openCount > 0 && <Pill label={`${g.openCount} open`} color="#DC2626" bg="#FEE2E2" />}
-                  </View>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827', marginTop: 2 }}>{g.asset?.typeName || '—'}</Text>
-                  {!!apt && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                      <Ionicons name="location-outline" size={11} color="#6B7280" />
-                      <Text style={{ fontSize: 12, color: '#6B7280' }}>{apt}</Text>
+        {/* ── Body: by asset type ── */}
+        {!aptView && (
+          <View style={{ marginTop: 4 }}>
+            {maintTypeGroups.map((g) => {
+              const open = expandedMaintType.has(g.typeId);
+              return (
+                <View key={g.typeId} style={{ ...card, marginBottom: 10 }}>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => toggleType(g.typeId)}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', flex: 1 }} numberOfLines={1}>{g.typeName}</Text>
+                      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#6B7280" />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                      {costChips(g.totalPurchase, g.totalMaint)}
+                      <View style={{ flex: 1 }} />
+                      {countBadges(g.assetCount, g.ticketCount, g.openCount)}
+                    </View>
+                  </TouchableOpacity>
+                  {open && (
+                    <View style={{ marginTop: 10 }}>
+                      {g.apartments.map((ag: any) => (
+                        <View key={ag.aptCode} style={{ marginBottom: 6 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="business-outline" size={12} color="#6B7280" />
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#6B7280' }}>{ag.aptCode} ({ag.assets.length})</Text>
+                          </View>
+                          {ag.assets.map(assetRowBlock)}
+                        </View>
+                      ))}
                     </View>
                   )}
-                  {g.spend > 0 && <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a', marginTop: 3 }}>Repair spend {fmtFull(g.spend)}</Text>}
                 </View>
-                {g.tickets.length > 0 && <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#6B7280" style={{ padding: 4 }} />}
-              </TouchableOpacity>
-              {expanded && g.tickets.length > 0 && (
-                <View style={{ borderTopWidth: 1, borderTopColor: '#EEF1F6', marginTop: 10, paddingTop: 8 }}>
-                  {g.tickets.map((t: any) => (
-                    <View key={t.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: 'rgba(37,99,235,0.06)' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#111827' }}>{t.ticket_number || '—'}</Text>
-                          <Pill label={t.status || 'open'} color={tStColor(t.status)} bg={tStColor(t.status) + '18'} />
-                        </View>
-                        {t.closure_cost != null && Number(t.closure_cost) > 0 && (
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#16a34a' }}>{fmtFull(Number(t.closure_cost))}</Text>
-                        )}
-                      </View>
-                      {!!t.issue_type && <Text style={{ fontSize: 12, color: '#556274', marginTop: 2 }}>{t.issue_type}</Text>}
-                      {!!t.created_at && <Text style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>Raised {fmtDate(t.created_at)}{t.resolved_at ? ` · Resolved ${fmtDate(t.resolved_at)}` : ''}</Text>}
+              );
+            })}
+            {maintTypeGroups.length === 0 && (
+              <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center', paddingVertical: 32 }}>No assets match the current filters.</Text>
+            )}
+          </View>
+        )}
+
+        {/* ── KPI detail modal (asset-type cards) ── */}
+        <Modal visible={!!maintKpiDetail} transparent animationType="fade" onRequestClose={() => setMaintKpiDetail(null)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 18, maxHeight: '80%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: '#111827', flex: 1 }}>{maintKpiDetailContent?.title}</Text>
+                <TouchableOpacity onPress={() => setMaintKpiDetail(null)}><Ionicons name="close" size={22} color="#6B7280" /></TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 11, color: '#6B7280', marginBottom: 10 }}>{maintKpiDetailContent?.description}</Text>
+              {maintKpiDetailContent && maintKpiDetailContent.rows.length > 0 ? (
+                <ScrollView style={{ maxHeight: 440 }}>
+                  {maintKpiDetailContent.rows.map((r, i) => (
+                    <View key={i} style={{ paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: '#EEF1F6' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{r.primary}</Text>
+                      <Text style={{ fontSize: 11, color: '#2563EB', marginTop: 2 }}>{r.apartment}</Text>
+                      <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{r.reason}</Text>
                     </View>
                   ))}
-                </View>
+                </ScrollView>
+              ) : (
+                <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center', paddingVertical: 24 }}>Nothing qualifies at the moment.</Text>
               )}
             </View>
-          );
-        })}
+          </View>
+        </Modal>
       </View>
     );
   };
