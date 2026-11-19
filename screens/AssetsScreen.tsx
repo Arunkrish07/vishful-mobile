@@ -1397,15 +1397,16 @@ function AssetPaymentsTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 //  MAIN SCREEN
 // ═══════════════════════════════════════════════════════════════════════════
+// Tab order + labels mirror the web Assets screen exactly.
 const TABS = [
-  { key: 'inventory',   label: 'Inventory',      icon: 'cube-outline' },
-  { key: 'payments',    label: 'Asset Payments', icon: 'cash-outline' },
-  { key: 'vendors',     label: 'Vendors',        icon: 'people-outline' },
-  { key: 'allocations', label: 'Allocations',    icon: 'location-outline' },
-  { key: 'maintenance', label: 'Maintenance',    icon: 'construct-outline' },
-  { key: 'categories',  label: 'Categories',     icon: 'folder-outline' },
-  { key: 'analytics',   label: 'Analytics',      icon: 'bar-chart-outline' },
-  { key: 'forecasts',   label: 'Forecasts',      icon: 'trending-up-outline' },
+  { key: 'inventory',   label: 'Inventory Pending',   icon: 'cube-outline' },
+  { key: 'allocations', label: 'Inventory Allocated', icon: 'location-outline' },
+  { key: 'maintenance', label: 'Asset Maintenance',   icon: 'construct-outline' },
+  { key: 'payments',    label: 'Asset Payments',      icon: 'cash-outline' },
+  { key: 'categories',  label: 'Categories',          icon: 'folder-outline' },
+  { key: 'vendors',     label: 'Vendors',             icon: 'people-outline' },
+  { key: 'analytics',   label: 'Analytics',           icon: 'bar-chart-outline' },
+  { key: 'forecasts',   label: 'Forecasts',           icon: 'trending-up-outline' },
 ];
 
 export default function AssetsScreen() {
@@ -1602,8 +1603,10 @@ export default function AssetsScreen() {
   const handleAddBrand = async (vals: any) => { await sb.createBrand(vals.name); fetchAll(true); };
 
   // ── filtered data ──
+  // Inventory Pending = assets still in stock (web parity: .eq("status","inventory")).
   const filteredAssets = useMemo(() =>
-    assets.filter(a => matches(a, search) && (typeFilter === 'all' || a.assetTypeId === typeFilter)),
+    assets.filter(a => (a.status || 'inventory') === 'inventory'
+      && matches(a, search) && (typeFilter === 'all' || a.assetTypeId === typeFilter)),
   [assets, search, typeFilter]);
   const filteredVendors = useMemo(() => {
     if (!vendorSearch) return vendors;
@@ -2083,6 +2086,12 @@ export default function AssetsScreen() {
   };
 
   const visibleTabs = filterTabs(TABS, visibleTabKeys);
+  // Web parity: "Inventory Allocated (N)" and "Vendors (N)" carry a live count in the label.
+  const tabLabel = (t: any) => {
+    if (t.key === 'allocations') return `${t.label} (${allocations.length})`;
+    if (t.key === 'vendors')     return `${t.label} (${vendors.length})`;
+    return t.label;
+  };
 
   if (loading && !refreshing) {
     return (
@@ -2138,7 +2147,7 @@ export default function AssetsScreen() {
           {visibleTabs.map((t: any) => (
             <TouchableOpacity key={t.key} onPress={() => setActiveTab(t.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: activeTab === t.key ? '#6D28D9' : '#F1F3F9' }}>
               <Ionicons name={t.icon} size={14} color={activeTab === t.key ? '#fff' : '#64748B'} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: activeTab === t.key ? '#fff' : '#64748B' }}>{t.label}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: activeTab === t.key ? '#fff' : '#64748B' }}>{tabLabel(t)}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
