@@ -177,6 +177,8 @@ export default function AccountingScreen() {
   const [gstFiled, setGstFiled] = useState<any[] | null>(null);
   const [trialBal, setTrialBal] = useState<any | null>(null);
   const [secLoading, setSecLoading] = useState(false);
+  // Loading flag for the on-demand ledger sections (receipts/expenses/rental payments).
+  const [subBusy, setSubBusy] = useState(false);
   const [ledgerTenant, setLedgerTenant] = useState('');
   const [ledger, setLedger] = useState<any | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
@@ -281,65 +283,89 @@ export default function AccountingScreen() {
     return () => { cancelled = true; };
   }, []);
 
+  // Invoices load PROGRESSIVELY so the screen opens fast: a bounded recent page
+  // paints first, then the full history (5k+ rows) streams in behind it to make
+  // the per-invoice totals exact. stays + pending dues load in parallel.
   useEffect(() => {
     if (!token) return;
     setInvoices(null);
-    Promise.all([
-      sb.listInvoices(),
-      sb.listBillingTenants(),
-      sb.getPendingDues(),
-    ]).then(([inv, s, dues]: any) => {
-      if (!mounted.current) return;
-      setInvoices(inv ?? []);
-      setStays(s ?? []);
+    let cancelled = false;
+    (async () => {
+      const quick = await safeCall<any[]>(() => sb.listInvoices({ limit: 500 }), []);
+      if (cancelled || !mounted.current) return;
+      setInvoices(Array.isArray(quick) ? quick : []);
+      const full = await safeCall<any[] | null>(() => sb.listInvoices(), null);
+      if (cancelled || !mounted.current || full == null) return;
+      setInvoices(full);
+    })();
+    (async () => {
+      const [s, dues] = await Promise.all([
+        safeCall<any[]>(() => sb.listBillingTenants(), []),
+        safeCall<any>(() => sb.getPendingDues(), null),
+      ]);
+      if (cancelled || !mounted.current) return;
+      setStays(Array.isArray(s) ? s : []);
       setPendingTotal(dues?.totalPending ?? 0);
-    }).catch((e: any) => {
-      if (!mounted.current || isAbortError(e)) return;
-      setInvoices([]);
-      setStays([]);
-      setPendingTotal(0);
-    });
+    })();
+    return () => { cancelled = true; };
   }, [token, refreshKey]);
 
-  // Period-scoped Financial Overview + Reports. Reloads when period changes.
+  // Always-visible Financial Overview summary (period-scoped, cheap aggregate).
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     (async () => {
-      const [s, p, bp, eb] = await Promise.all([
-        safeCall<any>(() => sb.getReportsSummary(period), null),
+      const s = await safeCall<any>(() => sb.getReportsSummary(period), null);
+      if (!cancelled && mounted.current) setSummary(s || null);
+    })();
+    return () => { cancelled = true; };
+  }, [token, period, refreshKey]);
+
+  // Reports detail (P&L / bed profitability / EB recon) — only when Reports is open.
+  useEffect(() => {
+    if (!token || section !== 'reports') return;
+    let cancelled = false;
+    (async () => {
+      const [p, bp, eb] = await Promise.all([
         safeCall<any[]>(() => sb.getPropertyPnL(period), []),
         safeCall<any[]>(() => sb.getBedProfitability(period), []),
         safeCall<any[]>(() => sb.getEBReconciliation(period), []),
       ]);
       if (cancelled || !mounted.current) return;
-      setSummary(s || null);
       setPnl(Array.isArray(p) ? p : []);
       setBedProfit(Array.isArray(bp) ? bp : []);
       setEbRecon(Array.isArray(eb) ? eb : []);
     })();
     return () => { cancelled = true; };
-  }, [token, period, refreshKey]);
+  }, [token, period, section, refreshKey]);
 
-  // Read-only ledgers (org-scoped, not period-scoped by their wrappers).
+  // Bank accounts are small and needed early for the payment pickers — load on mount.
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     (async () => {
-      const [rc, ex, op, ba] = await Promise.all([
-        safeCall<any[]>(() => sb.listReceipts(), []),
-        safeCall<any[]>(() => sb.listExpenses(), []),
-        safeCall<any[]>(() => sb.listOwnerPayments(), []),
-        safeCall<any[]>(() => fetchBankAccounts(), []),
-      ]);
-      if (cancelled || !mounted.current) return;
-      setReceipts(Array.isArray(rc) ? rc : []);
-      setExpenses(Array.isArray(ex) ? ex : []);
-      setOwnerPayments(Array.isArray(op) ? op : []);
-      setBankAccounts(Array.isArray(ba) ? ba : []);
+      const ba = await safeCall<any[]>(() => fetchBankAccounts(), []);
+      if (!cancelled && mounted.current) setBankAccounts(Array.isArray(ba) ? ba : []);
     })();
     return () => { cancelled = true; };
   }, [token, refreshKey]);
+
+  // Heavy ledgers (receipts / expenses / rental payments) load only when their
+  // section is opened — keeps them off the initial open path.
+  useEffect(() => {
+    if (!token) return;
+    if (section !== 'receipts' && section !== 'expenses' && section !== 'payments') return;
+    let cancelled = false;
+    setSubBusy(true);
+    (async () => {
+      try {
+        if (section === 'receipts') { const rc = await safeCall<any[]>(() => sb.listReceipts(), []); if (!cancelled && mounted.current) setReceipts(Array.isArray(rc) ? rc : []); }
+        else if (section === 'expenses') { const ex = await safeCall<any[]>(() => sb.listExpenses(), []); if (!cancelled && mounted.current) setExpenses(Array.isArray(ex) ? ex : []); }
+        else if (section === 'payments') { const op = await safeCall<any[]>(() => sb.listOwnerPayments(), []); if (!cancelled && mounted.current) setOwnerPayments(Array.isArray(op) ? op : []); }
+      } finally { if (!cancelled && mounted.current) setSubBusy(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [token, section, refreshKey]);
 
   const handleCreate = async () => {
     if (!tenantId || !month) { Alert.alert('Error', 'Select tenant and billing month'); return; }
@@ -948,7 +974,9 @@ export default function AccountingScreen() {
               <Text style={{ color: ACC.purple, fontWeight: '700', fontSize: fontSize.sm }}>Outstanding</Text>
             </TouchableOpacity>
           </View>
-          {receipts.length === 0 ? (
+          {subBusy && receipts.length === 0 ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
+          ) : receipts.length === 0 ? (
             <EmptyState title="No Receipts" subtitle="Recorded payments will appear here" icon="cash-outline" />
           ) : receipts.map((r: any) => (
             <View key={r.id} style={styles.card}>
@@ -1207,7 +1235,9 @@ export default function AccountingScreen() {
           <View style={{ marginBottom: spacing.md }}>
             <Button title="Add Expense" icon="add-circle-outline" onPress={openExpAdd} />
           </View>
-          {expenses.length === 0 ? (
+          {subBusy && expenses.length === 0 ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
+          ) : expenses.length === 0 ? (
             <EmptyState title="No Expenses" subtitle="Recorded expenses will appear here" icon="receipt-outline" />
           ) : (<>
             <View style={{ backgroundColor: '#FEF2F2', borderRadius: 14, padding: 12, marginBottom: spacing.md }}>
@@ -1234,7 +1264,9 @@ export default function AccountingScreen() {
 
         {/* ── RENTAL PAYMENTS / owner payouts (read-only) ── */}
         {section === 'payments' && (
-          ownerPayments.length === 0 ? (
+          subBusy && ownerPayments.length === 0 ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
+          ) : ownerPayments.length === 0 ? (
             <EmptyState title="No Rental Payments" subtitle="Owner payouts will appear here" icon="wallet-outline" />
           ) : (<>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md }}>

@@ -1560,8 +1560,8 @@ export async function createVendor(args: any) {
 // ACCOUNTING
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export async function listInvoices(args: { status?: string; tenantId?: string } = {}) {
-  const { status, tenantId } = args;
+export async function listInvoices(args: { status?: string; tenantId?: string; limit?: number } = {}) {
+  const { status, tenantId, limit } = args;
   let query = supabase
     .from("invoices")
     .select("id, invoice_number, tenant_id, allotment_id, property_id, apartment_id, bed_id, billing_month, rent_amount, electricity_amount, estimated_eb, late_fee, other_charges, total_amount, amount_paid, due_date, invoice_type, status, is_deleted, created_at")
@@ -1569,13 +1569,23 @@ export async function listInvoices(args: { status?: string; tenantId?: string } 
     .or("is_deleted.is.null,is_deleted.eq.false")
     .order("created_at", { ascending: false });
   if (tenantId) query = query.eq("tenant_id", tenantId);
-  const rows: any[] = await fetchAllPages((from, to) => query.range(from, to));
+  // `limit` loads just the most-recent N (one round-trip) for a fast first paint;
+  // without it we page the full history. The caller can follow up with the
+  // unbounded call to finalise totals.
+  const rows: any[] = limit
+    ? await safeList(query.limit(limit))
+    : await fetchAllPages((from, to) => query.range(from, to));
 
-  const settleRows: any[] = await safeList(
-    supabase.from("v_invoice_settlement_status")
-      .select("invoice_id, amount_settled, amount_outstanding, invoice_amount, settlement_status")
-      .eq("organization_id", ORG_ID)
-  );
+  // When bounded, fetch settlement rows only for the loaded invoices (keeps the
+  // quick path cheap); otherwise pull the whole settlement view.
+  let settleQuery = supabase.from("v_invoice_settlement_status")
+    .select("invoice_id, amount_settled, amount_outstanding, invoice_amount, settlement_status")
+    .eq("organization_id", ORG_ID);
+  if (limit) {
+    const ids = rows.map((r) => r.id).filter(Boolean);
+    settleQuery = settleQuery.in("invoice_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  }
+  const settleRows: any[] = await safeList(settleQuery);
   const settleById = new Map<string, any>();
   for (const s of settleRows) settleById.set(s.invoice_id, s);
 
