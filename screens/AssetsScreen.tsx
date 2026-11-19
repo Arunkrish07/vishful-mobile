@@ -20,6 +20,25 @@ import { useMountedRef } from '../lib/safeAsync';
 import { fetchVisibleTabKeys, filterTabs } from '../lib/tabPermissions';
 import * as ImagePicker from 'expo-image-picker';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/config';
+import { htmlToPdfAndShare } from '../lib/pdfShare';
+// qrcode (1.5.4, bundled via react-native-qrcode-styled). We use only its pure-JS
+// CORE (no canvas / Buffer / server deps) and build the SVG ourselves, so the
+// apartment QR PDF renders real QR codes entirely on-device.
+let QRCore: any = null;
+try { QRCore = require('qrcode/lib/core/qrcode'); } catch {}
+function qrSvg(text: string, size = 150): string {
+  if (!QRCore || !text) return '';
+  try {
+    const qr = QRCore.create(String(text), { errorCorrectionLevel: 'M' });
+    const n = qr.modules.size;
+    const cell = size / n;
+    let rects = '';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      if (qr.modules.get(r, c)) rects += `<rect x="${(c * cell).toFixed(2)}" y="${(r * cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}"/>`;
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#fff"/><g fill="#000">${rects}</g></svg>`;
+  } catch { return ''; }
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUSES   = ['inventory','allocated','maintenance','retired','disposed'];
@@ -85,6 +104,31 @@ const matches = (a: any, q: string) => {
     a.status, a.condition, a.vendorNameManual, a.serialNumber, a.invoiceNumber]
     .some(v => v && String(v).toLowerCase().includes(s));
 };
+const esc = (v: any) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+// Web parity (downloadApartmentQrPdf): a printable 2-col QR grid for one apartment.
+// QR codes are encoded on-device from the asset's public link — nothing leaves the device.
+async function downloadApartmentQrPdf(aptLabel: string, assetGroups: any[][], assetsById: Map<string, any>) {
+  const cards = assetGroups.map((grp) => {
+    const first = grp[0];
+    const asset = assetsById.get(String(first.asset_id)) || { _id: first.asset_id, assetCode: first.assets?.asset_code, qrCode: null };
+    const url = qrOf(asset) || String(first.asset_id || '');
+    const svg = qrSvg(url, 150);
+    const code = esc(asset.assetCode || first.assets?.asset_code || '—');
+    const typeName = esc(asset.typeName || first.assets?.asset_types?.name || '');
+    const place = esc([first.apartments?.apartment_code, first.beds?.bed_code].filter(Boolean).join(' · '));
+    return `<div class="card">${svg || '<div class="noqr">QR unavailable</div>'}<div class="code">${code}</div><div class="type">${typeName}</div><div class="place">${place}</div></div>`;
+  });
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><style>
+    *{box-sizing:border-box} body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:24px;color:#111827}
+    h1{font-size:18px;margin:0 0 4px} .sub{color:#6B7280;font-size:12px;margin-bottom:16px}
+    .grid{display:flex;flex-wrap:wrap;gap:16px}
+    .card{width:46%;border:1px solid #EEF1F6;border-radius:12px;padding:12px;text-align:center}
+    .card svg{width:150px;height:150px}
+    .noqr{width:150px;height:150px;line-height:150px;color:#9ca3af;font-size:11px;margin:0 auto}
+    .code{font-weight:800;color:#2563EB;margin-top:6px;font-size:13px} .type{color:#111827;font-size:12px} .place{color:#6B7280;font-size:11px;margin-top:2px}
+  </style></head><body><h1>${esc(aptLabel)} — Asset QR Codes</h1><div class="sub">${assetGroups.length} asset${assetGroups.length === 1 ? '' : 's'}</div><div class="grid">${cards.join('')}</div></body></html>`;
+  await htmlToPdfAndShare(html, { dialogTitle: `${aptLabel} QR Codes` });
+}
 
 // ─── QR display ──────────────────────────────────────────────────────────────
 let QRLib: any = null;
@@ -1510,6 +1554,8 @@ export default function AssetsScreen() {
   const [typeFilter,   setTypeFilter]   = useState('all');
   // Inventory list grouping mode (web parity: listModeSelect) — flat | asset | apartment
   const [listMode,     setListMode]     = useState<'flat' | 'asset' | 'apartment'>('flat');
+  // Allocated list grouping mode (web parity: allocListMode) — flat | type | apartment
+  const [allocListMode, setAllocListMode] = useState<'flat' | 'type' | 'apartment'>('flat');
   const [vendorSearch, setVendorSearch] = useState('');
   const [visibleTabKeys, setVisibleTabKeys] = useState<Set<string> | null>(null);
   // Maintenance tab (asset-linked tickets, grouped client-side)
@@ -2050,6 +2096,7 @@ export default function AssetsScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 8 }}>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', flex: 1 }} numberOfLines={1}>{g.title}</Text>
                   <Pill label={String(g.items.length)} color="#2563EB" bg="rgba(37,99,235,0.12)" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a' }}>Total {fmtFull(g.items.reduce((s: number, a: any) => s + (Number(a.purchasePrice) || 0), 0))}</Text>
                 </View>
                 {g.items.map(renderCard)}
               </View>
@@ -2111,13 +2158,22 @@ export default function AssetsScreen() {
   const renderAllocations = () => {
     const grouped = new Map<string, any[]>();
     allocations.forEach((a: any) => { const ex = grouped.get(a.asset_id) || []; ex.push(a); grouped.set(a.asset_id, ex); });
-    const groups = Array.from(grouped.values());
-    if (groups.length === 0) return <View style={{ alignItems: 'center', paddingVertical: 48 }}><Ionicons name="location-outline" size={52} color="#e0d9ec" /><Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No allocations</Text><Text style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Allocate assets from the Inventory tab</Text></View>;
-    return (
-      <View>
-        {groups.map((grp, idx) => {
+    const assetGroups = Array.from(grouped.values());
+    if (assetGroups.length === 0) return <View style={{ alignItems: 'center', paddingVertical: 48 }}><Ionicons name="location-outline" size={52} color="#e0d9ec" /><Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 12 }}>No allocations</Text><Text style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>Allocate assets from the Inventory tab</Text></View>;
+
+    const assetsById = new Map<string, any>();
+    for (const a of assets) if (a && a._id != null) assetsById.set(String(a._id), a);
+    const priceOf = (grp: any[]) => { const as = assetsById.get(String(grp[0].asset_id)); return as?.purchasePrice || grp[0].assets?.purchase_price || 0; };
+    const modeOptions = [
+      { label: 'Flat list', value: 'flat' },
+      { label: 'Group by asset type', value: 'type' },
+      { label: 'Group by apartment', value: 'apartment' },
+    ];
+    const modeBar = <View style={{ marginBottom: 10 }}><PickerSelect label="View" value={allocListMode} options={modeOptions} onSelect={(v: string) => setAllocListMode(v as any)} /></View>;
+
+    const renderCard = (grp: any[], idx: number) => {
           const first = grp[0];
-          const asset = assets.find((a: any) => a._id === first.asset_id);
+          const asset = assetsById.get(String(first.asset_id));
           const price = asset?.purchasePrice || first.assets?.purchase_price || 0;
           const perBed = first.allocation_type === 'bed' && grp.length > 0 ? Math.round(price / grp.length) : 0;
           return (
@@ -2167,6 +2223,47 @@ export default function AssetsScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+            </View>
+          );
+    };
+
+    if (allocListMode === 'flat') {
+      return <View>{modeBar}{assetGroups.map((grp, idx) => renderCard(grp, idx))}</View>;
+    }
+
+    // Grouped by asset type or apartment (web parity: allocationGroupLabel + per-group Total).
+    const sections = new Map<string, any[][]>();
+    for (const grp of assetGroups) {
+      const first = grp[0];
+      const as = assetsById.get(String(first.asset_id));
+      const label = allocListMode === 'type'
+        ? (as?.typeName || first.assets?.asset_types?.name || 'Unspecified')
+        : (first.apartments?.apartment_code || first.properties?.property_name || 'Unassigned');
+      const arr = sections.get(label) || []; arr.push(grp); sections.set(label, arr);
+    }
+    const sorted = Array.from(sections.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    return (
+      <View>
+        {modeBar}
+        {sorted.map(([label, grps]) => {
+          const total = grps.reduce((s, g) => s + priceOf(g), 0);
+          return (
+            <View key={label} style={{ marginBottom: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 8, flexWrap: 'wrap' }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827', flexShrink: 1 }} numberOfLines={1}>{label}</Text>
+                <Pill label={String(grps.length)} color="#2563EB" bg="rgba(37,99,235,0.12)" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#16a34a' }}>Total {fmtFull(total)}</Text>
+                <View style={{ flex: 1 }} />
+                {allocListMode === 'apartment' && (
+                  <TouchableOpacity
+                    onPress={() => downloadApartmentQrPdf(label, grps, assetsById).catch((e: any) => Alert.alert('Error', e?.message || 'Could not create the QR PDF.'))}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#EEF1F6', backgroundColor: '#EFF6FF' }}>
+                    <Ionicons name="download-outline" size={13} color="#2563EB" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>Download QRs</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {grps.map((grp, idx) => renderCard(grp, idx))}
             </View>
           );
         })}
