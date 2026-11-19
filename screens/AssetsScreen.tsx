@@ -1185,11 +1185,12 @@ function AssetPaymentsTab() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'partial' | 'paid'>('all');
   const [vendorFilter, setVendorFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const emptyForm = { assetId: '', assetCode: '', vendorId: '', paymentDate: new Date().toISOString().split('T')[0], amount: '', paymentMode: '', bankAccountId: '', referenceNumber: '', notes: '', balanceDue: 0 };
+  const emptyForm = { id: '', assetId: '', assetCode: '', vendorId: '', paymentDate: new Date().toISOString().split('T')[0], amount: '', paymentMode: '', bankAccountId: '', referenceNumber: '', notes: '', balanceDue: 0 };
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -1197,11 +1198,28 @@ function AssetPaymentsTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [r, b] = await Promise.all([sb.listAssetPaymentStatus().catch(() => []), sb.listAssetBankAccounts().catch(() => [])]);
-      setRows(r || []); setBanks(b || []);
+      const [r, b, p] = await Promise.all([
+        sb.listAssetPaymentStatus().catch(() => []),
+        sb.listAssetBankAccounts().catch(() => []),
+        sb.listAssetPaymentsAll().catch(() => []),
+      ]);
+      setRows(r || []); setBanks(b || []); setPayments(p || []);
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // Bank label by id (web shows "name · ****last4" in the payment history).
+  const bankLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    banks.forEach((b: any) => m.set(b.id, `${b.bankName}${b.accountNumber ? ` ****${String(b.accountNumber).slice(-4)}` : ''}`));
+    return m;
+  }, [banks]);
+  // Payment records keyed by assetId → each invoice group pulls its history.
+  const paymentsByAsset = useMemo(() => {
+    const m = new Map<string, any[]>();
+    payments.forEach((p: any) => { const a = m.get(p.assetId) || []; a.push(p); m.set(p.assetId, a); });
+    return m;
+  }, [payments]);
 
   const groups = useMemo(() => {
     const byKey = new Map<string, any[]>();
@@ -1234,6 +1252,13 @@ function AssetPaymentsTab() {
   const bankAccountOptions = useMemo(() => banks.map((b: any) => ({ label: `${b.bankName}${b.ifsc ? ` (${b.ifsc})` : ''} — ****${String(b.accountNumber).slice(-4)}${b.isPrimary ? ' • Primary' : ''}`, value: b.id })), [banks]);
 
   const openRecord = (g: any) => { setForm({ ...emptyForm, assetId: g.lead.assetId, assetCode: g.lead.assetCode, vendorId: g.lead.supplierId || '', balanceDue: g.displayDue, amount: g.displayDue > 0 ? String(Math.round(g.displayDue)) : '' }); setFormOpen(true); };
+  // Edit an existing payment record (web parity: openEditPayment).
+  const openEdit = (p: any, g: any) => {
+    setForm({ ...emptyForm, id: p.id, assetId: p.assetId, assetCode: g.lead.assetCode, vendorId: p.vendorId || g.lead.supplierId || '',
+      paymentDate: p.date || emptyForm.paymentDate, amount: p.amount ? String(p.amount) : '', paymentMode: p.mode || '',
+      bankAccountId: p.bankAccountId || '', referenceNumber: p.reference || '', notes: p.notes || '', balanceDue: g.displayDue });
+    setFormOpen(true);
+  };
   const savePayment = async () => {
     const amt = parseFloat(form.amount);
     if (!form.assetId) { Alert.alert('Validation', 'Asset is required.'); return; }
@@ -1241,29 +1266,40 @@ function AssetPaymentsTab() {
     if (form.paymentMode && form.paymentMode !== 'cash' && !form.bankAccountId) { Alert.alert('Validation', 'Bank account is required when payment mode is not cash.'); return; }
     setSaving(true);
     try {
-      await sb.recordAssetPayment({ assetId: form.assetId, vendorId: form.vendorId || null, paymentDate: form.paymentDate, amount: amt, paymentMode: form.paymentMode || null, bankAccountId: form.bankAccountId || null, referenceNumber: form.referenceNumber || null, notes: form.notes || null });
+      const payload = { assetId: form.assetId, vendorId: form.vendorId || null, paymentDate: form.paymentDate, amount: amt, paymentMode: form.paymentMode || null, bankAccountId: form.bankAccountId || null, referenceNumber: form.referenceNumber || null, notes: form.notes || null };
+      const res: any = form.id ? await sb.updateAssetPayment(form.id, payload) : await sb.recordAssetPayment(payload);
+      if (res && res.disabled) { Alert.alert('Writes disabled', res.message || 'Editing is currently disabled on this build.'); return; }
       setFormOpen(false); setForm(emptyForm); await load();
-    } catch (e: any) { Alert.alert('Error', e.message || 'Could not record payment.'); }
+    } catch (e: any) { Alert.alert('Error', e.message || 'Could not save payment.'); }
     finally { setSaving(false); }
+  };
+  // Delete a payment (gated — blocked while DELETES_ENABLED is false).
+  const deletePayment = async (p: any) => {
+    if (!(await confirmDelete('Delete this payment? It will reverse its journal entries.'))) return;
+    try {
+      const res: any = await sb.deleteAssetPayment(p.id);
+      if (res && res.disabled) { Alert.alert('Deletes disabled', res.message || 'Deleting is currently disabled.'); return; }
+      await load();
+    } catch (e: any) { Alert.alert('Error', e.message || 'Could not delete payment.'); }
   };
 
   if (loading) return <View style={{ alignItems: 'center', paddingVertical: 48 }}><ActivityIndicator size="large" color="#2563EB" /><Text style={{ marginTop: 12, color: '#6B7280' }}>Loading asset payments…</Text></View>;
 
   return (
     <View>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
-          <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '800', textTransform: 'uppercase' }}>Purchase</Text>
-          <Text style={{ fontSize: 15, fontWeight: '900', color: '#111827', marginTop: 4 }}>{fmtShort(totals.purchase)}</Text>
-        </View>
-        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
-          <Text style={{ fontSize: 10, color: '#16a34a', fontWeight: '800', textTransform: 'uppercase' }}>Paid</Text>
-          <Text style={{ fontSize: 15, fontWeight: '900', color: '#16a34a', marginTop: 4 }}>{fmtShort(totals.paid)}</Text>
-        </View>
-        <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
-          <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '800', textTransform: 'uppercase' }}>Due</Text>
-          <Text style={{ fontSize: 15, fontWeight: '900', color: '#DC2626', marginTop: 4 }}>{fmtShort(totals.due)}</Text>
-        </View>
+      {/* 4 KPI cards (web parity): Payment lines · Purchase Total · Paid · Balance Due */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 4 }}>
+        {[
+          { label: 'Payment lines', value: String(groups.length), color: '#2563EB' },
+          { label: 'Purchase',      value: fmtShort(totals.purchase), color: '#111827' },
+          { label: 'Paid',          value: fmtShort(totals.paid), color: '#16a34a' },
+          { label: 'Balance Due',   value: fmtShort(totals.due), color: '#DC2626' },
+        ].map((c) => (
+          <View key={c.label} style={{ width: '48.5%', backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+            <Text style={{ fontSize: 10, color: c.color === '#111827' ? '#6B7280' : c.color, fontWeight: '800', textTransform: 'uppercase' }} numberOfLines={1}>{c.label}</Text>
+            <Text style={{ fontSize: 16, fontWeight: '900', color: c.color, marginTop: 4 }} numberOfLines={1}>{c.value}</Text>
+          </View>
+        ))}
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#EEF1F6', paddingHorizontal: 10, marginBottom: 10 }}>
@@ -1305,6 +1341,8 @@ function AssetPaymentsTab() {
           const badge = PAY_STATUS_BADGE[g.displayStatus] || PAY_STATUS_BADGE.unpaid;
           const isMulti = g.rows.length > 1;
           const expanded = expandedKey === g.groupKey;
+          const grpPayments = g.rows.flatMap((r: any) => paymentsByAsset.get(r.assetId) || []);
+          const canExpand = isMulti || grpPayments.length > 0;
           return (
             <View key={g.groupKey} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1326,19 +1364,51 @@ function AssetPaymentsTab() {
                   </TouchableOpacity>
                 )}
               </View>
-              {isMulti && (
+              {canExpand && (
                 <TouchableOpacity onPress={() => setExpandedKey(expanded ? null : g.groupKey)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }}>
-                  <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#2563EB" /><Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{expanded ? 'Hide' : 'Show'} {g.rows.length} linked assets</Text>
+                  <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#2563EB" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
+                    {expanded ? 'Hide' : 'Show'} details{isMulti ? ` · ${g.rows.length} assets` : ''}{grpPayments.length > 0 ? ` · ${grpPayments.length} payment${grpPayments.length === 1 ? '' : 's'}` : ''}
+                  </Text>
                 </TouchableOpacity>
               )}
-              {isMulti && expanded && (
+              {canExpand && expanded && (
                 <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#EEF1F6', paddingTop: 8 }}>
-                  {g.rows.map((r: any) => (
-                    <View key={r.assetId} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 }}>
-                      <Text style={{ fontSize: 12, color: '#111827', fontWeight: '600' }}>{r.assetCode}</Text>
-                      <Text style={{ fontSize: 12, color: '#6B7280' }}>{fmtFull(r.purchasePrice)} · paid {fmtFull(r.totalPaid)}</Text>
+                  {isMulti && (
+                    <View style={{ marginBottom: grpPayments.length > 0 ? 10 : 0 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#6B7280', textTransform: 'uppercase', marginBottom: 4 }}>Linked assets</Text>
+                      {g.rows.map((r: any) => (
+                        <View key={r.assetId} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                          <Text style={{ fontSize: 12, color: '#111827', fontWeight: '600' }}>{r.assetCode}</Text>
+                          <Text style={{ fontSize: 12, color: '#6B7280' }}>{fmtFull(r.purchasePrice)} · paid {fmtFull(r.totalPaid)}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
+                  )}
+                  {grpPayments.length > 0 && (
+                    <View>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#6B7280', textTransform: 'uppercase', marginBottom: 4 }}>Payment history</Text>
+                      {grpPayments.map((p: any) => (
+                        <View key={p.id} style={{ backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#EEF1F6', padding: 10, marginBottom: 6 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#16a34a' }}>{fmtFull(p.amount)}</Text>
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                              <TouchableOpacity onPress={() => openEdit(p, g)} style={{ padding: 6, borderRadius: 8, backgroundColor: '#EFF6FF' }}><Ionicons name="pencil-outline" size={14} color="#2563EB" /></TouchableOpacity>
+                              <TouchableOpacity onPress={() => deletePayment(p)} style={{ padding: 6, borderRadius: 8, backgroundColor: 'rgba(220,38,38,0.08)' }}><Ionicons name="trash-outline" size={14} color="#DC2626" /></TouchableOpacity>
+                            </View>
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+                            <Text style={{ fontSize: 11, color: '#6B7280' }}>{fmtDate(p.date)}</Text>
+                            {!!p.mode && <Text style={{ fontSize: 11, color: '#6B7280', textTransform: 'capitalize' }}>{p.mode}</Text>}
+                            {!!p.bankAccountId && <Text style={{ fontSize: 11, color: '#6B7280' }}>{bankLabelById.get(p.bankAccountId) || 'Bank'}</Text>}
+                            {!!p.reference && <Text style={{ fontSize: 11, color: '#6B7280' }}>Ref {p.reference}</Text>}
+                            {isMulti && <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '600' }}>{g.rows.find((r: any) => r.assetId === p.assetId)?.assetCode || ''}</Text>}
+                          </View>
+                          {!!p.proofUrl && <TouchableOpacity onPress={() => Linking.openURL(p.proofUrl).catch(() => {})}><Text style={{ fontSize: 11, color: '#2563EB', marginTop: 3 }}>View proof</Text></TouchableOpacity>}
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -1350,7 +1420,7 @@ function AssetPaymentsTab() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(30,18,48,0.45)' }}>
           <View style={{ backgroundColor: '#F8FAFC', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36, maxHeight: '90%' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>Record Payment</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>{form.id ? 'Edit Payment' : 'Record Payment'}</Text>
               <TouchableOpacity onPress={() => setFormOpen(false)} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 999 }}><Ionicons name="close" size={18} color="#556274" /></TouchableOpacity>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

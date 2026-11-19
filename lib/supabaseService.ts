@@ -3791,8 +3791,40 @@ export async function recordAssetPayment(data: any) {
   if (error) throw new Error(`Record payment failed: ${error.message}`);
   return row;
 }
-export async function deleteAssetPayment(_paymentId: string) {
-  return deleteDisabledResult();
+// All asset payments for the org (web parity: ["asset_payments", orgId]) — used
+// to show each invoice group's payment history with mode/bank/reference.
+export async function listAssetPaymentsAll() {
+  const rows = await fetchAllPages((from, to) =>
+    supabase.from("asset_payments")
+      .select("*, vendors(vendor_name)")
+      .eq("organization_id", ORG_ID)
+      .order("payment_date", { ascending: false })
+      .range(from, to));
+  return rows.map((p: any) => ({
+    id: p.id, assetId: p.asset_id, date: p.payment_date, amount: Number(p.amount) || 0,
+    mode: p.payment_mode || null, reference: p.reference_number || null, vendorId: p.vendor_id || null,
+    vendor: (p.vendors as any)?.vendor_name || null, bankAccountId: p.bank_account_id || null,
+    proofUrl: p.payment_proof_url || null, notes: p.notes || null,
+  }));
+}
+// Edit an existing payment. Gated on the single DELETES_ENABLED switch (writes
+// stay inert on dev); becomes a real update once that switch is flipped.
+export async function updateAssetPayment(id: string, data: any) {
+  if (!DELETES_ENABLED) return deleteDisabledResult();
+  const { data: row, error } = await supabase.from("asset_payments").update({
+    vendor_id: data.vendorId || null, payment_date: data.paymentDate, amount: data.amount,
+    payment_mode: data.paymentMode || null, bank_account_id: data.bankAccountId || null,
+    reference_number: data.referenceNumber || null, payment_proof_url: data.proofUrl || null,
+    notes: data.notes || null,
+  }).eq("id", id).eq("organization_id", ORG_ID).select().single();
+  if (error) throw new Error(`Update payment failed: ${error.message}`);
+  return row;
+}
+export async function deleteAssetPayment(paymentId: string) {
+  if (!DELETES_ENABLED) return deleteDisabledResult();
+  const { error } = await supabase.from("asset_payments").delete().eq("id", paymentId).eq("organization_id", ORG_ID);
+  if (error) throw new Error(`Delete payment failed: ${error.message}`);
+  return { success: true as const };
 }
 export async function listAssetPaymentStatus() {
   const rows = await fetchAllPages((from, to) =>
