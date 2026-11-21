@@ -11,7 +11,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, asyncStoragePersister, CACHE_MAX_AGE } from './lib/queryClient';
 import { AuthProvider, useAuth } from './lib/auth';
 import * as sb from './lib/supabaseService';
-import { fontSize, spacing, sidebarColors, glass } from './lib/theme';
+import { fontSize, spacing, sidebarColors, glass, animation } from './lib/theme';
 import { useTheme, ThemeProvider } from './lib/ThemeContext';
 import LoginScreen from './screens/LoginScreen';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
@@ -223,7 +223,7 @@ const AuthStack = createNativeStackNavigator();
 
 function PropertiesStack() {
   return (
-    <PropStack.Navigator screenOptions={{ headerShown: false }}>
+    <PropStack.Navigator screenOptions={{ headerShown: false, animation: animation.stackAnimation, animationDuration: animation.stackDuration, gestureEnabled: true }}>
       <PropStack.Screen name="PropertiesList" component={PropertiesScreen} />
       <PropStack.Screen name="PropertyDetail" component={PropertyDetailScreen} />
     </PropStack.Navigator>
@@ -232,7 +232,7 @@ function PropertiesStack() {
 
 function TicketsStack() {
   return (
-    <TicketStack.Navigator screenOptions={{ headerShown: false }}>
+    <TicketStack.Navigator screenOptions={{ headerShown: false, animation: animation.stackAnimation, animationDuration: animation.stackDuration, gestureEnabled: true }}>
       <TicketStack.Screen name="TicketsList" component={TicketsScreen} />
       <TicketStack.Screen name="TicketDetail" component={TicketDetailScreen} />
     </TicketStack.Navigator>
@@ -528,7 +528,7 @@ function TenantTabNavigator() {
 
 function TenantNavigator() {
   return (
-    <TenantStack.Navigator screenOptions={{ headerShown: false }}>
+    <TenantStack.Navigator screenOptions={{ headerShown: false, animation: animation.stackAnimation, animationDuration: animation.stackDuration, gestureEnabled: true }}>
       <TenantStack.Screen name="TenantTabs" component={TenantTabNavigator} />
       <TenantStack.Screen name="CreateTicket" component={CreateTicketScreen} />
       <TenantStack.Screen name="TenantKyc" component={TenantKycScreen} />
@@ -546,6 +546,9 @@ function AuthNavigator() {
     <AuthStack.Navigator
       screenOptions={{
         headerShown: false,
+        animation: animation.stackAnimation,
+        animationDuration: animation.stackDuration,
+        gestureEnabled: true,
         // Native-stack keyboard handling fights Android IME and can close the
         // keypad right after the login number field focuses.
         keyboardHandlingEnabled: false,
