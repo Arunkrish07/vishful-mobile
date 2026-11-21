@@ -187,7 +187,7 @@ function TicketsDashboardScreen({ navigation }: any) {
   const StatCard = ({ label, value, color, bg, icon, onPress }: any) => (
     <TouchableOpacity
       onPress={onPress} activeOpacity={0.8}
-      style={{ flex: 1, backgroundColor: bg, borderRadius: 16, padding: 16, minHeight: 90, justifyContent: 'space-between', borderWidth: 1, borderColor: `${color}30`, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
+      style={{ flex: 1, backgroundColor: bg, borderRadius: 16, padding: 16, minHeight: 90, justifyContent: 'space-between', borderWidth: 1, borderColor: `${color}30`, shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Text style={{ fontSize: 28, fontWeight: '800', color }}>{value}</Text>
@@ -240,7 +240,7 @@ function TicketsDashboardScreen({ navigation }: any) {
             </View>
           </Animated.View>
 
-          <Animated.View style={{ opacity: fadeAnim, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+          <Animated.View style={{ opacity: fadeAnim, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Completion Rate</Text>
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#22C55E' }}>
@@ -315,7 +315,7 @@ function DashboardTicketRow({ ticket, onPress }: { ticket: Ticket; onPress: () =
   const priorityCfg = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.medium;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EBEFF5', marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
       <View style={{ width: 8, height: 40, borderRadius: 4, backgroundColor: statusCfg.color }} />
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND }}>{ticket.ticket_number}</Text>
@@ -357,7 +357,7 @@ function SkeletonBox({ width, height, borderRadius = 8, style }: { width?: numbe
 function TicketCardSkeleton() {
   const { colors } = useTheme();
   return (
-    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EEF1F6' }}>
+    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EBEFF5' }}>
       {/* Status bar at top */}
       <SkeletonBox width="40%" height={4} borderRadius={0} />
       <View style={{ padding: 16, gap: 10 }}>
@@ -529,7 +529,7 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
+      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
       <View style={{ height: 4, backgroundColor: statusCfg.color }} />
       <View style={{ padding: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -2074,7 +2074,7 @@ function CostEstimateRow({ estimate, isAdmin, ticketId, userId, onUpdated }: {
     : estimate.total;
 
   return (
-    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', gap: 10 }}>
+    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EBEFF5', gap: 10 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ flex: 1, marginRight: 10 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{estimate.item_name}</Text>
@@ -2277,7 +2277,7 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, a
             </Text>
 
             {items.map((item, idx) => (
-              <View key={idx} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', gap: 10 }}>
+              <View key={idx} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EBEFF5', gap: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>ITEM {idx + 1}</Text>
                   {items.length > 1 && (
@@ -2665,7 +2665,7 @@ function ReassignModal({ visible, ticketId, userId, onClose, onSubmit }: any) {
 function SectionCard({ title, icon, iconColor, iconBg, children }: any) {
   const { colors } = useTheme();
   return (
-    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name={icon} size={17} color={iconColor} />
