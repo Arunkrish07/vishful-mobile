@@ -2748,7 +2748,7 @@ const techNav = {
 function TechFloatingTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[techNav.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View style={[techNav.wrap, { paddingBottom: Math.max(insets.bottom, 10) + 14 }]}>
       <View style={techNav.pill}>
         {state.routes.map((route: any, index: number) => {
           const { options } = descriptors[route.key];
