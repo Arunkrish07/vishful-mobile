@@ -472,6 +472,10 @@ function MainDrawer() {
           options={{ drawerIcon: ({ color }: any) => <Ionicons name="document-text-outline" size={20} color={color} /> }} />
       )}
 
+      {/* "More" hub — grid of every non-primary section (reached from the bottom bar) */}
+      <Drawer.Screen name="More" component={MoreScreen}
+        options={{ drawerIcon: ({ color }: any) => <Ionicons name="grid-outline" size={20} color={color} /> }} />
+
       {/* Settings — always visible so admins can manage permissions */}
       <Drawer.Screen name="Settings" component={SettingsScreen}
         options={{ drawerIcon: ({ color }: any) => <Ionicons name="settings-outline" size={20} color={color} /> }} />
@@ -626,18 +630,60 @@ const ADMIN_NAV_RAIL: NavItem[] = [
   { name: 'Settings',         label: 'Settings',      icon: 'settings-outline',        always: true },
 ];
 
-function AdminFloatingNav({ navRef }: { navRef: any }) {
-  const insets = useSafeAreaInsets();
+// The bottom bar shows exactly these four destinations; everything else the
+// role can access is reached through the "More" screen. Keep in sync with labels.
+const PRIMARY_NAV_NAMES = ['Dashboard', 'Tenant Lifecycle', 'Tickets', 'Electricity'];
+
+// Shared gate used by both the bottom bar and the More screen.
+function useNavAccess() {
   const { canAccess: rawCanAccess, isSuperuser } = usePermissions();
-  const canAccess = React.useCallback(
+  return React.useCallback(
     (m?: AppModule, always?: boolean) =>
       !!always || (!!m && (isSuperuser || !HIDDEN_ON_MOBILE.has(m)) && rawCanAccess(m)),
     [rawCanAccess, isSuperuser],
   );
+}
+
+// Full-page "More" screen — a grid of every section the role can reach that
+// isn't one of the four primary tabs. Tapping a tile navigates to that screen.
+function MoreScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const canAccess = useNavAccess();
+  const moreItems = ADMIN_NAV_RAIL.filter(
+    i => !PRIMARY_NAV_NAMES.includes(i.name) && canAccess(i.module, i.always),
+  );
+  return (
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <View style={[MORE.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={MORE.title}>More</Text>
+        <Text style={MORE.subtitle}>All sections</Text>
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: Math.max(insets.bottom, 12) + 110 }}>
+        <View style={MORE.grid}>
+          {moreItems.map((item) => (
+            <TouchableOpacity
+              key={item.name}
+              style={MORE.tile}
+              activeOpacity={0.85}
+              onPress={() => { try { navigation.navigate(item.name); } catch {} }}
+            >
+              <View style={MORE.tileIcon}>
+                <Ionicons name={item.icon} size={24} color={NAV_UI.brand} />
+              </View>
+              <Text style={MORE.tileLabel} numberOfLines={2}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function AdminFloatingNav({ navRef }: { navRef: any }) {
+  const insets = useSafeAreaInsets();
+  const canAccess = useNavAccess();
 
   const [active, setActive] = useState('Dashboard');
-  const scrollRef = useRef<ScrollView>(null);
-  const itemLayouts = useRef<Record<string, { x: number; w: number }>>({});
 
   useEffect(() => {
     const update = () => {
@@ -652,62 +698,75 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
     return () => { try { unsub?.(); } catch {} };
   }, [navRef]);
 
-  // Keep the active tab centered in the horizontal rail (same as web nav-rail).
-  useEffect(() => {
-    const layout = itemLayouts.current[active];
-    if (!layout || !scrollRef.current) return;
-    const target = Math.max(0, layout.x - 80);
-    scrollRef.current.scrollTo({ x: target, animated: true });
-  }, [active]);
-
   const go = (name: string) => {
     try { if (navRef.isReady?.()) navRef.navigate(name as never); } catch {}
   };
 
-  const items = ADMIN_NAV_RAIL.filter(i => canAccess(i.module, i.always));
+  // Four fixed primary tabs (in the declared order) + everything else → "More".
+  const primary = PRIMARY_NAV_NAMES
+    .map(n => ADMIN_NAV_RAIL.find(i => i.name === n))
+    .filter((i): i is NavItem => !!i && canAccess(i.module, i.always));
+  // "More" is active on the More screen itself or on any screen reached through it.
+  const moreActive = active === 'More'
+    || ADMIN_NAV_RAIL.some(i => !PRIMARY_NAV_NAMES.includes(i.name) && i.name === active);
+
+  const renderTab = (item: NavItem, on: boolean, onPress: () => void, iconOverride?: string) => (
+    <TouchableOpacity
+      key={item.name}
+      style={[NAV.item, { flex: 1 }, on && NAV.itemOn]}
+      activeOpacity={0.85}
+      onPress={onPress}
+    >
+      <Ionicons
+        name={(iconOverride || item.icon) as any}
+        size={18}
+        color={on ? NAV_UI.brand : NAV_UI.idle}
+        style={on ? { transform: [{ translateY: -1 }, { scale: 1.06 }] } : undefined}
+      />
+      <Text style={[NAV.label, on && NAV.labelOn]} numberOfLines={1}>{item.label}</Text>
+      {on ? <View style={NAV.underline} /> : null}
+    </TouchableOpacity>
+  );
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={[NAV.rail, { bottom: Math.max(insets.bottom, 10) }]}
-    >
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={NAV.track}
-        decelerationRate="fast"
-      >
-        {items.map((item) => {
-          const on = active === item.name;
-          return (
-            <TouchableOpacity
-              key={item.name}
-              style={[NAV.item, on && NAV.itemOn]}
-              activeOpacity={0.85}
-              onPress={() => go(item.name)}
-              onLayout={(e) => {
-                const { x, width } = e.nativeEvent.layout;
-                itemLayouts.current[item.name] = { x, w: width };
-              }}
-            >
-              <Ionicons
-                name={item.icon}
-                size={18}
-                color={on ? NAV_UI.brand : NAV_UI.idle}
-                style={on ? { transform: [{ translateY: -1 }, { scale: 1.06 }] } : undefined}
-              />
-              <Text style={[NAV.label, on && NAV.labelOn]} numberOfLines={1}>
-                {item.label}
-              </Text>
-              {on ? <View style={NAV.underline} /> : null}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+    <View pointerEvents="box-none" style={[NAV.rail, { bottom: Math.max(insets.bottom, 10) }]}>
+      <View style={NAV.row}>
+        {primary.map(item => renderTab(item, active === item.name, () => go(item.name)))}
+        <TouchableOpacity
+          key="__more"
+          style={[NAV.item, { flex: 1 }, moreActive && NAV.itemOn]}
+          activeOpacity={0.85}
+          onPress={() => go('More')}
+        >
+          <Ionicons name="grid-outline" size={18} color={moreActive ? NAV_UI.brand : NAV_UI.idle} />
+          <Text style={[NAV.label, moreActive && NAV.labelOn]} numberOfLines={1}>More</Text>
+          {moreActive ? <View style={NAV.underline} /> : null}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
+
+const MORE = StyleSheet.create({
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF1F6',
+  },
+  title: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
+  subtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  tile: { width: '25%', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 2 },
+  tileIcon: {
+    width: 58, height: 58, borderRadius: 18,
+    backgroundColor: '#EEF0FF',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 7,
+  },
+  tileLabel: { fontSize: 11, color: '#475569', textAlign: 'center', fontWeight: '600' },
+});
 
 const NAV = StyleSheet.create({
   rail: {
@@ -760,6 +819,13 @@ const NAV = StyleSheet.create({
     height: 3,
     borderRadius: 2,
     backgroundColor: '#1D4ED8',
+  },
+  // Fixed 5-slot row (4 tabs + More) — no horizontal scroll.
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 8,
   },
 });
 
