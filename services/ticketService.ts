@@ -4,7 +4,8 @@
  * payment-proof OCR) go through Supabase Edge Functions (ai-diagnosis, payments-extract-proof).
  */
 import { supabase } from "../lib/supabase"; // direct client (Storage + data)
-import { ORG_ID, safeList, insertRow, updateRow, deleteDisabledResult } from "../lib/supabaseDb";
+import * as FileSystem from "expo-file-system/legacy"; // read picked images as base64 for edge-fn upload
+import { ORG_ID, safeList, fetchAllPages, insertRow, updateRow, deleteDisabledResult } from "../lib/supabaseDb";
 import { calcWorkingHoursSlaDeadline } from "../lib/ticketSla";
 
 async function generateTicketNumber(): Promise<string> {
@@ -254,11 +255,8 @@ export async function uploadTicketPhoto(
 export async function fetchTickets(role: string, userId?: string, tenantId?: string): Promise<Ticket[]> {
   try {
     // Direct Supabase port of convex/tickets.ts listTickets (role-scoped + enriched).
-    let query = supabase
-      .from("maintenance_tickets").select("*")
-      .eq("organization_id", ORG_ID)
-      .order("created_at", { ascending: false });
-
+    // Resolve technician scoping first (needs a team_members lookup).
+    let techAssignedIds: string[] | null = null;
     if (role === "technician" && userId) {
       const { data: memberRows } = await supabase
         .from("team_members").select("id, user_id")
@@ -268,11 +266,22 @@ export async function fetchTickets(role: string, userId?: string, tenantId?: str
       if (memberRows?.length) {
         memberRows.forEach((m: any) => { if (m.id) possibleIds.push(m.id); if (m.user_id) possibleIds.push(m.user_id); });
       }
-      query = query.in("assigned_to", [...new Set(possibleIds.filter(Boolean))]);
-    } else if (role === "tenant" && tenantId) {
-      query = query.eq("tenant_id", tenantId);
+      techAssignedIds = [...new Set(possibleIds.filter(Boolean))];
     }
-    const tickets = await safeList(query);
+
+    // Page through ALL matching tickets. PostgREST caps a single query at 1000
+    // rows; orgs can have more tickets than that, which (with newest-first order)
+    // previously truncated the list and under-counted older/closed tickets.
+    const tickets = await fetchAllPages<any>((from, to) => {
+      let q = supabase
+        .from("maintenance_tickets").select("*")
+        .eq("organization_id", ORG_ID)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (techAssignedIds) q = q.in("assigned_to", techAssignedIds);
+      else if (role === "tenant" && tenantId) q = q.eq("tenant_id", tenantId);
+      return q;
+    });
     if (!tickets.length) return [];
 
     const bedIds = [...new Set(tickets.map((t: any) => t.bed_id).filter(Boolean))];
@@ -892,38 +901,25 @@ export async function uploadKycPhoto(
   mimeType: string = 'image/jpeg'
 ): Promise<string | null> {
   try {
-    const BUCKET = 'kyc-docs';
+    // Upload to the EXISTING `documents` bucket (the same one the web app uses for
+    // KYC), folder `kyc/`. The old code targeted a `kyc-docs` bucket that doesn't
+    // exist and tried to create it client-side, which the anon/user role can't do
+    // → "Bucket not found".
+    const BUCKET = 'documents';
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
-    const fileName = `${tenantId}_${side}_${Date.now()}.${ext}`;
-    const filePath = `kyc/${fileName}`;
-
-    let uploadData: Blob | ArrayBuffer;
-    if (base64) {
-      const byteChars = atob(base64);
-      const byteArr = new Uint8Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-      uploadData = byteArr.buffer;
-    } else {
-      const response = await fetch(uri);
-      uploadData = await response.blob();
+    const filePath = `kyc/${tenantId}_${side}_${Date.now()}.${ext}`;
+    // The image picker (allowsEditing) often drops base64 on Android — read it back
+    // from the uri when missing, so there are always bytes to upload.
+    let b64 = base64;
+    if (!b64 && uri) {
+      try { b64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' as any }); } catch { /* fall through */ }
     }
-
-    // Ensure bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some((b: any) => b.name === BUCKET);
-    if (!bucketExists) {
-      await supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 10 * 1024 * 1024 });
-    }
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, uploadData, { contentType: mimeType, upsert: true });
-
-    if (error) {
-      console.warn('[uploadKycPhoto] Upload error:', error.message);
-      return null;
-    }
-
+    if (!b64) { console.warn('[uploadKycPhoto] No image data to upload'); return null; }
+    const byteChars = atob(b64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const { error } = await supabase.storage.from(BUCKET).upload(filePath, bytes, { contentType: mimeType, upsert: true });
+    if (error) { console.warn('[uploadKycPhoto] Upload error:', error.message); return null; }
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
     return data?.publicUrl ?? null;
   } catch (err: any) {
@@ -943,38 +939,22 @@ export async function uploadPaymentProof(
   mimeType: string = 'image/jpeg'
 ): Promise<string | null> {
   try {
+    // The `payment-proofs` bucket already exists; upload directly. (Dropped the old
+    // listBuckets/createBucket dance — the anon/user role can't create buckets, and
+    // it isn't needed since the bucket is present.)
     const BUCKET = 'payment-proofs';
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
-    const fileName = `${context}_${contextId}_${Date.now()}.${ext}`;
-    const filePath = `${context}/${fileName}`;
-
-    let uploadData: Blob | ArrayBuffer;
-    if (base64) {
-      const byteChars = atob(base64);
-      const byteArr = new Uint8Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-      uploadData = byteArr.buffer;
-    } else {
-      const response = await fetch(uri);
-      uploadData = await response.blob();
+    const filePath = `${context}/${context}_${contextId}_${Date.now()}.${ext}`;
+    let b64 = base64;
+    if (!b64 && uri) {
+      try { b64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' as any }); } catch { /* fall through */ }
     }
-
-    // Ensure bucket exists (create with public access if missing)
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some((b: any) => b.name === BUCKET);
-    if (!bucketExists) {
-      await supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 10 * 1024 * 1024 });
-    }
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, uploadData, { contentType: mimeType, upsert: true });
-
-    if (error) {
-      console.warn('[uploadPaymentProof] Upload error:', error.message);
-      return null;
-    }
-
+    if (!b64) { console.warn('[uploadPaymentProof] No image data to upload'); return null; }
+    const byteChars = atob(b64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const { error } = await supabase.storage.from(BUCKET).upload(filePath, bytes, { contentType: mimeType, upsert: true });
+    if (error) { console.warn('[uploadPaymentProof] Upload error:', error.message); return null; }
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
     return data?.publicUrl ?? null;
   } catch (err: any) {
