@@ -61,36 +61,38 @@ export function GlassBackground({ children, style }: { children: React.ReactNode
   );
 }
 
-/** Sticky page header (reference page-header) */
+/** Sticky page header — frosted glass chrome (both platforms) */
 export function GlassHeader({ children, style }: { children: React.ReactNode; style?: any }) {
-  if (Platform.OS === 'ios') {
-    return (
-      <BlurView intensity={48} tint="light" style={[{ overflow: 'hidden' }, style]}>
-        <View style={[{
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
-          borderBottomWidth: 1,
-          borderBottomColor: '#E5E7EB',
-          backgroundColor: 'rgba(255,255,255,0.72)',
-        }]}>
-          {children}
-        </View>
-      </BlurView>
-    );
-  }
   return (
-    <View style={[glass.header, { paddingHorizontal: spacing.lg, paddingVertical: spacing.md }, style]}>
-      {children}
-    </View>
+    <BlurView intensity={glass.blurIntensity} tint={glass.blurTint} style={[{ overflow: 'hidden' }, style]}>
+      <View style={{
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E6EBF2',
+        backgroundColor: glass.chrome.backgroundColor,
+      }}>
+        {children}
+      </View>
+    </BlurView>
   );
 }
 
-/** White panel card (reference panel / ticket card) */
-export function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
+/** White panel card (reference panel / ticket card). `animateIn` = subtle fade/rise on mount. */
+export function GlassCard({ children, style, animateIn }: { children: React.ReactNode; style?: any; animateIn?: boolean }) {
+  const a = useRef(new RNAnimated.Value(animateIn ? 0 : 1)).current;
+  useEffect(() => {
+    if (animateIn) {
+      RNAnimated.timing(a, { toValue: 1, duration: animation.normal, useNativeDriver: true }).start();
+    }
+  }, [a, animateIn]);
   return (
-    <View style={[glass.card, style]}>
+    <RNAnimated.View style={[glass.card, style, animateIn ? {
+      opacity: a,
+      transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+    } : null]}>
       {children}
-    </View>
+    </RNAnimated.View>
   );
 }
 
@@ -154,7 +156,7 @@ export function Button({ title, onPress, variant = 'primary', loading, icon, dis
         disabled={loading || disabled}
         activeOpacity={0.85}
         style={[{
-          height: 48, borderRadius: 14,
+          height: 48, borderRadius: 16,
           alignItems: 'center', justifyContent: 'center',
           backgroundColor: bgColor,
           borderWidth: variant === 'outline' ? 1.5 : 0,
@@ -193,7 +195,7 @@ export function Input({ label, value, onChangeText, placeholder, keyboardType, m
       <View style={{
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB',
+        borderRadius: 16, borderWidth: 1, borderColor: colors.border,
         paddingHorizontal: spacing.md,
       }}>
         {icon && <Ionicons name={icon as any} size={18} color={colors.textTertiary} style={{ marginRight: 8 }} />}
@@ -349,8 +351,8 @@ export function PickerSelect({ label, value, options, onSelect }: {
       )}
       <TouchableOpacity
         style={{
-          backgroundColor: 'rgba(255,255,255,0.6)',
-          borderWidth: 1, borderColor: 'rgba(224,213,234,0.5)', borderRadius: 14,
+          backgroundColor: '#FFFFFF',
+          borderWidth: 1, borderColor: colors.border, borderRadius: 16,
           paddingHorizontal: spacing.md, height: 50, justifyContent: 'center',
           flexDirection: 'row', alignItems: 'center',
         }}
@@ -560,11 +562,11 @@ export const WEB = {
   ink: '#0F172A',
   ink2: '#64748B',
   ink3: '#94A3B8',
-  paper: '#F8FAFC',
+  paper: '#F6F8FC',
   surface: '#FFFFFF',
-  line: '#E2E8F0',
+  line: '#E6EBF2',
   softLine: '#EEF2F7',
-  cardBorder: '#E5E7EB',
+  cardBorder: '#EBEFF5',
   good: '#16A34A',
   warn: '#D97706',
   bad: '#DC2626',
@@ -577,12 +579,13 @@ export function PageHeader({
   title: string; subtitle?: string; onBack?: () => void; right?: React.ReactNode; style?: any;
 }) {
   return (
-    <View style={[{
+    <BlurView intensity={glass.blurIntensity} tint={glass.blurTint} style={[{ overflow: 'hidden' }, style]}>
+    <View style={{
       flexDirection: 'row', alignItems: 'center', gap: 10,
       paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, minHeight: 58,
-      backgroundColor: 'rgba(255,255,255,0.96)',
+      backgroundColor: glass.chrome.backgroundColor,
       borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8EDF5',
-    }, style]}>
+    }}>
       {onBack ? (
         <TouchableOpacity
           onPress={onBack}
@@ -608,6 +611,7 @@ export function PageHeader({
       </View>
       {right}
     </View>
+    </BlurView>
   );
 }
 
@@ -654,7 +658,7 @@ export function SearchField({
     <View style={[{
       flexDirection: 'row', alignItems: 'center', gap: 8,
       minHeight: 46, paddingHorizontal: 12,
-      backgroundColor: '#fff', borderRadius: 13,
+      backgroundColor: '#fff', borderRadius: 16,
       borderWidth: 1, borderColor: WEB.line,
     }, style]}>
       <Ionicons name="search-outline" size={16} color={WEB.ink3} />
@@ -732,10 +736,10 @@ export function ModuleCard({ children, onPress, style }: {
 }) {
   const body = (
     <View style={[{
-      backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: WEB.cardBorder,
+      backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: WEB.cardBorder,
       padding: 12, marginBottom: 8,
-      shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-      elevation: 1,
+      shadowColor: '#1E293B', shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
     }, style]}>
       {children}
     </View>
