@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { Ionicons } from '@expo/vector-icons';
@@ -303,7 +304,7 @@ export default function LoginScreen() {
                 <Text style={styles.loginNumber}>+91 {formattedPhone}</Text>
               ) : null}
 
-              <View style={styles.sheet}>
+              <BlurView intensity={28} tint="dark" style={styles.sheet}>
                 {step === 'phone' && (
                   <>
                     <Text style={styles.fieldLabel}>Mobile number</Text>
@@ -413,7 +414,7 @@ export default function LoginScreen() {
                     </TouchableOpacity>
                   </>
                 )}
-              </View>
+              </BlurView>
 
               <View style={styles.secureRow}>
                 <Ionicons name="lock-closed-outline" size={12} color="rgba(148,163,184,0.50)" />
@@ -567,14 +568,20 @@ const styles = StyleSheet.create({
 
   sheet: {
     marginTop: 22,
-    borderRadius: 26,
-    backgroundColor: 'rgba(24,29,56,0.86)',
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(20,25,50,0.58)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: 'rgba(255,255,255,0.14)',
     paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 20,
     gap: 16,
+    shadowColor: '#0B1020',
+    shadowOpacity: 0.45,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 12,
   },
   fieldLabel: {
     color: 'rgba(203,213,225,0.55)',
@@ -665,6 +672,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 9,
+    shadowColor: '#2563EB',
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   goDisabled: { opacity: 1 },
   goText: { color: C.white, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
