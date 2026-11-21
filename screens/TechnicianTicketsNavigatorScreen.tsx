@@ -25,9 +25,9 @@ import React, {
 import {
   View, Text, ScrollView, TouchableOpacity, Animated,
   RefreshControl, ActivityIndicator, Image, Dimensions,
-  FlatList, Modal, TextInput, Alert, Platform,
+  FlatList, Modal, TextInput, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -187,15 +187,18 @@ function TicketsDashboardScreen({ navigation }: any) {
   const StatCard = ({ label, value, color, bg, icon, onPress }: any) => (
     <TouchableOpacity
       onPress={onPress} activeOpacity={0.8}
-      style={{ flex: 1, backgroundColor: bg, borderRadius: 16, padding: 16, minHeight: 90, justifyContent: 'space-between', borderWidth: 1, borderColor: `${color}30`, shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}
+      style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, minHeight: 96, justifyContent: 'space-between', borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Text style={{ fontSize: 28, fontWeight: '800', color }}>{value}</Text>
-        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: `${color}20`, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name={icon} size={16} color={color} />
+        <Text style={{ fontSize: 28, fontWeight: '800', color, letterSpacing: -0.5 }}>{value}</Text>
+        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: `${color}18`, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={icon} size={18} color={color} />
         </View>
       </View>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: `${color}CC`, letterSpacing: 0.3 }}>{label.toUpperCase()}</Text>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#5B6878', letterSpacing: 0.4, textTransform: 'uppercase' }}>{label}</Text>
+      <View style={{ height: 3, backgroundColor: `${color}18`, borderRadius: 2, marginTop: 8 }}>
+        <View style={{ height: 3, width: '55%', backgroundColor: color, borderRadius: 2, opacity: 0.7 }} />
+      </View>
     </TouchableOpacity>
   );
 
@@ -2717,45 +2720,75 @@ function TechElectricityScreen() {
   return <ElectricityScreen />;
 }
 
+// Floating pill bottom nav — matches the super-admin AdminFloatingNav look.
+const TECH_NAV_ICONS: Record<string, [string, string]> = {
+  TicketsDashboard: ['grid', 'grid-outline'],
+  MyTickets:        ['list', 'list-outline'],
+  Electricity:      ['flash', 'flash-outline'],
+  Profile:          ['person', 'person-outline'],
+};
+const TECH_NAV_UI = { brand: '#4F46E5', idle: '#8A94A6' };
+const techNav = {
+  wrap: { paddingHorizontal: 12, paddingTop: 8, backgroundColor: 'transparent' as const },
+  pill: {
+    flexDirection: 'row' as const, alignItems: 'center' as const,
+    backgroundColor: '#FFFFFF', borderRadius: 26, paddingHorizontal: 6, paddingVertical: 8,
+    shadowColor: '#0F172A', shadowOpacity: 0.10, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 20,
+  },
+  item: {
+    flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 16, position: 'relative' as const,
+  },
+  itemOn: { backgroundColor: '#EEF0FF' },
+  label: { marginTop: 2, fontSize: 10, fontWeight: '600' as const, color: TECH_NAV_UI.idle, letterSpacing: 0.1 },
+  labelOn: { color: TECH_NAV_UI.brand, fontWeight: '700' as const },
+  underline: { position: 'absolute' as const, bottom: 3, width: 22, height: 3, borderRadius: 2, backgroundColor: '#1D4ED8' },
+};
+
+function TechFloatingTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[techNav.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View style={techNav.pill}>
+        {state.routes.map((route: any, index: number) => {
+          const { options } = descriptors[route.key];
+          const label = (options.tabBarLabel ?? route.name) as string;
+          const focused = state.index === index;
+          const [activeIcon, inactiveIcon] = TECH_NAV_ICONS[route.name] || ['help', 'help-outline'];
+          const onPress = () => {
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+          };
+          return (
+            <TouchableOpacity
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={focused ? { selected: true } : {}}
+              activeOpacity={0.85}
+              onPress={onPress}
+              style={[techNav.item, focused && techNav.itemOn]}
+            >
+              <Ionicons
+                name={(focused ? activeIcon : inactiveIcon) as any}
+                size={20}
+                color={focused ? TECH_NAV_UI.brand : TECH_NAV_UI.idle}
+                style={focused ? { transform: [{ translateY: -1 }, { scale: 1.06 }] } : undefined}
+              />
+              <Text style={[techNav.label, focused && techNav.labelOn]} numberOfLines={1}>{label}</Text>
+              {focused ? <View style={techNav.underline} /> : null}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function TechnicianTabNavigator() {
-  const { colors } = useTheme();
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-          paddingTop: 8,
-          shadowColor: '#0F172A',
-          shadowOpacity: 0.06,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: -4 },
-          elevation: 0,
-        },
-        tabBarActiveTintColor: '#2563EB',
-        tabBarInactiveTintColor: '#71809A',
-        tabBarActiveBackgroundColor: '#EFF6FF',
-        tabBarItemStyle: {
-          borderRadius: 16,
-          marginHorizontal: 2,
-          marginVertical: 4,
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
-        tabBarIcon: ({ color, focused }) => {
-          const icons: Record<string, [string, string]> = {
-            TicketsDashboard: ['grid', 'grid-outline'],
-            MyTickets:        ['list', 'list-outline'],
-            Electricity:      ['flash', 'flash-outline'],
-            Profile:          ['person', 'person-outline'],
-          };
-          const [active, inactive] = icons[route.name] || ['help', 'help-outline'];
-          return <Ionicons name={(focused ? active : inactive) as any} size={22} color={color} />;
-        },
-      })}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <TechFloatingTabBar {...props} />}
     >
       <Tab.Screen name="TicketsDashboard" component={TicketsDashboardScreen} options={{ tabBarLabel: 'Dashboard' }} />
       <Tab.Screen name="MyTickets"        component={MyTicketsScreen}        options={{ tabBarLabel: 'My Tickets' }} />
