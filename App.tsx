@@ -911,8 +911,8 @@ function AppNavigator() {
       </NavigationContainer>
       {/* Floating bottom navigation — replaces the side drawer for admins */}
       {isAdmin && <AdminFloatingNav navRef={navRef} />}
-      {/* Floating AI assistant — visible on all screens for admin/employee */}
-      {(isAdmin || isEmployee) && <FloatingAIAssistant raised={isAdmin} />}
+      {/* Floating AI assistant — admin only (removed from the technician view) */}
+      {isAdmin && <FloatingAIAssistant raised />}
     </View>
   );
 }
