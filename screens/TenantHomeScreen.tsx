@@ -852,7 +852,7 @@ export default function TenantHomeScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => { setVoiceError(''); setVoiceStep('idle'); }} style={{ backgroundColor: '#1D4ED8', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
           <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Try Again</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={closeVoiceModal} style={{ backgroundColor: '#F8FAFC', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+        <TouchableOpacity onPress={closeVoiceModal} style={{ backgroundColor: '#F6F8FC', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
           <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 14 }}>Cancel</Text>
         </TouchableOpacity>
       </View>
@@ -922,7 +922,7 @@ export default function TenantHomeScreen({ navigation }: any) {
           {/* Raise Complaint card (always visible) */}
           <TouchableOpacity
             onPress={() => { resetVoice(); setVoiceModalOpen(true); }}
-            style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, flexDirection: 'row', alignItems: 'center', gap: 14 }}
+            style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2, flexDirection: 'row', alignItems: 'center', gap: 14 }}
           >
             <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#1D4ED8', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="mic" size={24} color="#fff" />
@@ -939,7 +939,7 @@ export default function TenantHomeScreen({ navigation }: any) {
           {/* Dues + Open Tickets stat tiles (parity with web TenantDashboard) */}
           <View style={{ flexDirection: 'row', gap: 12 }}>
             {/* Total Due */}
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
               <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: totalDue > 0 ? '#FEE2E2' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                 <Ionicons name="wallet-outline" size={15} color={totalDue > 0 ? '#DC2626' : '#16A34A'} />
               </View>
@@ -952,7 +952,7 @@ export default function TenantHomeScreen({ navigation }: any) {
               </Text>
             </View>
             {/* Open Tickets */}
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
               <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: '#EEF3FF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                 <Ionicons name="construct-outline" size={15} color="#1D4ED8" />
               </View>
@@ -990,12 +990,12 @@ export default function TenantHomeScreen({ navigation }: any) {
           {/* Tenant Profile Card */}
           <View onLayout={captureSectionOffset('staying')}>
           {detailsLoading && !tenantDetails ? (
-            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
               <ActivityIndicator size="small" color="#1D4ED8" />
               <Text style={{ fontSize: fontSize.xs, color: '#94A3B8' }}>Loading your details…</Text>
             </View>
           ) : tenantDetails?.tenant ? (
-            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, overflow: 'hidden' }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, gap: 14, borderBottomWidth: 1, borderBottomColor: '#DCE7FF', backgroundColor: '#EEF3FF' }}>
                 <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#1D4ED8', alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff' }}>{(tenantDetails.tenant.full_name || user?.userName || 'T')[0].toUpperCase()}</Text>
@@ -1019,7 +1019,7 @@ export default function TenantHomeScreen({ navigation }: any) {
           {/* Accommodation Card */}
           <View onLayout={captureSectionOffset('onboarding')}>
           {(tenantDetails?.allotment || tenantLocation) && (
-            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm }}>
                 <Ionicons name="home-outline" size={14} color="#1D4ED8" />
                 <Text style={{ fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 }}>ACCOMMODATION</Text>
@@ -1056,7 +1056,7 @@ export default function TenantHomeScreen({ navigation }: any) {
                     key={key}
                     activeOpacity={0.8}
                     onPress={() => setExpandedAnnouncement(expanded ? null : key)}
-                    style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, gap: 4 }}
+                    style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2, gap: 4 }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={{ flex: 1, fontSize: fontSize.sm, fontWeight: '800', color: '#0F172A' }} numberOfLines={expanded ? undefined : 1}>
@@ -1118,7 +1118,7 @@ export default function TenantHomeScreen({ navigation }: any) {
             VOICE MODAL
         ══════════════════════════════════════════════════════════════ */}
         <Modal visible={voiceModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeVoiceModal}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F6F8FC' }} edges={['top', 'bottom']}>
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#fff' }}>
               <TouchableOpacity onPress={closeVoiceModal} style={{ marginRight: 12, padding: 4 }}>
                 <Ionicons name="close" size={24} color="#0F172A" />
@@ -1160,7 +1160,7 @@ export default function TenantHomeScreen({ navigation }: any) {
             APPROVAL MODAL
         ══════════════════════════════════════════════════════════════ */}
         <Modal visible={!!approvalTicket} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setApprovalTicket(null)}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F6F8FC' }} edges={['top', 'bottom']}>
             <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
               <TouchableOpacity onPress={() => setApprovalTicket(null)} style={{ marginRight: 12 }}>
                 <Ionicons name="close" size={24} color="#0F172A" />
