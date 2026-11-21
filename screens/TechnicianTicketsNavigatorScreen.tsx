@@ -2729,7 +2729,7 @@ const TECH_NAV_ICONS: Record<string, [string, string]> = {
 };
 const TECH_NAV_UI = { brand: '#4F46E5', idle: '#8A94A6' };
 const techNav = {
-  wrap: { paddingHorizontal: 12, paddingTop: 8, backgroundColor: '#F8FAFC' as const },
+  wrap: { position: 'absolute' as const, left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingTop: 8, backgroundColor: 'transparent' as const },
   pill: {
     flexDirection: 'row' as const, alignItems: 'center' as const,
     backgroundColor: '#FFFFFF', borderRadius: 26, paddingHorizontal: 6, paddingVertical: 8,
