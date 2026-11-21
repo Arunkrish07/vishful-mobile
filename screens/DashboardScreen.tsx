@@ -24,17 +24,17 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Tokens (web dashboard parity) ───────────────────────────────────────────
 const DASH = {
-  bg: '#FFFFFF',
+  bg: '#F6F8FC',
   ink: '#0F172A',
-  ink2: '#64748B',
-  ink3: '#94A3B8',
+  ink2: '#5B6878',
+  ink3: '#8A98AA',
   indigo: '#2563EB',
   brandSub: '#556274',
   blue: '#1856FF',
   blueInk: '#1240C7',
   blueSoft: '#EEF3FF',
-  line: '#E2E8F0',
-  panelBorder: '#DFE6F3',
+  line: '#E6EBF2',
+  panelBorder: '#EBEFF5',
   good: '#16A34A',
   goodBg: '#DCFCE7',
   warn: '#EA580C',
@@ -1453,10 +1453,10 @@ const styles = StyleSheet.create({
   finGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   finCard: {
     width: '47%', flexGrow: 1,
-    borderRadius: 16, padding: 14, minHeight: 104,
+    borderRadius: 18, padding: 14, minHeight: 104,
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6',
-    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EBEFF5',
+    shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2,
   },
   finCardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   finCardIco: {
