@@ -8,7 +8,7 @@ import { StyleSheet, View, Text, ActivityIndicator, Alert, TouchableOpacity, Log
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { queryClient, asyncStoragePersister, CACHE_MAX_AGE } from './lib/queryClient';
+import { queryClient, asyncStoragePersister, CACHE_MAX_AGE, persistDehydrateOptions } from './lib/queryClient';
 import { AuthProvider, useAuth } from './lib/auth';
 import * as sb from './lib/supabaseService';
 import { fontSize, spacing, sidebarColors, glass, animation } from './lib/theme';
@@ -892,7 +892,7 @@ export default function App() {
       <SafeAreaProvider>
         <PersistQueryClientProvider
           client={queryClient}
-          persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE }}
+          persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE, dehydrateOptions: persistDehydrateOptions }}
         >
           <ThemeProvider>
             <AuthProvider>
