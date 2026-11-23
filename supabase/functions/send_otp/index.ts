@@ -28,8 +28,9 @@ function isSmsEnabled(): boolean {
 async function sendSmsOtp(phone: string, otp: string): Promise<void> {
   const apiKey = Deno.env.get('FAST2SMS_API_KEY');
   if (!apiKey) {
-    console.warn('[SMS] FAST2SMS_API_KEY not set — skipping SMS');
-    return;
+    // Hardened: never silently "succeed" without sending. Surface the misconfig.
+    console.error('[SMS] FAST2SMS_API_KEY not set — cannot send SMS');
+    throw new Error('SMS service is not configured (missing API key).');
   }
   const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
     method: 'POST',
@@ -99,16 +100,24 @@ Deno.serve(async (req) => {
       return json({ success: false, message: 'Failed to generate OTP. Please try again.' });
     }
 
+    const isDemoAccount = cleanPhone === '9876543210';
+
     if (isSmsEnabled()) {
       try {
         await sendSmsOtp(cleanPhone, generatedOtp);
         console.log(`[OTP] SMS sent to ${cleanPhone}`);
       } catch (smsErr: any) {
         console.error('[OTP] SMS send failed:', smsErr?.message);
-        return json({ success: false, message: 'Failed to send OTP SMS. Please try again.' });
+        return json({ success: false, message: 'Failed to send OTP SMS. Please try again or contact your administrator.' });
       }
+    } else if (isDemoAccount) {
+      // Demo viewer account uses a fixed OTP and needs no SMS.
+      console.log(`[OTP] demo account — SMS skipped | OTP: ${generatedOtp}`);
     } else {
-      console.log(`[OTP] 🔕 SMS MUTED (dev mode) | phone: ${cleanPhone} | OTP: ${generatedOtp}`);
+      // Hardened: SMS delivery is off on the server, so a real user can't get the
+      // code. Do NOT report a false success — surface the misconfiguration.
+      console.error(`[OTP] SMS_ENABLED is not "true" — cannot deliver OTP to ${cleanPhone}`);
+      return json({ success: false, message: 'OTP delivery is not enabled on the server. Please contact your administrator.' });
     }
 
     return json({ success: true, message: 'OTP sent successfully' });
