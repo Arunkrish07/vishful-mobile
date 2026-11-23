@@ -9,7 +9,7 @@
  *  5. Replaced SpeechRecognition (fails iOS Safari) with MediaRecorder + /api/transcribe
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, ScrollView, RefreshControl, TouchableOpacity,
   Alert, ActivityIndicator, Modal, TextInput, Image,
@@ -23,7 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassBackground, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { fetchTickets, tenantApproveCompletion, checkTenantPendingTickets, Ticket } from '../services/ticketService';
-import { getTenantNotices, recordNotice, getTenantLocation, listInvoices, listAnnouncements } from '../lib/supabaseService';
+import { getTenantNotices, recordNotice, getTenantLocation, listAnnouncements } from '../lib/supabaseService';
 import { getIssueTypes, createTicket } from '../services/ticketService';
 import { CONVEX_SITE_URL } from '../lib/config';
 
@@ -45,6 +45,14 @@ function formatDuration(ms: number): string {
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
   return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+}
+
+// Local-midnight YYYY-MM-DD (avoids UTC off-by-one when feeding formatDate).
+function toYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 // ─── MediaRecorder availability check ────────────────────────────────────────
@@ -207,9 +215,7 @@ export default function TenantHomeScreen({ navigation }: any) {
   const [detailsLoading, setDetailsLoading]       = useState(false);
   const [accountNotLinked, setAccountNotLinked]   = useState(false);
 
-  // ── Dues / tickets / announcements (parity with web TenantDashboard) ──────
-  const [totalDue, setTotalDue]                   = useState(0);
-  const [pendingInvoiceCount, setPendingInvoiceCount] = useState(0);
+  // ── Tickets / announcements (parity with web TenantDashboard) ─────────────
   const [openTicketCount, setOpenTicketCount]     = useState(0);
   const [announcements, setAnnouncements]         = useState<any[]>([]);
   const [expandedAnnouncement, setExpandedAnnouncement] = useState<string | null>(null);
@@ -237,6 +243,29 @@ export default function TenantHomeScreen({ navigation }: any) {
   const tenantId        = tenantLocation?.tenantId ?? '';
   const userId          = user?.supabaseUserId || user?.userId || '';
   const normalizedPhone = cleanPhone(user?.phone);
+
+  // ── Move-out notice rules ─────────────────────────────────────────────────
+  //  • 60-day lock-in: no notice until 60 days after check-in.
+  //  • 30-day notice: chosen move-out date must be ≥ 30 days from today.
+  const checkInRaw = (tenantDetails?.allotment?.onboarding_date || (tenantLocation as any)?.checkInDate || null) as string | null;
+  const noticeRules = useMemo(() => {
+    const MIN_STAY_DAYS = 60;
+    const NOTICE_DAYS   = 30;
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const addDays = (d: Date, n: number) => { const x = startOfDay(d); x.setDate(x.getDate() + n); return x; };
+    const parse = (raw: string): Date | null => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+      if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? null : startOfDay(d);
+    };
+    const today = startOfDay(new Date());
+    const earliestExit = addDays(today, NOTICE_DAYS);
+    const checkIn = checkInRaw ? parse(String(checkInRaw)) : null;
+    const eligibleFrom = checkIn ? addDays(checkIn, MIN_STAY_DAYS) : null;
+    const lockedIn = !!eligibleFrom && today.getTime() < eligibleFrom.getTime();
+    return { today, earliestExit, eligibleFrom, lockedIn, NOTICE_DAYS, MIN_STAY_DAYS };
+  }, [checkInRaw]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Data loaders
@@ -287,25 +316,6 @@ export default function TenantHomeScreen({ navigation }: any) {
     } catch {}
   }, [tenantId]);
 
-  // TASK 1 — Dues summary from real invoices
-  const loadDues = useCallback(async () => {
-    if (!tenantId) return;
-    try {
-      const invoices: any[] = (await listInvoices({ tenantId })) || [];
-      let due = 0;
-      let pending = 0;
-      for (const inv of invoices) {
-        const status = String(inv?.status || '').toLowerCase();
-        if (status === 'paid') continue;
-        pending += 1;
-        const balance = Number(inv?.totalAmount ?? 0) - Number(inv?.paidAmount ?? 0);
-        if (balance > 0) due += balance;
-      }
-      setTotalDue(due);
-      setPendingInvoiceCount(pending);
-    } catch { setTotalDue(0); setPendingInvoiceCount(0); }
-  }, [tenantId]);
-
   // TASK 3 — Published announcements
   const loadAnnouncements = useCallback(async () => {
     try {
@@ -325,13 +335,12 @@ export default function TenantHomeScreen({ navigation }: any) {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([loadPending(), loadNotices(), loadTenantDetails(), loadDues(), loadAnnouncements()]).finally(() => setRefreshing(false));
-  }, [loadPending, loadNotices, loadTenantDetails, loadDues, loadAnnouncements]);
+    Promise.all([loadPending(), loadNotices(), loadTenantDetails(), loadAnnouncements()]).finally(() => setRefreshing(false));
+  }, [loadPending, loadNotices, loadTenantDetails, loadAnnouncements]);
 
   useEffect(() => { loadPending(); },       [loadPending]);
   useEffect(() => { loadNotices(); },       [loadNotices]);
   useEffect(() => { loadTenantDetails(); }, [loadTenantDetails]);
-  useEffect(() => { loadDues(); },          [loadDues]);
   useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
 
   // Load issue types when voice modal opens
@@ -661,6 +670,18 @@ export default function TenantHomeScreen({ navigation }: any) {
   const handleSubmitNotice = async () => {
     if (!noticeExitDate.trim()) { Alert.alert('Required', 'Please enter your expected move-out date.'); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(noticeExitDate.trim())) { Alert.alert('Invalid Date', 'Please enter date in YYYY-MM-DD format.'); return; }
+    // Rule 1 — 60-day minimum stay before a notice can be submitted.
+    if (noticeRules.lockedIn && noticeRules.eligibleFrom) {
+      Alert.alert('Minimum stay not completed', `A minimum ${noticeRules.MIN_STAY_DAYS}-day stay is required. You can submit a move-out notice from ${formatDate(toYMD(noticeRules.eligibleFrom), '')}.`);
+      return;
+    }
+    // Rule 2 — move-out date must be at least 30 days from today.
+    const [ey, em, ed] = noticeExitDate.trim().split('-').map(Number);
+    const exitDate = new Date(ey, em - 1, ed);
+    if (exitDate.getTime() < noticeRules.earliestExit.getTime()) {
+      Alert.alert(`${noticeRules.NOTICE_DAYS} days notice required`, `The earliest move-out date is ${formatDate(toYMD(noticeRules.earliestExit), '')}. Please choose that date or later.`);
+      return;
+    }
     if (!tenantLocation?.tenantId || !tenantLocation?.allotmentId || !tenantLocation?.bedId) { Alert.alert('Error', 'Your location details are missing.'); return; }
     setNoticeSaving(true);
     try {
@@ -900,7 +921,7 @@ export default function TenantHomeScreen({ navigation }: any) {
 
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={{ padding: spacing.xl, paddingBottom: 20, gap: 16 }}
+          contentContainerStyle={{ padding: spacing.xl, paddingBottom: 120, gap: 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1D4ED8']} />}
         >
 
@@ -936,32 +957,18 @@ export default function TenantHomeScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color="#1D4ED8" />
           </TouchableOpacity>
 
-          {/* Dues + Open Tickets stat tiles (parity with web TenantDashboard) */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            {/* Total Due */}
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
-              <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: totalDue > 0 ? '#FEE2E2' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                <Ionicons name="wallet-outline" size={15} color={totalDue > 0 ? '#DC2626' : '#16A34A'} />
-              </View>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 0.8 }}>TOTAL DUE</Text>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: totalDue > 0 ? '#DC2626' : '#16A34A', marginTop: 2 }} numberOfLines={1}>
-                ₹{Number(totalDue).toLocaleString('en-IN')}
-              </Text>
-              <Text style={{ fontSize: fontSize.xs, color: '#94A3B8', marginTop: 2 }}>
-                {pendingInvoiceCount} pending {pendingInvoiceCount === 1 ? 'invoice' : 'invoices'}
-              </Text>
+          {/* Open Tickets stat tile (full width — dues intentionally not shown to tenants) */}
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#EEF3FF', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="construct-outline" size={20} color="#1D4ED8" />
             </View>
-            {/* Open Tickets */}
-            <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
-              <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: '#EEF3FF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                <Ionicons name="construct-outline" size={15} color="#1D4ED8" />
-              </View>
+            <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 0.8 }}>OPEN TICKETS</Text>
-              <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>{openTicketCount}</Text>
               <Text style={{ fontSize: fontSize.xs, color: '#94A3B8', marginTop: 2 }}>
                 {openTicketCount === 0 ? 'All resolved' : 'In progress'}
               </Text>
             </View>
+            <Text style={{ fontSize: fontSize.xl, fontWeight: '800', color: '#0F172A' }}>{openTicketCount}</Text>
           </View>
 
           {/* Pending Approval Alerts */}
@@ -1100,16 +1107,27 @@ export default function TenantHomeScreen({ navigation }: any) {
           )}
           </View>
 
-          {/* Move-out notice button */}
+          {/* Move-out notice button — gated by the 60-day minimum stay */}
           {tenantLocation && tenantNotices.length === 0 && (
-            <TouchableOpacity
-              onPress={() => setNoticeModalOpen(true)}
-              style={{ backgroundColor: 'rgba(255,248,225,0.8)', borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#F9A825', flexDirection: 'row', alignItems: 'center', gap: 10 }}
-            >
-              <Ionicons name="notifications-outline" size={20} color="#8B6914" />
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#8B6914', flex: 1 }}>Planning to move out? Submit a notice</Text>
-              <Ionicons name="chevron-forward" size={16} color="#8B6914" />
-            </TouchableOpacity>
+            noticeRules.lockedIn && noticeRules.eligibleFrom ? (
+              <View
+                style={{ backgroundColor: 'rgba(241,243,249,0.9)', borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#D7DCE5', flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              >
+                <Ionicons name="lock-closed-outline" size={20} color="#64748B" />
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#64748B', flex: 1 }}>
+                  Move-out notice available from {formatDate(toYMD(noticeRules.eligibleFrom), '')} (minimum {noticeRules.MIN_STAY_DAYS}-day stay)
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => setNoticeModalOpen(true)}
+                style={{ backgroundColor: 'rgba(255,248,225,0.8)', borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#F9A825', flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              >
+                <Ionicons name="notifications-outline" size={20} color="#8B6914" />
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: '#8B6914', flex: 1 }}>Planning to move out? Submit a notice</Text>
+                <Ionicons name="chevron-forward" size={16} color="#8B6914" />
+              </TouchableOpacity>
+            )
           )}
 
         </ScrollView>
@@ -1220,6 +1238,9 @@ export default function TenantHomeScreen({ navigation }: any) {
               <View style={{ gap: 8 }}>
                 <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#0F172A' }}>Expected Move-Out Date <Text style={{ color: '#DC2626' }}>*</Text></Text>
                 <DateField value={noticeExitDate} onChange={setNoticeExitDate} placeholder="Select move-out date" />
+                <Text style={{ fontSize: fontSize.xs, color: '#8B6914' }}>
+                  Minimum {noticeRules.NOTICE_DAYS} days notice required — earliest move-out: {formatDate(toYMD(noticeRules.earliestExit), '')}.
+                </Text>
               </View>
               <View style={{ gap: 8 }}>
                 <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#0F172A' }}>Additional Notes <Text style={{ color: '#94A3B8', fontWeight: '400' }}>(optional)</Text></Text>
