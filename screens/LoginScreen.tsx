@@ -7,7 +7,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Svg, { Path, Circle } from 'react-native-svg';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,14 +15,6 @@ import { useNavigation } from '@react-navigation/native';
 type Step = 'splash' | 'phone' | 'otp';
 
 const { width: WIN_W } = Dimensions.get('window');
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// Success checkmark geometry (72×72 viewBox).
-const CHECK_PATH = 'M22 37 L32 47 L51 26';
-const CHECK_LEN = 46;
-const RING_CIRC = 2 * Math.PI * 31;
 
 /** Light "premium blue" palette — bright background, dark text, blue accents. */
 const C = {
@@ -162,7 +153,7 @@ export default function LoginScreen() {
   const shake = useRef(new Animated.Value(0)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const ringScale = useRef(new Animated.Value(0)).current;
-  const checkDraw = useRef(new Animated.Value(0)).current;
+  const checkScale = useRef(new Animated.Value(0)).current;
 
   // Pop the most recently filled OTP cell.
   useEffect(() => {
@@ -193,16 +184,15 @@ export default function LoginScreen() {
   const playSuccess = () => {
     setSuccess(true);
     Animated.sequence([
-      Animated.timing(overlayOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.spring(ringScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
-    ]).start();
-    Animated.timing(checkDraw, { toValue: 1, duration: 440, delay: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false })
-      .start(() => {
-        setTimeout(() => {
-          const p = pendingLogin.current;
-          if (p) login(p.token, p.user as any, p.refreshToken);
-        }, 420);
-      });
+      Animated.timing(overlayOpacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+      Animated.spring(ringScale, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }),
+      Animated.spring(checkScale, { toValue: 1, friction: 4, tension: 130, useNativeDriver: true }),
+    ]).start(() => {
+      setTimeout(() => {
+        const p = pendingLogin.current;
+        if (p) login(p.token, p.user as any, p.refreshToken);
+      }, 500);
+    });
   };
 
   const handleSendOTP = async () => {
@@ -510,30 +500,10 @@ export default function LoginScreen() {
       {/* ── Success overlay — drawn checkmark, then enter the app ── */}
       {success && (
         <Animated.View style={[styles.successOverlay, { opacity: overlayOpacity }]} pointerEvents="none">
-          <Animated.View style={{ transform: [{ scale: ringScale }] }}>
-            <Svg width={120} height={120} viewBox="0 0 72 72">
-              <AnimatedCircle
-                cx={36}
-                cy={36}
-                r={31}
-                stroke={C.success}
-                strokeWidth={3}
-                fill="rgba(22,163,74,0.08)"
-                strokeDasharray={RING_CIRC}
-                strokeDashoffset={ringScale.interpolate({ inputRange: [0, 1], outputRange: [RING_CIRC, 0] })}
-                strokeLinecap="round"
-              />
-              <AnimatedPath
-                d={CHECK_PATH}
-                stroke={C.success}
-                strokeWidth={5}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray={CHECK_LEN}
-                strokeDashoffset={checkDraw.interpolate({ inputRange: [0, 1], outputRange: [CHECK_LEN, 0] })}
-              />
-            </Svg>
+          <Animated.View style={[styles.successRing, { transform: [{ scale: ringScale }] }]}>
+            <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+              <Ionicons name="checkmark-sharp" size={58} color="#FFFFFF" />
+            </Animated.View>
           </Animated.View>
           <Text style={styles.successText}>Verified</Text>
         </Animated.View>
@@ -670,7 +640,13 @@ const styles = StyleSheet.create({
   successOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(247,250,255,0.92)', gap: 14,
+    backgroundColor: 'rgba(247,250,255,0.94)', gap: 16,
+  },
+  successRing: {
+    width: 108, height: 108, borderRadius: 54,
+    backgroundColor: C.success,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: C.success, shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10,
   },
   successText: { color: C.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
 });
