@@ -175,7 +175,7 @@ export default function TenantProfileScreen() {
           <Text style={{ fontSize: 18, fontWeight: '800', color: TP.ink, letterSpacing: -0.3 }}>My Profile</Text>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 60 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 120 }}>
 
           {/* ── Loading ── */}
           {loading ? (

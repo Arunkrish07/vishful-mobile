@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from './lib/auth';
 import * as sb from './lib/supabaseService';
 import { fontSize, spacing, sidebarColors, glass, animation } from './lib/theme';
 import { useTheme, ThemeProvider } from './lib/ThemeContext';
+import FloatingNav from './components/FloatingNav';
 import LoginScreen from './screens/LoginScreen';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
 import DashboardScreen from './screens/DashboardScreen';
@@ -483,41 +484,37 @@ function MainDrawer() {
   );
 }
 
+// Icons for the tenant floating nav — [active (filled), inactive (outline)].
+const TENANT_NAV_ICONS: Record<string, [string, string]> = {
+  Home:    ['home', 'home-outline'],
+  Tickets: ['construct', 'construct-outline'],
+  Profile: ['person', 'person-outline'],
+};
+
+function TenantFloatingTabBar({ state, navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const items = state.routes.map((route: any) => {
+    const [activeIcon, inactiveIcon] = TENANT_NAV_ICONS[route.name] || ['help', 'help-outline'];
+    return { key: route.name, label: route.name, icon: inactiveIcon, activeIcon };
+  });
+  const activeKey = state.routes[state.index]?.name;
+  const onSelect = (name: string) => {
+    const route = state.routes.find((r: any) => r.name === name);
+    if (!route) return;
+    const focused = route.name === activeKey;
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (!focused && !event.defaultPrevented) navigation.navigate(name);
+  };
+  return (
+    <FloatingNav items={items} activeKey={activeKey} onSelect={onSelect} bottomInset={insets.bottom + 10} />
+  );
+}
+
 function TenantTabNavigator() {
   return (
     <TenantTab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarIcon: ({ color, size }) => {
-          let iconName: any = 'home-outline';
-          if (route.name === 'Home') iconName = 'home-outline';
-          else if (route.name === 'Tickets') iconName = 'construct-outline';
-          else if (route.name === 'Profile') iconName = 'person-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#1D4ED8',
-        tabBarInactiveTintColor: '#71809A',
-        tabBarActiveBackgroundColor: '#EFF6FF',
-        tabBarItemStyle: {
-          borderRadius: 16,
-          marginHorizontal: 4,
-          marginVertical: 4,
-        },
-        tabBarStyle: {
-          backgroundColor: '#FFFFFFF0',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-          height: 64,
-          paddingBottom: 6,
-          paddingTop: 4,
-          elevation: 0,
-          shadowColor: '#0F172A',
-          shadowOpacity: 0.08,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: -2 },
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 1 },
-      })}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <TenantFloatingTabBar {...props} />}
     >
       <TenantTab.Screen name="Home" component={TenantHomeScreen} />
       <TenantTab.Screen name="Tickets" component={TenantTicketsScreen} />
@@ -713,40 +710,20 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
   const moreActive = active === 'More'
     || ADMIN_NAV_RAIL.some(i => !PRIMARY_NAV_NAMES.includes(i.name) && i.name === active);
 
-  const renderTab = (item: NavItem, on: boolean, onPress: () => void, iconOverride?: string) => (
-    <TouchableOpacity
-      key={item.name}
-      style={[NAV.item, { flex: 1 }, on && NAV.itemOn]}
-      activeOpacity={0.85}
-      onPress={onPress}
-    >
-      <Ionicons
-        name={(iconOverride || item.icon) as any}
-        size={18}
-        color={on ? NAV_UI.brand : NAV_UI.idle}
-        style={on ? { transform: [{ translateY: -1 }, { scale: 1.06 }] } : undefined}
-      />
-      <Text style={[NAV.label, on && NAV.labelOn]} numberOfLines={1}>{item.label}</Text>
-      {on ? <View style={NAV.underline} /> : null}
-    </TouchableOpacity>
-  );
+  // Build the shared floating-nav item list: four primary tabs + a "More" entry.
+  const items = [
+    ...primary.map(item => ({ key: item.name, label: item.label, icon: item.icon })),
+    { key: 'More', label: 'More', icon: 'grid-outline' },
+  ];
+  const activeKey = moreActive ? 'More' : active;
 
   return (
-    <View pointerEvents="box-none" style={[NAV.rail, { bottom: Math.max(insets.bottom, 10) }]}>
-      <View style={NAV.row}>
-        {primary.map(item => renderTab(item, active === item.name, () => go(item.name)))}
-        <TouchableOpacity
-          key="__more"
-          style={[NAV.item, { flex: 1 }, moreActive && NAV.itemOn]}
-          activeOpacity={0.85}
-          onPress={() => go('More')}
-        >
-          <Ionicons name="grid-outline" size={18} color={moreActive ? NAV_UI.brand : NAV_UI.idle} />
-          <Text style={[NAV.label, moreActive && NAV.labelOn]} numberOfLines={1}>More</Text>
-          {moreActive ? <View style={NAV.underline} /> : null}
-        </TouchableOpacity>
-      </View>
-    </View>
+    <FloatingNav
+      items={items}
+      activeKey={activeKey}
+      onSelect={go}
+      bottomInset={insets.bottom}
+    />
   );
 }
 
@@ -771,66 +748,6 @@ const MORE = StyleSheet.create({
   tileLabel: { fontSize: 11, color: '#475569', textAlign: 'center', fontWeight: '600' },
 });
 
-const NAV = StyleSheet.create({
-  rail: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 0,
-    zIndex: 900,
-    elevation: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 26,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  track: {
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  item: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 58,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 16,
-    position: 'relative',
-  },
-  itemOn: {
-    backgroundColor: '#EEF0FF',
-  },
-  label: {
-    marginTop: 2,
-    fontSize: 10,
-    fontWeight: '600',
-    color: NAV_UI.idle,
-    letterSpacing: 0.1,
-  },
-  labelOn: {
-    color: NAV_UI.brand,
-    fontWeight: '700',
-  },
-  underline: {
-    position: 'absolute',
-    bottom: 3,
-    width: 22,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#1D4ED8',
-  },
-  // Fixed 5-slot row (4 tabs + More) — no horizontal scroll.
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 8,
-  },
-});
 
 // Shown when an authenticated account resolves to a role that is neither an admin
 // role nor tenant/technician — instead of silently dropping it into the admin app.

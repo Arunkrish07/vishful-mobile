@@ -36,6 +36,7 @@ import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
 import { getOrgExitSettings } from '../lib/supabaseService';
 import { GlassBackground, DateField } from '../components/shared';
+import FloatingNav from '../components/FloatingNav';
 import { formatDate } from '../lib/dateUtils';
 import { DiagnosticFlow, DiagnosticFlowResult } from './DiagnosticFlow';
 import TechnicianProfileScreen from './TechnicianProfileScreen';
@@ -2720,67 +2721,32 @@ function TechElectricityScreen() {
   return <ElectricityScreen />;
 }
 
-// Floating pill bottom nav — matches the super-admin AdminFloatingNav look.
+// Floating pill bottom nav — shared "glass bar + filled active chip" look.
 const TECH_NAV_ICONS: Record<string, [string, string]> = {
   TicketsDashboard: ['grid', 'grid-outline'],
   MyTickets:        ['list', 'list-outline'],
   Electricity:      ['flash', 'flash-outline'],
   Profile:          ['person', 'person-outline'],
 };
-const TECH_NAV_UI = { brand: '#4F46E5', idle: '#8A94A6' };
-const techNav = {
-  wrap: { position: 'absolute' as const, left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingTop: 8, backgroundColor: 'transparent' as const },
-  pill: {
-    flexDirection: 'row' as const, alignItems: 'center' as const,
-    backgroundColor: '#FFFFFF', borderRadius: 26, paddingHorizontal: 6, paddingVertical: 8,
-    shadowColor: '#0F172A', shadowOpacity: 0.10, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 20,
-  },
-  item: {
-    flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 16, position: 'relative' as const,
-  },
-  itemOn: { backgroundColor: '#EEF0FF' },
-  label: { marginTop: 2, fontSize: 10, fontWeight: '600' as const, color: TECH_NAV_UI.idle, letterSpacing: 0.1 },
-  labelOn: { color: TECH_NAV_UI.brand, fontWeight: '700' as const },
-  underline: { position: 'absolute' as const, bottom: 3, width: 22, height: 3, borderRadius: 2, backgroundColor: '#1D4ED8' },
-};
 
 function TechFloatingTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const items = state.routes.map((route: any) => {
+    const { options } = descriptors[route.key];
+    const label = (options.tabBarLabel ?? route.name) as string;
+    const [activeIcon, inactiveIcon] = TECH_NAV_ICONS[route.name] || ['help', 'help-outline'];
+    return { key: route.name, label, icon: inactiveIcon, activeIcon };
+  });
+  const activeKey = state.routes[state.index]?.name;
+  const onSelect = (name: string) => {
+    const route = state.routes.find((r: any) => r.name === name);
+    if (!route) return;
+    const focused = route.name === activeKey;
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+  };
   return (
-    <View style={[techNav.wrap, { paddingBottom: Math.max(insets.bottom, 10) + 14 }]}>
-      <View style={techNav.pill}>
-        {state.routes.map((route: any, index: number) => {
-          const { options } = descriptors[route.key];
-          const label = (options.tabBarLabel ?? route.name) as string;
-          const focused = state.index === index;
-          const [activeIcon, inactiveIcon] = TECH_NAV_ICONS[route.name] || ['help', 'help-outline'];
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-          };
-          return (
-            <TouchableOpacity
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={focused ? { selected: true } : {}}
-              activeOpacity={0.85}
-              onPress={onPress}
-              style={[techNav.item, focused && techNav.itemOn]}
-            >
-              <Ionicons
-                name={(focused ? activeIcon : inactiveIcon) as any}
-                size={20}
-                color={focused ? TECH_NAV_UI.brand : TECH_NAV_UI.idle}
-                style={focused ? { transform: [{ translateY: -1 }, { scale: 1.06 }] } : undefined}
-              />
-              <Text style={[techNav.label, focused && techNav.labelOn]} numberOfLines={1}>{label}</Text>
-              {focused ? <View style={techNav.underline} /> : null}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
+    <FloatingNav items={items} activeKey={activeKey} onSelect={onSelect} bottomInset={insets.bottom + 10} />
   );
 }
 
