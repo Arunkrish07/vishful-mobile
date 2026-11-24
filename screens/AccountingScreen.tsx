@@ -107,6 +107,11 @@ export default function AccountingScreen() {
   const [stays, setStays] = useState<any[]>([]);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  // The recent-500 page covers the default Invoices list; the full history (5k+
+  // rows) is parsed lazily — only when the user searches/filters across all of
+  // it — because doing it on open froze the JS thread (dead buttons) for seconds.
+  const invFullRef = React.useRef(false);
+  const [invFullLoading, setInvFullLoading] = useState(false);
 
   // section switcher + period scoping (parity with web Accounting.tsx)
   const [section, setSection] = useState('invoices');
@@ -152,6 +157,12 @@ export default function AccountingScreen() {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  // Cap how many list rows are actually RENDERED. The full dataset still loads
+  // (so search/filter and KPI totals stay accurate), but mounting thousands of
+  // card views at once froze the JS/UI thread on Android. We render a page at a
+  // time and let the user tap "Show more". Reset whenever the feeding view changes.
+  const ROW_PAGE = 40;
+  const [rowLimit, setRowLimit] = useState(ROW_PAGE);
   // Outstanding Dues — ledger-backed reminder audience (read-only preview).
   const [showOutstanding, setShowOutstanding] = useState(false);
   const [outstanding, setOutstanding] = useState<any[]>([]);
@@ -283,20 +294,20 @@ export default function AccountingScreen() {
     return () => { cancelled = true; };
   }, []);
 
-  // Invoices load PROGRESSIVELY so the screen opens fast: a bounded recent page
-  // paints first, then the full history (5k+ rows) streams in behind it to make
-  // the per-invoice totals exact. stays + pending dues load in parallel.
+  // Invoices open FAST: only the bounded recent page (500) is fetched + parsed on
+  // open. The full 5k-row history is NOT loaded here — parsing it synchronously on
+  // the JS thread blocked all touch handlers for several seconds. It streams in
+  // lazily (effect below) the first time the user searches/filters. stays +
+  // pending dues load in parallel.
   useEffect(() => {
     if (!token) return;
     setInvoices(null);
+    invFullRef.current = false;
     let cancelled = false;
     (async () => {
       const quick = await safeCall<any[]>(() => sb.listInvoices({ limit: 500 }), []);
       if (cancelled || !mounted.current) return;
       setInvoices(Array.isArray(quick) ? quick : []);
-      const full = await safeCall<any[] | null>(() => sb.listInvoices(), null);
-      if (cancelled || !mounted.current || full == null) return;
-      setInvoices(full);
     })();
     (async () => {
       const [s, dues] = await Promise.all([
@@ -310,12 +321,38 @@ export default function AccountingScreen() {
     return () => { cancelled = true; };
   }, [token, refreshKey]);
 
-  // Always-visible Financial Overview summary (period-scoped, cheap aggregate).
+  // Lazily pull the complete invoice history the first time the user searches or
+  // filters — only then does the list need rows beyond the recent-500 page. This
+  // keeps the heavy (5k-row) parse off the open path so the screen stays
+  // interactive immediately; a spinner shows while it streams in.
+  useEffect(() => {
+    if (!token || invFullRef.current) return;
+    const needsFull = !!search.trim() || filter !== 'all';
+    if (!needsFull) return;
+    invFullRef.current = true;
+    let cancelled = false;
+    setInvFullLoading(true);
+    (async () => {
+      const full = await safeCall<any[] | null>(() => sb.listInvoices(), null);
+      if (cancelled || !mounted.current) return;
+      if (full != null) setInvoices(full);
+      setInvFullLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [token, search, filter]);
+
+  // Reset the visible-row cap when the view that feeds a list changes, so a fresh
+  // section/search/filter always starts from the top page rather than a stale count.
+  useEffect(() => { setRowLimit(ROW_PAGE); }, [section, search, filter]);
+
+  // Always-visible Financial Overview summary (period-scoped). Uses the RPC-only
+  // getAccountingOverview — NOT getReportsSummary, which pulls thousands of raw
+  // rows to the client and blocked the JS thread on open (Android ANR).
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     (async () => {
-      const s = await safeCall<any>(() => sb.getReportsSummary(period), null);
+      const s = await safeCall<any>(() => sb.getAccountingOverview(period), null);
       if (!cancelled && mounted.current) setSummary(s || null);
     })();
     return () => { cancelled = true; };
@@ -907,6 +944,12 @@ export default function AccountingScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          {invFullLoading && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.sm }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={{ fontSize: fontSize.xs, color: ACC.ink2 }}>Loading full invoice history…</Text>
+            </View>
+          )}
           {filtered.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md }}>
               {([
@@ -925,11 +968,22 @@ export default function AccountingScreen() {
           )}
           {filtered.length === 0 ? (
             <EmptyState title="No Invoices" subtitle="Create invoices for tenant billing" icon="receipt-outline" />
-          ) : filtered.map((inv: any) => (
+          ) : filtered.slice(0, rowLimit).map((inv: any) => (
             <TouchableOpacity key={inv._id} style={styles.card} onPress={() => openInvoiceDetail(inv)}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <Text style={styles.invNum}>{inv.invoiceNumber}</Text>
-                <Badge text={inv.status} color={statusColor(inv.status)} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Badge text={inv.status} color={statusColor(inv.status)} />
+                  <TouchableOpacity
+                    onPress={() => shareInv(inv)}
+                    disabled={pdfBusy === (inv._id || inv.id)}
+                    hitSlop={8}
+                    style={{ width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: ACC.line, alignItems: 'center', justifyContent: 'center' }}>
+                    {pdfBusy === (inv._id || inv.id)
+                      ? <ActivityIndicator size="small" color={ACC.purple} />
+                      : <Ionicons name="download-outline" size={16} color={ACC.purple} />}
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={styles.cardTitle}>{inv.tenantName}</Text>
               <Text style={styles.cardSub}>{inv.billingMonth} | {inv.propertyName}</Text>
@@ -945,16 +999,17 @@ export default function AccountingScreen() {
                   {inv.paidAmount > 0 && <Text style={{ fontSize: fontSize.sm, color: ACC.good, fontWeight: '600' }}>Paid: Rs {inv.paidAmount}</Text>}
                 </View>
               </View>
-              <TouchableOpacity
-                onPress={() => shareInv(inv)}
-                disabled={pdfBusy === (inv._id || inv.id)}
-                style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line }}>
-                {pdfBusy === (inv._id || inv.id)
-                  ? <ActivityIndicator size="small" color={ACC.purple} />
-                  : <><Ionicons name="download-outline" size={15} color={ACC.purple} /><Text style={{ color: ACC.purple, fontWeight: '700', fontSize: fontSize.sm }}>PDF</Text></>}
-              </TouchableOpacity>
             </TouchableOpacity>
           ))}
+          {filtered.length > rowLimit && (
+            <TouchableOpacity
+              onPress={() => setRowLimit((n) => n + ROW_PAGE)}
+              style={{ marginTop: 4, marginBottom: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: ACC.line, backgroundColor: '#fff', alignItems: 'center' }}>
+              <Text style={{ color: ACC.purple, fontWeight: '700', fontSize: fontSize.sm }}>
+                Show more ({filtered.length - rowLimit} remaining)
+              </Text>
+            </TouchableOpacity>
+          )}
         </>)}
 
         {/* ── RECEIPTS + Add Collection ── */}
@@ -978,26 +1033,38 @@ export default function AccountingScreen() {
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
           ) : receipts.length === 0 ? (
             <EmptyState title="No Receipts" subtitle="Recorded payments will appear here" icon="cash-outline" />
-          ) : receipts.map((r: any) => (
+          ) : receipts.slice(0, rowLimit).map((r: any) => (
             <View key={r.id} style={styles.card}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={styles.cardTitle} numberOfLines={1}>{tenantNameFor(r)}</Text>
-                <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.good }}>Rs {Number(r.amount_paid || 0).toLocaleString('en-IN')}</Text>
+                <Text style={[styles.cardTitle, { flex: 1 }]} numberOfLines={1}>{tenantNameFor(r)}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Text style={{ fontSize: fontSize.lg, fontWeight: '800', color: ACC.good }}>Rs {Number(r.amount_paid || 0).toLocaleString('en-IN')}</Text>
+                  <TouchableOpacity
+                    onPress={() => shareRcpt(r)}
+                    disabled={pdfBusy === r.id}
+                    hitSlop={8}
+                    style={{ width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: ACC.line, alignItems: 'center', justifyContent: 'center' }}>
+                    {pdfBusy === r.id
+                      ? <ActivityIndicator size="small" color={ACC.good} />
+                      : <Ionicons name="download-outline" size={16} color={ACC.good} />}
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                 <Text style={styles.cardSub}>{r.payment_date ? formatDate(r.payment_date) : '—'}{r.payment_mode ? ` · ${String(r.payment_mode).toUpperCase()}` : ''}</Text>
                 {!!r.reference_number && <Text style={styles.cardSub} numberOfLines={1}>Ref: {r.reference_number}</Text>}
               </View>
-              <TouchableOpacity
-                onPress={() => shareRcpt(r)}
-                disabled={pdfBusy === r.id}
-                style={{ marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: borderRadius.md, borderWidth: 1, borderColor: ACC.line }}>
-                {pdfBusy === r.id
-                  ? <ActivityIndicator size="small" color={ACC.good} />
-                  : <><Ionicons name="download-outline" size={15} color={ACC.good} /><Text style={{ color: ACC.good, fontWeight: '700', fontSize: fontSize.sm }}>Receipt PDF</Text></>}
-              </TouchableOpacity>
             </View>
           ))}
+          {receipts.length > rowLimit && (
+            <TouchableOpacity
+              onPress={() => setRowLimit((n) => n + ROW_PAGE)}
+              style={{ marginTop: 4, marginBottom: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: ACC.line, backgroundColor: '#fff', alignItems: 'center' }}>
+              <Text style={{ color: ACC.good, fontWeight: '700', fontSize: fontSize.sm }}>
+                Show more ({receipts.length - rowLimit} remaining)
+              </Text>
+            </TouchableOpacity>
+          )}
         </>)}
 
         {/* ── ADJUSTMENTS (credit/debit notes, read-only) ── */}
@@ -1914,17 +1981,18 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: spacing.md, marginHorizontal: spacing.xl, marginTop: spacing.sm,
   },
   pendingText: { fontSize: fontSize.sm, color: ACC.bad, fontWeight: '700' },
-  filters: { backgroundColor: '#FFFFFF', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, maxHeight: 50,
+  filters: { backgroundColor: '#FFFFFF', paddingHorizontal: spacing.lg, paddingVertical: 10, maxHeight: 58,
     borderBottomWidth: 1, borderBottomColor: ACC.line },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: ACC.pillInactiveBg, marginRight: 8,
-    borderWidth: 1, borderColor: ACC.pillInactiveBg },
-  filterActive: { backgroundColor: ACC.purple, borderColor: ACC.purple },
-  filterText: { fontSize: fontSize.sm, color: ACC.ink2, textTransform: 'capitalize', fontWeight: '600' },
-  filterTextActive: { color: colors.white, fontWeight: '700' },
+  filterChip: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 999, backgroundColor: ACC.soft, marginRight: 8,
+    borderWidth: 1, borderColor: ACC.line },
+  filterActive: { backgroundColor: ACC.purple, borderColor: ACC.purple,
+    shadowColor: ACC.purple, shadowOpacity: 0.28, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  filterText: { fontSize: 13, color: ACC.ink2, textTransform: 'capitalize', fontWeight: '700' },
+  filterTextActive: { color: colors.white, fontWeight: '800' },
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: spacing.lg,
-    marginBottom: spacing.md, borderWidth: 1, borderColor: ACC.line,
-    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+    backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14,
+    marginBottom: 8, borderWidth: 1, borderColor: ACC.line,
+    shadowColor: '#0F172A', shadowOpacity: 0.045, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1,
   },
   invNum: { fontSize: fontSize.xs, fontWeight: '700', color: colors.primary },
   cardTitle: { fontSize: fontSize.md, fontWeight: '800', color: ACC.ink },
@@ -1948,10 +2016,10 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 17, fontWeight: '800', color: ACC.ink },
   sectionSub: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
   kpiTile: {
-    flexGrow: 1, flexBasis: '30%', minWidth: '30%', backgroundColor: '#FFFFFF', borderRadius: 16,
-    padding: spacing.md, borderWidth: 1, borderColor: ACC.line,
-    shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+    flexGrow: 1, flexBasis: '47%', minWidth: '47%', backgroundColor: '#FFFFFF', borderRadius: 16,
+    paddingVertical: 14, paddingHorizontal: 14, borderWidth: 1, borderColor: ACC.line,
+    shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1,
   },
-  kpiValue: { fontSize: fontSize.md, fontWeight: '800', color: ACC.ink, letterSpacing: -0.3 },
-  kpiLabel: { fontSize: fontSize.xs, color: ACC.ink2, marginTop: 2 },
+  kpiValue: { fontSize: 18, fontWeight: '800', color: ACC.ink, letterSpacing: -0.4 },
+  kpiLabel: { fontSize: 11, color: ACC.ink3, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: '700' },
 });

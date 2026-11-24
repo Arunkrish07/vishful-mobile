@@ -61,10 +61,24 @@ export function GlassBackground({ children, style }: { children: React.ReactNode
   );
 }
 
-/** Sticky page header — frosted glass chrome (both platforms) */
+/** Sticky-header chrome. iOS gets a real frosted blur; Android renders an opaque
+ *  surface instead — expo-blur's Android BlurView (no experimentalBlurMethod set)
+ *  is a per-frame jank source and paints as a flat/odd box, so we skip it off-iOS. */
+function Chrome({ children, style }: { children: React.ReactNode; style?: any }) {
+  if (Platform.OS === 'ios') {
+    return (
+      <BlurView intensity={glass.blurIntensity} tint={glass.blurTint} style={[{ overflow: 'hidden' }, style]}>
+        {children}
+      </BlurView>
+    );
+  }
+  return <View style={[{ overflow: 'hidden', backgroundColor: '#FFFFFF' }, style]}>{children}</View>;
+}
+
+/** Sticky page header — frosted glass chrome (iOS) / solid surface (Android) */
 export function GlassHeader({ children, style }: { children: React.ReactNode; style?: any }) {
   return (
-    <BlurView intensity={glass.blurIntensity} tint={glass.blurTint} style={[{ overflow: 'hidden' }, style]}>
+    <Chrome style={style}>
       <View style={{
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
@@ -74,7 +88,7 @@ export function GlassHeader({ children, style }: { children: React.ReactNode; st
       }}>
         {children}
       </View>
-    </BlurView>
+    </Chrome>
   );
 }
 
@@ -300,8 +314,8 @@ export function LoadingScreen() {
   useEffect(() => {
     const pulse = RNAnimated.loop(
       RNAnimated.sequence([
-        RNAnimated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: false }),
-        RNAnimated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: false }),
+        RNAnimated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
+        RNAnimated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
       ])
     );
     pulse.start();
@@ -579,7 +593,7 @@ export function PageHeader({
   title: string; subtitle?: string; onBack?: () => void; right?: React.ReactNode; style?: any;
 }) {
   return (
-    <BlurView intensity={glass.blurIntensity} tint={glass.blurTint} style={[{ overflow: 'hidden' }, style]}>
+    <Chrome style={style}>
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: 10,
       paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, minHeight: 58,
@@ -611,7 +625,7 @@ export function PageHeader({
       </View>
       {right}
     </View>
-    </BlurView>
+    </Chrome>
   );
 }
 

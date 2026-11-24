@@ -346,8 +346,8 @@ function SkeletonBox({ width, height, borderRadius = 8, style }: { width?: numbe
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.9, duration: 700, useNativeDriver: false }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: false }),
+        Animated.timing(opacity, { toValue: 0.9, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
       ])
     );
     anim.start();

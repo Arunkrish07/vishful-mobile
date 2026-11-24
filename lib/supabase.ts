@@ -23,7 +23,16 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
   auth: {
     storage: AsyncStorage as any,
     autoRefreshToken: true,
-    persistSession: true,
+    // persistSession is intentionally FALSE. The app layer (lib/auth.tsx) is the
+    // single source of truth for the stored session — it keeps the tokens in
+    // `@vishful_auth_*` and rehydrates this client on startup via
+    // supabaseService.rehydrateSession(). If supabase-js ALSO persisted its own
+    // copy, the two would diverge (refresh tokens are single-use and get rotated
+    // by whichever refresher runs first), and on the next cold start supabase-js
+    // would auto-recover its stale copy, fail to refresh it, and log a red
+    // "Invalid Refresh Token: Refresh Token Not Found" error — leaving the client
+    // unauthenticated. Owning persistence ourselves removes that failure mode.
+    persistSession: false,
     detectSessionInUrl: false,
   },
   // Realtime is not used by the app; leave default. Reads/writes use PostgREST.

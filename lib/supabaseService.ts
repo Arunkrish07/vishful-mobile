@@ -136,6 +136,56 @@ export async function refreshSession(refreshToken: string): Promise<{ success: b
   }
 }
 
+// Re-authenticate the Supabase client on startup from the app's authoritative
+// stored tokens. The client no longer persists its own session (see
+// lib/supabase.ts), so this is what makes RLS-gated reads work after a cold
+// start. Unlike the boot-time auto-recovery that supabase-js used to do, the
+// setSession() path RETURNS any refresh error instead of console.error-ing it,
+// so a stale/expired token here fails quietly (we warn) rather than painting a
+// red error screen. Returns true only when a live session was established.
+export async function rehydrateSession(accessToken: string, refreshToken: string): Promise<boolean> {
+  if (!accessToken || !refreshToken || typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
+    return false;
+  }
+  try {
+    const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    if (error || !data?.session) {
+      console.warn('[supabaseService] rehydrateSession failed:', error?.message);
+      return false;
+    }
+    return true;
+  } catch (e: any) {
+    console.warn('[supabaseService] rehydrateSession error:', e?.message);
+    return false;
+  }
+}
+
+// Subscribe to supabase-js session changes and surface the rotated tokens so the
+// app layer can keep its stored copy in lock-step. This is what prevents the
+// stored refresh token from ever going stale (refresh tokens are single-use, so
+// every auto-refresh rotates them). The callback must never throw — supabase-js
+// re-logs subscriber exceptions via console.error. Returns an unsubscribe fn.
+export function onSupabaseAuthTokens(cb: (accessToken: string, refreshToken: string) => void): () => void {
+  try {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      try {
+        if (
+          (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') &&
+          session?.access_token &&
+          session?.refresh_token
+        ) {
+          cb(session.access_token, session.refresh_token);
+        }
+      } catch {
+        /* never throw from an auth state callback */
+      }
+    });
+    return () => { try { data?.subscription?.unsubscribe(); } catch { /* noop */ } };
+  } catch {
+    return () => { /* noop */ };
+  }
+}
+
 // Validate a stored access token and resolve the user's role, directly via
 // Supabase (no server). Reads team_members / user_roles / tenants under the
 // user's JWT — so these tables must allow the signed-in user to read their own
@@ -3142,6 +3192,37 @@ export async function getReportsSummary(period: string) {
     tickets: { total: pTickets.length, open: pTickets.length - ticketClosed, closed: ticketClosed, needsTenantApproval: pTickets.filter((t: any) => t.status === "pending_tenant_approval").length },
   };
 }
+
+// Lightweight accounting KPIs for the Accounting screen's "Financial Overview".
+// Calls ONLY the server-side metrics RPC — unlike getReportsSummary it does NOT
+// pull every invoice/receipt/etc. (thousands of rows) to the client. Parsing
+// those large payloads on the JS thread blocked Accounting on open long enough
+// to trip Android's ANR ("Close app / Wait"). Returns the same { accounting }
+// shape the screen reads; on RPC failure the tiles simply show 0.
+export async function getAccountingOverview(period: string) {
+  const p = (period || "current_fy") as ReportingPeriod;
+  const { from, to } = rptPeriodDateRange(p);
+  try {
+    const { data, error } = await supabase.rpc("get_universal_metrics_v2", rptMetricsRpcArgs(p, from, to));
+    if (error) throw error;
+    const payload = Array.isArray(data) ? data[0] : data;
+    const acct: any = payload?.accounting || {};
+    return {
+      accounting: {
+        totalInvoiced: Number(acct.totalRevenue ?? 0),
+        totalCollections: Number(acct.totalCollections ?? 0),
+        depositCollections: Number(acct.depositCollections ?? 0),
+        totalPendingCollection: Number(acct.totalPendingCollection ?? 0),
+        totalExpenses: Number(acct.totalExpenses ?? 0),
+        totalProfit: Number(acct.totalProfit ?? 0),
+      },
+    };
+  } catch (e: any) {
+    console.warn("[accounting] overview RPC failed:", e?.message);
+    return { accounting: {} };
+  }
+}
+
 export async function getOccupancyDetail() {
   // Direct Supabase port of convex/reports.ts getOccupancyDetail.
   const [properties, apartments, beds, allotments] = await Promise.all([

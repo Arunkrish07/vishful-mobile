@@ -10,6 +10,7 @@ import { spacing, fontSize, glass } from '../lib/theme';
 import { Button, Input, EmptyState, LoadingScreen, GlassBackground, IconBtnSolid, SearchField, PageHeader, FilterChip, WEB } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 
@@ -222,7 +223,6 @@ export default function AnnouncementsScreen() {
   const [imgUploading, setImgUploading] = useState(false);
   const handlePickImage = async () => {
     try {
-      const ImagePicker = await import('expo-image-picker') as any;
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access to add a banner image.'); return; }
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8, base64: true });
@@ -230,7 +230,7 @@ export default function AnnouncementsScreen() {
       const asset = result.assets[0];
       setImgUploading(true);
       const ext = (asset.mimeType || '').includes('png') ? 'png' : 'jpg';
-      const res = await sb.uploadAnnouncementImage(asset.base64, asset.mimeType || 'image/jpeg', ext);
+      const res = await sb.uploadAnnouncementImage(asset.base64!, asset.mimeType || 'image/jpeg', ext);
       if (res?.ok && res.url) {
         setForm((p: any) => ({ ...p, image_url: res.url }));
       } else {

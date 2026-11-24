@@ -14,7 +14,7 @@
 // are enabled.
 // ============================================================
 import { supabase } from "./supabase";
-import { ORG_ID, safeList, insertRow, deleteRow, DELETES_ENABLED } from "./supabaseDb";
+import { ORG_ID, safeList, fetchAllPages, insertRow, deleteRow, DELETES_ENABLED } from "./supabaseDb";
 
 // ════════════════════════════════════════════════════════════════════
 // EXIT-MONTH ESTIMATED EB — pure helpers (port of convex/exiteb.ts)
@@ -287,18 +287,43 @@ export async function listLifecycleReceipts() {
 export async function createBookingFull(args: { data: any }) {
   const data = args.data;
   const today = new Date().toISOString().split("T")[0];
+  // Payment date defaults to today, but the desk can set it (e.g. OCR'd from the proof).
+  const paymentDate = data.paymentDate || today;
+
+  // ── Excess-payment split ──────────────────────────────────────────────────
+  // The desk may collect MORE than the booking fee at booking time (e.g. the full
+  // onboarding advance). When the paid amount exceeds the booking fee, the fee is
+  // booked as the booking charge and the remainder is held as an advance
+  // (deposit_paid) so the onboarding step shows a reduced balance.
+  //   onboarding_charges = booking fee   | deposit_paid = additional advance
+  //   paid_amount        = total paid    | two receipts: booking + additional_payment
+  const totalPaid = Number(data.amount) || 0;
+  const bookingFee = Number(data.bookingFee) > 0 ? Number(data.bookingFee) : totalPaid;
+  const additional = Math.max(0, Math.round(totalPaid - bookingFee));
+  const feePortion = additional > 0 ? bookingFee : totalPaid;
+
   const allotment = await insertRow("tenant_allotments", {
     tenant_id: data.tenantId, property_id: data.propertyId, apartment_id: data.apartmentId, bed_id: data.bedId,
     booking_date: today, onboarding_date: data.onboardingDate || null, staying_status: "Booked",
-    deposit_paid: 0, onboarding_charges: data.amount, paid_amount: data.amount, payment_status: "partial",
+    deposit_paid: additional, onboarding_charges: feePortion, paid_amount: totalPaid, payment_status: "partial",
     discount: data.discount || 0, premium: data.premium || 0,
   });
+  // Booking-fee receipt.
   await insertRow("receipts", {
-    tenant_id: data.tenantId, tenant_allotment_id: allotment.id, amount_paid: data.amount, base_amount: data.amount,
+    tenant_id: data.tenantId, tenant_allotment_id: allotment.id, amount_paid: feePortion, base_amount: feePortion,
     processing_fee: 0, payment_mode: data.paymentMode, reference_number: data.referenceNumber || null,
-    payment_date: today, receipt_type: "booking",
+    payment_date: paymentDate, receipt_type: "booking",
     ...(data.bankAccountId ? { bank_account_id: data.bankAccountId } : {}),
   });
+  // Advance (excess over the booking fee) → separate additional_payment receipt.
+  if (additional > 0) {
+    await insertRow("receipts", {
+      tenant_id: data.tenantId, tenant_allotment_id: allotment.id, amount_paid: additional, base_amount: additional,
+      processing_fee: 0, payment_mode: data.paymentMode, reference_number: data.referenceNumber || null,
+      payment_date: paymentDate, receipt_type: "additional_payment",
+      ...(data.bankAccountId ? { bank_account_id: data.bankAccountId } : {}),
+    });
+  }
   const bedStatus = data.isBedOnNotice ? "notice-booked" : "booked";
   await supabase.from("beds").update({ bed_lifecycle_status: bedStatus } as any).eq("id", data.bedId);
   await supabase.from("tenants").update({ staying_status: "booked" } as any).eq("id", data.tenantId);
@@ -331,11 +356,13 @@ export async function cancelBookingFull(args: { allotmentId: string; reason: str
 
 export async function processOnboardingFull(args: { data: any }) {
   const data = args.data;
-  const allots = await safeList(
-    supabase.from("tenant_allotments").select("*").eq("id", data.allotmentId).eq("organization_id", ORG_ID).limit(1)
-  );
-  const allot: any = allots[0];
-  if (!allot) throw new Error("Allotment not found");
+  // Direct query (not safeList) so a query/RLS error is surfaced instead of silently
+  // becoming an empty result that looks like "not found".
+  const { data: allotRows, error: allotErr } = await supabase
+    .from("tenant_allotments").select("*").eq("id", data.allotmentId).eq("organization_id", ORG_ID).limit(1);
+  if (allotErr) throw new Error(`Could not load allotment: ${allotErr.message}`);
+  const allot: any = (allotRows || [])[0];
+  if (!allot) throw new Error(`Allotment not found (id=${data.allotmentId || "empty"})`);
   const paidNow = data.paidAmount || 0;
   const alreadyPaid = Math.max(allot.paid_amount || 0, allot.deposit_paid || 0);
   const totalPaid = alreadyPaid + paidNow;
@@ -347,6 +374,9 @@ export async function processOnboardingFull(args: { data: any }) {
     monthly_rental: data.monthlyRent, deposit_paid: data.advance, prorated_rent: data.proratedRent,
     onboarding_charges: data.onboardingCharges, total_due: data.totalDue, paid_amount: totalPaid,
     balance_due: balanceDue, payment_status: paymentStatus,
+    // Persist any discount/premium edited at onboarding so billing uses the final values.
+    ...(data.discount != null ? { discount: data.discount } : {}),
+    ...(data.premium != null ? { premium: data.premium } : {}),
   } as any).eq("id", data.allotmentId).eq("organization_id", ORG_ID);
   const ccChargesOnboard = Number(data.ccCharges) || 0;
   if (paidNow > 0) {
@@ -732,8 +762,14 @@ export async function deleteAbsenceRecord(args: { id: string }) {
 
 export async function getLifecycleFullData() {
   const [allotments, tenants, beds, apartments, properties, exits, notices, bedRates, lifecycleConfigRows, bankAccounts, absenceRecords] = await Promise.all([
-    safeList(supabase.from("tenant_allotments").select("*, tenants(full_name,phone,kyc_completed,gender), properties(property_name), apartments(apartment_code,gender_allowed,status), beds(bed_code,bed_type,toilet_type,bed_lifecycle_status)").eq("organization_id", ORG_ID).order("created_at", { ascending: false })),
-    safeList(supabase.from("tenants").select("*").eq("organization_id", ORG_ID).order("full_name")),
+    // PostgREST caps each query at 1000 rows; this org has >1000 allotments/tenants,
+    // so page through — otherwise the oldest rows (e.g. 2022 tenants still "Staying")
+    // are silently dropped and the Visual Map shows their beds as vacant.
+    // The secondary .order("id") is REQUIRED: created_at/full_name have ties (bulk
+    // imports share timestamps), and range-paginating a non-unique sort returns some
+    // rows twice and skips others. A unique tiebreaker makes paging deterministic.
+    fetchAllPages((from, to) => supabase.from("tenant_allotments").select("*, tenants(full_name,phone,kyc_completed,gender), properties(property_name), apartments(apartment_code,gender_allowed,status), beds(bed_code,bed_type,toilet_type,bed_lifecycle_status)").eq("organization_id", ORG_ID).order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, to)),
+    fetchAllPages((from, to) => supabase.from("tenants").select("*").eq("organization_id", ORG_ID).order("full_name").order("id", { ascending: true }).range(from, to)),
     safeList(supabase.from("beds").select("*").eq("organization_id", ORG_ID)),
     safeList(supabase.from("apartments").select("*").eq("organization_id", ORG_ID)),
     safeList(supabase.from("properties").select("*").eq("organization_id", ORG_ID)),
@@ -751,7 +787,19 @@ export async function getLifecycleFullData() {
     refund_deadline_days: 5, cc_charge_percent: 1.5,
   };
   if (activeConfig.cc_charge_percent == null) activeConfig.cc_charge_percent = 1.5;
-  return { allotments, tenants, beds, apartments, properties, exits, notices, bedRates, config: activeConfig, bankAccounts, absenceRecords };
+  // Safety net: dedupe paginated sets by id so a boundary-duplicate can never reach
+  // the UI as a repeated React key (the .order("id") tiebreaker already prevents it).
+  const uniqById = <T extends { id?: string }>(rows: T[]): T[] => {
+    const seen = new Set<string>();
+    return (rows || []).filter((r) => {
+      const id = String((r as any)?.id || "");
+      if (!id) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  };
+  return { allotments: uniqById(allotments as any[]), tenants: uniqById(tenants as any[]), beds, apartments, properties, exits, notices, bedRates, config: activeConfig, bankAccounts, absenceRecords };
 }
 
 // ─── EXIT TASKS (port of convex/tenantsextraactions.ts) ──────────────

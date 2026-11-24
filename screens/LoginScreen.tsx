@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import Svg, { Rect, Circle, Path } from 'react-native-svg';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,6 +87,79 @@ function MeshBackground() {
       <Animated.View style={[styles.blob, styles.blobViolet, tf(c, 26, 22, 0.9, 1.14)]} />
     </View>
   );
+}
+
+// ── Inline vector illustrations (react-native-svg) ──────────────────────────
+// Static shapes only — no animated path draw (that was the earlier "fragile"
+// checkmark). Blue-palette flat art tuned to the light premium theme.
+
+/** Phone step: a friendly apartment / skyline scene. */
+function BuildingIllustration({ width = 236, height = 128 }: { width?: number; height?: number }) {
+  const win = (x: number, y: number, key: string) => (
+    <Rect key={key} x={x} y={y} width={9} height={9} rx={2} fill="#EFF6FF" opacity={0.92} />
+  );
+  const mainWins: any[] = [];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) mainWins.push(win(101 + c * 15, 42 + r * 15, `m${r}${c}`));
+  const backWins: any[] = [];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) backWins.push(win(52 + c * 16, 58 + r * 16, `b${r}${c}`));
+  const frontWins: any[] = [];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) frontWins.push(win(161 + c * 15, 70 + r * 14, `f${r}${c}`));
+  return (
+    <Svg width={width} height={height} viewBox="0 0 240 140" fill="none">
+      <Rect x="4" y="4" width="232" height="132" rx="22" fill="#EFF6FF" />
+      <Circle cx="200" cy="38" r="15" fill="#BFDBFE" />
+      {/* back building */}
+      <Rect x="44" y="48" width="44" height="68" rx="6" fill="#93C5FD" />
+      {backWins}
+      {/* main building */}
+      <Rect x="92" y="30" width="58" height="86" rx="8" fill="#2563EB" />
+      {mainWins}
+      {/* door */}
+      <Rect x="112" y="98" width="18" height="18" rx="3" fill="#BFDBFE" />
+      {/* front building */}
+      <Rect x="154" y="60" width="46" height="56" rx="6" fill="#1D4ED8" />
+      {frontWins}
+      {/* ground */}
+      <Rect x="24" y="114" width="192" height="6" rx="3" fill="#DBEAFE" />
+    </Svg>
+  );
+}
+
+/** OTP step: a phone with the code on screen + a security shield badge. */
+function OtpSecurityIllustration({ width = 236, height = 128 }: { width?: number; height?: number }) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 240 140" fill="none">
+      <Rect x="4" y="4" width="232" height="132" rx="22" fill="#EFF6FF" />
+      {/* phone body */}
+      <Rect x="84" y="16" width="60" height="108" rx="15" fill="#2563EB" />
+      {/* screen */}
+      <Rect x="90" y="26" width="48" height="82" rx="7" fill="#FFFFFF" />
+      {/* OTP dots */}
+      <Circle cx="102" cy="52" r="4" fill="#2563EB" />
+      <Circle cx="114" cy="52" r="4" fill="#2563EB" />
+      <Circle cx="126" cy="52" r="4" fill="#93C5FD" />
+      {/* message lines */}
+      <Rect x="99" y="66" width="30" height="5" rx="2.5" fill="#DBEAFE" />
+      <Rect x="99" y="76" width="22" height="5" rx="2.5" fill="#DBEAFE" />
+      {/* home indicator */}
+      <Circle cx="114" cy="116" r="3" fill="#BFDBFE" />
+      {/* security shield badge (static) */}
+      <Path d="M158 66 L180 75 L180 94 Q180 108 158 117 Q136 108 136 94 L136 75 Z" fill="#1D4ED8" />
+      <Path d="M148 91 l7 7 l14 -16" stroke="#FFFFFF" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  );
+}
+
+// Login card wrapper. iOS gets a real frosted blur; Android gets an OPAQUE white
+// card. On Android, expo-blur's BlurView with a translucent background + elevation
+// + rounded corners paints a hard white rectangle behind the rounded shape — the
+// "white box inside the login box". An opaque background clips the elevation to the
+// rounded corners cleanly and renders identically without the blur layer.
+function Sheet({ children }: { children: React.ReactNode }) {
+  if (Platform.OS === 'ios') {
+    return <BlurView intensity={22} tint="light" style={styles.sheet}>{children}</BlurView>;
+  }
+  return <View style={[styles.sheet, styles.sheetAndroid]}>{children}</View>;
 }
 
 export default function LoginScreen() {
@@ -353,8 +427,10 @@ export default function LoginScreen() {
             bounces={false}
           >
             <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
-              <View style={styles.loginMark}>
-                <Image source={require('../assets/vishful-logo-DPK24n8p.webp')} style={styles.loginMarkImg} />
+              <View style={styles.heroWrap}>
+                {step === 'phone'
+                  ? <BuildingIllustration width={236} height={128} />
+                  : <OtpSecurityIllustration width={236} height={128} />}
               </View>
               <View style={styles.eyebrowRow}>
                 <View style={styles.eyebrowDot} />
@@ -368,7 +444,7 @@ export default function LoginScreen() {
               </Text>
               {step === 'otp' ? <Text style={styles.loginNumber}>+91 {formattedPhone}</Text> : null}
 
-              <BlurView intensity={22} tint="light" style={styles.sheet}>
+              <Sheet>
                 {step === 'phone' && (
                   <>
                     <Text style={styles.fieldLabel}>Mobile number</Text>
@@ -424,7 +500,17 @@ export default function LoginScreen() {
                   </>
                 )}
 
-                {step === 'otp' && (
+                {step === 'otp' && (success ? (
+                  <Animated.View style={[styles.verifiedWrap, { opacity: overlayOpacity }]}>
+                    <Animated.View style={[styles.verifiedRing, { transform: [{ scale: ringScale }] }]}>
+                      <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+                        <Ionicons name="checkmark-sharp" size={44} color="#FFFFFF" />
+                      </Animated.View>
+                    </Animated.View>
+                    <Text style={styles.verifiedTitle}>Verified</Text>
+                    <Text style={styles.verifiedSub}>Signing you in…</Text>
+                  </Animated.View>
+                ) : (
                   <>
                     <View style={styles.otpHead}>
                       <TouchableOpacity
@@ -481,8 +567,8 @@ export default function LoginScreen() {
                       </Text>
                     </TouchableOpacity>
                   </>
-                )}
-              </BlurView>
+                ))}
+              </Sheet>
 
               <View style={styles.secureRow}>
                 <Ionicons name="lock-closed-outline" size={12} color={C.dim} />
@@ -497,17 +583,6 @@ export default function LoginScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* ── Success overlay — drawn checkmark, then enter the app ── */}
-      {success && (
-        <Animated.View style={[styles.successOverlay, { opacity: overlayOpacity }]} pointerEvents="none">
-          <Animated.View style={[styles.successRing, { transform: [{ scale: ringScale }] }]}>
-            <Animated.View style={{ transform: [{ scale: checkScale }] }}>
-              <Ionicons name="checkmark-sharp" size={58} color="#FFFFFF" />
-            </Animated.View>
-          </Animated.View>
-          <Text style={styles.successText}>Verified</Text>
-        </Animated.View>
-      )}
     </View>
   );
 }
@@ -570,6 +645,7 @@ const styles = StyleSheet.create({
     shadowColor: '#1E293B', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 6,
   },
   loginMarkImg: { width: 72, height: 72, resizeMode: 'contain' },
+  heroWrap: { alignSelf: 'center', marginBottom: 12, marginTop: 2 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 },
   eyebrowDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: C.accent },
   eyebrow: { color: C.eyebrow, fontSize: 10, fontWeight: '800', letterSpacing: 3.2, textTransform: 'uppercase' },
@@ -584,6 +660,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 22, paddingBottom: 20, gap: 16,
     shadowColor: '#1E293B', shadowOpacity: 0.10, shadowRadius: 28, shadowOffset: { width: 0, height: 16 }, elevation: 10,
   },
+  // Android override: opaque background so elevation clips to the rounded corners
+  // instead of painting a white rectangle behind the card.
+  sheetAndroid: { backgroundColor: '#FFFFFF', borderColor: '#E7ECF3' },
   fieldLabel: { color: C.lede, fontSize: 10, fontWeight: '800', letterSpacing: 2.2, textTransform: 'uppercase' },
   phoneField: {
     minHeight: 58, borderRadius: 18, backgroundColor: C.field,
@@ -637,16 +716,14 @@ const styles = StyleSheet.create({
   privacyBtn: { alignItems: 'center', marginTop: 14, paddingVertical: 6 },
   privacyText: { color: C.brand, fontSize: 12, fontWeight: '700' },
 
-  successOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(247,250,255,0.94)', gap: 16,
-  },
-  successRing: {
-    width: 108, height: 108, borderRadius: 54,
+  // Inline "Verified" state — rendered inside the card in place of the OTP fields.
+  verifiedWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 26, gap: 12 },
+  verifiedRing: {
+    width: 88, height: 88, borderRadius: 44,
     backgroundColor: C.success,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: C.success, shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10,
+    shadowColor: C.success, shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
-  successText: { color: C.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  verifiedTitle: { color: C.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  verifiedSub: { color: C.lede, fontSize: 13, fontWeight: '600' },
 });

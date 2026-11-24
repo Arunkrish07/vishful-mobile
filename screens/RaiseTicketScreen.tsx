@@ -246,12 +246,12 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
       Animated.loop(Animated.sequence([
         Animated.delay(delay),
         Animated.parallel([
-          Animated.timing(scale,   { toValue: toScale, duration: 1400, useNativeDriver: false }),
-          Animated.timing(opacity, { toValue: 0,       duration: 1400, useNativeDriver: false }),
+          Animated.timing(scale,   { toValue: toScale, duration: 1400, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0,       duration: 1400, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(scale,   { toValue: 1,   duration: 0, useNativeDriver: false }),
-          Animated.timing(opacity, { toValue: 0.6, duration: 0, useNativeDriver: false }),
+          Animated.timing(scale,   { toValue: 1,   duration: 0, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.6, duration: 0, useNativeDriver: true }),
         ]),
       ]));
     const p1 = make(pulseScale1, pulseOpacity1, 2,   0);

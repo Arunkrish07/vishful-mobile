@@ -10,6 +10,7 @@ import { colors, spacing, fontSize, glass } from '../lib/theme';
 import { Button, Input, EmptyState, LoadingScreen, GlassBackground, DateField, PageHeader, IconBtnSolid, SearchField, FilterChip } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
 import { fetchVisibleTabKeys, filterTabs } from '../lib/tabPermissions';
@@ -102,6 +103,12 @@ export default function TenantsScreen() {
   const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female'>('all');
   const [search,       setSearch]       = useState('');
   const [loading,      setLoading]      = useState(false);
+  // Cap how many tenant cards are actually rendered — the full roster still loads
+  // and filters, but mounting the whole list at once froze the UI thread. Paged via
+  // "Show more"; reset whenever the feeding filter/search/tab changes.
+  const TENANT_PAGE = 40;
+  const [rowLimit, setRowLimit] = useState(TENANT_PAGE);
+  useEffect(() => { setRowLimit(TENANT_PAGE); }, [statusFilter, genderFilter, search, activeTab]);
 
   // ── Modals ──
   const [showAdd,     setShowAdd]     = useState(false);
@@ -153,17 +160,15 @@ export default function TenantsScreen() {
   const pickImage = async (onDone: (uri: string, b64?: string) => void, title = 'Upload Photo') => {
     Alert.alert(title, 'Choose source', [
       { text: 'Gallery', onPress: async () => {
-        const IP = await import('expo-image-picker') as any;
-        const { status } = await IP.requestMediaLibraryPermissionsAsync();
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') { Alert.alert('Permission needed'); return; }
-        const r = await IP.launchImageLibraryAsync({ mediaTypes: 'images' as any, quality: 0.8, base64: true });
+        const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images' as any, quality: 0.8, base64: true });
         if (!r.canceled && r.assets[0]) onDone(r.assets[0].uri, r.assets[0].base64 ?? undefined);
       }},
       { text: 'Camera', onPress: async () => {
-        const IP = await import('expo-image-picker') as any;
-        const { status } = await IP.requestCameraPermissionsAsync();
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') { Alert.alert('Permission needed'); return; }
-        const r = await IP.launchCameraAsync({ quality: 0.8, base64: true });
+        const r = await ImagePicker.launchCameraAsync({ quality: 0.8, base64: true });
         if (!r.canceled && r.assets[0]) onDone(r.assets[0].uri, r.assets[0].base64 ?? undefined);
       }},
       { text: 'Cancel', style: 'cancel' },
@@ -726,7 +731,7 @@ export default function TenantsScreen() {
                   icon="people-outline"
                 />
               ) : (
-                filtered.map(t => (
+                filtered.slice(0, rowLimit).map(t => (
                   <TenantCard
                     key={t._id}
                     tenant={t}
@@ -738,6 +743,15 @@ export default function TenantsScreen() {
                     onComputeRating={() => handleComputeRating(t._id)}
                   />
                 ))
+              )}
+              {filtered.length > rowLimit && (
+                <TouchableOpacity
+                  onPress={() => setRowLimit((n) => n + TENANT_PAGE)}
+                  style={{ marginTop: 4, marginBottom: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center' }}>
+                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+                    Show more ({filtered.length - rowLimit} remaining)
+                  </Text>
+                </TouchableOpacity>
               )}
             </>
           ) : (

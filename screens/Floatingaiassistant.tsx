@@ -15,6 +15,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
@@ -85,6 +86,10 @@ function getSpeechRecognitionCtor(): any {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function FloatingAIAssistant({ raised }: { raised?: boolean }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  // Sit clear of the floating bottom bar when it's present (admin). The bar sits
+  // at max(insets.bottom,10) and is ~62pt tall, so clear its top + a gap.
+  const fabBottom = raised ? Math.max(insets.bottom, 10) + 78 : insets.bottom + 20;
   const [open, setOpen]         = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput]       = useState('');
@@ -174,7 +179,7 @@ export default function FloatingAIAssistant({ raised }: { raised?: boolean }) {
   const canSend = Boolean(input.trim()) && !busy;
 
   return (
-    <View style={[S.container, { bottom: raised ? 88 : 28 }]} pointerEvents="box-none">
+    <View style={[S.container, { bottom: fabBottom }]} pointerEvents="box-none">
       {/* ── Floating Card panel (above the FAB) ─────────────────────────────── */}
       {open && (
         <KeyboardAvoidingView

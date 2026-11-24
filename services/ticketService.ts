@@ -282,6 +282,7 @@ export async function fetchTickets(role: string, userId?: string, tenantId?: str
       else if (role === "tenant" && tenantId) q = q.eq("tenant_id", tenantId);
       return q;
     });
+    console.log(`[ticketService] fetchTickets role=${role} fetched ${tickets.length} tickets`);
     if (!tickets.length) return [];
 
     const bedIds = [...new Set(tickets.map((t: any) => t.bed_id).filter(Boolean))];

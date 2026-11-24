@@ -1465,6 +1465,11 @@ export default function OwnersScreen() {
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
   const [unallottedOnly, setUnallottedOnly] = useState(false);
   const [properties, setProperties] = useState<any[]>([]);
+  // Render a capped page of owner cards (full list still loads + filters); mounting
+  // every card at once froze the UI thread. Reset the cap when a filter/search changes.
+  const OWNER_PAGE = 40;
+  const [rowLimit, setRowLimit] = useState(OWNER_PAGE);
+  useEffect(() => { setRowLimit(OWNER_PAGE); }, [search, propertyFilter, unallottedOnly]);
   const [showPropPicker, setShowPropPicker] = useState(false);
 
   const fetchOwners = useCallback(async () => {
@@ -1579,9 +1584,18 @@ export default function OwnersScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563EB" />}>
           {filtered.length === 0 ? (
             <EmptyState title={search ? 'No matches' : 'No Owners'} subtitle={search ? 'Try different search terms' : 'Tap Add to create your first owner'} icon="person-outline" />
-          ) : filtered.map(owner => (
+          ) : filtered.slice(0, rowLimit).map(owner => (
             <OwnerCard key={owner.id} owner={owner} onPress={() => setSelectedOwner(owner.id)} />
           ))}
+          {filtered.length > rowLimit && (
+            <TouchableOpacity
+              onPress={() => setRowLimit((n) => n + OWNER_PAGE)}
+              style={{ marginTop: 4, marginBottom: 8, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E6EBF2', backgroundColor: '#fff', alignItems: 'center' }}>
+              <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 13 }}>
+                Show more ({filtered.length - rowLimit} remaining)
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {/* Modals */}

@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 const MEDIA_TYPE_IMAGES = 'images' as any;
 import { GlassBackground, PageHeader, IconBtnSolid, SearchField, FilterChip } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
@@ -1168,10 +1170,8 @@ export default function TicketsScreen({ navigation }: any) {
                     });
                     const csvContent = [header, ...rows].join('\n');
                     const filename = `tickets-${new Date().toISOString().split('T')[0]}.csv`;
-                    const FileSystem = await import('expo-file-system/legacy') as any;
                     const fileUri = FileSystem.cacheDirectory + filename;
-                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
-                    const Sharing = await import('expo-sharing') as any;
+                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' as any });
                     const canShare = await Sharing.isAvailableAsync();
                     if (canShare) {
                       await Sharing.shareAsync(fileUri, {
