@@ -3,7 +3,6 @@ import { View, Text, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Ima
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as sb from '../lib/supabaseService';
 import { useAuth } from '../lib/auth';
-import DeleteAccountButton from '../components/DeleteAccountButton';
 import { spacing } from '../lib/theme';
 import { Button, GlassBackground } from '../components/shared';
 import { useNavigation } from '@react-navigation/native';
@@ -176,7 +175,7 @@ export default function TenantProfileScreen() {
           <Text style={{ fontSize: 18, fontWeight: '800', color: TP.ink, letterSpacing: -0.3 }}>My Profile</Text>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 60 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 120 }}>
 
           {/* ── Loading ── */}
           {loading ? (
@@ -303,7 +302,6 @@ export default function TenantProfileScreen() {
                   variant="danger"
                   icon="log-out-outline"
                 />
-                <DeleteAccountButton style={{ marginTop: 12 }} />
               </View>
             </>
           )}

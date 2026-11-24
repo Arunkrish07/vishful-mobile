@@ -20,7 +20,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../lib/ThemeContext';
 import { useAuth } from '../lib/auth';
-import { client, api } from '../lib/convexApi';
+import { supabase } from '../lib/supabase';
 import { saveTicketResolution, submitDiagnosis } from '../services/ticketService';
 import * as sb from '../lib/supabaseService';
 
@@ -222,9 +222,17 @@ export function DiagnosticFlow({ issueTypeName, issueTypeId, ticketId, issueSubT
   async function runDiagnosis() {
     setStage('diagnosing');
     try {
-      const result = await client.action(api.runAIDiagnosis.runAIDiagnosis, { ticketId, issueTypeId, issueSubType:issueSubType||undefined, answers });
-      setDiagnosis(result as DiagnosisResult);
-      if ((result as DiagnosisResult).causes?.length > 0) setSelectedCause((result as DiagnosisResult).causes[0]);
+      // Web parity: AI diagnosis runs in the `ai-diagnosis` edge function
+      // (action: 'run_diagnosis'); the supabase client carries the user's JWT.
+      // The result is persisted downstream by submitDiagnosis on confirm.
+      const { data, error } = await supabase.functions.invoke('ai-diagnosis', {
+        body: { issueType: issueTypeName, issueSubType: issueSubType || '', answers, action: 'run_diagnosis' },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const result = data as DiagnosisResult;
+      setDiagnosis(result);
+      if (result.causes?.length > 0) setSelectedCause(result.causes[0]);
       setStage('result');
     } catch (e: any) {
       Alert.alert('Diagnosis failed', e?.message||'Unknown error');

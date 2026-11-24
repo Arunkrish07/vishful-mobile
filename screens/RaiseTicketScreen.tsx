@@ -6,8 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { useAction } from 'convex/react';
-import { api } from '../convex/_generated/api';
+import { createTicket } from '../services/ticketService';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 // SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
@@ -130,11 +129,11 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
         if (!authUser) { setProfileLoading(false); return; }
 
         // Try tenants table by user_id
-        let { data } = await supabase
+        let data: any = (await supabase
           .from('tenants')
           .select('id, full_name, phone, property_id, apartment_id, bed_id, organization_id, properties(name), apartments(apartment_number)')
           .eq('user_id', authUser.id)
-          .maybeSingle();
+          .maybeSingle()).data;
 
         // Fallback: match by phone
         if (!data && authUser.phone) {
@@ -230,8 +229,6 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
     }
   }, [classification, issueTypes]);
 
-  const createTicket = useAction(api.tickets.createTicket);
-
   // ── Recording refs ───────────────────────────────────────────────────────
   const audioRecorder     = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const silenceTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -249,12 +246,12 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
       Animated.loop(Animated.sequence([
         Animated.delay(delay),
         Animated.parallel([
-          Animated.timing(scale,   { toValue: toScale, duration: 1400, useNativeDriver: false }),
-          Animated.timing(opacity, { toValue: 0,       duration: 1400, useNativeDriver: false }),
+          Animated.timing(scale,   { toValue: toScale, duration: 1400, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0,       duration: 1400, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(scale,   { toValue: 1,   duration: 0, useNativeDriver: false }),
-          Animated.timing(opacity, { toValue: 0.6, duration: 0, useNativeDriver: false }),
+          Animated.timing(scale,   { toValue: 1,   duration: 0, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.6, duration: 0, useNativeDriver: true }),
         ]),
       ]));
     const p1 = make(pulseScale1, pulseOpacity1, 2,   0);
@@ -486,9 +483,8 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
       const safeApartmentId    = tenantProfile?.apartment_id   ?? tenantLocation?.apartmentId ?? null;
       const safeBedId          = tenantProfile?.bed_id         ?? tenantLocation?.bedId       ?? null;
 
-      // ── Create ticket via Convex (uses admin Supabase client — bypasses RLS) ──
+      // ── Create ticket via Supabase (direct port of Convex createTicketHelper) ──
       const result = await createTicket({
-        data: {
           tenant_id:       safeTenantId,
           property_id:     safePropertyId,
           apartment_id:    safeApartmentId,
@@ -507,7 +503,6 @@ export default function RaiseTicketScreen({ navigation, route }: any) {
             voice_transcription: transcript,
             keywords: classification.keywords,
           },
-        },
       });
 
       console.log('[RaiseTicket] Ticket created:', result?.id || result?.ticket_number);

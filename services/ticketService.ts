@@ -1,10 +1,28 @@
 /**
  * ticketService.ts
- * Routes all ticket operations through Convex actions → Supabase.
- * No direct Supabase calls from client.
+ * Direct Supabase (user JWT / RLS). No Convex. AI features (issue classification,
+ * payment-proof OCR) go through Supabase Edge Functions (ai-diagnosis, payments-extract-proof).
  */
-import { client, api } from "../lib/convexApi";
-import { supabase } from "../lib/supabase"; // direct client for Storage only
+import { supabase } from "../lib/supabase"; // direct client (Storage + data)
+import * as FileSystem from "expo-file-system/legacy"; // read picked images as base64 for edge-fn upload
+import { ORG_ID, safeList, fetchAllPages, insertRow, updateRow, deleteDisabledResult } from "../lib/supabaseDb";
+import { calcWorkingHoursSlaDeadline } from "../lib/ticketSla";
+
+async function generateTicketNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const { data } = await supabase
+    .from("maintenance_tickets").select("ticket_number")
+    .eq("organization_id", ORG_ID).like("ticket_number", `VISH-${year}-%`)
+    .order("ticket_number", { ascending: false }).limit(1);
+  let nextSeq = 1;
+  if (data && data.length > 0) {
+    const parts = String(data[0].ticket_number).split("-");
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+  }
+  const rand = Math.floor(Math.random() * 90 + 10);
+  return `VISH-${year}-${String(nextSeq).padStart(4, "0")}${rand}`;
+}
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -236,7 +254,73 @@ export async function uploadTicketPhoto(
 
 export async function fetchTickets(role: string, userId?: string, tenantId?: string): Promise<Ticket[]> {
   try {
-    return await client.action(api.tickets.listTickets, { role, userId, tenantId });
+    // Direct Supabase port of convex/tickets.ts listTickets (role-scoped + enriched).
+    // Resolve technician scoping first (needs a team_members lookup).
+    let techAssignedIds: string[] | null = null;
+    if (role === "technician" && userId) {
+      const { data: memberRows } = await supabase
+        .from("team_members").select("id, user_id")
+        .eq("organization_id", ORG_ID)
+        .or(`id.eq.${userId},user_id.eq.${userId}`);
+      const possibleIds: string[] = [userId];
+      if (memberRows?.length) {
+        memberRows.forEach((m: any) => { if (m.id) possibleIds.push(m.id); if (m.user_id) possibleIds.push(m.user_id); });
+      }
+      techAssignedIds = [...new Set(possibleIds.filter(Boolean))];
+    }
+
+    // Page through ALL matching tickets. PostgREST caps a single query at 1000
+    // rows; orgs can have more tickets than that, which (with newest-first order)
+    // previously truncated the list and under-counted older/closed tickets.
+    const tickets = await fetchAllPages<any>((from, to) => {
+      let q = supabase
+        .from("maintenance_tickets").select("*")
+        .eq("organization_id", ORG_ID)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (techAssignedIds) q = q.in("assigned_to", techAssignedIds);
+      else if (role === "tenant" && tenantId) q = q.eq("tenant_id", tenantId);
+      return q;
+    });
+    console.log(`[ticketService] fetchTickets role=${role} fetched ${tickets.length} tickets`);
+    if (!tickets.length) return [];
+
+    const bedIds = [...new Set(tickets.map((t: any) => t.bed_id).filter(Boolean))];
+    const bedCodeMap: Record<string, string> = {};
+    if (bedIds.length) {
+      const beds = await safeList(supabase.from("beds").select("id, bed_code").eq("organization_id", ORG_ID).in("id", bedIds));
+      beds.forEach((b: any) => { bedCodeMap[b.id] = b.bed_code || ""; });
+    }
+    const apartmentIds = [...new Set(tickets.map((t: any) => t.apartment_id).filter(Boolean))];
+    const apartmentCodeMap: Record<string, string> = {};
+    if (apartmentIds.length) {
+      const apts = await safeList(supabase.from("apartments").select("id, apartment_code").eq("organization_id", ORG_ID).in("id", apartmentIds));
+      apts.forEach((a: any) => { apartmentCodeMap[a.id] = a.apartment_code || ""; });
+    }
+    const issueTypeIds = [...new Set(tickets.map((t: any) => t.issue_type_id).filter(Boolean))];
+    const issueTypeNameMap: Record<string, string> = {};
+    if (issueTypeIds.length) {
+      const its = await safeList(supabase.from("issue_types").select("id, name").eq("organization_id", ORG_ID).in("id", issueTypeIds));
+      its.forEach((it: any) => { issueTypeNameMap[it.id] = it.name || ""; });
+    }
+    return tickets.map((t: any) => {
+      const diag = t.diagnostic_data || {};
+      const resolvedApartmentCode = (t.apartment_id ? apartmentCodeMap[t.apartment_id] : null) || diag.apartment_code || null;
+      return {
+        ...t,
+        bed_code: t.bed_id ? (bedCodeMap[t.bed_id] || null) : null,
+        apartment_code: resolvedApartmentCode,
+        issue_type_name: t.issue_type_id ? (issueTypeNameMap[t.issue_type_id] || diag.issue_type || t.issue_type || null) : (diag.issue_type || t.issue_type || null),
+        issue_subtype: diag.issue_subtype || null,
+        assigned_to_name: diag.assigned_to_name || null,
+        assigned_to_phone: diag.assigned_to_phone || null,
+        photo_urls: Array.isArray(t.photo_urls)
+          ? t.photo_urls
+          : typeof t.photo_urls === 'string'
+            ? (() => { try { return JSON.parse(t.photo_urls); } catch { return []; } })()
+            : [],
+      };
+    }) as any;
   } catch (e: any) {
     console.warn("[ticketService] fetchTickets:", e?.message);
     return [];
@@ -245,7 +329,66 @@ export async function fetchTickets(role: string, userId?: string, tenantId?: str
 
 export async function fetchTicket(ticketId: string): Promise<Ticket | null> {
   try {
-    return await client.action(api.tickets.getTicket, { ticketId });
+    const { data, error } = await supabase.from("maintenance_tickets").select("*").eq("id", ticketId).single();
+    if (error) throw new Error(error.message);
+    let bed_code: string | null = null;
+    let apartment_code: string | null = null;
+    if (data.bed_id) {
+      const { data: bed } = await supabase.from("beds").select("id, bed_code, apartment_id").eq("organization_id", ORG_ID).eq("id", data.bed_id).single();
+      if (bed) {
+        bed_code = bed.bed_code || null;
+        if (bed.apartment_id) {
+          const { data: apt } = await supabase.from("apartments").select("apartment_code").eq("organization_id", ORG_ID).eq("id", bed.apartment_id).single();
+          if (apt) apartment_code = apt.apartment_code || null;
+        }
+      }
+    }
+    if (!apartment_code && data.apartment_id) {
+      const { data: apt } = await supabase.from("apartments").select("apartment_code").eq("organization_id", ORG_ID).eq("id", data.apartment_id).single();
+      if (apt) apartment_code = apt.apartment_code || null;
+    }
+    if (!apartment_code) apartment_code = data.diagnostic_data?.apartment_code || null;
+    let issue_type_name: string | null = null;
+    if (data.issue_type_id) {
+      const { data: it } = await supabase.from("issue_types").select("name").eq("organization_id", ORG_ID).eq("id", data.issue_type_id).single();
+      issue_type_name = it?.name || data.diagnostic_data?.issue_type || data.issue_type || null;
+    } else {
+      issue_type_name = data.diagnostic_data?.issue_type || data.issue_type || null;
+    }
+    const diag = data.diagnostic_data || {};
+    let property_name: string | null = null;
+    if (data.property_id) {
+      const { data: prop } = await supabase.from("properties").select("property_name").eq("organization_id", ORG_ID).eq("id", data.property_id).single();
+      property_name = prop?.property_name || null;
+    }
+    let tenant_full_name: string | null = data.tenant_name || null;
+    let tenant_phone_resolved: string | null = data.tenant_phone || null;
+    if ((!tenant_full_name || !tenant_phone_resolved) && data.tenant_id) {
+      const { data: ten } = await supabase.from("tenants").select("full_name, phone").eq("organization_id", ORG_ID).eq("id", data.tenant_id).single();
+      if (ten) { if (!tenant_full_name) tenant_full_name = ten.full_name || null; if (!tenant_phone_resolved) tenant_phone_resolved = ten.phone || null; }
+    }
+    let created_by_name: string | null = null;
+    let is_creator_tenant = false;
+    if (data.created_by) {
+      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", data.created_by).single();
+      created_by_name = prof?.full_name || null;
+      is_creator_tenant = !!(tenant_full_name && created_by_name && created_by_name === tenant_full_name);
+    }
+    let linked_asset: any = null;
+    if (data.asset_id) {
+      const { data: asset } = await supabase.from("assets").select("id, asset_code, brand, model, condition").eq("organization_id", ORG_ID).eq("id", data.asset_id).single();
+      if (asset) linked_asset = { id: asset.id, asset_code: asset.asset_code, label: [asset.brand, asset.model].filter(Boolean).join(" ") || asset.asset_code, condition: asset.condition || null };
+    }
+    let photoUrls: string[] = [];
+    if (Array.isArray(data.photo_urls)) photoUrls = data.photo_urls;
+    else if (typeof data.photo_urls === 'string') { try { photoUrls = JSON.parse(data.photo_urls); } catch { photoUrls = []; } }
+    return {
+      ...data, photo_urls: photoUrls, bed_code, apartment_code, apartment: apartment_code,
+      issue_type_name, issue_type: issue_type_name,
+      issue_subtype: diag.issue_subtype || null, assigned_to_name: diag.assigned_to_name || null, assigned_to_phone: diag.assigned_to_phone || null,
+      property_name, tenant_name: tenant_full_name, tenant_phone: tenant_phone_resolved,
+      created_by_name, is_creator_tenant, linked_asset,
+    } as any;
   } catch (e: any) {
     console.warn("[ticketService] fetchTicket:", e?.message);
     return null;
@@ -254,15 +397,100 @@ export async function fetchTicket(ticketId: string): Promise<Ticket | null> {
 
 export async function fetchTicketLogs(ticketId: string): Promise<TicketLog[]> {
   try {
-    return await client.action(api.tickets.getTicketLogs, { ticketId });
+    return await safeList(
+      supabase.from("ticket_logs").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: true })
+    ) as any;
   } catch (e: any) {
     console.warn("[ticketService] fetchTicketLogs:", e?.message);
     return [];
   }
 }
 
-export async function createTicket(data: Partial<Ticket> & { issue_type_id: string }): Promise<Ticket> {
-  return client.action(api.tickets.createTicket, { data });
+export async function createTicket(data: any): Promise<Ticket> {
+  // Direct port of convex createTicketHelper (SMS to technician omitted — that is a
+  // secret-key feature that belongs in an Edge Function, like login).
+  const ticketNumber = await generateTicketNumber();
+  let slaDelta = 24 * 3600000;
+  let priority = data.priority || "medium";
+  if (data.issue_type_id) {
+    const { data: it } = await supabase.from("issue_types").select("sla_hours,priority").eq("id", data.issue_type_id).single();
+    if (it) { slaDelta = (it.sla_hours || 24) * 3600000; priority = data.priority || it.priority || "medium"; }
+  }
+  const slaDeadline = calcWorkingHoursSlaDeadline(new Date(), slaDelta / 3600000).toISOString();
+  let tenantPhone: string | null = data.tenant_phone || null;
+  let tenantName: string | null = null;
+  let resolvedTenantId: string | null = data.tenant_id || null;
+  if (!resolvedTenantId && data.bed_id) {
+    const { data: allotment } = await supabase.from("tenant_allotments").select("tenant_id")
+      .eq("bed_id", data.bed_id).eq("organization_id", ORG_ID)
+      .in("staying_status", ["Staying", "On-Notice", "Booked"]).order("created_at", { ascending: false }).limit(1).single();
+    if (allotment?.tenant_id) resolvedTenantId = allotment.tenant_id;
+  }
+  if (resolvedTenantId) {
+    const { data: profile } = await supabase.from("profiles").select("phone, full_name").eq("id", resolvedTenantId).single();
+    if (profile) { tenantPhone = tenantPhone || profile.phone || null; tenantName = profile.full_name || null; }
+  }
+  let assignedTo: string | null = data.assigned_to || null;
+  if (!assignedTo && data.issue_type_id) {
+    const { data: rules } = await supabase.from("ticket_assignment_rules")
+      .select("assigned_employee_id, apartment_code, priority")
+      .eq("organization_id", ORG_ID).eq("issue_type_id", data.issue_type_id).order("priority", { ascending: true });
+    if (rules?.length) {
+      const prefixMatch = data.apartment_code && rules.find((r: any) => r.apartment_code && data.apartment_code?.startsWith(r.apartment_code));
+      assignedTo = prefixMatch?.assigned_employee_id || rules[0].assigned_employee_id;
+    }
+  }
+  if (!assignedTo) {
+    const { data: allMembers } = await supabase.from("team_members").select("id, user_id, first_name, last_name").eq("organization_id", ORG_ID).eq("status", "active");
+    if (allMembers?.length) {
+      const memberUserIds = allMembers.map((m: any) => m.user_id).filter(Boolean);
+      let technicianUserIds = new Set<string>();
+      if (memberUserIds.length) {
+        const { data: techRoles } = await supabase.from("user_roles").select("user_id").in("user_id", memberUserIds).eq("role", "technician");
+        technicianUserIds = new Set((techRoles || []).map((r: any) => r.user_id));
+      }
+      const technicians = allMembers.filter((m: any) => technicianUserIds.has(m.user_id));
+      const pool: any[] = technicians.length > 0 ? technicians : allMembers;
+      let min = Infinity; let best: string | null = null;
+      for (const m of pool) {
+        const assignKey = m.user_id || m.id;
+        const { count } = await supabase.from("maintenance_tickets").select("*", { count: "exact", head: true })
+          .eq("organization_id", ORG_ID).eq("assigned_to", assignKey)
+          .not("status", "in", "(closed,completed,pending_admin_approval,pending_tenant_approval)");
+        if ((count || 0) < min) { min = count || 0; best = assignKey; }
+      }
+      assignedTo = best;
+    }
+  }
+  let assignedToName: string | null = null;
+  let assignedToPhone: string | null = null;
+  if (assignedTo) {
+    const { data: m } = await supabase.from("team_members").select("first_name, last_name, phone").eq("user_id", assignedTo).eq("organization_id", ORG_ID).single();
+    if (m) { assignedToName = `${m.first_name || ""} ${m.last_name || ""}`.trim(); assignedToPhone = m.phone || null; }
+  }
+  const status = assignedTo ? "assigned" : "open";
+  const extraMeta = {
+    issue_type: data.issue_type || null, issue_subtype: data.issue_subtype || null,
+    assigned_to_name: assignedToName, assigned_to_phone: assignedToPhone,
+    apartment_code: data.apartment_code || null, source: data.source || null,
+    voice_transcription: data.voice_transcription || null,
+  };
+  const row: any = await insertRow("maintenance_tickets", {
+    organization_id: ORG_ID, ticket_number: ticketNumber,
+    tenant_id: resolvedTenantId || null, property_id: data.property_id || null,
+    apartment_id: data.apartment_id || null, bed_id: data.bed_id || null,
+    issue_type_id: data.issue_type_id, description: data.description || null,
+    priority, sla_deadline: slaDeadline, assigned_to: assignedTo, status,
+    asset_id: data.asset_id || null, photo_urls: data.photo_urls || null,
+    created_by: data.created_by || null, tenant_name: tenantName, tenant_phone: tenantPhone,
+    diagnostic_data: extraMeta,
+  });
+  await insertRow("ticket_logs", {
+    ticket_id: row.id, action: "Ticket created", new_status: status, created_by: data.created_by || null,
+    notes: `${ticketNumber} created. Issue: ${data.issue_type || "N/A"}. ${assignedTo ? `Auto-assigned to ${assignedToName || assignedTo}.` : "Awaiting assignment."}${data.source ? ` Source: ${data.source}` : ""}`,
+    organization_id: ORG_ID,
+  });
+  return row as any;
 }
 
 export async function updateTicketStatus(
@@ -271,28 +499,106 @@ export async function updateTicketStatus(
   userId: string,
   options?: { notes?: string; rejectionReason?: string }
 ): Promise<{ success: boolean; newStatus: string }> {
-  return client.action(api.tickets.updateTicketStatus, {
-    ticketId, newStatus, userId,
-    notes: options?.notes, rejectionReason: options?.rejectionReason,
-  });
+  const notes = options?.notes;
+  const rejectionReason = options?.rejectionReason;
+  const { data: ticket } = await supabase.from("maintenance_tickets").select("status,created_by,tenant_id").eq("id", ticketId).single();
+  if (!ticket) throw new Error("Ticket not found");
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (newStatus === "completed") {
+    updates.resolved_at = new Date().toISOString();
+    const isAdminCreated = !ticket.tenant_id;
+    const pendingStatus = isAdminCreated ? "pending_admin_approval" : "pending_tenant_approval";
+    updates.status = pendingStatus;
+    let raiserName = "the requester";
+    const raiserId = ticket.tenant_id || ticket.created_by;
+    if (raiserId) {
+      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", raiserId).maybeSingle();
+      if (prof) raiserName = prof.full_name || (ticket.tenant_id ? "Tenant" : "Admin");
+    }
+    await insertRow("ticket_logs", {
+      ticket_id: ticketId, action: isAdminCreated ? "Approval request sent to Admin" : "Approval request sent to Tenant",
+      new_status: pendingStatus, created_by: userId,
+      notes: `Work is complete. Approval request sent to ${raiserName}. Please review and approve or reject.`,
+      organization_id: ORG_ID,
+    });
+    // Push notification to raiser is a secret-key feature → handled by backend/edge fn, skipped here.
+  } else if (newStatus === "closed") {
+    updates.status = "closed"; updates.closed_at = new Date().toISOString(); updates.tenant_approved = true;
+  } else if (newStatus === "in_progress" && rejectionReason) {
+    updates.status = "in_progress"; updates.tenant_approved = false; updates.tenant_rejection_reason = rejectionReason; updates.resolved_at = null;
+  } else {
+    updates.status = newStatus;
+  }
+  await updateRow("maintenance_tickets", ticketId, updates);
+  if (newStatus !== "completed") {
+    await insertRow("ticket_logs", {
+      ticket_id: ticketId, action: `Status → ${updates.status || newStatus}`,
+      old_status: ticket.status, new_status: updates.status || newStatus,
+      created_by: userId, notes: notes || rejectionReason || null, organization_id: ORG_ID,
+    });
+  }
+  return { success: true, newStatus: updates.status || newStatus };
 }
 
 export async function reassignTicket(
   ticketId: string, newAssigneeId: string, userId: string, notes?: string
 ): Promise<{ success: boolean }> {
-  return client.action(api.tickets.reassignTicket, { ticketId, newAssigneeId, userId, notes });
+  // SMS to new technician omitted (secret-key → edge function).
+  const { data: m } = await supabase.from("team_members").select("first_name, last_name, phone").eq("user_id", newAssigneeId).eq("organization_id", ORG_ID).single();
+  const name = m ? `${m.first_name || ""} ${m.last_name || ""}`.trim() : null;
+  const { data: existingTicket } = await supabase.from("maintenance_tickets").select("diagnostic_data, issue_type_id").eq("id", ticketId).single();
+  const updatedMeta = { ...(existingTicket?.diagnostic_data || {}), assigned_to_name: name, assigned_to_phone: m?.phone || null };
+  let newSlaDeadline: string | null = null;
+  if (existingTicket?.issue_type_id) {
+    const { data: it } = await supabase.from("issue_types").select("sla_hours").eq("id", existingTicket.issue_type_id).single();
+    newSlaDeadline = calcWorkingHoursSlaDeadline(new Date(), it?.sla_hours || 24).toISOString();
+  }
+  await updateRow("maintenance_tickets", ticketId, {
+    assigned_to: newAssigneeId, status: "assigned", updated_at: new Date().toISOString(),
+    diagnostic_data: updatedMeta, ...(newSlaDeadline ? { sla_deadline: newSlaDeadline } : {}),
+  });
+  await insertRow("ticket_logs", {
+    ticket_id: ticketId, action: "Ticket reassigned", new_status: "assigned", created_by: userId,
+    notes: `${notes || `Reassigned to ${name || newAssigneeId}`}${newSlaDeadline ? `. SLA reset to ${new Date(newSlaDeadline).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}`,
+    organization_id: ORG_ID,
+  });
+  return { success: true };
 }
 
 export async function submitDiagnosis(args: {
   ticketId: string; issueTypeId: string; questionsAnswers: Record<string, string>;
   aiDiagnosis?: string; employeeOverride?: string; performedBy: string;
 }): Promise<{ success: boolean }> {
-  return client.action(api.tickets.submitDiagnosis, args);
+  const { data: existing } = await supabase.from("diagnostic_sessions").select("id").eq("ticket_id", args.ticketId).maybeSingle();
+  const diagData = {
+    ticket_id: args.ticketId, organization_id: ORG_ID, issue_type_id: args.issueTypeId,
+    performed_by: args.performedBy, questions_answers: args.questionsAnswers,
+    ai_diagnosis: args.aiDiagnosis || null, employee_override: args.employeeOverride || null,
+    status: "completed", completed_at: new Date().toISOString(),
+  };
+  if (existing?.id) await updateRow("diagnostic_sessions", existing.id, diagData);
+  else await insertRow("diagnostic_sessions", diagData);
+  const diagResult = args.employeeOverride || args.aiDiagnosis || "";
+  await updateRow("maintenance_tickets", args.ticketId, {
+    // NOTE: maintenance_tickets has no `diagnosis` scalar column — the result lives in diagnostic_data.
+    diagnostic_data: { answers: args.questionsAnswers, result: diagResult, performed_at: new Date().toISOString() },
+    updated_at: new Date().toISOString(),
+  });
+  const qaSummary = Object.entries(args.questionsAnswers || {}).map(([q, a]) => `Q: ${q} → A: ${a}`).join("; ");
+  await insertRow("ticket_logs", { ticket_id: args.ticketId, action: "Diagnosis completed", created_by: args.performedBy, notes: `${qaSummary}. Result: ${diagResult}`, organization_id: ORG_ID });
+  const { data: currentTicket } = await supabase.from("maintenance_tickets").select("status").eq("id", args.ticketId).maybeSingle();
+  if (currentTicket?.status === "assigned") {
+    await updateRow("maintenance_tickets", args.ticketId, { status: "in_progress" });
+    await insertRow("ticket_logs", { ticket_id: args.ticketId, action: "Status → in_progress", old_status: "assigned", new_status: "in_progress", created_by: args.performedBy, notes: "Auto-transitioned to In Progress after diagnostics completion.", organization_id: ORG_ID });
+  }
+  return { success: true };
 }
 
 export async function fetchCostEstimates(ticketId: string): Promise<CostEstimate[]> {
   try {
-    return await client.action(api.tickets.getCostEstimates, { ticketId });
+    return await safeList(
+      supabase.from("ticket_cost_estimates").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: true })
+    ) as any;
   } catch (e: any) {
     return [];
   }
@@ -303,7 +609,51 @@ export async function submitCostEstimates(
   items: { item_name: string; cost_type: string; quantity: number; unit_price: number }[],
   submittedBy: string
 ): Promise<{ success: boolean }> {
-  return client.action(api.tickets.submitCostEstimates, { ticketId, items, submittedBy });
+  // Push notification to approvers omitted (secret-key → edge function).
+  const inserted: any[] = [];
+  for (const item of items) {
+    const total = (item.quantity || 1) * (item.unit_price || 0);
+    const row = await insertRow("ticket_cost_estimates", {
+      ticket_id: ticketId, organization_id: ORG_ID, item_name: item.item_name,
+      cost_type: item.cost_type || "parts", quantity: item.quantity || 1, unit_price: item.unit_price || 0,
+      total, submitted_by: submittedBy, status: "pending",
+    });
+    inserted.push(row);
+    await insertRow("ticket_logs", { ticket_id: ticketId, action: "Cost estimate submitted", created_by: submittedBy, notes: `${item.item_name} x${item.quantity || 1} @ ₹${item.unit_price || 0} = ₹${total}`, organization_id: ORG_ID });
+  }
+  await updateRow("maintenance_tickets", ticketId, { status: "waiting_for_cost_approval", updated_at: new Date().toISOString() });
+  const { data: orgSettings } = await supabase.from("organizations").select("ticket_auto_approve_threshold, ticket_repeat_check_days").eq("id", ORG_ID).maybeSingle();
+  const AUTO_APPROVE_THRESHOLD = Number((orgSettings as any)?.ticket_auto_approve_threshold) || 1000;
+  const REPEAT_CHECK_DAYS = Number((orgSettings as any)?.ticket_repeat_check_days) || 30;
+  const totalEstimatedCost = items.reduce((s: number, i: any) => s + ((i.quantity || 1) * (i.unit_price || 0)), 0);
+  const { data: ticketCtx } = await supabase.from("maintenance_tickets").select("apartment_id, bed_id, issue_type_id, property_id, organization_id, issue_types(name)").eq("id", ticketId).maybeSingle();
+  let isRepeatJob = false;
+  if (ticketCtx?.apartment_id && ticketCtx?.issue_type_id) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - REPEAT_CHECK_DAYS);
+    let repeatQ: any = supabase.from("maintenance_tickets").select("id, ticket_number, created_at")
+      .eq("organization_id", ORG_ID).eq("apartment_id", ticketCtx.apartment_id).eq("issue_type_id", ticketCtx.issue_type_id)
+      .in("status", ["completed", "closed"]).gte("created_at", cutoff.toISOString()).neq("id", ticketId)
+      .order("created_at", { ascending: false }).limit(1);
+    if (ticketCtx.bed_id) repeatQ = repeatQ.eq("bed_id", ticketCtx.bed_id);
+    const { data: repeatTickets } = await repeatQ;
+    isRepeatJob = !!(repeatTickets && repeatTickets.length > 0);
+    if (isRepeatJob) {
+      const prev: any = (repeatTickets as any[])[0];
+      const daysAgo = Math.floor((Date.now() - new Date(prev.created_at).getTime()) / 86400000);
+      await supabase.from("ticket_cost_estimates").update({ repeat_job_alert: true, repeat_job_previous_ticket_id: prev.id }).eq("ticket_id", ticketId);
+      await insertRow("ticket_logs", { ticket_id: ticketId, organization_id: ORG_ID, action: "Repeat Job Alert", notes: `Same issue (${(ticketCtx as any).issue_types?.name || "unknown"}) resolved in this apartment ${daysAgo} days ago (Ticket #${prev.ticket_number}). Manual approval required.`, created_by: submittedBy });
+    }
+  }
+  if (!isRepeatJob && totalEstimatedCost > 0 && totalEstimatedCost <= AUTO_APPROVE_THRESHOLD) {
+    await supabase.from("ticket_cost_estimates").update({
+      status: "approved", is_auto_approved: true,
+      auto_approval_reason: `Auto-approved: total ₹${Math.round(totalEstimatedCost)} is under ₹${AUTO_APPROVE_THRESHOLD} threshold`,
+      approved_at: new Date().toISOString(),
+    }).eq("ticket_id", ticketId);
+    await updateRow("maintenance_tickets", ticketId, { status: "waiting_for_parts", updated_at: new Date().toISOString() });
+    await insertRow("ticket_logs", { ticket_id: ticketId, organization_id: ORG_ID, action: "Cost auto-approved", notes: `Total ₹${Math.round(totalEstimatedCost)} is under ₹${AUTO_APPROVE_THRESHOLD} threshold — auto-approved. Ticket moved to Waiting for Parts.`, created_by: submittedBy });
+  }
+  return { success: true, estimates: inserted } as any;
 }
 
 export async function approveCostEstimate(args: {
@@ -311,7 +661,29 @@ export async function approveCostEstimate(args: {
   action: "approve" | "decline"; approvedBy: string;
   declineReason?: string; modifiedQuantity?: number; modifiedUnitPrice?: number;
 }): Promise<{ success: boolean; newTicketStatus: string | null }> {
-  return client.action(api.tickets.approveCostEstimate, args);
+  const { data: estimate } = await supabase.from("ticket_cost_estimates").select("quantity, unit_price, item_name").eq("id", args.estimateId).single();
+  const updates: Record<string, any> = {
+    status: args.action === "approve" ? "approved" : "declined",
+    approved_by: args.approvedBy, approved_at: new Date().toISOString(),
+  };
+  if (args.action === "decline") updates.decline_reason = args.declineReason || null;
+  if (args.action === "approve" && args.modifiedQuantity !== undefined) updates.quantity = args.modifiedQuantity;
+  if (args.action === "approve" && args.modifiedUnitPrice !== undefined) {
+    updates.unit_price = args.modifiedUnitPrice;
+    updates.total = (args.modifiedQuantity || (estimate as any)?.quantity || 1) * args.modifiedUnitPrice;
+  }
+  await supabase.from("ticket_cost_estimates").update(updates).eq("id", args.estimateId);
+  const { data: all } = await supabase.from("ticket_cost_estimates").select("status").eq("ticket_id", args.ticketId);
+  const pending = all?.filter((e: any) => e.status === "pending") || [];
+  const approved = all?.filter((e: any) => e.status === "approved") || [];
+  let newTicketStatus: string | null = null;
+  if (pending.length === 0) newTicketStatus = approved.length > 0 ? "waiting_for_parts" : "in_progress";
+  if (newTicketStatus) await updateRow("maintenance_tickets", args.ticketId, { status: newTicketStatus, updated_at: new Date().toISOString() });
+  await insertRow("ticket_logs", {
+    ticket_id: args.ticketId, action: `Cost ${args.action === "approve" ? "approved" : "declined"}`, created_by: args.approvedBy,
+    notes: args.action === "decline" ? `Declined: ${args.declineReason}` : `Approved: ${(estimate as any)?.item_name}`, organization_id: ORG_ID,
+  });
+  return { success: true, newTicketStatus };
 }
 
 export async function recordPurchase(args: {
@@ -319,12 +691,40 @@ export async function recordPurchase(args: {
   vendorNameManual?: string; invoiceUrl?: string;
   purchasedBy: string; costEstimateId?: string;
 }): Promise<{ success: boolean }> {
-  return client.action(api.tickets.recordPurchase, args);
+  const totalCost = args.items.reduce((s: number, i: any) => s + (i.actual_cost || 0), 0);
+  const purchase: any = await insertRow("ticket_purchases", {
+    ticket_id: args.ticketId, organization_id: ORG_ID, cost_estimate_id: args.costEstimateId || null,
+    actual_cost: totalCost, vendor_id: args.vendorId || null, vendor_name_manual: args.vendorNameManual || null,
+    invoice_url: args.invoiceUrl || null, purchased_by: args.purchasedBy, purchase_date: new Date().toISOString().split("T")[0],
+  });
+  const { data: ticket } = await supabase.from("maintenance_tickets").select("bed_id, apartment_id, property_id, tenant_id, issue_type_id, diagnostic_data").eq("id", args.ticketId).single();
+  if (ticket) {
+    let costScope = "bed"; const distributedBeds: any = {};
+    if (ticket.bed_id) { distributedBeds[ticket.bed_id] = totalCost; }
+    else if (ticket.apartment_id) {
+      costScope = "apartment";
+      const { data: beds } = await supabase.from("beds").select("id").eq("apartment_id", ticket.apartment_id);
+      if (beds?.length) { const perBed = totalCost / beds.length; beds.forEach((b: any) => { distributedBeds[b.id] = perBed; }); }
+    } else { costScope = "property"; }
+    await insertRow("running_bed_maintenance_details", {
+      ticket_id: args.ticketId, purchase_id: purchase.id, organization_id: ORG_ID,
+      tenant_id: ticket.tenant_id || null, bed_id: ticket.bed_id || null, apartment_id: ticket.apartment_id || null, property_id: ticket.property_id || null,
+      item_name: args.items.map((i: any) => i.item_name).join(", "), quantity: args.items.reduce((s: number, i: any) => s + (i.quantity || 1), 0),
+      actual_cost: totalCost, vendor_name: args.vendorNameManual || null, cost_scope: costScope,
+      distributed_amount: totalCost, billing_month: new Date().toISOString().substring(0, 7),
+      maintenance_type: ticket.diagnostic_data?.issue_type || "maintenance", parts_details: args.items, distributed_beds: distributedBeds,
+    });
+  }
+  await updateRow("maintenance_tickets", args.ticketId, { status: "in_progress", updated_at: new Date().toISOString() });
+  await insertRow("ticket_logs", { ticket_id: args.ticketId, action: "Purchase recorded", created_by: args.purchasedBy, notes: `₹${totalCost} from ${args.vendorNameManual || "vendor"}`, organization_id: ORG_ID });
+  return { success: true, purchase } as any;
 }
 
 export async function fetchPurchases(ticketId: string): Promise<any[]> {
   try {
-    return await client.action(api.tickets.getPurchases, { ticketId });
+    return await safeList(
+      supabase.from("ticket_purchases").select("*").eq("ticket_id", ticketId).order("created_at", { ascending: false })
+    );
   } catch (e: any) {
     return [];
   }
@@ -333,41 +733,109 @@ export async function fetchPurchases(ticketId: string): Promise<any[]> {
 export async function tenantApproveCompletion(
   ticketId: string, approved: boolean, userId: string, rejectionReason?: string
 ): Promise<{ success: boolean }> {
-  return client.action(api.tickets.tenantApproveCompletion, { ticketId, approved, userId, rejectionReason });
+  const updates: Record<string, any> = { tenant_approved: approved, updated_at: new Date().toISOString() };
+  if (approved) { updates.status = "closed"; updates.closed_at = new Date().toISOString(); }
+  else { updates.status = "in_progress"; updates.tenant_rejection_reason = rejectionReason || null; updates.resolved_at = null; }
+  await updateRow("maintenance_tickets", ticketId, updates);
+  await insertRow("ticket_logs", {
+    ticket_id: ticketId, action: approved ? "Completion approved by Tenant" : "Completion rejected by Tenant",
+    new_status: updates.status, created_by: userId,
+    notes: approved ? "Tenant approved — ticket closed" : `Tenant rejected: ${rejectionReason || ""}`, organization_id: ORG_ID,
+  });
+  return { success: true };
 }
 
 export async function adminApproveCompletion(
   ticketId: string, approved: boolean, userId: string, rejectionReason?: string
 ): Promise<{ success: boolean }> {
-  return client.action(api.tickets.adminApproveCompletion, { ticketId, approved, userId, rejectionReason });
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (approved) { updates.status = "closed"; updates.closed_at = new Date().toISOString(); }
+  else { updates.status = "in_progress"; updates.resolved_at = null; }
+  await updateRow("maintenance_tickets", ticketId, updates);
+  await insertRow("ticket_logs", {
+    ticket_id: ticketId, action: approved ? "Completion approved by Admin" : "Completion rejected by Admin",
+    new_status: updates.status, created_by: userId,
+    notes: approved ? "Admin approved — ticket closed" : `Admin rejected: ${rejectionReason || ""}`, organization_id: ORG_ID,
+  });
+  return { success: true };
 }
 
 export async function fetchIssueTypes(): Promise<IssueType[]> {
   try {
-    return await client.action(api.tickets.getIssueTypes, {});
+    return await safeList(
+      supabase.from("issue_types")
+        .select("*, issue_type_asset_types(asset_type_id, asset_types(id, name))")
+        .eq("organization_id", ORG_ID)
+        .order("name", { ascending: true })
+    ) as any;
   } catch (e: any) {
     return [];
   }
 }
 
 export async function fetchAssetTypesLite(): Promise<{ id: string; name: string }[]> {
-  try { return await client.action((api as any).tickets.listAssetTypesLite, {}); }
-  catch { return []; }
+  try {
+    return await safeList(
+      supabase.from("asset_types").select("id, name").eq("organization_id", ORG_ID).order("name", { ascending: true })
+    ) as any;
+  } catch { return []; }
+}
+
+// Regular (recurring) maintenance rules — admin Tickets → "Regular" tab.
+export async function fetchRegularMaintenanceRules(): Promise<any[]> {
+  try {
+    const rules = await safeList(
+      supabase.from("regular_maintenance_rules")
+        .select("id, maintenance_type, frequency, issue_type_id, is_active, next_run_at, created_at")
+        .eq("organization_id", ORG_ID).order("created_at", { ascending: false })
+    );
+    const typeIds = [...new Set(rules.map((r: any) => r.issue_type_id).filter(Boolean))];
+    const types = typeIds.length
+      ? await safeList(supabase.from("issue_types").select("id, name").eq("organization_id", ORG_ID).in("id", typeIds)) : [];
+    const typeName = new Map<string, string>(); for (const t of types) typeName.set(t.id, t.name);
+    return rules.map((r: any) => ({
+      id: r.id,
+      name: r.maintenance_type || typeName.get(r.issue_type_id) || "Maintenance Rule",
+      frequency: r.frequency || null,
+      issue_type: r.issue_type_id ? (typeName.get(r.issue_type_id) || null) : null,
+      is_active: r.is_active,
+      next_run_at: r.next_run_at || null,
+    }));
+  } catch { return []; }
 }
 
 export async function updateIssueType(args: {
   issueTypeId: string; name?: string; icon?: string; priority?: string; slaHours?: number; assetTypeIds?: string[];
 }): Promise<any> {
-  return client.action((api as any).tickets.updateIssueType, args);
+  const patch: any = {};
+  if (args.name !== undefined) patch.name = args.name;
+  if (args.icon !== undefined) patch.icon = args.icon;
+  if (args.priority !== undefined) patch.priority = args.priority;
+  if (args.slaHours !== undefined) patch.sla_hours = args.slaHours;
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from("issue_types").update(patch).eq("id", args.issueTypeId).eq("organization_id", ORG_ID);
+    if (error) throw new Error(`Update category failed: ${error.message}`);
+  }
+  if (args.assetTypeIds !== undefined) {
+    await supabase.from("issue_type_asset_types").delete().eq("issue_type_id", args.issueTypeId).eq("organization_id", ORG_ID);
+    if (args.assetTypeIds.length > 0) {
+      const rows = args.assetTypeIds.map((atId) => ({ organization_id: ORG_ID, issue_type_id: args.issueTypeId, asset_type_id: atId }));
+      const { error } = await supabase.from("issue_type_asset_types").insert(rows);
+      if (error) throw new Error(`Link asset types failed: ${error.message}`);
+    }
+  }
+  return { success: true };
 }
 
-export async function deleteIssueType(issueTypeId: string): Promise<any> {
-  return client.action((api as any).tickets.deleteIssueType, { issueTypeId });
+export async function deleteIssueType(_issueTypeId: string): Promise<any> {
+  return deleteDisabledResult();
 }
 
 export async function fetchIssueSubTypes(issueTypeId: string): Promise<IssueSubType[]> {
   try {
-    return await client.action(api.tickets.getIssueSubTypes, { issueTypeId });
+    return await safeList(
+      supabase.from("issue_sub_types").select("*").eq("issue_type_id", issueTypeId).eq("organization_id", ORG_ID).order("sort_order", { ascending: true })
+    ) as any;
   } catch (e: any) {
     return [];
   }
@@ -375,7 +843,19 @@ export async function fetchIssueSubTypes(issueTypeId: string): Promise<IssueSubT
 
 export async function fetchTeamMembers(): Promise<TeamMember[]> {
   try {
-    return await client.action(api.tickets.getTeamMembers, {});
+    // Technicians only (web parity): active members whose user_role is technician.
+    const allMembers = await safeList(
+      supabase.from("team_members").select("*").eq("organization_id", ORG_ID).eq("status", "active")
+    );
+    if (!allMembers.length) return [] as any;
+    const memberUserIds = allMembers.map((m: any) => m.user_id).filter(Boolean);
+    let technicianUserIds = new Set<string>();
+    if (memberUserIds.length) {
+      const { data: techRoles } = await supabase.from("user_roles").select("user_id").in("user_id", memberUserIds).eq("role", "technician");
+      technicianUserIds = new Set((techRoles || []).map((r: any) => r.user_id));
+    }
+    if (technicianUserIds.size === 0) return allMembers as any;
+    return allMembers.filter((m: any) => technicianUserIds.has(m.user_id)) as any;
   } catch (e: any) {
     return [];
   }
@@ -383,7 +863,8 @@ export async function fetchTeamMembers(): Promise<TeamMember[]> {
 
 export async function fetchDiagnosticSession(ticketId: string): Promise<any | null> {
   try {
-    return await client.action(api.tickets.getDiagnosticSession, { ticketId });
+    const { data } = await supabase.from("diagnostic_sessions").select("*").eq("ticket_id", ticketId).maybeSingle();
+    return data || null;
   } catch (e: any) {
     return null;
   }
@@ -391,22 +872,25 @@ export async function fetchDiagnosticSession(ticketId: string): Promise<any | nu
 
 export async function checkTenantPendingTickets(tenantId: string): Promise<{ hasPending: boolean; tickets: any[] }> {
   try {
-    return await client.action(api.tickets.checkTenantPendingTickets, { tenantId });
+    const { data, count } = await supabase
+      .from("maintenance_tickets").select("id, ticket_number, status", { count: "exact" })
+      .eq("tenant_id", tenantId).eq("status", "pending_tenant_approval");
+    return { hasPending: (count || 0) > 0, tickets: data || [] };
   } catch (e: any) {
     return { hasPending: false, tickets: [] };
   }
 }
 
 export async function fetchProperties(): Promise<any[]> {
-  try { return await client.action(api.tickets.getProperties, {}); } catch { return []; }
+  try { return await safeList(supabase.from("properties").select("id, property_name").eq("organization_id", ORG_ID).order("property_name", { ascending: true })); } catch { return []; }
 }
 
 export async function fetchApartments(propertyId: string): Promise<any[]> {
-  try { return await client.action(api.tickets.getApartments, { propertyId }); } catch { return []; }
+  try { return await safeList(supabase.from("apartments").select("id, apartment_code, property_id").eq("property_id", propertyId).order("apartment_code", { ascending: true })); } catch { return []; }
 }
 
 export async function fetchBeds(apartmentId: string): Promise<any[]> {
-  try { return await client.action(api.tickets.getBeds, { apartmentId }); } catch { return []; }
+  try { return await safeList(supabase.from("beds").select("id, bed_code, apartment_id, bed_type, toilet_type").eq("apartment_id", apartmentId).order("bed_code", { ascending: true })); } catch { return []; }
 }
 
 // ─── KYC DOCUMENT UPLOAD ──────────────────────────────────────────────────────
@@ -418,38 +902,25 @@ export async function uploadKycPhoto(
   mimeType: string = 'image/jpeg'
 ): Promise<string | null> {
   try {
-    const BUCKET = 'kyc-docs';
+    // Upload to the EXISTING `documents` bucket (the same one the web app uses for
+    // KYC), folder `kyc/`. The old code targeted a `kyc-docs` bucket that doesn't
+    // exist and tried to create it client-side, which the anon/user role can't do
+    // → "Bucket not found".
+    const BUCKET = 'documents';
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
-    const fileName = `${tenantId}_${side}_${Date.now()}.${ext}`;
-    const filePath = `kyc/${fileName}`;
-
-    let uploadData: Blob | ArrayBuffer;
-    if (base64) {
-      const byteChars = atob(base64);
-      const byteArr = new Uint8Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-      uploadData = byteArr.buffer;
-    } else {
-      const response = await fetch(uri);
-      uploadData = await response.blob();
+    const filePath = `kyc/${tenantId}_${side}_${Date.now()}.${ext}`;
+    // The image picker (allowsEditing) often drops base64 on Android — read it back
+    // from the uri when missing, so there are always bytes to upload.
+    let b64 = base64;
+    if (!b64 && uri) {
+      try { b64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' as any }); } catch { /* fall through */ }
     }
-
-    // Ensure bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some((b: any) => b.name === BUCKET);
-    if (!bucketExists) {
-      await supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 10 * 1024 * 1024 });
-    }
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, uploadData, { contentType: mimeType, upsert: true });
-
-    if (error) {
-      console.warn('[uploadKycPhoto] Upload error:', error.message);
-      return null;
-    }
-
+    if (!b64) { console.warn('[uploadKycPhoto] No image data to upload'); return null; }
+    const byteChars = atob(b64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const { error } = await supabase.storage.from(BUCKET).upload(filePath, bytes, { contentType: mimeType, upsert: true });
+    if (error) { console.warn('[uploadKycPhoto] Upload error:', error.message); return null; }
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
     return data?.publicUrl ?? null;
   } catch (err: any) {
@@ -469,38 +940,22 @@ export async function uploadPaymentProof(
   mimeType: string = 'image/jpeg'
 ): Promise<string | null> {
   try {
+    // The `payment-proofs` bucket already exists; upload directly. (Dropped the old
+    // listBuckets/createBucket dance — the anon/user role can't create buckets, and
+    // it isn't needed since the bucket is present.)
     const BUCKET = 'payment-proofs';
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
-    const fileName = `${context}_${contextId}_${Date.now()}.${ext}`;
-    const filePath = `${context}/${fileName}`;
-
-    let uploadData: Blob | ArrayBuffer;
-    if (base64) {
-      const byteChars = atob(base64);
-      const byteArr = new Uint8Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-      uploadData = byteArr.buffer;
-    } else {
-      const response = await fetch(uri);
-      uploadData = await response.blob();
+    const filePath = `${context}/${context}_${contextId}_${Date.now()}.${ext}`;
+    let b64 = base64;
+    if (!b64 && uri) {
+      try { b64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' as any }); } catch { /* fall through */ }
     }
-
-    // Ensure bucket exists (create with public access if missing)
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets?.some((b: any) => b.name === BUCKET);
-    if (!bucketExists) {
-      await supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 10 * 1024 * 1024 });
-    }
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, uploadData, { contentType: mimeType, upsert: true });
-
-    if (error) {
-      console.warn('[uploadPaymentProof] Upload error:', error.message);
-      return null;
-    }
-
+    if (!b64) { console.warn('[uploadPaymentProof] No image data to upload'); return null; }
+    const byteChars = atob(b64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const { error } = await supabase.storage.from(BUCKET).upload(filePath, bytes, { contentType: mimeType, upsert: true });
+    if (error) { console.warn('[uploadPaymentProof] Upload error:', error.message); return null; }
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
     return data?.publicUrl ?? null;
   } catch (err: any) {
@@ -518,23 +973,153 @@ export async function saveTicketResolution(args: {
   proofOfPurchaseUrl?: string; proofOfPaymentUrl?: string;
   isUnlockEdit?: boolean;
 }): Promise<{ success: boolean; newStatus: string }> {
-  return client.action((api as any).tickets.saveResolution, args);
+  // Direct Supabase port of convex/tickets.ts saveResolution (upsert resolution +
+  // approval routing + accounting expense sync + log). Runs under the user JWT.
+  const { data: ticket } = await supabase
+    .from("maintenance_tickets")
+    .select("status, tenant_id, created_by, property_id, apartment_id, bed_id, issue_type_id, asset_id, ticket_number, organization_id")
+    .eq("id", args.ticketId)
+    .single();
+  if (!ticket) throw new Error("Ticket not found");
+
+  const totalParts = (args.items || []).reduce((s: number, i: any) => s + ((i.qty || 1) * (i.unit_cost || 0)), 0);
+  const totalCost = totalParts + (args.totalLabourCost || 0);
+
+  if (totalCost > 0) {
+    if (!args.paymentDate) throw new Error("Payment date is required when actual cost is greater than 0.");
+    if (!args.bankAccountId) throw new Error("Bank account is required when actual cost is greater than 0.");
+    if (!args.paymentReferenceNo) throw new Error("Payment reference no. is required when actual cost is greater than 0.");
+    if (!args.proofOfPurchaseUrl) throw new Error("Bill of purchase is required to complete resolution when cost is involved.");
+  }
+
+  const { data: existing } = await supabase.from("ticket_resolutions").select("id").eq("ticket_id", args.ticketId).maybeSingle();
+  const resPayload: any = {
+    ticket_id: args.ticketId, organization_id: ORG_ID,
+    resolution_type: args.resolutionType, service_type: args.serviceType, closure_summary: args.closureSummary,
+    total_labour_cost: args.totalLabourCost || 0, total_parts_cost: totalParts, total_cost: totalCost,
+    vendor_name_manual: args.vendorNameManual || null, vendor_id: args.vendorId || null,
+    items_used: args.items || [], actual_items_used: args.items || [], actual_total_cost: totalCost,
+    payment_date: args.paymentDate || null, bank_account_id: args.bankAccountId || null,
+    payment_reference_no: args.paymentReferenceNo || null, proof_of_purchase_url: args.proofOfPurchaseUrl || null,
+    proof_of_payment_url: args.proofOfPaymentUrl || null, resolved_by: args.userId, resolved_at: new Date().toISOString(),
+  };
+
+  let resolutionRowId: string | undefined;
+  if (existing?.id) {
+    await supabase.from("ticket_resolutions").update(resPayload).eq("id", existing.id);
+    resolutionRowId = existing.id;
+    await supabase.from("maintenance_tickets").update({ resolution_id: existing.id } as any).eq("id", args.ticketId);
+  } else {
+    const { data: res } = await supabase.from("ticket_resolutions").insert(resPayload).select("id").single();
+    resolutionRowId = res?.id;
+    if (res?.id) await supabase.from("maintenance_tickets").update({ resolution_id: res.id } as any).eq("id", args.ticketId);
+  }
+
+  if (args.isUnlockEdit) {
+    const itemSummary = (args.items || []).filter((i: any) => i.name).map((i: any) => `${i.name} × ${i.qty}`).join("; ");
+    await insertRow("ticket_logs", {
+      ticket_id: args.ticketId, action: "Resolution updated (admin unlock)", created_by: args.userId,
+      notes: `Edited on closed ticket. Cost: ₹${Math.round(totalCost)}${itemSummary ? ` | Items: ${itemSummary}` : ""}`,
+    });
+    if (resolutionRowId && totalCost > 0 && args.paymentDate) {
+      await _syncExpenseToSupabase(ticket, resolutionRowId, totalCost, args.paymentDate, args.vendorId || null, args.proofOfPurchaseUrl || null, args.closureSummary);
+    }
+    return { success: true, newStatus: ticket.status };
+  }
+
+  const isAdminCreated = !ticket.tenant_id;
+  let pendingStatus: string = isAdminCreated ? "pending_admin_approval" : "pending_tenant_approval";
+  if (isAdminCreated) {
+    const { data: estRows } = await supabase.from("ticket_cost_estimates").select("id").eq("ticket_id", args.ticketId).limit(1);
+    if (!estRows || (estRows as any[]).length === 0) pendingStatus = "closed";
+  }
+  await supabase.from("maintenance_tickets").update({
+    status: pendingStatus, resolved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  } as any).eq("id", args.ticketId);
+
+  if (resolutionRowId && totalCost > 0 && args.paymentDate) {
+    await _syncExpenseToSupabase(ticket, resolutionRowId, totalCost, args.paymentDate, args.vendorId || null, args.proofOfPurchaseUrl || null, args.closureSummary);
+  }
+
+  const itemSummary = (args.items || []).filter((i: any) => i.name).map((i: any) => `${i.name} × ${i.qty}`).join("; ");
+  await insertRow("ticket_logs", {
+    ticket_id: args.ticketId, action: "Resolution submitted", created_by: args.userId,
+    notes: `Type: ${args.resolutionType} • Service: ${args.serviceType} • Cost: ₹${Math.round(totalCost)}${itemSummary ? ` | Items: ${itemSummary}` : ""}${args.closureSummary ? ` | Summary: ${args.closureSummary}` : ""}`,
+    new_status: pendingStatus,
+  });
+
+  return { success: true, newStatus: pendingStatus };
+}
+
+// Internal: sync a resolved ticket's cost into accounting expenses (web parity,
+// idempotent on ticket_resolution_id). Failure never blocks the resolution save.
+async function _syncExpenseToSupabase(
+  ticket: any, resolutionRowId: string, totalCost: number, paymentDate: string,
+  vendorId: string | null, proofUrl: string | null, closureSummary: string,
+) {
+  try {
+    const { data: existing } = await supabase.from("expenses").select("id").eq("ticket_resolution_id", resolutionRowId).maybeSingle();
+    let categoryId: string | null = null;
+    let subcategoryId: string | null = null;
+    if (ticket.issue_type_id) {
+      const { data: mapping } = await supabase.from("issue_type_expense_mapping").select("expense_category_id, expense_subcategory_id")
+        .eq("organization_id", ORG_ID).eq("issue_type_id", ticket.issue_type_id).maybeSingle();
+      if ((mapping as any)?.expense_category_id) {
+        categoryId = (mapping as any).expense_category_id;
+        subcategoryId = (mapping as any).expense_subcategory_id || null;
+      }
+    }
+    if (!categoryId) {
+      const { data: cat } = await supabase.from("expense_categories").select("id").eq("organization_id", ORG_ID).ilike("label", "%maintenance%").limit(1).maybeSingle();
+      categoryId = (cat as any)?.id || null;
+    }
+    if (!categoryId) return;
+    const billingMonth = paymentDate.slice(0, 7);
+    const description = `[Maintenance] Ticket ${ticket.ticket_number ?? ticket.id}\n${closureSummary}\nReference: resolution ${resolutionRowId}`.trim();
+    const payload: any = {
+      organization_id: ORG_ID, category_id: categoryId, subcategory_id: subcategoryId,
+      issue_type_id: ticket.issue_type_id || null, amount: Math.round(totalCost * 100) / 100,
+      expense_date: paymentDate, billing_month: billingMonth, description, receipt_url: proofUrl,
+      property_id: ticket.property_id || null, apartment_id: ticket.apartment_id || null, bed_id: ticket.bed_id || null,
+      vendor_id: vendorId, data_source: "ticket_resolution", ticket_resolution_id: resolutionRowId,
+    };
+    if (existing?.id) {
+      await supabase.from("expenses").update(payload).eq("id", (existing as any).id);
+    } else {
+      await supabase.from("expenses").insert(payload);
+    }
+  } catch (e) {
+    console.error("[_syncExpenseToSupabase] error:", e);
+  }
 }
 
 export async function postTicketComment(ticketId: string, text: string, userId: string): Promise<{ success: boolean }> {
-  return client.action((api as any).tickets.postComment, { ticketId, text, userId });
+  // Direct Supabase port of convex/tickets.ts postComment (insertRow auto-scopes org_id).
+  await insertRow("ticket_logs", { ticket_id: ticketId, action: "Comment", created_by: userId, notes: text.trim() });
+  return { success: true };
 }
 
 export async function fetchVendors(): Promise<{ id: string; vendor_name: string }[]> {
-  try { return await client.action((api as any).tickets.getVendors, {}); } catch { return []; }
+  try { return await safeList(supabase.from("vendors").select("id, vendor_name").eq("organization_id", ORG_ID).eq("status", "active").order("vendor_name")) as any; } catch { return []; }
 }
 
 export async function fetchTicketResolution(ticketId: string): Promise<any | null> {
-  try { return await client.action((api as any).tickets.getResolution, { ticketId }); } catch { return null; }
+  try {
+    const { data } = await supabase.from("ticket_resolutions").select("*").eq("ticket_id", ticketId).maybeSingle();
+    return data || null;
+  } catch { return null; }
 }
 
 export async function unlockResolutionEditing(ticketId: string, userId: string, reason: string): Promise<void> {
-  await client.action((api as any).tickets.unlockResolutionEditing, { ticketId, userId, reason });
+  // Direct Supabase port of convex/tickets.ts unlockResolutionEditing.
+  const { data: ticket } = await supabase.from("maintenance_tickets").select("status").eq("id", ticketId).single();
+  if (!ticket) throw new Error("Ticket not found");
+  if (ticket.status !== "closed") throw new Error("Only closed tickets can be unlocked.");
+  await insertRow("ticket_logs", {
+    ticket_id: ticketId, action: "Admin unlocked resolution editing",
+    notes: reason?.trim() ? `Reason: ${reason.trim()}` : "Unlocked resolution editing on a closed ticket.",
+    created_by: userId,
+  });
 }
 
 export async function classifyIssue(description: string, issueTypes: any[]): Promise<{
@@ -546,13 +1131,29 @@ export async function classifyIssue(description: string, issueTypes: any[]): Pro
   action: 'auto_select' | 'suggest' | 'manual' | 'idle';
 }> {
   try {
-    return await client.action((api as any).tickets.classifyIssue, {
-      description,
-      issueTypes: issueTypes.map((t: any) => ({
-        id: t.id, name: t.name,
-        subTypes: (t.subTypes || []).map((s: any) => ({ id: s.id, name: s.name, description: s.description || '' })),
-      })),
+    // Web parity: the issue classifier runs in the `ai-diagnosis` edge function
+    // (mode: 'classify_issue'). The supabase client carries the user's JWT.
+    const { data, error } = await supabase.functions.invoke('ai-diagnosis', {
+      body: {
+        mode: 'classify_issue',
+        description,
+        issueTypes: issueTypes.map((t: any) => ({
+          id: t.id, name: t.name,
+          subTypes: (t.subTypes || []).map((s: any) => ({ id: s.id, name: s.name, description: s.description || '' })),
+        })),
+      },
     });
+    if (error || !data) throw (error || new Error('no data'));
+    const topConf = Number(data.top_confidence ?? 0);
+    const action = topConf >= 85 ? 'auto_select' : topConf >= 55 ? 'suggest' : 'manual';
+    return {
+      matches: data.matches || [],
+      top_issue_type_id: data.top_issue_type_id ?? null,
+      top_confidence: topConf,
+      top_issue_sub_type_id: data.top_issue_sub_type_id ?? null,
+      top_issue_sub_type_confidence: Number(data.top_issue_sub_type_confidence ?? 0),
+      action,
+    };
   } catch {
     return { matches: [], top_issue_type_id: null, top_confidence: 0, top_issue_sub_type_id: null, top_issue_sub_type_confidence: 0, action: 'manual' };
   }
@@ -566,12 +1167,50 @@ export async function extractPaymentProof(imageBase64: string): Promise<{
   _requireManualAmount?: boolean; _message?: string; _source?: string;
 }> {
   try {
-    return await client.action((api as any).tickets.extractPaymentProof, { imageBase64 });
+    // Web parity: OCR runs in the `payments-extract-proof` edge function, which takes a
+    // file_url. Upload the base64 image to the payment-proofs bucket, then invoke.
+    const byteChars = atob(imageBase64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const path = `ocr/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+    const { error: upErr } = await supabase.storage.from('payment-proofs').upload(path, bytes.buffer, { contentType: 'image/jpeg', upsert: true });
+    if (upErr) throw upErr;
+    const { data: pub } = supabase.storage.from('payment-proofs').getPublicUrl(path);
+    const fileUrl = pub?.publicUrl;
+    if (!fileUrl) throw new Error('upload failed');
+    const { data, error } = await supabase.functions.invoke('payments-extract-proof', { body: { file_url: fileUrl } });
+    if (error || !data) throw (error || new Error('no data'));
+    return {
+      amount: data.amount ?? null,
+      payment_date: data.payment_date ?? null,
+      bank_name: data.bank_name ?? null,
+      transaction_reference: data.transaction_reference ?? null,
+      _requireManualAmount: data._requireManualAmount,
+      _message: data._message,
+      _source: data._source,
+    };
   } catch {
     return { amount: null, payment_date: null, bank_name: null, transaction_reference: null };
   }
 }
 
 export async function fetchBankAccounts(): Promise<{ id: string; bank_name: string; account_number?: string; account_name?: string }[]> {
-  try { return await client.action((api as any).tickets.getBankAccounts, {}); } catch { return []; }
+  // Direct Supabase port of convex/tickets.ts getBankAccounts.
+  try { return await safeList(supabase.from("organization_bank_accounts").select("id, bank_name, account_number, account_name").eq("organization_id", ORG_ID).eq("status", "active").order("bank_name")) as any; } catch { return []; }
+}
+
+// Direct Supabase port of convex/tickets.ts getIssueTypes — embeds linked asset types
+// (via issue_type_asset_types junction) so the Categories tab matches the web app.
+export async function getIssueTypes(): Promise<any[]> {
+  try {
+    return await safeList(
+      supabase
+        .from("issue_types")
+        .select("*, issue_type_asset_types(asset_type_id, asset_types(id, name))")
+        .eq("organization_id", ORG_ID)
+        .order("name", { ascending: true })
+    );
+  } catch {
+    return [];
+  }
 }

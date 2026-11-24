@@ -11,13 +11,16 @@ export function LifecycleCard({ children, style }: { children: React.ReactNode; 
   );
 }
 
-export function PrimaryButton({ title, icon, onPress, loading, disabled, small }: any) {
+export function PrimaryButton({ title, icon, onPress, loading, disabled, small, stretch }: any) {
+  // `small` historically implied flex:1 (fill its row). `stretch` lets callers
+  // opt out so the button sizes to its label — e.g. in a header next to other buttons.
+  const shouldStretch = stretch ?? small;
   return (
     <Pressable onPress={onPress} disabled={disabled || loading}
       style={{ backgroundColor: disabled ? '#93B4FB' : LC.blue, borderRadius: 10, paddingVertical: small ? 8 : 12,
-        paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flex: small ? 1 : undefined }}>
+        paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flex: shouldStretch ? 1 : undefined }}>
       {loading ? <ActivityIndicator color="#fff" /> : icon ? <Ionicons name={icon} size={16} color="#fff" /> : null}
-      <Text style={{ color: '#fff', fontWeight: '700', fontSize: small ? 13 : 15 }}>{title}</Text>
+      <Text numberOfLines={1} style={{ color: '#fff', fontWeight: '700', fontSize: small ? 13 : 15 }}>{title}</Text>
     </Pressable>
   );
 }

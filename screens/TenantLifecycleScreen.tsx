@@ -19,13 +19,17 @@ import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, s
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { spacing, fontSize, borderRadius } from '../lib/theme';
 import { LoadingScreen, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { useMountedRef, isAbortError } from '../lib/safeAsync';
-import { client, api } from '../lib/convexApi';
+import * as lc from '../lib/lifecycle';
 import { uploadKycPhoto, uploadPaymentProof, extractPaymentProof } from '../services/ticketService';
 import { LifecycleCard, PrimaryButton, OutlineButton, InfoLine, SearchField, AvatarInitial, KpiTile } from '../components/lifecycle';
 import { StatusBadge } from '../components/lifecycle/StatusBadge';
@@ -794,6 +798,7 @@ export default function TenantLifecycleScreen() {
   const [editExitOpen,      setEditExitOpen]      = useState(false);
   const [editRefundOpen,    setEditRefundOpen]    = useState(false);
   const [completeRefundOpen,setCompleteRefundOpen]= useState(false);
+  const [collectOpen,       setCollectOpen]       = useState(false);
   const [undoOnboardId,     setUndoOnboardId]     = useState<string | null>(null);
 
   // ── Absence (Not in Property) state ──────────────────────────────────────
@@ -816,7 +821,7 @@ export default function TenantLifecycleScreen() {
     setBedPay({ loading: true, months: [] });
     (async () => {
       try {
-        const inv = await client.action((api as any).accounting.listInvoices, { tenantId: tid });
+        const inv = await sb.listInvoices({ tenantId: tid });
         if (!alive) return;
         const byMonth = new Map<string, number>();
         (inv || []).forEach((i: any) => {
@@ -905,10 +910,10 @@ export default function TenantLifecycleScreen() {
   [bankAccounts]);
 
   // ── forms ──
-  const blankBook = { tenantId: '', bedId: '', onboardingDate: today(), paymentMode: '', refNo: '', amount: '', discount: '0', premium: '0', bankAccountId: '' };
+  const blankBook = { tenantId: '', bedId: '', onboardingDate: today(), paymentMode: '', refNo: '', amount: '', discount: '0', premium: '0', bankAccountId: '', paymentDate: today() };
   const [bForm, setBForm] = useState<any>(blankBook);
 
-  const blankOnboard = { allotmentId: '', date: today(), bedId: '', payMode: '', refNo: '', paidAmount: '', bankAccountId: '', ccCharges: '' };
+  const blankOnboard = { allotmentId: '', date: today(), bedId: '', payMode: '', refNo: '', paidAmount: '', bankAccountId: '', ccCharges: '', discount: '0', premium: '0' };
   const [oForm, setOForm] = useState<any>(blankOnboard);
 
   // ── KYC upload state ──
@@ -940,10 +945,9 @@ export default function TenantLifecycleScreen() {
     let b64 = base64;
     if (uri) {
       try {
-        const IM: any = await import('expo-image-manipulator');
-        const FS: any = await import('expo-file-system/legacy');
+        const IM: any = ImageManipulator;
         const manip = await IM.manipulateAsync(uri, [{ resize: { width: 1400 } }], { compress: 0.7, format: IM.SaveFormat.JPEG });
-        const encoded = await FS.readAsStringAsync(manip.uri, { encoding: 'base64' });
+        const encoded = await FileSystem.readAsStringAsync(manip.uri, { encoding: 'base64' as any });
         if (encoded) b64 = encoded;
       } catch { /* fall back to any picker-provided base64 */ }
     }
@@ -986,12 +990,14 @@ export default function TenantLifecycleScreen() {
 
       if (ocr && (ocr.amount || ocr.payment_date || ocr.bank_name || ocr.transaction_reference)) {
         if (target === 'booking') {
+          const scannedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(ocr.payment_date || '')) ? ocr.payment_date : null;
           setBForm((p: any) => ({
             ...p,
             amount:        ocr.amount ? String(Math.round(Number(ocr.amount))) : p.amount,
             refNo:         ocr.transaction_reference || p.refNo,
             paymentMode:   mode || p.paymentMode,
             bankAccountId: matchedBankId || p.bankAccountId,
+            paymentDate:   scannedDate || p.paymentDate,
           }));
         } else {
           setOForm((p: any) => ({
@@ -1029,7 +1035,6 @@ export default function TenantLifecycleScreen() {
   const openProofGallery = useCallback(async (target: 'booking' | 'onboarding' | 'refund') => {
     const setFn = target === 'booking' ? setBookingProof : target === 'onboarding' ? setOnboardProof : setRefundProof;
     try {
-      const ImagePicker = await import('expo-image-picker') as any;
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') { Alert.alert('Permission Required', 'Allow photo library access to upload proof.'); return; }
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8, base64: true });
@@ -1043,7 +1048,6 @@ export default function TenantLifecycleScreen() {
   const openProofCamera = useCallback(async (target: 'booking' | 'onboarding' | 'refund') => {
     const setFn = target === 'booking' ? setBookingProof : target === 'onboarding' ? setOnboardProof : setRefundProof;
     try {
-      const ImagePicker = await import('expo-image-picker') as any;
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') { Alert.alert('Permission Required', 'Allow camera access to take a photo.'); return; }
       const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8, base64: true });
@@ -1091,7 +1095,7 @@ export default function TenantLifecycleScreen() {
     if (!exitOpen || !eForm.allotmentId || !eForm.exitDate) { setExitEb(null); return; }
     let active = true;
     setExitEbLoading(true);
-    (client.action as any)((api as any).tenants.computeExitMonthEb, {
+    lc.computeExitMonthEb({
       allotmentId: eForm.allotmentId,
       exitDate: eForm.exitDate,
     })
@@ -1108,6 +1112,8 @@ export default function TenantLifecycleScreen() {
   const [editExitForm, setEditExitForm] = useState<any>({ exitId: '', allotmentId: '', exitDate: '', hasNotice: false, keyReturned: true, damageCharges: '0', notes: '' });
   const [editRefundForm, setEditRefundForm] = useState<any>({ exitId: '', allotmentId: '', advanceHeld: 0, pendingRent: '0', ebCharges: '0', exitCharges: '0', damageCharges: '0', keyLossFee: '0' });
   const [completeRefundForm, setCompleteRefundForm] = useState<any>({ exitId: '', allotmentId: '', tenantId: '', tenantName: '', refundDue: 0, refundDate: today(), referenceNumber: '', bankAccountId: '' });
+  // Collect-from-tenant (negative exit refund). amountOwed is the SIGNED refund_due (negative).
+  const [collectForm, setCollectForm] = useState<any>({ exitId: '', allotmentId: '', tenantId: '', tenantName: '', apartmentCode: '', amountOwed: 0, amount: '', paymentMode: '', referenceNumber: '', bankAccountId: '' });
   refundDueRef.current = Math.round(Number(completeRefundForm.refundDue) || 0);
 
   // ─── FETCH ─────────────────────────────────────────────────────────────────
@@ -1115,10 +1121,10 @@ export default function TenantLifecycleScreen() {
   const fetchAll = useCallback(async () => {
     try {
       const [data, switches, rcpts, preExitTasks] = await Promise.all([
-        client.action((api as any).tenants.getLifecycleFullData, {}),
-        client.action((api as any).tenants.listRoomSwitches, {}).catch(() => []),
-        client.action((api as any).tenants.listLifecycleReceipts, {}).catch(() => []),
-        client.action((api as any).tenantsextraactions.listExitTasks, {}).catch(() => []),
+        lc.getLifecycleFullData(),
+        lc.listRoomSwitches().catch(() => []),
+        lc.listLifecycleReceipts().catch(() => []),
+        lc.listExitTasks().catch(() => []),
       ]);
 
       if (!mounted.current) return;
@@ -1246,13 +1252,13 @@ export default function TenantLifecycleScreen() {
   [liveBeds, getBedStatusFromAllotments, aptById]);
 
   // Booking cost helper
-  const calcOnboardingCosts = useCallback((allotmentId: string, onboardDate: string, overrideBedId?: string) => {
+  const calcOnboardingCosts = useCallback((allotmentId: string, onboardDate: string, overrideBedId?: string, overrideDiscount?: number, overridePremium?: number) => {
     const allot = allotments.find((a: any) => a.id === allotmentId);
     if (!allot) return null;
     const bedId = overrideBedId || allot.bed_id;
     const monthlyRent = getBedRate(bedId, onboardDate);
-    const discount = allot.discount || 0;
-    const premium = allot.premium || 0;
+    const discount = overrideDiscount != null && !isNaN(overrideDiscount) ? overrideDiscount : (allot.discount || 0);
+    const premium = overridePremium != null && !isNaN(overridePremium) ? overridePremium : (allot.premium || 0);
     const effectiveRent = Math.max(0, monthlyRent - discount + premium);
     const advance = Math.ceil(effectiveRent * (config.advance_ratio || 1.5));
     const onDate = new Date(onboardDate);
@@ -1304,19 +1310,26 @@ export default function TenantLifecycleScreen() {
         finally { setProofUploading(false); }
       }
 
-      await client.action((api as any).tenants.createBookingFull, {
+      await lc.createBookingFull({
         data: {
           tenantId: bForm.tenantId, bedId: bForm.bedId,
           propertyId: apt.property_id || '', apartmentId: apt.id || '',
           onboardingDate: bForm.onboardingDate,
-          amount: amt, paymentMode: bForm.paymentMode, referenceNumber: bForm.refNo || null,
+          amount: amt, bookingFee: config.booking_fee || 1000,
+          paymentMode: bForm.paymentMode, referenceNumber: bForm.refNo || null,
+          paymentDate: bForm.paymentDate || null,
           discount: parseFloat(bForm.discount) || 0, premium: parseFloat(bForm.premium) || 0,
           isBedOnNotice: bedStatus === 'notice',
           bankAccountId: bForm.bankAccountId || null,
           ...(bookingProofUrl ? { proofUrl: bookingProofUrl } : {}),
         },
       });
-      Alert.alert('Success', 'Booking created!' + (bookingProofUrl ? '\nPayment proof uploaded.' : ''));
+      const feeNow = config.booking_fee || 1000;
+      const extraNow = Math.round(amt - feeNow);
+      const splitMsg = extraNow > 0
+        ? `\nBooking fee ₹${fmtAmt(feeNow)} + advance ₹${fmtAmt(extraNow)} credited to onboarding.`
+        : '';
+      Alert.alert('Success', 'Booking created!' + splitMsg + (bookingProofUrl ? '\nPayment proof uploaded.' : ''));
       setBookingOpen(false); setBForm(blankBook); setBookingProof(null); fetchAll();
     });
   }
@@ -1327,7 +1340,7 @@ export default function TenantLifecycleScreen() {
       { text: 'No', style: 'cancel' },
       { text: 'Cancel Booking', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.cancelBookingFull, { allotmentId: cancelId, reason: 'Cancelled by admin' });
+          await lc.cancelBookingFull({ allotmentId: cancelId, reason: 'Cancelled by admin' });
           Alert.alert('Done', 'Booking cancelled.'); setCancelOpen(false); setCancelId(''); fetchAll();
         });
       }},
@@ -1337,7 +1350,6 @@ export default function TenantLifecycleScreen() {
   // ── KYC photo picker ─────────────────────────────────────────────────────────
   const pickKycPhoto = async (side: 'front' | 'back') => {
     try {
-      const ImagePicker = await import('expo-image-picker') as any;
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Required', 'Please allow access to your photo library.');
@@ -1362,7 +1374,7 @@ export default function TenantLifecycleScreen() {
   async function doOnboard() {
     if (!oForm.allotmentId || !oForm.date) return Alert.alert('Validation', 'Select allotment and date.');
     if (!kycFront || !kycBack) return Alert.alert('KYC Required', 'Please upload both front and back KYC documents before completing onboarding.');
-    const costs = calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId);
+    const costs = calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId, parseFloat(oForm.discount), parseFloat(oForm.premium));
     if (!costs) return Alert.alert('Error', 'Cannot calculate costs.');
     const paidNow = parseFloat(oForm.paidAmount) || 0;
 
@@ -1401,13 +1413,14 @@ export default function TenantLifecycleScreen() {
         finally { setProofUploading(false); }
       }
 
-      await client.action((api as any).tenants.processOnboardingFull, {
+      await lc.processOnboardingFull({
         data: {
           allotmentId: oForm.allotmentId, onboardingDate: oForm.date,
           bedId: oForm.bedId, paymentMode: oForm.payMode, referenceNumber: oForm.refNo,
           paidAmount: paidNow, monthlyRent: costs.monthlyRent, advance: costs.advance,
           proratedRent: costs.proratedRent, onboardingCharges: costs.onboardingCharges,
           totalDue: costs.totalDue,
+          discount: parseFloat(oForm.discount) || 0, premium: parseFloat(oForm.premium) || 0,
           bankAccountId: oForm.bankAccountId || null,
           ccCharges: parseFloat(oForm.ccCharges) || 0,
           ...(kycFrontUrl ? { kycFrontUrl } : {}),
@@ -1432,7 +1445,7 @@ export default function TenantLifecycleScreen() {
   // ── Build RegistrationPdfData from the current onboard form + allotment ──
   async function buildRegData(): Promise<RegistrationPdfData | null> {
     if (!oForm.allotmentId) { Alert.alert('Select an allotment first'); return null; }
-    const costs = calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId);
+    const costs = calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId, parseFloat(oForm.discount), parseFloat(oForm.premium));
     const allot = bookedAllotments.find((a: any) => a.id === oForm.allotmentId);
     // Pull rich tenant/apt/bed details from backend (web parity)
     let rich: any = null;
@@ -1559,7 +1572,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Undo Onboarding', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.undoOnboardingFull, { allotmentId });
+          await lc.undoOnboardingFull({ allotmentId });
           Alert.alert('Done', 'Tenant reverted to Booked.'); setUndoOnboardId(null); fetchAll();
         });
       }},
@@ -1569,7 +1582,7 @@ export default function TenantLifecycleScreen() {
   async function doSwitch() {
     if (!swForm.allotmentId || !swForm.newBedId) return Alert.alert('Validation', 'Select tenant and new bed.');
     await withSave(async () => {
-      await client.action((api as any).tenants.processSwitchFull, {
+      await lc.processSwitchFull({
         data: {
           allotmentId: swForm.allotmentId, tenantId: swForm.tenantId,
           oldBedId: swForm.oldBedId, newBedId: swForm.newBedId,
@@ -1600,9 +1613,9 @@ export default function TenantLifecycleScreen() {
       // Adjustments = credit/debit notes (room-switch rent credits, deposit-return
       // credits, CC debit notes) which were previously invisible in this modal.
       const [inv, rec, adj] = await Promise.all([
-        client.action((api as any).accounting.listInvoices, { tenantId: s.tenantId }),
-        client.action((api as any).accounting.listReceipts, {}).catch(() => []),
-        client.action((api as any).accounting.listAdjustments, {}).catch(() => []),
+        sb.listInvoices({ tenantId: s.tenantId }),
+        sb.listReceipts().catch(() => []),
+        sb.listAdjustments().catch(() => []),
       ]);
       setStmtInvoices(inv || []);
       setStmtAdjustments((adj || []).filter((a: any) => a.tenant_id === s.tenantId));
@@ -1626,7 +1639,7 @@ export default function TenantLifecycleScreen() {
   async function doSaveDeposit(allot: any, value: string) {
     if (!allot) { Alert.alert('No allotment', 'No active allotment found to edit.'); return; }
     await withSave(async () => {
-      await client.action((api as any).tenants.updateAllotmentDetails, {
+      await lc.updateAllotmentDetails({
         data: {
           allotmentId:   allot.id,
           onboardingDate: allot.onboarding_date || '',
@@ -1645,7 +1658,7 @@ export default function TenantLifecycleScreen() {
     const exitDate = a.estimated_exit_date || '';
     if (!exitDate) { Alert.alert('Missing date', 'This notice has no estimated exit date. Edit the notice to set one first.'); return; }
     await withSave(async () => {
-      await client.action((api as any).tenantsextraactions.createExitTask, {
+      await lc.createExitTask({
         data: { allotmentId: a.id, tenantId: a.tenant_id, exitDate },
       });
       Alert.alert('Pre-Exit Task Created', 'Assigned to the exit-task staff configured in Settings.');
@@ -1668,7 +1681,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Complete', style: 'default', onPress: async () => {
         try { setSaving(true);
-          await client.action((api as any).tenants.completeSwitch, { switchId: s._id });
+          await lc.completeSwitch({ switchId: s._id });
           Alert.alert('Success', 'Switch completed'); fetchAll();
         } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
       }},
@@ -1679,7 +1692,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Cancel Switch', style: 'destructive', onPress: async () => {
         try { setSaving(true);
-          await client.action((api as any).tenants.cancelSwitch, { switchId: s._id });
+          await lc.cancelSwitch({ switchId: s._id });
           Alert.alert('Cancelled', 'Switch cancelled'); fetchAll();
         } catch (e: any) { Alert.alert('Error', e?.message || 'Failed'); } finally { setSaving(false); }
       }},
@@ -1702,8 +1715,7 @@ export default function TenantLifecycleScreen() {
       const uri = noticeRecorder.uri;
       if (!uri) { setNoticeVoiceErr('No audio captured. Please try again.'); setNoticeRecState('error'); return; }
 
-      const FileSystem = await import('expo-file-system/legacy') as any;
-      const audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      const audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' as any });
       const resp = await fetch(TRANSCRIBE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1757,12 +1769,12 @@ export default function TenantLifecycleScreen() {
       Animated.loop(Animated.sequence([
         Animated.delay(delay),
         Animated.parallel([
-          Animated.timing(scale,   { toValue: toScale, duration: 1400, useNativeDriver: false }),
-          Animated.timing(opacity, { toValue: 0,       duration: 1400, useNativeDriver: false }),
+          Animated.timing(scale,   { toValue: toScale, duration: 1400, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0,       duration: 1400, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(scale,   { toValue: 1,   duration: 0, useNativeDriver: false }),
-          Animated.timing(opacity, { toValue: 0.6, duration: 0, useNativeDriver: false }),
+          Animated.timing(scale,   { toValue: 1,   duration: 0, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.6, duration: 0, useNativeDriver: true }),
         ]),
       ]));
     const p1 = make(noticePulseScale1, noticePulseOpacity1, 2, 0);
@@ -1801,7 +1813,7 @@ export default function TenantLifecycleScreen() {
   async function doNotice() {
     if (!nForm.allotmentId || !nForm.exitDate) return Alert.alert('Validation', 'Select tenant and exit date.');
     await withSave(async () => {
-      await client.action((api as any).tenants.createNoticeFull, {
+      await lc.createNoticeFull({
         data: { allotmentId: nForm.allotmentId, tenantId: nForm.tenantId, bedId: nForm.bedId, exitDate: nForm.exitDate, notes: nForm.notes },
       });
       Alert.alert('Success', 'Notice recorded!'); setNoticeOpen(false); setNForm(blankNotice); fetchAll();
@@ -1814,7 +1826,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.deleteNoticeFull, {
+          await lc.deleteNoticeFull({
             noticeId: notice.id, allotmentId: notice.allotment_id,
             bedId: allot?.bed_id || notice.bed_id, tenantId: notice.tenant_id,
           });
@@ -1827,7 +1839,7 @@ export default function TenantLifecycleScreen() {
   async function doUpdateNotice() {
     if (!editNoticeForm.noticeId && !editNoticeForm.allotmentId) return;
     await withSave(async () => {
-      await client.action((api as any).tenants.updateNoticeFull, {
+      await lc.updateNoticeFull({
         data: { noticeId: editNoticeForm.noticeId, allotmentId: editNoticeForm.allotmentId, noticeDate: editNoticeForm.noticeDate, exitDate: editNoticeForm.exitDate, notes: editNoticeForm.notes },
       });
       Alert.alert('Updated', 'Notice updated.'); setEditNoticeOpen(false); fetchAll();
@@ -1857,7 +1869,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Process Exit', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.processExitFull, {
+          await lc.processExitFull({
             data: {
               allotmentId: eForm.allotmentId, tenantId: eForm.tenantId,
               bedId: eForm.bedId, exitDate: eForm.exitDate,
@@ -1895,7 +1907,7 @@ export default function TenantLifecycleScreen() {
     const total   = damage + keyLoss + exitChg + pendRent;
     const refund  = (exitRec.advance_held || 0) - total;
     await withSave(async () => {
-      await client.action((api as any).tenants.updateExitFull, {
+      await lc.updateExitFull({
         data: { exitId: editExitForm.exitId, allotmentId: editExitForm.allotmentId, exitDate: editExitForm.exitDate, hasNotice: editExitForm.hasNotice, keyReturned: editExitForm.keyReturned, damageCharges: damage, keyLossFee: keyLoss, exitCharges: exitChg, totalDeductions: total, refundDue: refund, notes: editExitForm.notes },
       });
       setEditExitOpen(false); fetchAll();
@@ -1906,7 +1918,7 @@ export default function TenantLifecycleScreen() {
     const amt = parseFloat(addPayForm.amount) || 0;
     if (amt <= 0 || !addPayForm.paymentMode) return Alert.alert('Validation', 'Enter amount and payment mode.');
     await withSave(async () => {
-      await client.action((api as any).tenants.addLifecyclePayment, {
+      await lc.addLifecyclePayment({
         data: { allotmentId: addPayForm.allotmentId, amount: amt, paymentMode: addPayForm.paymentMode, referenceNumber: addPayForm.refNo, bankAccountId: addPayForm.bankAccountId || null, ccCharges: parseFloat(addPayForm.ccCharges) || 0 },
       });
       Alert.alert('Success', 'Payment recorded.'); setAddPayOpen(false); fetchAll();
@@ -1915,7 +1927,7 @@ export default function TenantLifecycleScreen() {
 
   async function doEditOccupied() {
     await withSave(async () => {
-      await client.action((api as any).tenants.updateAllotmentDetails, {
+      await lc.updateAllotmentDetails({
         data: { allotmentId: editOccForm.allotmentId, onboardingDate: editOccForm.onboardingDate, discount: parseFloat(editOccForm.discount) || 0, premium: parseFloat(editOccForm.premium) || 0, depositPaid: parseFloat(editOccForm.depositPaid) || 0 },
       });
       setEditOccOpen(false); fetchAll();
@@ -1924,7 +1936,7 @@ export default function TenantLifecycleScreen() {
 
   async function doEditRefund() {
     await withSave(async () => {
-      await client.action((api as any).tenants.updateExitRefund, {
+      await lc.updateExitRefund({
         data: { exitId: editRefundForm.exitId, allotmentId: editRefundForm.allotmentId, advanceHeld: editRefundForm.advanceHeld, pendingRent: parseFloat(editRefundForm.pendingRent) || 0, ebCharges: parseFloat(editRefundForm.ebCharges) || 0, exitCharges: parseFloat(editRefundForm.exitCharges) || 0, damageCharges: parseFloat(editRefundForm.damageCharges) || 0, keyLossFee: parseFloat(editRefundForm.keyLossFee) || 0 },
       });
       setEditRefundOpen(false); fetchAll();
@@ -1939,11 +1951,70 @@ export default function TenantLifecycleScreen() {
     if (refundProofAmount !== due) return Alert.alert('Amount mismatch', `The screenshot shows ₹${refundProofAmount} but the refund amount is ₹${due}. Only a screenshot with the exact refund amount is allowed.`);
     if (!completeRefundForm.referenceNumber) return Alert.alert('Validation', 'Enter reference number.');
     await withSave(async () => {
-      await client.action((api as any).tenants.completeRefundFull, {
+      await lc.completeRefundFull({
         data: { exitId: completeRefundForm.exitId, allotmentId: completeRefundForm.allotmentId, tenantId: completeRefundForm.tenantId, refundDate: completeRefundForm.refundDate, referenceNumber: completeRefundForm.referenceNumber, bankAccountId: completeRefundForm.bankAccountId || null },
       });
       Alert.alert('Success', 'Refund completed!'); setCompleteRefundOpen(false); fetchAll();
     });
+  }
+
+  // Collect from tenant when the exit refund is NEGATIVE (tenant owes). Mirrors web collectPayment.
+  async function doCollectExit() {
+    const owed = Math.abs(Number(collectForm.amountOwed) || 0);
+    const amt = parseFloat(collectForm.amount) || 0;
+    if (amt <= 0) return Alert.alert('Validation', 'Enter an amount greater than 0.');
+    if (amt > owed + 0.01) return Alert.alert('Validation', `Amount cannot exceed ₹${fmtAmt(owed)}.`);
+    if (!collectForm.paymentMode) return Alert.alert('Validation', 'Select a payment mode.');
+    await withSave(async () => {
+      await lc.collectExitPayment({
+        data: {
+          exitId: collectForm.exitId,
+          allotmentId: collectForm.allotmentId || null,
+          tenantId: collectForm.tenantId,
+          amount: amt,
+          amountOwed: Number(collectForm.amountOwed) || 0,
+          paymentMode: collectForm.paymentMode,
+          referenceNumber: collectForm.referenceNumber || null,
+          bankAccountId: collectForm.bankAccountId || null,
+        },
+      });
+      Alert.alert('Collected', 'Payment recorded.'); setCollectOpen(false); fetchAll();
+    });
+  }
+
+  // Cancel / reverse a processed exit → tenant back to On-Notice. Mirrors web cancelExit.
+  function doCancelExit(e: any) {
+    const refundStatus = e.refundStatus || e.refund_status || 'none';
+    if (refundStatus !== 'pending' && refundStatus !== 'none') {
+      return Alert.alert('Cannot Reverse', 'This exit cannot be reversed because its refund has already been processed.');
+    }
+    const name = e.tenantName || e.tenants?.full_name || 'this tenant';
+    Alert.alert(
+      'Reverse Exit',
+      `Reverse the exit for ${name}? The tenant returns to On-Notice and the bed is freed back to notice. Any exit refund settlement for this allotment is undone.`,
+      [
+        { text: 'Keep Exit', style: 'cancel' },
+        { text: 'Reverse Exit', style: 'destructive', onPress: async () => {
+          await withSave(async () => {
+            try {
+              await lc.cancelExitFull({
+                data: {
+                  exitId: e._id || e.id,
+                  allotmentId: e.allotmentId || e.allotment_id,
+                  bedId: e.bedId || e.bed_id,
+                  tenantId: e.tenantId || e.tenant_id,
+                  refundStatus,
+                },
+              });
+              Alert.alert('Reversed', 'Exit reversed — tenant is back to On-Notice.');
+              fetchAll();
+            } catch (err: any) {
+              Alert.alert('Could not reverse', err?.message || String(err));
+            }
+          });
+        }},
+      ],
+    );
   }
 
   // ─── RENDER HELPERS ────────────────────────────────────────────────────────
@@ -2363,10 +2434,8 @@ export default function TenantLifecycleScreen() {
         });
         const csvContent = [header, ...rows].join('\n');
         const filename = `beds-${new Date().toISOString().split('T')[0]}.csv`;
-        const FileSystem = await import('expo-file-system/legacy') as any;
         const fileUri = FileSystem.cacheDirectory + filename;
-        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
-        const Sharing = await import('expo-sharing') as any;
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' as any });
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
           await Sharing.shareAsync(fileUri, {
@@ -2805,8 +2874,43 @@ export default function TenantLifecycleScreen() {
   // ─── TAB: BOOKING ──────────────────────────────────────────────────────────
 
   function renderBooking() {
-    const allBeds = [...vacantBeds, ...noticeBeds];
-    const bedOptions = allBeds.map((b: any) => ({ label: `${b._aptCode}-${b.bed_code} (${b.bed_type}) — ₹${fmtAmt(getBedRate(b.id))}/mo`, value: b.id }));
+    // Selected tenant record (for Aadhaar/photo display + gender-based bed filtering).
+    const selBookTenant: any = tenants.find((t: any) => t.id === bForm.tenantId) || null;
+    const tGender = String(selBookTenant?.gender || '').toLowerCase();
+
+    // A bed is free on the chosen booking/onboarding date if no allotment holds it on
+    // that date: Booked = reserved (never offered), Staying/On-Notice = occupied until
+    // their exit — so an on-notice bed that exits BEFORE the date becomes available.
+    const bedFreeOn = (bedId: string, dateStr: string): boolean => {
+      const d = new Date(dateStr);
+      const active = allotments.filter((a: any) =>
+        a.bed_id === bedId && ['Staying', 'Booked', 'On-Notice'].includes(a.staying_status));
+      for (const a of active) {
+        if (a.staying_status === 'Booked') return false; // reserved
+        const end = a.actual_exit_date ? new Date(a.actual_exit_date)
+          : (a.estimated_exit_date ? new Date(a.estimated_exit_date) : null);
+        if (!end || end >= d) return false; // still occupied on/after the date
+      }
+      return true;
+    };
+
+    // Gender match: open apartments (mixed/unknown) are offered to anyone; a single-gender
+    // apartment is only offered to a tenant of that gender. Unknown tenant gender → no filter.
+    const genderOk = (b: any): boolean => {
+      const ga = String((aptById[b.apartment_id] || {}).gender_allowed || '').toLowerCase();
+      if (!ga || ['mixed', 'any', 'co-ed', 'coed', 'unisex', 'both'].includes(ga)) return true;
+      if (!tGender) return true;
+      return ga === tGender || ga.startsWith(tGender);
+    };
+
+    // Available beds = live beds free on the chosen date AND gender-compatible.
+    const availBookingBeds = liveBeds
+      .filter((b: any) => bedFreeOn(b.id, bForm.onboardingDate))
+      .filter(genderOk)
+      .map((b: any) => ({ ...b, _aptCode: (aptById[b.apartment_id] || {}).apartment_code || '?' }))
+      .sort((a: any, b: any) => `${a._aptCode}-${a.bed_code}`.localeCompare(`${b._aptCode}-${b.bed_code}`));
+
+    const bedOptions = availBookingBeds.map((b: any) => ({ label: `${b._aptCode}-${b.bed_code} (${b.bed_type}) — ₹${fmtAmt(getBedRate(b.id))}/mo`, value: b.id }));
     const tenantOptions = [
       ...eligibleTenants.map((t: any) => ({ label: `${t.full_name} · ${t.phone}`, value: t.id })),
       ...returningTenants.map((t: any) => ({ label: `↩ ${t.full_name} · ${t.phone}`, value: t.id })),
@@ -2903,17 +3007,69 @@ export default function TenantLifecycleScreen() {
         {/* Booking form */}
         <BottomSheet visible={bookingOpen} onClose={() => setBookingOpen(false)} title="New Booking">
           <Field label="Tenant *">
-            <SelectF options={tenantOptions} value={bForm.tenantId} onChange={v => setBForm({ ...bForm, tenantId: v })} placeholder="Select tenant…" />
+            {/* Changing tenant clears the bed — the available set is gender-specific. */}
+            <SelectF options={tenantOptions} value={bForm.tenantId} onChange={v => setBForm({ ...bForm, tenantId: v, bedId: '' })} placeholder="Select tenant…" />
           </Field>
+
+          {/* ── Tenant identity: photo + Aadhaar, so the desk can verify who they're booking ── */}
+          {selBookTenant && (
+            <Card style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                {selBookTenant.photo_url ? (
+                  <Image source={{ uri: selBookTenant.photo_url }} style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: '#EEF1F6' }} />
+                ) : (
+                  <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: '#EEF1F6', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="person" size={26} color="#94A3B8" />
+                  </View>
+                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <Text style={{ fontWeight: '800', fontSize: fontSize.sm, color: '#0F172A' }} numberOfLines={1}>{selBookTenant.full_name}</Text>
+                    {!!tGender && (
+                      <View style={{ backgroundColor: tGender === 'female' ? '#FCE7F3' : tGender === 'male' ? '#DBEAFE' : '#F1F5F9', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: tGender === 'female' ? '#C2185B' : tGender === 'male' ? '#1D4ED8' : '#64748B', textTransform: 'uppercase' }}>{selBookTenant.gender}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {!!selBookTenant.phone && <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>{selBookTenant.phone}</Text>}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                    <Text style={{ fontSize: fontSize.xs, color: '#64748B' }}>Aadhaar: {selBookTenant.aadhar_number || '—'}</Text>
+                    <View style={{ backgroundColor: selBookTenant.kyc_completed ? '#DCFCE7' : '#FEF3C7', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
+                      <Text style={{ fontSize: 8, fontWeight: '800', color: selBookTenant.kyc_completed ? '#16A34A' : '#B45309', textTransform: 'uppercase' }}>{selBookTenant.kyc_completed ? 'KYC ✓' : 'KYC pending'}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              {(() => {
+                const aadImg = selBookTenant.aadhar_image_url || selBookTenant.id_proof_url || selBookTenant.id_card_url || null;
+                return aadImg ? (
+                  <View style={{ marginTop: 10 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Aadhaar / ID on file</Text>
+                    <Image source={{ uri: aadImg }} style={{ width: '100%', height: 150, borderRadius: 10, backgroundColor: '#EEF1F6' }} resizeMode="contain" />
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: fontSize.xs, color: '#B45309', marginTop: 8 }}>No Aadhaar / ID image on file for this tenant.</Text>
+                );
+              })()}
+            </Card>
+          )}
+
+          {/* Date drives bed availability, so it comes before the bed picker. */}
+          <Field label="Planned Onboarding Date *"><DateF value={bForm.onboardingDate} onChange={v => setBForm({ ...bForm, onboardingDate: v, bedId: '' })} /></Field>
+
           <Field label="Bed *">
-            <SelectF options={bedOptions} value={bForm.bedId} onChange={v => setBForm({ ...bForm, bedId: v })} placeholder="Select bed…" />
+            <SelectF options={bedOptions} value={bForm.bedId} onChange={v => setBForm({ ...bForm, bedId: v })} placeholder={bForm.tenantId ? 'Select bed…' : 'Select a tenant first…'} />
+            <Text style={{ fontSize: 10, color: '#64748B', marginTop: 4 }}>
+              {bedOptions.length > 0
+                ? `${bedOptions.length} bed${bedOptions.length === 1 ? '' : 's'} available on ${fmtDate(bForm.onboardingDate)}${tGender ? ` for ${tGender}` : ''}`
+                : `No ${tGender ? `${tGender} ` : ''}beds available on ${fmtDate(bForm.onboardingDate)}. Try another date.`}
+            </Text>
           </Field>
           {bForm.bedId && (
             <Card style={{ marginBottom: 14 }}>
               <Row label="Bed Rate" value={`₹${fmtAmt(getBedRate(bForm.bedId))}/mo`} />
             </Card>
           )}
-          <Field label="Planned Onboarding Date *"><DateF value={bForm.onboardingDate} onChange={v => setBForm({ ...bForm, onboardingDate: v })} /></Field>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1 }}><Field label="Discount (₹)"><TextF value={bForm.discount} onChange={v => setBForm({ ...bForm, discount: v })} keyboardType="numeric" /></Field></View>
             <View style={{ flex: 1 }}><Field label="Premium (₹)"><TextF value={bForm.premium} onChange={v => setBForm({ ...bForm, premium: v })} keyboardType="numeric" /></Field></View>
@@ -2982,10 +3138,40 @@ export default function TenantLifecycleScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}><Field label="Booking Amount (₹)"><TextF value={bForm.amount} onChange={v => setBForm({ ...bForm, amount: v })} keyboardType="numeric" placeholder={String(config.booking_fee || 1000)} /></Field></View>
+            <View style={{ flex: 1 }}><Field label="Amount Paid (₹)"><TextF value={bForm.amount} onChange={v => setBForm({ ...bForm, amount: v })} keyboardType="numeric" placeholder={String(config.booking_fee || 1000)} /></Field></View>
             <View style={{ flex: 1 }}><Field label="Payment Mode *"><SelectF options={PAY_MODES} value={bForm.paymentMode} onChange={v => setBForm({ ...bForm, paymentMode: v })} /></Field></View>
           </View>
-          <Field label="Transaction Reference"><TextF value={bForm.refNo} onChange={v => setBForm({ ...bForm, refNo: v })} placeholder="UTR/Ref no." /></Field>
+
+          {/* ── Excess-payment split: shown when the amount paid exceeds the booking fee ── */}
+          {(() => {
+            const fee = Number(config.booking_fee) || 1000;
+            const paid = parseFloat(bForm.amount) || 0;
+            const extra = Math.round(paid - fee);
+            if (!(extra > 0)) return null;
+            return (
+              <View style={{ marginBottom: 14, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 12, padding: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: fontSize.xs, color: '#166534' }}>Booking fee</Text>
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#166534' }}>₹{fmtAmt(fee)}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: fontSize.xs, color: '#166534' }}>Additional advance</Text>
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#166534' }}>₹{fmtAmt(extra)}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#BBF7D0', paddingTop: 4, marginTop: 2 }}>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#14532D' }}>Total paid</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#14532D' }}>₹{fmtAmt(paid)}</Text>
+                </View>
+                <Text style={{ fontSize: 10, color: '#15803D', marginTop: 6, lineHeight: 14 }}>
+                  ₹{fmtAmt(extra)} over the ₹{fmtAmt(fee)} booking fee will be held as an advance and credited to this tenant's onboarding balance.
+                </Text>
+              </View>
+            );
+          })()}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}><Field label="Transaction Reference"><TextF value={bForm.refNo} onChange={v => setBForm({ ...bForm, refNo: v })} placeholder="UTR/Ref no." /></Field></View>
+            <View style={{ flex: 1 }}><Field label="Payment Date"><DateF value={bForm.paymentDate} onChange={v => setBForm({ ...bForm, paymentDate: v })} /></Field></View>
+          </View>
 
           {/* ── Bank Details (mirrors web app) ─────────────────────────────── */}
           <Field label="Bank Details">
@@ -3017,7 +3203,7 @@ export default function TenantLifecycleScreen() {
   function renderOnboarding() {
     const allotOpts = bookedAllotments.map((a: any) => ({ label: `${a.tenants?.full_name} — ${a.apartments?.apartment_code}-${a.beds?.bed_code}`, value: a.id }));
     const vacantBedOpts = vacantBeds.map((b: any) => ({ label: `${b._aptCode}-${b.bed_code} (${b.bed_type})`, value: b.id }));
-    const costs = oForm.allotmentId && oForm.date ? calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId) : null;
+    const costs = oForm.allotmentId && oForm.date ? calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId, parseFloat(oForm.discount), parseFloat(oForm.premium)) : null;
 
     const recentStaying = [...stayingAllotments].filter((a: any) => a.onboarding_date).sort((a: any, b: any) => (b.onboarding_date || '').localeCompare(a.onboarding_date || '')).slice(0, 10);
     const filtered = filterBySearch(bookedAllotments, ['tenants.full_name', 'apartments.apartment_code'], ts('onboard'));
@@ -3044,7 +3230,7 @@ export default function TenantLifecycleScreen() {
                 {/* Onboard — opens the same onboarding BottomSheet/oForm flow as before */}
                 <PrimaryButton title="Onboard" icon="person-add-outline" small onPress={() => {
                   const d = a.onboarding_date || today();
-                  setOForm({ allotmentId: a.id, date: d, bedId: a.bed_id, payMode: '', refNo: '', paidAmount: depositDefault(a.id, d, a.bed_id), bankAccountId: '', ccCharges: '' });
+                  setOForm({ allotmentId: a.id, date: d, bedId: a.bed_id, payMode: '', refNo: '', paidAmount: depositDefault(a.id, d, a.bed_id), bankAccountId: '', ccCharges: '', discount: String(a.discount || 0), premium: String(a.premium || 0) });
                   setOnboardOpen(true);
                 }} />
                 {/* Cancel booking — reuses existing cancelOpen/doCancelBooking flow */}
@@ -3103,13 +3289,33 @@ export default function TenantLifecycleScreen() {
             <SelectF options={allotOpts} value={oForm.allotmentId} onChange={v => {
               const a = bookedAllotments.find((x: any) => x.id === v);
               const d = a?.onboarding_date || today();
-              setOForm({ ...oForm, allotmentId: v, bedId: a?.bed_id || '', date: d, paidAmount: depositDefault(v, d, a?.bed_id || '') });
+              setOForm({ ...oForm, allotmentId: v, bedId: a?.bed_id || '', date: d, paidAmount: depositDefault(v, d, a?.bed_id || ''), discount: String(a?.discount || 0), premium: String(a?.premium || 0) });
             }} />
           </Field>
           <Field label="Onboarding Date *"><DateF value={oForm.date} onChange={v => setOForm({ ...oForm, date: v, paidAmount: depositDefault(oForm.allotmentId, v, oForm.bedId) })} /></Field>
           <Field label="Bed (optional override)">
             <SelectF options={[{ label: '— Keep current bed —', value: '' }, ...vacantBedOpts]} value={oForm.bedId} onChange={v => setOForm({ ...oForm, bedId: v, paidAmount: depositDefault(oForm.allotmentId, oForm.date, v) })} />
           </Field>
+          {/* Discount / Premium — prefilled from booking, editable; adjust the effective rent
+              (and therefore advance + prorated rent) live, and persist on Complete Onboarding. */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Field label="Discount (₹)">
+                <TextF value={oForm.discount} keyboardType="numeric" onChange={v => {
+                  const nd = parseFloat(v); const c = calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId, isNaN(nd) ? 0 : nd, parseFloat(oForm.premium));
+                  setOForm({ ...oForm, discount: v, paidAmount: c ? String(c.advance) : oForm.paidAmount });
+                }} />
+              </Field>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field label="Premium (₹)">
+                <TextF value={oForm.premium} keyboardType="numeric" onChange={v => {
+                  const np = parseFloat(v); const c = calcOnboardingCosts(oForm.allotmentId, oForm.date, oForm.bedId, parseFloat(oForm.discount), isNaN(np) ? 0 : np);
+                  setOForm({ ...oForm, premium: v, paidAmount: c ? String(c.advance) : oForm.paidAmount });
+                }} />
+              </Field>
+            </View>
+          </View>
           {costs && (
             <Card style={{ marginBottom: 14 }}>
               <Row label="Bed Rate" value={`₹${fmtAmt(costs.monthlyRent)}/mo`} />
@@ -3325,20 +3531,16 @@ export default function TenantLifecycleScreen() {
             </View>
           )}
 
-          <ActionBtn title="Complete Onboarding" onPress={doOnboard} loading={saving || kycUploading || proofUploading} disabled={!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo || !kycFront || !kycBack} />
-          {(!kycFront || !kycBack) && oForm.allotmentId && (
-            <Text style={{ fontSize: fontSize.xs, color: '#DC2626', textAlign: 'center', marginTop: 6 }}>
-              KYC front & back photos are required to complete onboarding
-            </Text>
-          )}
-
-          {/* Registration PDF — generate → preview (Terms of Stay) → download / WhatsApp */}
+          {/* ── Step 1 — Registration PDF: generate → preview (Terms of Stay) → send on WhatsApp ── */}
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 4, marginBottom: 6 }}>
+            Step 1 · Registration form
+          </Text>
           <TouchableOpacity
             onPress={handleGenerateRegistration}
             disabled={!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo || regGenerating}
             style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-              marginTop: 10, paddingVertical: 13, borderRadius: borderRadius.lg,
+              paddingVertical: 13, borderRadius: borderRadius.lg,
               borderWidth: 1.5, borderColor: '#2563EB',
               backgroundColor: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 'rgba(37,99,235,0.05)' : 'rgba(37,99,235,0.08)',
               opacity: (!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo) ? 0.5 : 1,
@@ -3348,9 +3550,23 @@ export default function TenantLifecycleScreen() {
               ? <ActivityIndicator size="small" color="#2563EB" />
               : <Ionicons name="document-text-outline" size={18} color="#2563EB" />}
             <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: '#2563EB' }}>
-              Generate Registration PDF
+              {regData ? 'Regenerate / Send Registration' : 'Generate Registration PDF'}
             </Text>
           </TouchableOpacity>
+          <Text style={{ fontSize: 10, color: '#64748B', textAlign: 'center', marginTop: 5 }}>
+            Opens a preview — tick the Terms of Stay, then send it to the tenant on WhatsApp.
+          </Text>
+
+          {/* ── Step 2 — Complete onboarding ── */}
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748B', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 16, marginBottom: 6 }}>
+            Step 2 · Finish
+          </Text>
+          <ActionBtn title="Complete Onboarding" onPress={doOnboard} loading={saving || kycUploading || proofUploading} disabled={!oForm.allotmentId || !oForm.date || !oForm.payMode || !oForm.refNo || !kycFront || !kycBack} />
+          {(!kycFront || !kycBack) && oForm.allotmentId && (
+            <Text style={{ fontSize: fontSize.xs, color: '#DC2626', textAlign: 'center', marginTop: 6 }}>
+              KYC front & back photos are required to complete onboarding
+            </Text>
+          )}
         </BottomSheet>
 
         {/* ── Registration PDF Preview (Terms of Stay) ───────────────────── */}
@@ -3621,7 +3837,7 @@ export default function TenantLifecycleScreen() {
               <Ionicons name="mic-outline" size={16} color="#EA580C" />
               <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: '#EA580C' }}>Voice</Text>
             </TouchableOpacity>
-            <PrimaryButton title="Record Notice" icon="notifications-outline" small onPress={() => setNoticeOpen(true)} />
+            <PrimaryButton title="Record Notice" icon="notifications-outline" small stretch={false} onPress={() => setNoticeOpen(true)} />
           </View>
         </View>
         <SearchField value={ts('notices')} onChangeText={(v: string) => setTs('notices', v)} placeholder="Search by tenant name..." />
@@ -3946,12 +4162,19 @@ export default function TenantLifecycleScreen() {
                       <Row label="Refund Due" value={`₹${fmtAmt(e.refundDue || e.refund_due)}`} valueColor="#16A34A" />
                       <StatusPill status={e.refundStatus || e.refund_status || 'none'} />
                     </View>
-                    <TouchableOpacity onPress={() => {
-                      setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
-                      setEditExitOpen(true);
-                    }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
-                      <Ionicons name="pencil-outline" size={16} color="#2563EB" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity onPress={() => {
+                        setEditExitForm({ exitId: e._id || e.id, allotmentId: e.allotmentId || e.allotment_id, exitDate: e.exitDate || e.exit_date || '', hasNotice: e.hasNotice || e.has_notice || false, keyReturned: e.keyReturned !== false && e.key_returned !== false, damageCharges: String(e.damageCharges || e.damage_charges || 0), notes: e.notes || '' });
+                        setEditExitOpen(true);
+                      }} style={{ backgroundColor: '#EFF6FF', borderRadius: 8, padding: 8 }}>
+                        <Ionicons name="pencil-outline" size={16} color="#2563EB" />
+                      </TouchableOpacity>
+                      {((e.refundStatus || e.refund_status || 'none') === 'pending' || (e.refundStatus || e.refund_status || 'none') === 'none') && (
+                        <TouchableOpacity onPress={() => doCancelExit(e)} style={{ backgroundColor: '#FEF2F2', borderRadius: 8, padding: 8 }}>
+                          <Ionicons name="arrow-undo-outline" size={16} color="#DC2626" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </LifecycleCard>
               ))
@@ -4157,7 +4380,19 @@ export default function TenantLifecycleScreen() {
                   }} />
                   {tenantOwes ? (
                     <OutlineButton title="Collect" icon="cash-outline" tone="success" small onPress={() => {
-                      Alert.alert('Collect from Tenant', `Tenant owes ₹${fmtAmt(Math.abs(refundAmt))}. Collecting dues from an exit is not implemented as a separate flow yet — use Edit to adjust deductions.`);
+                      setCollectForm({
+                        exitId: e._id || e.id,
+                        allotmentId: e.allotmentId || e.allotment_id || '',
+                        tenantId: e.tenantId || e.tenant_id || '',
+                        tenantName: tenantName || '',
+                        apartmentCode: code || '',
+                        amountOwed: refundAmt, // signed (negative)
+                        amount: String(Math.abs(refundAmt) || ''),
+                        paymentMode: '',
+                        referenceNumber: '',
+                        bankAccountId: '',
+                      });
+                      setCollectOpen(true);
                     }} />
                   ) : (
                     <PrimaryButton title="Complete" icon="checkmark-circle-outline" small onPress={() => {
@@ -4323,6 +4558,47 @@ export default function TenantLifecycleScreen() {
             </Text>
           )}
         </BottomSheet>
+
+        {/* Collect-from-tenant sheet (negative exit refund) */}
+        <BottomSheet visible={collectOpen} onClose={() => setCollectOpen(false)} title="Collect from Tenant">
+          <Card style={{ marginBottom: 14 }}>
+            <Row label="Tenant" value={collectForm.tenantName} />
+            {!!collectForm.apartmentCode && <Row label="Apartment" value={collectForm.apartmentCode} />}
+            <Row label="Amount Owed" value={`₹${fmtAmt(Math.abs(Number(collectForm.amountOwed) || 0))}`} valueColor="#DC2626" />
+          </Card>
+          <Field label="Amount to Collect (₹) *">
+            <TextF value={collectForm.amount} onChange={v => setCollectForm({ ...collectForm, amount: v })} keyboardType="numeric" placeholder="0" />
+          </Field>
+          <Field label="Payment Mode *">
+            <SelectF options={PAY_MODES} value={collectForm.paymentMode} onChange={v => setCollectForm({ ...collectForm, paymentMode: v })} placeholder="Select payment mode" />
+          </Field>
+          <Field label="Bank Account">
+            {bankAccountOptions.length === 0
+              ? <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 4 }}>No bank accounts found.</Text>
+              : <SelectF options={[{ label: '— Select bank account —', value: '' }, ...bankAccountOptions]} value={collectForm.bankAccountId} onChange={v => setCollectForm({ ...collectForm, bankAccountId: v })} placeholder="Select bank account" />
+            }
+          </Field>
+          <Field label="Reference Number">
+            <TextF value={collectForm.referenceNumber} onChange={v => setCollectForm({ ...collectForm, referenceNumber: v })} placeholder="UTR / transaction ID" />
+          </Field>
+          {(() => {
+            const collecting = parseFloat(collectForm.amount) || 0;
+            const owed = Math.abs(Number(collectForm.amountOwed) || 0);
+            const remaining = Math.max(0, owed - collecting);
+            return (
+              <Card style={{ marginBottom: 14 }}>
+                <Row label="Collecting" value={`₹${fmtAmt(collecting)}`} valueColor="#16A34A" />
+                <Row label="Remaining Owed" value={`₹${fmtAmt(remaining)}`} valueColor={remaining > 0 ? '#DC2626' : '#16A34A'} />
+              </Card>
+            );
+          })()}
+          <ActionBtn
+            title="Record Payment"
+            onPress={doCollectExit}
+            loading={saving}
+            disabled={!(parseFloat(collectForm.amount) > 0) || !collectForm.paymentMode}
+          />
+        </BottomSheet>
       </ScrollView>
     );
   }
@@ -4336,13 +4612,13 @@ export default function TenantLifecycleScreen() {
       return Alert.alert('Validation', 'To date must be on or after from date.');
     await withSave(async () => {
       if (absenceEditId) {
-        await client.action((api as any).tenants.updateAbsenceRecord, {
+        await lc.updateAbsenceRecord({
           id: absenceEditId,
           data: { fromDate: absenceForm.fromDate, toDate: absenceForm.toDate, reason: absenceForm.reason },
         });
         Alert.alert('Updated', 'Absence record updated.');
       } else {
-        await client.action((api as any).tenants.createAbsenceRecord, {
+        await lc.createAbsenceRecord({
           data: {
             tenantId: absenceForm.tenantId,
             allotmentId: absenceForm.allotmentId || null,
@@ -4365,7 +4641,7 @@ export default function TenantLifecycleScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         await withSave(async () => {
-          await client.action((api as any).tenants.deleteAbsenceRecord, { id });
+          await lc.deleteAbsenceRecord({ id });
           fetchAll();
         });
       }},

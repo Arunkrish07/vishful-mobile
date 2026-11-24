@@ -6,7 +6,8 @@
  * null  → no rows configured in DB for this role/module → default OPEN (show all)
  * Empty Set → rows exist but none are visible → show nothing
  */
-import { client, api } from './convexApi';
+import { supabase } from './supabase';
+import { ORG_ID, safeList } from './supabaseDb';
 
 // Roles that always bypass tab permission checks
 const SUPERUSER_ROLES = new Set(['super_admin', 'org_admin']);
@@ -22,7 +23,9 @@ export async function fetchVisibleTabKeys(
   if (!role || SUPERUSER_ROLES.has(role)) return null; // superusers see everything
 
   try {
-    const rows: any[] = await client.action(api.settings.getTabPermissions, {});
+    const rows: any[] = await safeList(
+      supabase.from('tab_permissions').select('*').eq('organization_id', ORG_ID).order('module')
+    );
     const roleRows = (rows || []).filter(
       (r: any) => r.role === role && r.module === module
     );

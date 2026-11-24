@@ -7,6 +7,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { GlassBackground, GlassHeader, DateField } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
 import { useAuth } from '../lib/auth';
@@ -1631,7 +1632,6 @@ function ResolutionFormModal({
       // Web/desktop: use expo-document-picker which calls the native browser file dialog
       // directly from the user gesture — no hidden <input> needed, no gesture chain break
       try {
-        const DocumentPicker = await import('expo-document-picker') as any;
         const result = await DocumentPicker.getDocumentAsync({
           type: ['image/*', 'application/pdf'],
           copyToCacheDirectory: true,

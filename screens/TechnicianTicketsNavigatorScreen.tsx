@@ -25,17 +25,18 @@ import React, {
 import {
   View, Text, ScrollView, TouchableOpacity, Animated,
   RefreshControl, ActivityIndicator, Image, Dimensions,
-  FlatList, Modal, TextInput, Alert, Platform,
+  FlatList, Modal, TextInput, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
-import { client as convexClient, api as convexApi } from '../lib/convexApi';
+import { getOrgExitSettings } from '../lib/supabaseService';
 import { GlassBackground, DateField } from '../components/shared';
+import FloatingNav from '../components/FloatingNav';
 import { formatDate } from '../lib/dateUtils';
 import { DiagnosticFlow, DiagnosticFlowResult } from './DiagnosticFlow';
 import TechnicianProfileScreen from './TechnicianProfileScreen';
@@ -187,15 +188,18 @@ function TicketsDashboardScreen({ navigation }: any) {
   const StatCard = ({ label, value, color, bg, icon, onPress }: any) => (
     <TouchableOpacity
       onPress={onPress} activeOpacity={0.8}
-      style={{ flex: 1, backgroundColor: bg, borderRadius: 16, padding: 16, minHeight: 90, justifyContent: 'space-between', borderWidth: 1, borderColor: `${color}30`, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
+      style={{ flex: 1, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, minHeight: 96, justifyContent: 'space-between', borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Text style={{ fontSize: 28, fontWeight: '800', color }}>{value}</Text>
-        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: `${color}20`, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name={icon} size={16} color={color} />
+        <Text style={{ fontSize: 28, fontWeight: '800', color, letterSpacing: -0.5 }}>{value}</Text>
+        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: `${color}18`, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={icon} size={18} color={color} />
         </View>
       </View>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: `${color}CC`, letterSpacing: 0.3 }}>{label.toUpperCase()}</Text>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#5B6878', letterSpacing: 0.4, textTransform: 'uppercase' }}>{label}</Text>
+      <View style={{ height: 3, backgroundColor: `${color}18`, borderRadius: 2, marginTop: 8 }}>
+        <View style={{ height: 3, width: '55%', backgroundColor: color, borderRadius: 2, opacity: 0.7 }} />
+      </View>
     </TouchableOpacity>
   );
 
@@ -240,7 +244,7 @@ function TicketsDashboardScreen({ navigation }: any) {
             </View>
           </Animated.View>
 
-          <Animated.View style={{ opacity: fadeAnim, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+          <Animated.View style={{ opacity: fadeAnim, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Completion Rate</Text>
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#22C55E' }}>
@@ -315,7 +319,7 @@ function DashboardTicketRow({ ticket, onPress }: { ticket: Ticket; onPress: () =
   const priorityCfg = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.medium;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EBEFF5', marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
       <View style={{ width: 8, height: 40, borderRadius: 4, backgroundColor: statusCfg.color }} />
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND }}>{ticket.ticket_number}</Text>
@@ -342,8 +346,8 @@ function SkeletonBox({ width, height, borderRadius = 8, style }: { width?: numbe
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.9, duration: 700, useNativeDriver: false }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: false }),
+        Animated.timing(opacity, { toValue: 0.9, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
       ])
     );
     anim.start();
@@ -357,7 +361,7 @@ function SkeletonBox({ width, height, borderRadius = 8, style }: { width?: numbe
 function TicketCardSkeleton() {
   const { colors } = useTheme();
   return (
-    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EEF1F6' }}>
+    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EBEFF5' }}>
       {/* Status bar at top */}
       <SkeletonBox width="40%" height={4} borderRadius={0} />
       <View style={{ padding: 16, gap: 10 }}>
@@ -529,7 +533,7 @@ function TicketCard({ ticket, onPress }: { ticket: Ticket; onPress: () => void }
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}
-      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
+      style={{ backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
       <View style={{ height: 4, backgroundColor: statusCfg.color }} />
       <View style={{ padding: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -695,7 +699,7 @@ function TicketDetailScreen({ navigation, route }: any) {
 
   // Org auto-approve threshold for cost estimates (web parity — was hardcoded ₹1,000)
   useEffect(() => {
-    convexClient.action((convexApi as any).settings.getOrgExitSettings, {})
+    getOrgExitSettings()
       .then((data: any) => {
         const val = Number(data?.ticket_auto_approve_threshold);
         if (Number.isFinite(val) && val > 0) setAutoApproveThreshold(val);
@@ -2074,7 +2078,7 @@ function CostEstimateRow({ estimate, isAdmin, ticketId, userId, onUpdated }: {
     : estimate.total;
 
   return (
-    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', gap: 10 }}>
+    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EBEFF5', gap: 10 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ flex: 1, marginRight: 10 }}>
           <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{estimate.item_name}</Text>
@@ -2277,7 +2281,7 @@ function CostEstimateReviewModal({ visible, ticketId, userId, diagnosisResult, a
             </Text>
 
             {items.map((item, idx) => (
-              <View key={idx} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EEF1F6', gap: 10 }}>
+              <View key={idx} style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#EBEFF5', gap: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>ITEM {idx + 1}</Text>
                   {items.length > 1 && (
@@ -2665,7 +2669,7 @@ function ReassignModal({ visible, ticketId, userId, onClose, onSubmit }: any) {
 function SectionCard({ title, icon, iconColor, iconBg, children }: any) {
   const { colors } = useTheme();
   return (
-    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#EEF1F6', shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}>
+    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#EBEFF5', shadowColor: '#1E293B', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name={icon} size={17} color={iconColor} />
@@ -2717,45 +2721,40 @@ function TechElectricityScreen() {
   return <ElectricityScreen />;
 }
 
+// Floating pill bottom nav — shared "glass bar + filled active chip" look.
+const TECH_NAV_ICONS: Record<string, [string, string]> = {
+  TicketsDashboard: ['grid', 'grid-outline'],
+  MyTickets:        ['list', 'list-outline'],
+  Electricity:      ['flash', 'flash-outline'],
+  Profile:          ['person', 'person-outline'],
+};
+
+function TechFloatingTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const items = state.routes.map((route: any) => {
+    const { options } = descriptors[route.key];
+    const label = (options.tabBarLabel ?? route.name) as string;
+    const [activeIcon, inactiveIcon] = TECH_NAV_ICONS[route.name] || ['help', 'help-outline'];
+    return { key: route.name, label, icon: inactiveIcon, activeIcon };
+  });
+  const activeKey = state.routes[state.index]?.name;
+  const onSelect = (name: string) => {
+    const route = state.routes.find((r: any) => r.name === name);
+    if (!route) return;
+    const focused = route.name === activeKey;
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+  };
+  return (
+    <FloatingNav items={items} activeKey={activeKey} onSelect={onSelect} bottomInset={insets.bottom + 10} />
+  );
+}
+
 function TechnicianTabNavigator() {
-  const { colors } = useTheme();
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-          paddingTop: 8,
-          shadowColor: '#0F172A',
-          shadowOpacity: 0.06,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: -4 },
-          elevation: 0,
-        },
-        tabBarActiveTintColor: '#2563EB',
-        tabBarInactiveTintColor: '#71809A',
-        tabBarActiveBackgroundColor: '#EFF6FF',
-        tabBarItemStyle: {
-          borderRadius: 16,
-          marginHorizontal: 2,
-          marginVertical: 4,
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
-        tabBarIcon: ({ color, focused }) => {
-          const icons: Record<string, [string, string]> = {
-            TicketsDashboard: ['grid', 'grid-outline'],
-            MyTickets:        ['list', 'list-outline'],
-            Electricity:      ['flash', 'flash-outline'],
-            Profile:          ['person', 'person-outline'],
-          };
-          const [active, inactive] = icons[route.name] || ['help', 'help-outline'];
-          return <Ionicons name={(focused ? active : inactive) as any} size={22} color={color} />;
-        },
-      })}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <TechFloatingTabBar {...props} />}
     >
       <Tab.Screen name="TicketsDashboard" component={TicketsDashboardScreen} options={{ tabBarLabel: 'Dashboard' }} />
       <Tab.Screen name="MyTickets"        component={MyTicketsScreen}        options={{ tabBarLabel: 'My Tickets' }} />

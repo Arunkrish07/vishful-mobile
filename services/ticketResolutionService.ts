@@ -1,4 +1,4 @@
-import { client, api } from '../lib/convexApi';
+import * as ticketService from './ticketService';
 
 export interface ResolutionItem {
   name: string;
@@ -74,7 +74,7 @@ export function populateFormFromResolution(resolution: any): TicketResolutionFor
 
 export async function fetchResolution(ticketId: string): Promise<any | null> {
   try {
-    return await client.action(api.tickets.getResolution, { ticketId });
+    return await ticketService.fetchTicketResolution(ticketId);
   } catch (error) {
     console.warn('[ticketResolutionService] fetchResolution failed');
     return null;
@@ -83,8 +83,7 @@ export async function fetchResolution(ticketId: string): Promise<any | null> {
 
 export async function fetchBankAccounts(): Promise<BankAccount[]> {
   try {
-    const data = await client.action(api.tenants.getLifecycleFullData, {});
-    return Array.isArray(data?.bankAccounts) ? data.bankAccounts : [];
+    return (await ticketService.fetchBankAccounts()) as any;
   } catch (error) {
     console.warn('[ticketResolutionService] fetchBankAccounts failed');
     return [];
@@ -93,7 +92,7 @@ export async function fetchBankAccounts(): Promise<BankAccount[]> {
 
 export async function fetchVendors(): Promise<any[]> {
   try {
-    return await client.action(api.tickets.getVendors, {});
+    return await ticketService.fetchVendors();
   } catch (error) {
     console.warn('[ticketResolutionService] fetchVendors failed');
     return [];
@@ -110,7 +109,7 @@ export async function saveResolution(args: {
   const totalLabourCost = Number(args.form.total_labour_cost) || 0;
   const totalCost = totalParts + totalLabourCost;
 
-  const result = await client.action(api.tickets.saveResolution, {
+  const result = await ticketService.saveTicketResolution({
     ticketId: args.ticketId,
     userId: args.organizationId,
     resolutionType: args.form.resolution_type,
@@ -123,7 +122,7 @@ export async function saveResolution(args: {
     proofOfPurchaseUrl: args.form.proof_of_purchase_url || undefined,
   });
 
-  return result?.resolutionId || args.existingResolutionId || args.ticketId;
+  return (result as any)?.resolutionId || args.existingResolutionId || args.ticketId;
 }
 
 export async function deleteResolution(_args: { ticketId: string; resolutionId?: string | null }): Promise<{ success: boolean }> {

@@ -63,6 +63,22 @@ export function AuthProvider({ children }: { children: any }) {
 
   useEffect(() => { return () => { mounted.current = false; }; }, []);
 
+  // Keep our stored tokens in lock-step with supabase-js token rotations. Refresh
+  // tokens are single-use, so each background auto-refresh rotates them; mirroring
+  // the new pair into AsyncStorage keeps the refresh token we persist from going
+  // stale — the exact divergence that used to surface as "Invalid Refresh Token"
+  // on the next cold start. We deliberately do NOT call setToken here (the access
+  // token is only used for coarse validation / the auth flag), to avoid re-render
+  // and re-validation loops.
+  useEffect(() => {
+    const unsub = sb.onSupabaseAuthTokens((accessToken, refreshToken) => {
+      refreshTokenRef.current = refreshToken;
+      AsyncStorage.setItem(TOKEN_KEY, accessToken).catch(() => {});
+      AsyncStorage.setItem(REFRESH_KEY, refreshToken).catch(() => {});
+    });
+    return unsub;
+  }, []);
+
   // Load stored token + user on startup
   useEffect(() => {
     const loadAuth = async () => {
@@ -73,6 +89,15 @@ export function AuthProvider({ children }: { children: any }) {
         refreshTokenRef.current = savedRefresh;
 
         console.log("[LOAD AUTH] token exists:", !!savedToken, "user exists:", !!savedUser, "refresh exists:", !!savedRefresh);
+
+        // Re-authenticate the Supabase data client from our authoritative tokens.
+        // The client itself no longer persists a session (see lib/supabase.ts), so
+        // without this it would run unauthenticated (anon) after a restart and all
+        // RLS-gated reads would come back empty. Fire-and-forget: setSession may do
+        // a network refresh and we must never block first paint on it.
+        if (savedToken && savedRefresh) {
+          sb.rehydrateSession(savedToken, savedRefresh).catch(() => {});
+        }
 
         if (savedToken && savedUser) {
           setToken(savedToken);
@@ -237,6 +262,8 @@ export function AuthProvider({ children }: { children: any }) {
   const logout = useCallback(() => {
     sessionValidated.current = false;
     refreshTokenRef.current = null;
+    // Clear the Supabase client session too (direct-to-Supabase data layer).
+    sb.signOutSupabase().catch(() => {});
     // Best-effort: drop this device's push token before clearing the session.
     import('./pushNotifications').then(m => m.unregisterPush()).catch(() => {});
     setToken(null);

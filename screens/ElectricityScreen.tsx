@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, borderRadius } from '../lib/theme';
@@ -440,14 +441,28 @@ export default function ElectricityScreen() {
 
   // Pick MANY photos at once, upload + recognise each, and match by apartment code.
   const bulkScanPhotos = async () => {
-    const IP = await import('expo-image-picker') as any;
-    const { status } = await IP.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission needed'); return; }
-    const r = await IP.launchImageLibraryAsync({
-      mediaTypes: 'images' as any, quality: 0.8, base64: true,
-      allowsMultipleSelection: true, selectionLimit: 0,
-    });
-    if (r.canceled || !r.assets?.length) return;
+    let r: any;
+    try {
+      console.log('[bulkScan] opening picker…');
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('[bulkScan] permission:', status);
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow photo-library access to bulk-scan meter photos.');
+        return;
+      }
+      // NOTE: selectionLimit:0 (unlimited) throws on some Android builds — omit it
+      // and rely on allowsMultipleSelection, which is the portable multi-select flag.
+      r = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images' as any, quality: 0.8, base64: true,
+        allowsMultipleSelection: true,
+      });
+      console.log('[bulkScan] picker result:', r?.canceled, r?.assets?.length);
+    } catch (e: any) {
+      console.error('[bulkScan] picker failed:', e?.message, e);
+      Alert.alert('Could not open photos', e?.message || 'The image picker failed to open. Please try again.');
+      return;
+    }
+    if (!r || r.canceled || !r.assets?.length) return;
     setBulkScanBusy(true);
     try {
       // meter photos now upload via sb.uploadMeterPhoto (documents/meter-photos bucket)
@@ -480,16 +495,15 @@ export default function ElectricityScreen() {
   };
 
   const pickMeterPhoto = async (idx: number) => {
-    const IP = await import('expo-image-picker') as any;
     Alert.alert('Meter Photo', 'Choose source', [
       {
         text: 'Camera',
         onPress: async () => {
-          const { status } = await IP.requestCameraPermissionsAsync();
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed'); return; }
-          const r = await IP.launchCameraAsync({ quality: 0.8, base64: true });
+          const r = await ImagePicker.launchCameraAsync({ quality: 0.8, base64: true });
           if (!r.canceled && r.assets[0]) {
-            setMeterPhotoUris(prev => ({ ...prev, [idx]: { uri: r.assets[0].uri, base64: r.assets[0].base64 } }));
+            setMeterPhotoUris(prev => ({ ...prev, [idx]: { uri: r.assets[0].uri, base64: r.assets[0].base64 ?? undefined } }));
             // Upload immediately
             try {
               // meter photos now upload via sb.uploadMeterPhoto (documents/meter-photos bucket)
@@ -502,11 +516,11 @@ export default function ElectricityScreen() {
       {
         text: 'Gallery',
         onPress: async () => {
-          const { status } = await IP.requestMediaLibraryPermissionsAsync();
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed'); return; }
-          const r = await IP.launchImageLibraryAsync({ mediaTypes: 'images' as any, quality: 0.8, base64: true });
+          const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images' as any, quality: 0.8, base64: true });
           if (!r.canceled && r.assets[0]) {
-            setMeterPhotoUris(prev => ({ ...prev, [idx]: { uri: r.assets[0].uri, base64: r.assets[0].base64 } }));
+            setMeterPhotoUris(prev => ({ ...prev, [idx]: { uri: r.assets[0].uri, base64: r.assets[0].base64 ?? undefined } }));
             try {
               // meter photos now upload via sb.uploadMeterPhoto (documents/meter-photos bucket)
               const url = await sb.uploadMeterPhoto(r.assets[0].base64);

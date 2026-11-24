@@ -8,11 +8,12 @@ import { StyleSheet, View, Text, ActivityIndicator, Alert, TouchableOpacity, Log
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { queryClient, asyncStoragePersister, CACHE_MAX_AGE } from './lib/queryClient';
+import { queryClient, asyncStoragePersister, CACHE_MAX_AGE, persistDehydrateOptions } from './lib/queryClient';
 import { AuthProvider, useAuth } from './lib/auth';
 import * as sb from './lib/supabaseService';
-import { fontSize, spacing, sidebarColors, glass } from './lib/theme';
+import { fontSize, spacing, sidebarColors, glass, animation } from './lib/theme';
 import { useTheme, ThemeProvider } from './lib/ThemeContext';
+import FloatingNav from './components/FloatingNav';
 import LoginScreen from './screens/LoginScreen';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
 import DashboardScreen from './screens/DashboardScreen';
@@ -44,7 +45,6 @@ import WhatsAppLogsScreen from './screens/WhatsAppLogsScreen';
 import AuditLogsScreen from './screens/AuditLogsScreen';
 import FloatingAIAssistant from './screens/Floatingaiassistant';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
 
 // ── Inline Permissions System ────────────────────────────────────────────────
 // Fetches role_permissions from Supabase and exposes canAccess(module).
@@ -224,7 +224,7 @@ const AuthStack = createNativeStackNavigator();
 
 function PropertiesStack() {
   return (
-    <PropStack.Navigator screenOptions={{ headerShown: false }}>
+    <PropStack.Navigator screenOptions={{ headerShown: false, animation: animation.stackAnimation, animationDuration: animation.stackDuration, gestureEnabled: true }}>
       <PropStack.Screen name="PropertiesList" component={PropertiesScreen} />
       <PropStack.Screen name="PropertyDetail" component={PropertyDetailScreen} />
     </PropStack.Navigator>
@@ -233,7 +233,7 @@ function PropertiesStack() {
 
 function TicketsStack() {
   return (
-    <TicketStack.Navigator screenOptions={{ headerShown: false }}>
+    <TicketStack.Navigator screenOptions={{ headerShown: false, animation: animation.stackAnimation, animationDuration: animation.stackDuration, gestureEnabled: true }}>
       <TicketStack.Screen name="TicketsList" component={TicketsScreen} />
       <TicketStack.Screen name="TicketDetail" component={TicketDetailScreen} />
     </TicketStack.Navigator>
@@ -473,6 +473,10 @@ function MainDrawer() {
           options={{ drawerIcon: ({ color }: any) => <Ionicons name="document-text-outline" size={20} color={color} /> }} />
       )}
 
+      {/* "More" hub — grid of every non-primary section (reached from the bottom bar) */}
+      <Drawer.Screen name="More" component={MoreScreen}
+        options={{ drawerIcon: ({ color }: any) => <Ionicons name="grid-outline" size={20} color={color} /> }} />
+
       {/* Settings — always visible so admins can manage permissions */}
       <Drawer.Screen name="Settings" component={SettingsScreen}
         options={{ drawerIcon: ({ color }: any) => <Ionicons name="settings-outline" size={20} color={color} /> }} />
@@ -480,41 +484,37 @@ function MainDrawer() {
   );
 }
 
+// Icons for the tenant floating nav — [active (filled), inactive (outline)].
+const TENANT_NAV_ICONS: Record<string, [string, string]> = {
+  Home:    ['home', 'home-outline'],
+  Tickets: ['construct', 'construct-outline'],
+  Profile: ['person', 'person-outline'],
+};
+
+function TenantFloatingTabBar({ state, navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const items = state.routes.map((route: any) => {
+    const [activeIcon, inactiveIcon] = TENANT_NAV_ICONS[route.name] || ['help', 'help-outline'];
+    return { key: route.name, label: route.name, icon: inactiveIcon, activeIcon };
+  });
+  const activeKey = state.routes[state.index]?.name;
+  const onSelect = (name: string) => {
+    const route = state.routes.find((r: any) => r.name === name);
+    if (!route) return;
+    const focused = route.name === activeKey;
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (!focused && !event.defaultPrevented) navigation.navigate(name);
+  };
+  return (
+    <FloatingNav items={items} activeKey={activeKey} onSelect={onSelect} bottomInset={insets.bottom + 10} />
+  );
+}
+
 function TenantTabNavigator() {
   return (
     <TenantTab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarIcon: ({ color, size }) => {
-          let iconName: any = 'home-outline';
-          if (route.name === 'Home') iconName = 'home-outline';
-          else if (route.name === 'Tickets') iconName = 'construct-outline';
-          else if (route.name === 'Profile') iconName = 'person-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#1D4ED8',
-        tabBarInactiveTintColor: '#71809A',
-        tabBarActiveBackgroundColor: '#EFF6FF',
-        tabBarItemStyle: {
-          borderRadius: 16,
-          marginHorizontal: 4,
-          marginVertical: 4,
-        },
-        tabBarStyle: {
-          backgroundColor: '#FFFFFFF0',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-          height: 64,
-          paddingBottom: 6,
-          paddingTop: 4,
-          elevation: 0,
-          shadowColor: '#0F172A',
-          shadowOpacity: 0.08,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: -2 },
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 1 },
-      })}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <TenantFloatingTabBar {...props} />}
     >
       <TenantTab.Screen name="Home" component={TenantHomeScreen} />
       <TenantTab.Screen name="Tickets" component={TenantTicketsScreen} />
@@ -525,7 +525,7 @@ function TenantTabNavigator() {
 
 function TenantNavigator() {
   return (
-    <TenantStack.Navigator screenOptions={{ headerShown: false }}>
+    <TenantStack.Navigator screenOptions={{ headerShown: false, animation: animation.stackAnimation, animationDuration: animation.stackDuration, gestureEnabled: true }}>
       <TenantStack.Screen name="TenantTabs" component={TenantTabNavigator} />
       <TenantStack.Screen name="CreateTicket" component={CreateTicketScreen} />
       <TenantStack.Screen name="TenantKyc" component={TenantKycScreen} />
@@ -543,6 +543,9 @@ function AuthNavigator() {
     <AuthStack.Navigator
       screenOptions={{
         headerShown: false,
+        animation: animation.stackAnimation,
+        animationDuration: animation.stackDuration,
+        gestureEnabled: true,
         // Native-stack keyboard handling fights Android IME and can close the
         // keypad right after the login number field focuses.
         keyboardHandlingEnabled: false,
@@ -627,18 +630,60 @@ const ADMIN_NAV_RAIL: NavItem[] = [
   { name: 'Settings',         label: 'Settings',      icon: 'settings-outline',        always: true },
 ];
 
-function AdminFloatingNav({ navRef }: { navRef: any }) {
-  const insets = useSafeAreaInsets();
+// The bottom bar shows exactly these four destinations; everything else the
+// role can access is reached through the "More" screen. Keep in sync with labels.
+const PRIMARY_NAV_NAMES = ['Dashboard', 'Tenant Lifecycle', 'Tickets', 'Electricity'];
+
+// Shared gate used by both the bottom bar and the More screen.
+function useNavAccess() {
   const { canAccess: rawCanAccess, isSuperuser } = usePermissions();
-  const canAccess = React.useCallback(
+  return React.useCallback(
     (m?: AppModule, always?: boolean) =>
       !!always || (!!m && (isSuperuser || !HIDDEN_ON_MOBILE.has(m)) && rawCanAccess(m)),
     [rawCanAccess, isSuperuser],
   );
+}
+
+// Full-page "More" screen — a grid of every section the role can reach that
+// isn't one of the four primary tabs. Tapping a tile navigates to that screen.
+function MoreScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const canAccess = useNavAccess();
+  const moreItems = ADMIN_NAV_RAIL.filter(
+    i => !PRIMARY_NAV_NAMES.includes(i.name) && canAccess(i.module, i.always),
+  );
+  return (
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <View style={[MORE.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={MORE.title}>More</Text>
+        <Text style={MORE.subtitle}>All sections</Text>
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: Math.max(insets.bottom, 12) + 110 }}>
+        <View style={MORE.grid}>
+          {moreItems.map((item) => (
+            <TouchableOpacity
+              key={item.name}
+              style={MORE.tile}
+              activeOpacity={0.85}
+              onPress={() => { try { navigation.navigate(item.name); } catch {} }}
+            >
+              <View style={MORE.tileIcon}>
+                <Ionicons name={item.icon} size={24} color={NAV_UI.brand} />
+              </View>
+              <Text style={MORE.tileLabel} numberOfLines={2}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function AdminFloatingNav({ navRef }: { navRef: any }) {
+  const insets = useSafeAreaInsets();
+  const canAccess = useNavAccess();
 
   const [active, setActive] = useState('Dashboard');
-  const scrollRef = useRef<ScrollView>(null);
-  const itemLayouts = useRef<Record<string, { x: number; w: number }>>({});
 
   useEffect(() => {
     const update = () => {
@@ -653,116 +698,56 @@ function AdminFloatingNav({ navRef }: { navRef: any }) {
     return () => { try { unsub?.(); } catch {} };
   }, [navRef]);
 
-  // Keep the active tab centered in the horizontal rail (same as web nav-rail).
-  useEffect(() => {
-    const layout = itemLayouts.current[active];
-    if (!layout || !scrollRef.current) return;
-    const target = Math.max(0, layout.x - 80);
-    scrollRef.current.scrollTo({ x: target, animated: true });
-  }, [active]);
-
   const go = (name: string) => {
     try { if (navRef.isReady?.()) navRef.navigate(name as never); } catch {}
   };
 
-  const items = ADMIN_NAV_RAIL.filter(i => canAccess(i.module, i.always));
+  // Four fixed primary tabs (in the declared order) + everything else → "More".
+  const primary = PRIMARY_NAV_NAMES
+    .map(n => ADMIN_NAV_RAIL.find(i => i.name === n))
+    .filter((i): i is NavItem => !!i && canAccess(i.module, i.always));
+  // "More" is active on the More screen itself or on any screen reached through it.
+  const moreActive = active === 'More'
+    || ADMIN_NAV_RAIL.some(i => !PRIMARY_NAV_NAMES.includes(i.name) && i.name === active);
+
+  // Build the shared floating-nav item list: four primary tabs + a "More" entry.
+  const items = [
+    ...primary.map(item => ({ key: item.name, label: item.label, icon: item.icon })),
+    { key: 'More', label: 'More', icon: 'grid-outline' },
+  ];
+  const activeKey = moreActive ? 'More' : active;
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={[NAV.rail, { bottom: Math.max(insets.bottom, 10) }]}
-    >
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={NAV.track}
-        decelerationRate="fast"
-      >
-        {items.map((item) => {
-          const on = active === item.name;
-          return (
-            <TouchableOpacity
-              key={item.name}
-              style={[NAV.item, on && NAV.itemOn]}
-              activeOpacity={0.85}
-              onPress={() => go(item.name)}
-              onLayout={(e) => {
-                const { x, width } = e.nativeEvent.layout;
-                itemLayouts.current[item.name] = { x, w: width };
-              }}
-            >
-              <Ionicons
-                name={item.icon}
-                size={18}
-                color={on ? NAV_UI.brand : NAV_UI.idle}
-                style={on ? { transform: [{ translateY: -1 }, { scale: 1.06 }] } : undefined}
-              />
-              <Text style={[NAV.label, on && NAV.labelOn]} numberOfLines={1}>
-                {item.label}
-              </Text>
-              {on ? <View style={NAV.underline} /> : null}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
+    <FloatingNav
+      items={items}
+      activeKey={activeKey}
+      onSelect={go}
+      bottomInset={insets.bottom}
+    />
   );
 }
 
-const NAV = StyleSheet.create({
-  rail: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 0,
-    zIndex: 900,
-    elevation: 20,
+const MORE = StyleSheet.create({
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
     backgroundColor: '#FFFFFF',
-    borderRadius: 26,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF1F6',
   },
-  track: {
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  item: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 58,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 16,
-    position: 'relative',
-  },
-  itemOn: {
+  title: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 },
+  subtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  tile: { width: '25%', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 2 },
+  tileIcon: {
+    width: 58, height: 58, borderRadius: 18,
     backgroundColor: '#EEF0FF',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 7,
   },
-  label: {
-    marginTop: 2,
-    fontSize: 10,
-    fontWeight: '600',
-    color: NAV_UI.idle,
-    letterSpacing: 0.1,
-  },
-  labelOn: {
-    color: NAV_UI.brand,
-    fontWeight: '700',
-  },
-  underline: {
-    position: 'absolute',
-    bottom: 3,
-    width: 22,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#1D4ED8',
-  },
+  tileLabel: { fontSize: 11, color: '#475569', textAlign: 'center', fontWeight: '600' },
 });
+
 
 // Shown when an authenticated account resolves to a role that is neither an admin
 // role nor tenant/technician — instead of silently dropping it into the admin app.
@@ -843,8 +828,8 @@ function AppNavigator() {
       </NavigationContainer>
       {/* Floating bottom navigation — replaces the side drawer for admins */}
       {isAdmin && <AdminFloatingNav navRef={navRef} />}
-      {/* Floating AI assistant — visible on all screens for admin/employee */}
-      {(isAdmin || isEmployee) && <FloatingAIAssistant raised={isAdmin} />}
+      {/* Floating AI assistant — admin only (removed from the technician view) */}
+      {isAdmin && <FloatingAIAssistant raised />}
     </View>
   );
 }
@@ -901,27 +886,23 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-const convexClient = new ConvexReactClient('https://polished-sockeye-740.convex.cloud');
-
 export default function App() {
   return (
     <ErrorBoundary>
-      <ConvexProvider client={convexClient}>
-        <SafeAreaProvider>
-          <PersistQueryClientProvider
-            client={queryClient}
-            persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE }}
-          >
-            <ThemeProvider>
-              <AuthProvider>
-                <PermissionsProvider>
-                  <AppNavigator />
-                </PermissionsProvider>
-              </AuthProvider>
-            </ThemeProvider>
-          </PersistQueryClientProvider>
-        </SafeAreaProvider>
-      </ConvexProvider>
+      <SafeAreaProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: asyncStoragePersister, maxAge: CACHE_MAX_AGE, dehydrateOptions: persistDehydrateOptions }}
+        >
+          <ThemeProvider>
+            <AuthProvider>
+              <PermissionsProvider>
+                <AppNavigator />
+              </PermissionsProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </PersistQueryClientProvider>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

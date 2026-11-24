@@ -1,9 +1,9 @@
 /**
  * voiceTicketService.ts
- * Frontend service for submitting voice complaints via Convex → Supabase.
- * Used by all sources: web_voice, mobile_voice, whatsapp.
+ * Submits voice complaints via the Supabase `tenant-voice-action` edge function
+ * (no Convex). Used by all sources: web_voice, mobile_voice, whatsapp.
  */
-import { client, api } from "../lib/convexApi";
+import { supabase } from "../lib/supabase";
 
 export interface VoiceTicketParams {
   transcription: string;
@@ -19,16 +19,20 @@ export interface VoiceTicketParams {
 }
 
 export async function submitVoiceTicket(params: VoiceTicketParams): Promise<any> {
-  return client.action(api.voiceTicket.processVoiceTicket, {
-    transcription: params.transcription,
-    source: params.source,
-    tenantId: params.tenantId,
-    propertyId: params.propertyId,
-    apartmentId: params.apartmentId,
-    bedId: params.bedId,
-    tenantName: params.tenantName,
-    tenantPhone: params.tenantPhone,
-    apartmentCode: params.apartmentCode,
-    createdBy: params.createdBy,
+  const { data, error } = await supabase.functions.invoke("tenant-voice-action", {
+    body: {
+      transcription: params.transcription,
+      source: params.source,
+      tenantId: params.tenantId,
+      propertyId: params.propertyId,
+      apartmentId: params.apartmentId,
+      bedId: params.bedId,
+      tenantName: params.tenantName,
+      tenantPhone: params.tenantPhone,
+      apartmentCode: params.apartmentCode,
+      createdBy: params.createdBy,
+    },
   });
+  if (error) throw error;
+  return data;
 }

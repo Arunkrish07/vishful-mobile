@@ -16,7 +16,6 @@ import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, borderRadius } from '../lib/theme';
 import { GlassBackground } from '../components/shared';
 import DeleteAccountButton from '../components/DeleteAccountButton';
-import { client as convexClient, api as convexApi } from '../lib/convexApi';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as sb from '../lib/supabaseService';
 
@@ -215,12 +214,21 @@ export default function SettingsScreen() {
   const [expBusy,    setExpBusy]    = useState(false);
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
+  // Generic dispatcher → the direct-Supabase hub. Each settings action is a hub
+  // fn of the same name; most accept a single args object, so sb[action](args)
+  // works uniformly. deleteExpenseCategory is the one positional exception.
   const call = useCallback(async (action: string, args: any = {}) => {
-    return convexClient.action((convexApi as any).settings[action], args);
+    const fn = (sb as any)[action];
+    if (typeof fn !== 'function') throw new Error(`Settings action not available: ${action}`);
+    if (action === 'deleteExpenseCategory') return fn(args.id);
+    return fn(args);
   }, []);
 
-  const callConvex = useCallback(async (namespace: string, action: string, args: any = {}) => {
-    return convexClient.action((convexApi as any)[namespace][action], args);
+  // getBankAccounts formerly lived in the tickets namespace; it's now a hub fn too.
+  const callConvex = useCallback(async (_namespace: string, action: string, args: any = {}) => {
+    const fn = (sb as any)[action];
+    if (typeof fn !== 'function') throw new Error(`Settings action not available: ${action}`);
+    return fn(args);
   }, []);
 
   // ─── Load data per tab ────────────────────────────────────────────────────
@@ -229,8 +237,7 @@ export default function SettingsScreen() {
     try {
       if (tab === 'organization') {
         try {
-          const sb = await import('../lib/convexApi');
-          const data = await convexClient.action((convexApi as any).settings.getOrgSettings, {});
+          const data = await sb.getOrgSettings();
           if (data) setOrgForm(f => ({
             ...f,
             organization_name: data.organizationName || '',

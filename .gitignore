@@ -48,3 +48,16 @@ skills-lock.json
 # local build backups / scratch artifacts (not part of the app build)
 package.json.*.bak
 expo-go-qr.png
+
+# orphaned node_modules backup from the junction clobber (679MB, not source)
+_node_modules_onedrive_bak/
+
+# tenant financial data exports (PII, not app code)
+FY*_Tenant_Advances.xlsx
+
+# Supabase CLI local state/temp
+supabase/.temp/
+supabase/.branches/
+
+# Claude MCP local config (dev tooling, may hold tokens)
+.mcp.json

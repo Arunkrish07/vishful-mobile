@@ -29,7 +29,7 @@ import { formatDate } from '../lib/dateUtils';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/ThemeContext';
 import { glass, spacing, borderRadius, fontSize } from '../lib/theme';
-import { client, api } from '../lib/convexApi';
+import { getIssueTypes } from '../services/ticketService';
 import { CONVEX_SITE_URL } from '../lib/config';
 import {
   fetchTickets,
@@ -110,7 +110,7 @@ export default function TenantTicketsScreen({ navigation }: any) {
   // ── Load issue types when voice modal opens ───────────────────────────────
   useEffect(() => {
     if (!voiceOpen) return;
-    client.action(api.tickets.getIssueTypes, {})
+    getIssueTypes()
       .then((t: any) => setIssueTypes(t || []))
       .catch(() => setIssueTypes([]));
   }, [voiceOpen]);

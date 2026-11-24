@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 const MEDIA_TYPE_IMAGES = 'images' as any;
 import { GlassBackground, PageHeader, IconBtnSolid, SearchField, FilterChip } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
@@ -1061,8 +1063,8 @@ export default function TicketsScreen({ navigation }: any) {
     if (regularRules.length > 0 || regularLoading) return;
     setRegularLoading(true);
     try {
-      const { client, api } = await import('../lib/convexApi') as any;
-      const rules = await client.action(api.tickets.listRegularMaintenanceRules, {});
+      const { fetchRegularMaintenanceRules } = await import('../services/ticketService');
+      const rules = await fetchRegularMaintenanceRules();
       setRegularRules(Array.isArray(rules) ? rules : []);
     } catch {
       setRegularRules([]);
@@ -1168,10 +1170,8 @@ export default function TicketsScreen({ navigation }: any) {
                     });
                     const csvContent = [header, ...rows].join('\n');
                     const filename = `tickets-${new Date().toISOString().split('T')[0]}.csv`;
-                    const FileSystem = await import('expo-file-system/legacy') as any;
                     const fileUri = FileSystem.cacheDirectory + filename;
-                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
-                    const Sharing = await import('expo-sharing') as any;
+                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' as any });
                     const canShare = await Sharing.isAvailableAsync();
                     if (canShare) {
                       await Sharing.shareAsync(fileUri, {
@@ -1626,11 +1626,8 @@ export default function TicketsScreen({ navigation }: any) {
                     const breached= tickets.filter(t=>t.sla_deadline&&new Date(t.sla_deadline)<new Date()&&!['completed','closed'].includes(t.status)).length;
                     const summary = `Total: ${tickets.length}, Open: ${open}, SLA Breached: ${breached}.\nTop issues: ${Object.entries(issueDist).sort(([,a],[,b])=>b-a).slice(0,5).map(([k,v])=>`${k}(${v})`).join(', ')}.\nProperties: ${Object.entries(propDist).slice(0,3).map(([k,v])=>`${k}(${v})`).join(', ')}.`;
                     const question = `You are a property maintenance analyst. Analyse these ticket stats and give 3-5 concise actionable insights. Keep each point under 2 sentences. Stats: ${summary}`;
-                    const { client, api } = await import('../lib/convexApi') as any;
-                    const res = await client.action(
-                      (api as any).aiAssistant.askAssistant,
-                      { question, history: [] }
-                    );
+                    const { supabase } = await import('../lib/supabase') as any;
+                    const { data: res } = await supabase.functions.invoke('ask_assistant', { body: { question, history: [] } });
                     const text = (res?.answer || '').trim();
                     if (!text) {
                       setAiAnalysis('Could not load AI insights: the assistant returned an empty response. Please try again.');

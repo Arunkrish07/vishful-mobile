@@ -10,14 +10,15 @@ import { useAuth } from '../lib/auth';
 import { colors, spacing, fontSize, borderRadius } from '../lib/theme';
 import { GlassBackground, EmptyState, LoadingScreen, DateField, SearchField, IconBtnSolid } from '../components/shared';
 import { formatDate } from '../lib/dateUtils';
-import { client as convexClient, api as convexApi } from '../lib/convexApi';
+import * as sb from '../lib/supabaseService';
+import * as ownerImport from '../lib/ownerImport';
 import { INDIAN_STATES, INDIAN_CITIES } from '../lib/indianCitiesStates';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as DocumentPicker from 'expo-document-picker';
 // SDK 54: readAsStringAsync/EncodingType moved to the /legacy entry (removed from the default export).
 import * as FileSystem from 'expo-file-system/legacy';
 
-const owners = (convexApi as any).owners;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtAmt  = (v: number) => `₹${(v || 0).toLocaleString('en-IN')}`;
@@ -236,13 +237,14 @@ function DocUpload({ label, value, onChange, folder, isImage }: {
       );
       const base64 = await FileSystem.readAsStringAsync(manip.uri, { encoding: FileSystem.EncodingType.Base64 });
 
-      const res: any = await convexClient.action(owners.uploadDocument, {
+      const url = await sb.uploadDocument(
         base64,
-        fileName: `${label.replace(/\s+/g, '_').toLowerCase()}.jpg`,
+        `${label.replace(/\s+/g, '_').toLowerCase()}.jpg`,
         folder,
-        contentType: 'image/jpeg',
-      });
-      onChange(res.url);
+        'image/jpeg',
+      );
+      if (!url) throw new Error('Upload failed');
+      onChange(url);
     } catch (e: any) {
       Alert.alert('Upload failed', e.message || 'Could not upload file');
     } finally {
@@ -338,9 +340,9 @@ function OwnerFormModal({ mode, initial, onClose, onSaved }: {
     try {
       // title is UI-only (not a DB column) — backend ignores it
       if (mode === 'add') {
-        await convexClient.action(owners.createOwner, { data: form });
+        await sb.createOwner(form);
       } else {
-        await convexClient.action(owners.updateOwner, { id: initial.id, data: form });
+        await sb.updateOwner(initial.id, form);
       }
       onSaved();
     } catch (e: any) { Alert.alert('Error', e.message); }
@@ -456,12 +458,11 @@ function PaymentModal({ payment, mode, aptCode, onClose, onSaved }: {
     try {
       if (mode === 'record') {
         if (!form.paid_date) { Alert.alert('Required', 'Payment date is required'); setSaving(false); return; }
-        await convexClient.action(owners.recordOwnerPayment, {
-          id: payment.id,
-          data: { paid_date: form.paid_date, payment_mode: form.payment_mode, reference_number: form.reference_number, notes: form.notes },
+        await sb.recordOwnerPayment(payment.id, {
+          paid_date: form.paid_date, payment_mode: form.payment_mode, reference_number: form.reference_number, notes: form.notes,
         });
       } else {
-        await convexClient.action(owners.editOwnerPayment, { id: payment.id, data: form });
+        await sb.editOwnerPayment(payment.id, form);
       }
       onSaved();
     } catch (e: any) { Alert.alert('Error', e.message); }
@@ -539,7 +540,7 @@ function ContractDetailModal({ contract, onClose }: { contract: any; onClose: ()
 
   const load = useCallback(() => {
     setLoading(true);
-    convexClient.action(owners.getContractPayments, { contractId: contract.id })
+    sb.getContractPayments(contract.id)
       .then((d: any) => setPayments(d || []))
       .catch(() => setPayments([]))
       .finally(() => setLoading(false));
@@ -659,13 +660,13 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
   const [period, setPeriod]             = useState('current_fy');
 
   const loadDetail = useCallback(() => {
-    convexClient.action(owners.getOwnerDetail, { ownerId })
+    sb.getOwnerDetail(ownerId)
       .then(setData).catch(() => setData(null)).finally(() => setLoading(false));
   }, [ownerId]);
 
   const loadPayments = useCallback(() => {
     setPaymentsLoading(true);
-    convexClient.action(owners.listOwnerPaymentsConsolidated, { ownerId })
+    sb.listOwnerPaymentsConsolidated(ownerId)
       .then((d: any) => setAllPayments(d || []))
       .catch(() => setAllPayments([]))
       .finally(() => setPaymentsLoading(false));
@@ -685,7 +686,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
         { text: 'Cancel', style: 'cancel' },
         { text: isActive ? 'Deactivate' : 'Activate', style: isActive ? 'destructive' : 'default', onPress: async () => {
           try {
-            await convexClient.action(owners.toggleOwnerStatus, { id: ownerId, currentStatus: isActive ? 'active' : 'inactive' });
+            await sb.toggleOwnerStatus(ownerId, isActive ? 'active' : 'inactive');
             loadDetail(); onChanged();
           } catch (e: any) { Alert.alert('Error', e.message); }
         }},
@@ -697,7 +698,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
     Alert.alert('Delete Contract', `Delete this ${(c.contractType || '').replace(/_/g, ' ')} contract? Payment records will also be removed.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await convexClient.action(owners.deleteContract, { id: c.id }); loadDetail(); }
+        try { await sb.deleteContract(c.id); loadDetail(); }
         catch (e: any) { Alert.alert('Error', e.message); }
       }},
     ]);
@@ -708,7 +709,7 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
       { text: 'Cancel', style: 'cancel' },
       { text: 'Regenerate', onPress: async () => {
         try {
-          await convexClient.action(owners.regenerateOwnerBills, { ownerId, mode: 'all' });
+          await sb.regenerateOwnerBills(ownerId, 'all');
           Alert.alert('Done', 'Bills regenerated.');
           if (tab === 'payments') loadPayments();
         } catch (e: any) { Alert.alert('Error', e.message); }
@@ -737,6 +738,46 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
     try {
       await Share.share({ message: csv, title: `${owner?.name} — Owner Payments` });
     } catch (_) { /* user cancelled */ }
+  };
+
+  // ── Import payments (CSV — web parity for the xlsx import) ──────────────────
+  const [importOpen, setImportOpen]   = useState(false);
+  const [importMode, setImportMode]   = useState<'append' | 'replace'>('append');
+  const [importing, setImporting]     = useState(false);
+
+  const downloadTemplate = async () => {
+    try { await ownerImport.downloadOwnerPaymentsTemplate(); }
+    catch (e: any) { Alert.alert('Template', e?.message || 'Could not share the template.'); }
+  };
+
+  const pickAndImport = async () => {
+    try {
+      const res: any = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'application/csv', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (res?.canceled) return;
+      const asset = res?.assets?.[0] || res; // SDK 58 returns { assets: [...] }
+      const uri = asset?.uri;
+      if (!uri) { Alert.alert('Import', 'Could not read the selected file.'); return; }
+      setImporting(true);
+      const csvText = await FileSystem.readAsStringAsync(uri, { encoding: 'utf8' as any });
+      const result = await ownerImport.importOwnerPayments({ ownerId, csvText, mode: importMode });
+      if ((result as any).success) {
+        const r: any = result;
+        Alert.alert('Import complete', `${r.inserted} payment(s) imported (${r.mode}).${r.skipped ? ` ${r.skipped} row(s) skipped.` : ''}`);
+        setImportOpen(false);
+        loadPayments();
+      } else if ((result as any).disabled) {
+        Alert.alert('Replace unavailable', (result as any).message);
+      } else {
+        Alert.alert('Import failed', (result as any).message || 'Unknown error.');
+      }
+    } catch (e: any) {
+      Alert.alert('Import failed', e?.message || String(e));
+    } finally {
+      setImporting(false);
+    }
   };
 
   const filteredContracts = (data?.contracts || []).filter((c: any) =>
@@ -967,6 +1008,11 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
                         <Ionicons name="refresh-outline" size={14} color="#0284C7" />
                         <Text style={{ fontSize: 12, fontWeight: '700', color: '#0284C7' }}>Regenerate</Text>
                       </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setImportMode('append'); setImportOpen(true); }}
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EEF1F6', borderRadius: 12 }}>
+                        <Ionicons name="cloud-upload-outline" size={14} color="#7C3AED" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#7C3AED' }}>Import</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -1045,6 +1091,51 @@ function OwnerDetailModal({ ownerId, onClose, onChanged }: { ownerId: string; on
           {showEditOwner && owner && (
             <OwnerFormModal mode="edit" initial={{ ...owner, full_name: owner.name }} onClose={() => setShowEditOwner(false)} onSaved={() => { setShowEditOwner(false); loadDetail(); onChanged(); }} />
           )}
+
+          {/* Import owner payments (CSV) */}
+          <Modal visible={importOpen} transparent animationType="fade" onRequestClose={() => { if (!importing) setImportOpen(false); }}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 24 }}>
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, padding: 18 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>Import Payments</Text>
+                  <TouchableOpacity onPress={() => !importing && setImportOpen(false)}><Ionicons name="close" size={22} color="#64748B" /></TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12, lineHeight: 18 }}>
+                  Upload a CSV of rental payments. Apartment codes must match this owner's contracts. Download the template for the exact columns.
+                </Text>
+
+                <TouchableOpacity onPress={downloadTemplate} disabled={importing}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, backgroundColor: '#F5F3FF', borderRadius: 12, marginBottom: 14 }}>
+                  <Ionicons name="download-outline" size={15} color="#7C3AED" />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#7C3AED' }}>Download CSV Template</Text>
+                </TouchableOpacity>
+
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#556274', marginBottom: 6 }}>IMPORT MODE</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+                  {(['append', 'replace'] as const).map(m => (
+                    <TouchableOpacity key={m} onPress={() => setImportMode(m)} disabled={importing}
+                      style={{ flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, alignItems: 'center',
+                        borderColor: importMode === m ? '#7C3AED' : '#E5E7EB', backgroundColor: importMode === m ? '#F5F3FF' : '#FFFFFF' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: importMode === m ? '#7C3AED' : '#64748B' }}>
+                        {m === 'append' ? 'Append' : 'Replace all'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {importMode === 'replace' && (
+                  <Text style={{ fontSize: 11, color: '#B45309', marginBottom: 14 }}>
+                    Replace clears this owner's existing payments first. This requires deletes to be enabled.
+                  </Text>
+                )}
+
+                <TouchableOpacity onPress={pickAndImport} disabled={importing}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, backgroundColor: importing ? '#A78BDA' : '#7C3AED', borderRadius: 12 }}>
+                  {importing ? <ActivityIndicator color="#fff" /> : <Ionicons name="cloud-upload-outline" size={16} color="#fff" />}
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>{importing ? 'Importing…' : 'Select CSV & Import'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       </GlassBackground>
     </Modal>
@@ -1108,7 +1199,7 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
 
   useEffect(() => {
     if (isEdit) return;
-    convexClient.action(owners.listApartmentsForContract, {})
+    sb.listApartmentsForContract()
       .then(setApts).catch(() => setApts([])).finally(() => setLoadingApts(false));
   }, [isEdit]);
 
@@ -1132,10 +1223,10 @@ function AddContractModal({ ownerId, ownerName, ownerGst, editTarget, renewFrom,
     try {
       const gstInfo = ownerGst?.trim() ? (form.rent_includes_gst ? 'Rent Includes GST' : 'Rent Excludes GST') : 'GST under RCM';
       if (isEdit) {
-        await convexClient.action(owners.updateContract, { id: editTarget.id, data: { ...form, gst_info: gstInfo } });
+        await sb.updateContract(editTarget.id, { ...form, gst_info: gstInfo });
         Alert.alert('Success', 'Contract updated.');
       } else {
-        await convexClient.action(owners.createOwnerContract, { ownerId, data: { ...form, gst_info: gstInfo } });
+        await sb.createOwnerContract(ownerId, { ...form, gst_info: gstInfo });
         Alert.alert('Success', `Contract created for ${form.apartment_ids.length} apartment(s).`);
       }
       onSaved();
@@ -1374,13 +1465,18 @@ export default function OwnersScreen() {
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
   const [unallottedOnly, setUnallottedOnly] = useState(false);
   const [properties, setProperties] = useState<any[]>([]);
+  // Render a capped page of owner cards (full list still loads + filters); mounting
+  // every card at once froze the UI thread. Reset the cap when a filter/search changes.
+  const OWNER_PAGE = 40;
+  const [rowLimit, setRowLimit] = useState(OWNER_PAGE);
+  useEffect(() => { setRowLimit(OWNER_PAGE); }, [search, propertyFilter, unallottedOnly]);
   const [showPropPicker, setShowPropPicker] = useState(false);
 
   const fetchOwners = useCallback(async () => {
     try {
       const [data, props] = await Promise.all([
-        convexClient.action(owners.listOwners, {}),
-        convexClient.action(owners.listPropertiesForFilter, {}).catch(() => []),
+        sb.listOwners(),
+        sb.listPropertiesForFilter().catch(() => []),
       ]);
       setOwnersList(data || []);
       setProperties(props || []);
@@ -1488,9 +1584,18 @@ export default function OwnersScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563EB" />}>
           {filtered.length === 0 ? (
             <EmptyState title={search ? 'No matches' : 'No Owners'} subtitle={search ? 'Try different search terms' : 'Tap Add to create your first owner'} icon="person-outline" />
-          ) : filtered.map(owner => (
+          ) : filtered.slice(0, rowLimit).map(owner => (
             <OwnerCard key={owner.id} owner={owner} onPress={() => setSelectedOwner(owner.id)} />
           ))}
+          {filtered.length > rowLimit && (
+            <TouchableOpacity
+              onPress={() => setRowLimit((n) => n + OWNER_PAGE)}
+              style={{ marginTop: 4, marginBottom: 8, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E6EBF2', backgroundColor: '#fff', alignItems: 'center' }}>
+              <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 13 }}>
+                Show more ({filtered.length - rowLimit} remaining)
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {/* Modals */}

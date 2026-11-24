@@ -3,5 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["convex", "node_modules"]
+  "exclude": ["convex", "node_modules", "supabase", "_node_modules_onedrive_bak"]
 }
